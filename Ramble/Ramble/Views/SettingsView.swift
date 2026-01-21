@@ -63,15 +63,26 @@ struct SettingsView: View {
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
 
-            HStack {
+            VStack(alignment: .leading, spacing: 8) {
                 Text("Auth Token")
-                Spacer()
-                Text(viewModel.webhookAuthToken.prefix(8) + "...")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                HStack {
+                    Text(viewModel.webhookAuthToken)
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundColor(.secondary)
+                        .textSelection(.enabled)
+                    Spacer()
+                    Button {
+                        HapticService.buttonTap()
+                        UIPasteboard.general.string = viewModel.webhookAuthToken
+                    } label: {
+                        Image(systemName: "doc.on.doc")
+                            .font(.caption)
+                    }
+                }
             }
 
             Button("Regenerate Token") {
+                HapticService.buttonTap()
                 viewModel.regenerateAuthToken()
             }
         } header: {

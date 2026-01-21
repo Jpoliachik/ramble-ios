@@ -64,6 +64,7 @@ final class RecordingViewModel: ObservableObject {
 
         do {
             try await audioRecorder.startRecording(to: recording.audioFileURL)
+            HapticService.recordStart()
         } catch {
             print("Failed to start recording: \(error)")
             currentRecording = nil
@@ -72,6 +73,7 @@ final class RecordingViewModel: ObservableObject {
 
     private func stopRecording() async {
         let duration = audioRecorder.stopRecording()
+        HapticService.recordStop()
 
         guard var recording = currentRecording else { return }
         recording.duration = duration

@@ -17,14 +17,16 @@ struct RecordingListView: View {
                 ForEach(recordingsByDay, id: \.date) { day in
                     Section {
                         ForEach(day.recordings) { recording in
-                            RecordingRowView(recording: recording)
-                                .swipeActions(edge: .trailing) {
-                                    Button(role: .destructive) {
-                                        onDelete(recording)
-                                    } label: {
-                                        Label("Delete", systemImage: "trash")
-                                    }
+                            NavigationLink(value: recording) {
+                                RecordingRowView(recording: recording)
+                            }
+                            .swipeActions(edge: .trailing) {
+                                Button(role: .destructive) {
+                                    onDelete(recording)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
                                 }
+                            }
                         }
                     } header: {
                         Text(DateFormatters.formatDayHeader(for: day.date))

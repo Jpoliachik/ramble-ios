@@ -13,7 +13,7 @@ enum TranscriptionStatus: String, Codable {
     case failed
 }
 
-struct Recording: Identifiable, Codable {
+struct Recording: Identifiable, Codable, Hashable {
     let id: UUID
     let createdAt: Date
     var duration: TimeInterval

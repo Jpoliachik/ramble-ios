@@ -10,48 +10,54 @@ struct MainView: View {
     @State private var showSettings = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Top bar
-            HStack {
-                Text("Ramble")
-                    .font(.largeTitle.bold())
-                Spacer()
-                SettingsButtonView {
-                    showSettings = true
-                }
-            }
-            .padding(.horizontal)
-            .padding(.top, 8)
-
-            // Recording list
-            RecordingListView(
-                recordingsByDay: viewModel.recordingsByDay,
-                onDelete: viewModel.deleteRecording
-            )
-
-            Divider()
-
-            // Bottom controls
-            RecordingControlsView(
-                isRecording: viewModel.isRecording,
-                duration: viewModel.currentDuration,
-                onToggleRecording: {
-                    Task {
-                        await viewModel.toggleRecording()
+        NavigationStack {
+            VStack(spacing: 0) {
+                // Top bar
+                HStack {
+                    Text("Ramble")
+                        .font(.largeTitle.bold())
+                    Spacer()
+                    SettingsButtonView {
+                        HapticService.buttonTap()
+                        showSettings = true
                     }
                 }
-            )
-            .background(Color(uiColor: .systemBackground))
-        }
-        .overlay(alignment: .top) {
-            if viewModel.showSavedConfirmation {
-                savedConfirmationView
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                .padding(.horizontal)
+                .padding(.top, 8)
+
+                // Recording list
+                RecordingListView(
+                    recordingsByDay: viewModel.recordingsByDay,
+                    onDelete: viewModel.deleteRecording
+                )
+
+                Divider()
+
+                // Bottom controls
+                RecordingControlsView(
+                    isRecording: viewModel.isRecording,
+                    duration: viewModel.currentDuration,
+                    onToggleRecording: {
+                        Task {
+                            await viewModel.toggleRecording()
+                        }
+                    }
+                )
+                .background(Color(uiColor: .systemBackground))
             }
-        }
-        .animation(.easeInOut(duration: 0.3), value: viewModel.showSavedConfirmation)
-        .sheet(isPresented: $showSettings) {
-            SettingsView()
+            .navigationDestination(for: Recording.self) { recording in
+                RecordingDetailView(recording: recording)
+            }
+            .overlay(alignment: .top) {
+                if viewModel.showSavedConfirmation {
+                    savedConfirmationView
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+            }
+            .animation(.easeInOut(duration: 0.3), value: viewModel.showSavedConfirmation)
+            .sheet(isPresented: $showSettings) {
+                SettingsView()
+            }
         }
     }
 

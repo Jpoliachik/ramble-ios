@@ -33,7 +33,7 @@ struct RecordButtonView: View {
             }
         }
         .buttonStyle(.plain)
-        .animation(.easeInOut(duration: 0.2), value: isRecording)
+        .animation(.easeInOut(duration: 0.08), value: isRecording)
         .onChange(of: isRecording) { _, newValue in
             if newValue {
                 startPulseAnimation()
@@ -45,7 +45,7 @@ struct RecordButtonView: View {
 
     private func startPulseAnimation() {
         withAnimation(
-            .easeInOut(duration: 0.8)
+            .easeInOut(duration: 0.5)
             .repeatForever(autoreverses: true)
         ) {
             pulseScale = 1.15

@@ -27,17 +27,12 @@ struct RecordingRowView: View {
                     statusView
                 }
 
-                // Transcription preview
+                // Transcription preview (1 line only)
                 if let transcription = recording.transcription, !transcription.isEmpty {
                     Text(transcription)
-                        .font(.body)
-                        .foregroundColor(.primary)
-                        .lineLimit(3)
-                } else if recording.transcriptionStatus == .pending {
-                    Text("Tap to transcribe")
-                        .font(.body)
+                        .font(.caption)
                         .foregroundColor(.secondary)
-                        .italic()
+                        .lineLimit(1)
                 }
             }
         }
