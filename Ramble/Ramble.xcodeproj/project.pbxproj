@@ -71,11 +71,21 @@
 			);
 			target = 8A290E3E2F2153180020317A /* widgetsExtension */;
 		};
+		8A290EAC2F215B590020317A /* Exceptions for "Ramble" folder in "Ramble" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 8A290E2C2F2152E10020317A /* Ramble */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		8A290E2F2F2152E10020317A /* Ramble */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				8A290EAC2F215B590020317A /* Exceptions for "Ramble" folder in "Ramble" target */,
+			);
 			path = Ramble;
 			sourceTree = "<group>";
 		};
@@ -459,6 +469,9 @@
 				DEVELOPMENT_TEAM = SW6VLKWS7Q;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Ramble/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Ramble needs microphone access to record your voice journals.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -491,6 +504,9 @@
 				DEVELOPMENT_TEAM = SW6VLKWS7Q;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Ramble/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Ramble needs microphone access to record your voice journals.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -584,6 +600,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = watch;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Ramble needs microphone access to record your voice journals.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = dev.goodloop.Ramble;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -617,6 +634,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = watch;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Ramble needs microphone access to record your voice journals.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = dev.goodloop.Ramble;
 				LD_RUNPATH_SEARCH_PATHS = (

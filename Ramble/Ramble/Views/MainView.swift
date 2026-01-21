@@ -1,0 +1,78 @@
+//
+//  MainView.swift
+//  Ramble
+//
+
+import SwiftUI
+
+struct MainView: View {
+    @StateObject private var viewModel = RecordingViewModel()
+    @State private var showSettings = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Top bar
+            HStack {
+                Text("Ramble")
+                    .font(.largeTitle.bold())
+                Spacer()
+                SettingsButtonView {
+                    showSettings = true
+                }
+            }
+            .padding(.horizontal)
+            .padding(.top, 8)
+
+            // Recording list
+            RecordingListView(
+                recordingsByDay: viewModel.recordingsByDay,
+                onDelete: viewModel.deleteRecording
+            )
+
+            Divider()
+
+            // Bottom controls
+            RecordingControlsView(
+                isRecording: viewModel.isRecording,
+                duration: viewModel.currentDuration,
+                onToggleRecording: {
+                    Task {
+                        await viewModel.toggleRecording()
+                    }
+                }
+            )
+            .background(Color(uiColor: .systemBackground))
+        }
+        .overlay(alignment: .top) {
+            if viewModel.showSavedConfirmation {
+                savedConfirmationView
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: viewModel.showSavedConfirmation)
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
+        }
+    }
+
+    private var savedConfirmationView: some View {
+        HStack {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundColor(.green)
+            Text("Saved")
+                .font(.subheadline.weight(.medium))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(
+            Capsule()
+                .fill(Color(uiColor: .secondarySystemBackground))
+                .shadow(radius: 4)
+        )
+        .padding(.top, 60)
+    }
+}
+
+#Preview {
+    MainView()
+}

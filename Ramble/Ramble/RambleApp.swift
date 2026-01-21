@@ -9,9 +9,21 @@ import SwiftUI
 
 @main
 struct RambleApp: App {
+    init() {
+        BackgroundTaskService.shared.registerBackgroundTasks()
+        _ = PhoneConnectivityService.shared
+    }
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            MainView()
+                .onReceive(
+                    NotificationCenter.default.publisher(
+                        for: UIApplication.didEnterBackgroundNotification
+                    )
+                ) { _ in
+                    BackgroundTaskService.shared.scheduleTranscriptionTask()
+                }
         }
     }
 }

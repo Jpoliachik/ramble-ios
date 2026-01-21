@@ -54,3 +54,6 @@ playground.xcworkspace
 .env
 *.env
 .env.*
+
+# API keys
+Ramble/Ramble/Secrets.swift
