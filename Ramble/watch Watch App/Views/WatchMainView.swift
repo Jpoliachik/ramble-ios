@@ -39,6 +39,7 @@ struct WatchMainView: View {
         .padding()
         .onAppear {
             subscribeToStopRequests()
+            connectivity.queryPhoneState()
         }
         .onDisappear {
             stopRequestCancellable?.cancel()

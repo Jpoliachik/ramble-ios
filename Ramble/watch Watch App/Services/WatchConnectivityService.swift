@@ -60,6 +60,11 @@ final class WatchConnectivityService: NSObject, ObservableObject {
         sendMessage(message)
     }
 
+    func queryPhoneState() {
+        let message: [String: Any] = ["type": "stateQuery"]
+        sendMessage(message)
+    }
+
     private func sendMessage(_ message: [String: Any]) {
         guard WCSession.default.activationState == .activated else { return }
 
@@ -89,6 +94,15 @@ final class WatchConnectivityService: NSObject, ObservableObject {
 
             case "stopRequest":
                 self.stopRequestReceived.send()
+
+            case "stateResponse":
+                let isRecording = message["isRecording"] as? Bool ?? false
+                if isRecording, let startTime = message["startTime"] as? TimeInterval {
+                    self.phoneRecordingStartTime = Date(timeIntervalSince1970: startTime)
+                } else {
+                    self.phoneRecordingStartTime = nil
+                }
+                self.phoneIsRecording = isRecording
 
             default:
                 break
@@ -133,8 +147,16 @@ extension WatchConnectivityService: WCSessionDelegate {
     ) {
         if let error = error {
             print("WCSession activation failed: \(error)")
-        } else {
-            print("WCSession activated: \(activationState.rawValue)")
+            return
+        }
+        print("WCSession activated: \(activationState.rawValue)")
+
+        // Load any pending state from application context
+        if activationState == .activated {
+            let context = session.receivedApplicationContext
+            if !context.isEmpty {
+                handleReceivedMessage(context)
+            }
         }
     }
 

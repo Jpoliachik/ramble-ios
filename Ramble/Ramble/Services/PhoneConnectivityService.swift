@@ -14,6 +14,10 @@ final class PhoneConnectivityService: NSObject, ObservableObject {
     @Published var watchIsRecording = false
     @Published var watchRecordingStartTime: Date?
 
+    // Phone's own recording state (for responding to watch queries)
+    private(set) var phoneIsRecording = false
+    private(set) var phoneRecordingStartTime: Date?
+
     // Signal when watch requests phone to stop recording
     let stopRequestReceived = PassthroughSubject<Void, Never>()
 
@@ -37,15 +41,19 @@ final class PhoneConnectivityService: NSObject, ObservableObject {
     // MARK: - Recording State Sync
 
     func sendRecordingStarted() {
+        phoneIsRecording = true
+        phoneRecordingStartTime = Date()
         let message: [String: Any] = [
             "type": "recordingStarted",
             "device": "phone",
-            "startTime": Date().timeIntervalSince1970
+            "startTime": phoneRecordingStartTime!.timeIntervalSince1970
         ]
         sendMessage(message)
     }
 
     func sendRecordingStopped() {
+        phoneIsRecording = false
+        phoneRecordingStartTime = nil
         let message: [String: Any] = [
             "type": "recordingStopped",
             "device": "phone"
@@ -89,10 +97,24 @@ final class PhoneConnectivityService: NSObject, ObservableObject {
             case "stopRequest":
                 self.stopRequestReceived.send()
 
+            case "stateQuery":
+                self.respondWithCurrentState()
+
             default:
                 break
             }
         }
+    }
+
+    private func respondWithCurrentState() {
+        var message: [String: Any] = [
+            "type": "stateResponse",
+            "isRecording": phoneIsRecording
+        ]
+        if let startTime = phoneRecordingStartTime {
+            message["startTime"] = startTime.timeIntervalSince1970
+        }
+        sendMessage(message)
     }
 }
 
@@ -104,8 +126,16 @@ extension PhoneConnectivityService: WCSessionDelegate {
     ) {
         if let error = error {
             print("Phone WCSession activation failed: \(error)")
-        } else {
-            print("Phone WCSession activated: \(activationState.rawValue)")
+            return
+        }
+        print("Phone WCSession activated: \(activationState.rawValue)")
+
+        // Load any pending state from application context
+        if activationState == .activated {
+            let context = session.receivedApplicationContext
+            if !context.isEmpty {
+                handleReceivedMessage(context)
+            }
         }
     }
 
