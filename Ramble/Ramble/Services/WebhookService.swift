@@ -12,13 +12,24 @@ final class WebhookService {
 
     private init() {}
 
-    func sendRecording(_ recording: Recording) async {
+    var isWebhookConfigured: Bool {
+        let settings = settingsService.load()
+        guard let url = settings.webhookURL, !url.isEmpty else { return false }
+        return URL(string: url) != nil
+    }
+
+    var currentWebhookURL: String? {
+        let settings = settingsService.load()
+        return settings.webhookURL
+    }
+
+    func sendRecording(_ recording: Recording) async -> WebhookAttempt? {
         let settings = settingsService.load()
 
         guard let webhookURLString = settings.webhookURL,
               !webhookURLString.isEmpty,
               let webhookURL = URL(string: webhookURLString) else {
-            return
+            return nil
         }
 
         var request = URLRequest(url: webhookURL)
@@ -33,16 +44,32 @@ final class WebhookService {
             transcription: recording.transcription
         )
 
-        guard let data = try? JSONEncoder().encode(payload) else { return }
+        guard let data = try? JSONEncoder().encode(payload) else {
+            return WebhookAttempt(
+                url: webhookURLString,
+                success: false,
+                errorMessage: "Failed to encode payload"
+            )
+        }
         request.httpBody = data
 
         do {
             let (_, response) = try await URLSession.shared.data(for: request)
             if let httpResponse = response as? HTTPURLResponse {
-                print("Webhook response: \(httpResponse.statusCode)")
+                let success = (200...299).contains(httpResponse.statusCode)
+                return WebhookAttempt(
+                    url: webhookURLString,
+                    success: success,
+                    statusCode: httpResponse.statusCode
+                )
             }
+            return WebhookAttempt(url: webhookURLString, success: false, errorMessage: "No response")
         } catch {
-            print("Webhook failed: \(error)")
+            return WebhookAttempt(
+                url: webhookURLString,
+                success: false,
+                errorMessage: error.localizedDescription
+            )
         }
     }
 }

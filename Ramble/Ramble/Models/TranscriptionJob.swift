@@ -18,5 +18,14 @@ struct TranscriptionJob: Identifiable, Codable {
         self.createdAt = Date()
     }
 
-    static let maxRetries = 3
+    static let maxRetries = 5
+
+    /// Calculates delay in nanoseconds using exponential backoff
+    /// Retry 1: 5s, Retry 2: 15s, Retry 3: 45s, Retry 4: 90s, Retry 5: 180s
+    var retryDelayNanoseconds: UInt64 {
+        let baseDelay: UInt64 = 5_000_000_000 // 5 seconds
+        let multiplier = UInt64(pow(Double(3), Double(retryCount)))
+        let maxDelay: UInt64 = 180_000_000_000 // Cap at 3 minutes
+        return min(baseDelay * multiplier, maxDelay)
+    }
 }

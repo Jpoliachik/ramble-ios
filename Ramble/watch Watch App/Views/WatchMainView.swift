@@ -62,8 +62,10 @@ struct WatchMainView: View {
 
     private func toggleRecording() async {
         if audioRecorder.isRecording {
+            WatchHapticService.recordStop()
             await stopAndTransfer()
         } else {
+            WatchHapticService.recordStart()
             await startRecording()
         }
     }

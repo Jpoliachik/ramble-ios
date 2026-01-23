@@ -39,6 +39,30 @@ final class TranscriptionQueueService: ObservableObject {
         processNextIfNeeded()
     }
 
+    /// Manually retry a failed transcription by re-enqueuing it
+    func retryTranscription(for recordingId: UUID) {
+        // Reset the recording status and clear any previous error
+        var recordings = storageService.loadRecordings()
+        guard let idx = recordings.firstIndex(where: { $0.id == recordingId }) else { return }
+
+        recordings[idx].transcriptionStatus = .pending
+        recordings[idx].lastTranscriptionError = nil
+        storageService.saveRecordings(recordings)
+
+        // Enqueue a fresh job (retryCount starts at 0)
+        enqueue(recordingId: recordingId)
+    }
+
+    func retryWebhook(for recordingId: UUID) async {
+        var recordings = storageService.loadRecordings()
+        guard let idx = recordings.firstIndex(where: { $0.id == recordingId }) else { return }
+
+        if let attempt = await webhookService.sendRecording(recordings[idx]) {
+            recordings[idx].webhookAttempts.append(attempt)
+            storageService.saveRecordings(recordings)
+        }
+    }
+
     private func processJob(_ job: TranscriptionJob) {
         isProcessing = true
 
@@ -66,10 +90,14 @@ final class TranscriptionQueueService: ObservableObject {
                 if let idx = updatedRecordings.firstIndex(where: { $0.id == job.recordingId }) {
                     updatedRecordings[idx].transcription = transcription
                     updatedRecordings[idx].transcriptionStatus = .completed
-                    storageService.saveRecordings(updatedRecordings)
+                    updatedRecordings[idx].lastTranscriptionError = nil
 
-                    // Send to webhook
-                    await webhookService.sendRecording(updatedRecordings[idx])
+                    // Send to webhook and record attempt
+                    if let attempt = await webhookService.sendRecording(updatedRecordings[idx]) {
+                        updatedRecordings[idx].webhookAttempts.append(attempt)
+                    }
+
+                    storageService.saveRecordings(updatedRecordings)
                 }
 
                 removeJob(job)
@@ -77,13 +105,15 @@ final class TranscriptionQueueService: ObservableObject {
                 processNextIfNeeded()
 
             } catch {
-                print("Transcription failed: \(error)")
+                let errorMessage = String(describing: error)
+                print("Transcription failed: \(errorMessage)")
 
                 var updatedJob = job
                 updatedJob.retryCount += 1
 
                 var updatedRecordings = storageService.loadRecordings()
                 if let idx = updatedRecordings.firstIndex(where: { $0.id == job.recordingId }) {
+                    updatedRecordings[idx].lastTranscriptionError = errorMessage
                     if updatedJob.retryCount >= TranscriptionJob.maxRetries {
                         updatedRecordings[idx].transcriptionStatus = .failed
                         removeJob(job)
@@ -97,7 +127,9 @@ final class TranscriptionQueueService: ObservableObject {
                 isProcessing = false
 
                 if updatedJob.retryCount < TranscriptionJob.maxRetries {
-                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    let delay = updatedJob.retryDelayNanoseconds
+                    print("Retrying in \(delay / 1_000_000_000) seconds (attempt \(updatedJob.retryCount + 1)/\(TranscriptionJob.maxRetries))")
+                    try? await Task.sleep(nanoseconds: delay)
                     processNextIfNeeded()
                 } else {
                     processNextIfNeeded()

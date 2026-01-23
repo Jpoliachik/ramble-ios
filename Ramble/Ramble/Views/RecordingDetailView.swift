@@ -6,21 +6,36 @@
 import SwiftUI
 
 struct RecordingDetailView: View {
-    let recording: Recording
+    let recordingId: UUID
+    @State private var recording: Recording?
     @State private var showCopied = false
+    @State private var isRetryingWebhook = false
+    @State private var isRetryingTranscription = false
+
+    private let storageService = StorageService.shared
+    private let transcriptionQueue = TranscriptionQueueService.shared
+    private let webhookService = WebhookService.shared
+
+    init(recording: Recording) {
+        self.recordingId = recording.id
+        self._recording = State(initialValue: recording)
+    }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                // Metadata section
-                metadataSection
+            if let recording = recording {
+                VStack(alignment: .leading, spacing: 20) {
+                    metadataSection(recording)
+                    Divider()
+                    transcriptSection(recording)
 
-                Divider()
-
-                // Transcript section
-                transcriptSection
+                    if webhookService.isWebhookConfigured {
+                        Divider()
+                        webhookSection(recording)
+                    }
+                }
+                .padding()
             }
-            .padding()
         }
         .navigationTitle("Recording")
         .navigationBarTitleDisplayMode(.inline)
@@ -31,9 +46,15 @@ struct RecordingDetailView: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: showCopied)
+        .onAppear { refreshRecording() }
     }
 
-    private var metadataSection: some View {
+    private func refreshRecording() {
+        let recordings = storageService.loadRecordings()
+        recording = recordings.first { $0.id == recordingId }
+    }
+
+    private func metadataSection(_ recording: Recording) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Label(
@@ -63,12 +84,12 @@ struct RecordingDetailView: View {
 
                 Spacer()
 
-                statusBadge
+                statusBadge(for: recording)
             }
         }
     }
 
-    private var statusBadge: some View {
+    private func statusBadge(for recording: Recording) -> some View {
         HStack(spacing: 4) {
             switch recording.transcriptionStatus {
             case .pending:
@@ -96,7 +117,7 @@ struct RecordingDetailView: View {
         .foregroundColor(.secondary)
     }
 
-    private var transcriptSection: some View {
+    private func transcriptSection(_ recording: Recording) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Transcript")
@@ -125,15 +146,55 @@ struct RecordingDetailView: View {
                     .font(.body)
                     .textSelection(.enabled)
             } else {
-                Text(transcriptPlaceholder)
+                Text(transcriptPlaceholder(for: recording))
                     .font(.body)
                     .foregroundColor(.secondary)
                     .italic()
             }
+
+            if recording.transcriptionStatus == .failed {
+                if let error = recording.lastTranscriptionError {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Error:")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.red)
+                        Text(error)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.red.opacity(0.1))
+                    .cornerRadius(8)
+                }
+
+                Button {
+                    HapticService.buttonTap()
+                    isRetryingTranscription = true
+                    transcriptionQueue.retryTranscription(for: recording.id)
+                    refreshRecording()
+                    isRetryingTranscription = false
+                } label: {
+                    HStack {
+                        if isRetryingTranscription {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                        Text("Retry Transcription")
+                    }
+                    .font(.subheadline)
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(isRetryingTranscription)
+            }
         }
     }
 
-    private var transcriptPlaceholder: String {
+    private func transcriptPlaceholder(for recording: Recording) -> String {
         switch recording.transcriptionStatus {
         case .pending:
             return "Transcription pending..."
@@ -146,6 +207,84 @@ struct RecordingDetailView: View {
         case .failed:
             return "Transcription failed. Please try again."
         }
+    }
+
+    private func webhookSection(_ recording: Recording) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Webhook")
+                .font(.headline)
+
+            if recording.webhookAttempts.isEmpty {
+                Text("No webhook attempts yet")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .italic()
+            } else {
+                ForEach(recording.webhookAttempts) { attempt in
+                    webhookAttemptRow(attempt)
+                }
+            }
+
+            Button {
+                HapticService.buttonTap()
+                isRetryingWebhook = true
+                Task {
+                    await transcriptionQueue.retryWebhook(for: recording.id)
+                    refreshRecording()
+                    isRetryingWebhook = false
+                }
+            } label: {
+                HStack {
+                    if isRetryingWebhook {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    Text(recording.webhookAttempts.isEmpty ? "Send Webhook" : "Retry Webhook")
+                }
+                .font(.subheadline)
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .disabled(isRetryingWebhook)
+        }
+    }
+
+    private func webhookAttemptRow(_ attempt: WebhookAttempt) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: attempt.success ? "checkmark.circle.fill" : "xmark.circle.fill")
+                .foregroundColor(attempt.success ? .green : .red)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(attempt.url)
+                    .font(.system(.caption, design: .monospaced))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+
+                HStack(spacing: 8) {
+                    Text(DateFormatters.timeFormatter.string(from: attempt.timestamp))
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+
+                    if let statusCode = attempt.statusCode {
+                        Text("HTTP \(statusCode)")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+
+                    if let error = attempt.errorMessage, !attempt.success {
+                        Text(error)
+                            .font(.caption2)
+                            .foregroundColor(.red)
+                            .lineLimit(1)
+                    }
+                }
+            }
+
+            Spacer()
+        }
+        .padding(.vertical, 4)
     }
 
     private var copiedConfirmation: some View {
@@ -170,8 +309,12 @@ struct RecordingDetailView: View {
     NavigationStack {
         RecordingDetailView(recording: Recording(
             duration: 125,
-            transcription: "This is a sample transcription that shows what the full text might look like. It could be quite long with multiple sentences describing various topics discussed during the recording session.",
-            transcriptionStatus: .completed
+            transcription: "This is a sample transcription.",
+            transcriptionStatus: .completed,
+            webhookAttempts: [
+                WebhookAttempt(url: "https://example.com/webhook", success: true, statusCode: 200),
+                WebhookAttempt(url: "https://example.com/webhook", success: false, statusCode: 500)
+            ]
         ))
     }
 }
