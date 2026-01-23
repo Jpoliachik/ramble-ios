@@ -14,15 +14,27 @@ final class RecordingViewModel: ObservableObject {
     @Published private(set) var currentDuration: TimeInterval = 0
     @Published var showSavedConfirmation = false
 
+    // Watch recording state (exposed from connectivity)
+    @Published private(set) var watchIsRecording = false
+    @Published private(set) var watchRecordingStartTime: Date?
+
     private let audioRecorder = AudioRecorderService()
     private let storageService = StorageService.shared
     private let transcriptionQueue = TranscriptionQueueService.shared
+    private let connectivity = PhoneConnectivityService.shared
     private var currentRecording: Recording?
     private var refreshTimer: Timer?
+    private var cancellables = Set<AnyCancellable>()
+
+    var watchRecordingDuration: TimeInterval {
+        guard let startTime = watchRecordingStartTime else { return 0 }
+        return Date().timeIntervalSince(startTime)
+    }
 
     init() {
         loadRecordings()
         observeRecorder()
+        observeConnectivity()
         startRefreshTimer()
         transcriptionQueue.resumePendingJobs()
     }
@@ -30,6 +42,31 @@ final class RecordingViewModel: ObservableObject {
     private func observeRecorder() {
         audioRecorder.$isRecording.assign(to: &$isRecording)
         audioRecorder.$currentDuration.assign(to: &$currentDuration)
+    }
+
+    private func observeConnectivity() {
+        connectivity.$watchIsRecording
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$watchIsRecording)
+
+        connectivity.$watchRecordingStartTime
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$watchRecordingStartTime)
+
+        connectivity.stopRequestReceived
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in
+                Task {
+                    await self?.stopRecordingFromWatch()
+                }
+            }
+            .store(in: &cancellables)
+    }
+
+    private func stopRecordingFromWatch() async {
+        guard isRecording else { return }
+        HapticService.recordStop()
+        await stopRecording()
     }
 
     private func startRefreshTimer() {
@@ -66,6 +103,7 @@ final class RecordingViewModel: ObservableObject {
 
         do {
             try await audioRecorder.startRecording(to: recording.audioFileURL)
+            connectivity.sendRecordingStarted()
         } catch {
             print("Failed to start recording: \(error)")
             currentRecording = nil
@@ -74,6 +112,7 @@ final class RecordingViewModel: ObservableObject {
 
     private func stopRecording() async {
         let duration = audioRecorder.stopRecording()
+        connectivity.sendRecordingStopped()
 
         guard var recording = currentRecording else { return }
         recording.duration = duration
@@ -89,6 +128,10 @@ final class RecordingViewModel: ObservableObject {
         showSavedConfirmation = true
         try? await Task.sleep(nanoseconds: 1_500_000_000)
         showSavedConfirmation = false
+    }
+
+    func stopWatchRecording() {
+        connectivity.requestWatchStopRecording()
     }
 
     func deleteRecording(_ recording: Recording) {

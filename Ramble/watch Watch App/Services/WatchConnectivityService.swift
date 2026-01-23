@@ -13,6 +13,13 @@ final class WatchConnectivityService: NSObject, ObservableObject {
     @Published var isTransferring = false
     @Published var lastTransferSuccess: Bool?
 
+    // Phone recording state
+    @Published var phoneIsRecording = false
+    @Published var phoneRecordingStartTime: Date?
+
+    // Signal when phone requests watch to stop recording
+    let stopRequestReceived = PassthroughSubject<Void, Never>()
+
     private var pendingTransfers: [WCSessionFileTransfer] = []
 
     override init() {
@@ -27,6 +34,66 @@ final class WatchConnectivityService: NSObject, ObservableObject {
         let recordingId: String
         let createdAt: Date
         let duration: TimeInterval
+    }
+
+    // MARK: - Recording State Sync
+
+    func sendRecordingStarted() {
+        let message: [String: Any] = [
+            "type": "recordingStarted",
+            "device": "watch",
+            "startTime": Date().timeIntervalSince1970
+        ]
+        sendMessage(message)
+    }
+
+    func sendRecordingStopped() {
+        let message: [String: Any] = [
+            "type": "recordingStopped",
+            "device": "watch"
+        ]
+        sendMessage(message)
+    }
+
+    func requestPhoneStopRecording() {
+        let message: [String: Any] = ["type": "stopRequest"]
+        sendMessage(message)
+    }
+
+    private func sendMessage(_ message: [String: Any]) {
+        guard WCSession.default.activationState == .activated else { return }
+
+        if WCSession.default.isReachable {
+            WCSession.default.sendMessage(message, replyHandler: nil) { error in
+                print("Failed to send message: \(error)")
+            }
+        } else {
+            try? WCSession.default.updateApplicationContext(message)
+        }
+    }
+
+    private func handleReceivedMessage(_ message: [String: Any]) {
+        guard let type = message["type"] as? String else { return }
+
+        Task { @MainActor in
+            switch type {
+            case "recordingStarted":
+                if let startTime = message["startTime"] as? TimeInterval {
+                    self.phoneRecordingStartTime = Date(timeIntervalSince1970: startTime)
+                }
+                self.phoneIsRecording = true
+
+            case "recordingStopped":
+                self.phoneIsRecording = false
+                self.phoneRecordingStartTime = nil
+
+            case "stopRequest":
+                self.stopRequestReceived.send()
+
+            default:
+                break
+            }
+        }
     }
 
     func transferRecording(url: URL, duration: TimeInterval) {
@@ -69,6 +136,17 @@ extension WatchConnectivityService: WCSessionDelegate {
         } else {
             print("WCSession activated: \(activationState.rawValue)")
         }
+    }
+
+    func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
+        handleReceivedMessage(message)
+    }
+
+    func session(
+        _ session: WCSession,
+        didReceiveApplicationContext applicationContext: [String: Any]
+    ) {
+        handleReceivedMessage(applicationContext)
     }
 
     func session(_ session: WCSession, didFinish fileTransfer: WCSessionFileTransfer, error: Error?) {
