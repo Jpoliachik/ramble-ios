@@ -63,32 +63,14 @@ struct SettingsView: View {
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Auth Token")
-                HStack {
-                    Text(viewModel.webhookAuthToken)
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundColor(.secondary)
-                        .textSelection(.enabled)
-                    Spacer()
-                    Button {
-                        HapticService.buttonTap()
-                        UIPasteboard.general.string = viewModel.webhookAuthToken
-                    } label: {
-                        Image(systemName: "doc.on.doc")
-                            .font(.caption)
-                    }
-                }
-            }
-
-            Button("Regenerate Token") {
-                HapticService.buttonTap()
-                viewModel.regenerateAuthToken()
-            }
+            TextField("Bearer token (optional)", text: $viewModel.webhookAuthToken)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .font(.system(.body, design: .monospaced))
         } header: {
             Text("Webhook")
         } footer: {
-            Text("Completed transcriptions will be POSTed to this URL with the auth token in the Authorization header.")
+            Text("Completed transcriptions will be POSTed to this URL. If a token is provided, it will be sent as a Bearer token in the Authorization header.")
         }
     }
 

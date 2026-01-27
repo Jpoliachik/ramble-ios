@@ -7,11 +7,11 @@ import Foundation
 
 struct Settings: Codable {
     var webhookURL: String?
-    var webhookAuthToken: String
+    var webhookAuthToken: String?
 
     init(webhookURL: String? = nil, webhookAuthToken: String? = nil) {
         self.webhookURL = webhookURL
-        self.webhookAuthToken = webhookAuthToken ?? UUID().uuidString
+        self.webhookAuthToken = webhookAuthToken
     }
 
     static let `default` = Settings()

@@ -6,31 +6,30 @@
 import UIKit
 
 enum HapticService {
-    static func impact(_ style: UIImpactFeedbackGenerator.FeedbackStyle = .medium) {
-        let generator = UIImpactFeedbackGenerator(style: style)
-        generator.impactOccurred()
+    // Pre-allocated generators for instant haptics
+    private static let heavyGenerator = UIImpactFeedbackGenerator(style: .heavy)
+    private static let lightGenerator = UIImpactFeedbackGenerator(style: .light)
+    private static let notificationGenerator = UINotificationFeedbackGenerator()
+
+    /// Call once at app launch to wake the Taptic Engine
+    static func prepare() {
+        heavyGenerator.prepare()
+        lightGenerator.prepare()
+        notificationGenerator.prepare()
     }
 
-    static func notification(_ type: UINotificationFeedbackGenerator.FeedbackType) {
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(type)
-    }
-
-    static func selection() {
-        let generator = UISelectionFeedbackGenerator()
-        generator.selectionChanged()
-    }
-
-    // Convenience methods
     static func recordStart() {
-        impact(.heavy)
+        heavyGenerator.impactOccurred()
+        heavyGenerator.prepare()
     }
 
     static func recordStop() {
-        notification(.success)
+        notificationGenerator.notificationOccurred(.success)
+        notificationGenerator.prepare()
     }
 
     static func buttonTap() {
-        impact(.light)
+        lightGenerator.impactOccurred()
+        lightGenerator.prepare()
     }
 }

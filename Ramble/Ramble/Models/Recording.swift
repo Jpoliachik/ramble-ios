@@ -20,14 +20,22 @@ struct WebhookAttempt: Codable, Hashable, Identifiable {
     let success: Bool
     let statusCode: Int?
     let errorMessage: String?
+    let durationMs: Int?
 
-    init(url: String, success: Bool, statusCode: Int? = nil, errorMessage: String? = nil) {
+    init(
+        url: String,
+        success: Bool,
+        statusCode: Int? = nil,
+        errorMessage: String? = nil,
+        durationMs: Int? = nil
+    ) {
         self.id = UUID()
         self.url = url
         self.timestamp = Date()
         self.success = success
         self.statusCode = statusCode
         self.errorMessage = errorMessage
+        self.durationMs = durationMs
     }
 }
 

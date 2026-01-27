@@ -11,20 +11,43 @@ import Foundation
 final class AudioRecorderService: NSObject, ObservableObject {
     @Published private(set) var isRecording = false
     @Published private(set) var currentDuration: TimeInterval = 0
+    @Published private(set) var inputSourceName: String?
+    @Published private(set) var audioLevel: Float = 0
 
     private var audioRecorder: AVAudioRecorder?
     private var recordingStartTime: Date?
     private var timer: Timer?
     private var currentRecordingURL: URL?
 
+    private var isSessionActive = false
+
     override init() {
         super.init()
+        prepareAudioSession()
     }
 
-    func startRecording(to url: URL) async throws {
+    /// Pre-warm the audio session so record starts instantly
+    func prepareAudioSession() {
+        guard !isSessionActive else { return }
         let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
-        try session.setActive(true)
+        do {
+            try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
+            try session.setActive(true)
+            isSessionActive = true
+        } catch {
+            print("Failed to prepare audio session: \(error)")
+        }
+    }
+
+    func startRecording(to url: URL) throws {
+        let session = AVAudioSession.sharedInstance()
+
+        // Ensure session is active (should already be from init)
+        if !isSessionActive {
+            try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
+            try session.setActive(true)
+            isSessionActive = true
+        }
 
         let settings: [String: Any] = [
             AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
@@ -34,6 +57,7 @@ final class AudioRecorderService: NSObject, ObservableObject {
         ]
 
         audioRecorder = try AVAudioRecorder(url: url, settings: settings)
+        audioRecorder?.isMeteringEnabled = true
         audioRecorder?.delegate = self
         audioRecorder?.record()
 
@@ -41,6 +65,7 @@ final class AudioRecorderService: NSObject, ObservableObject {
         recordingStartTime = Date()
         isRecording = true
         currentDuration = 0
+        inputSourceName = session.currentRoute.inputs.first?.portName
 
         startTimer()
     }
@@ -56,6 +81,8 @@ final class AudioRecorderService: NSObject, ObservableObject {
         currentDuration = 0
         recordingStartTime = nil
         currentRecordingURL = nil
+        inputSourceName = nil
+        audioLevel = 0
 
         return duration
     }
@@ -65,8 +92,16 @@ final class AudioRecorderService: NSObject, ObservableObject {
             Task { @MainActor in
                 guard let self = self, let startTime = self.recordingStartTime else { return }
                 self.currentDuration = Date().timeIntervalSince(startTime)
+                self.audioRecorder?.updateMeters()
+                let dB = self.audioRecorder?.averagePower(forChannel: 0) ?? -160
+                self.audioLevel = Self.normalizeAudioLevel(dB)
             }
         }
+    }
+
+    private static func normalizeAudioLevel(_ dB: Float) -> Float {
+        // Map -50dB..0dB to 0..1, clamp
+        max(0, min(1, (dB + 50) / 50))
     }
 
     func requestPermission() async -> Bool {

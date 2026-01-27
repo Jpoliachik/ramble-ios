@@ -35,13 +35,15 @@ final class WebhookService {
         var request = URLRequest(url: webhookURL)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(settings.webhookAuthToken)", forHTTPHeaderField: "Authorization")
+        if let authToken = settings.webhookAuthToken, !authToken.isEmpty {
+            request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
+        }
 
         let payload = WebhookPayload(
             id: recording.id.uuidString,
             createdAt: ISO8601DateFormatter().string(from: recording.createdAt),
             duration: recording.duration,
-            transcription: recording.transcription
+            transcript: recording.transcription
         )
 
         guard let data = try? JSONEncoder().encode(payload) else {
@@ -53,22 +55,27 @@ final class WebhookService {
         }
         request.httpBody = data
 
+        let startTime = Date()
         do {
             let (_, response) = try await URLSession.shared.data(for: request)
+            let durationMs = Int(Date().timeIntervalSince(startTime) * 1000)
             if let httpResponse = response as? HTTPURLResponse {
                 let success = (200...299).contains(httpResponse.statusCode)
                 return WebhookAttempt(
                     url: webhookURLString,
                     success: success,
-                    statusCode: httpResponse.statusCode
+                    statusCode: httpResponse.statusCode,
+                    durationMs: durationMs
                 )
             }
-            return WebhookAttempt(url: webhookURLString, success: false, errorMessage: "No response")
+            return WebhookAttempt(url: webhookURLString, success: false, errorMessage: "No response", durationMs: durationMs)
         } catch {
+            let durationMs = Int(Date().timeIntervalSince(startTime) * 1000)
             return WebhookAttempt(
                 url: webhookURLString,
                 success: false,
-                errorMessage: error.localizedDescription
+                errorMessage: error.localizedDescription,
+                durationMs: durationMs
             )
         }
     }
@@ -78,5 +85,5 @@ private struct WebhookPayload: Encodable {
     let id: String
     let createdAt: String
     let duration: TimeInterval
-    let transcription: String?
+    let transcript: String?
 }

@@ -23,21 +23,16 @@ final class SettingsViewModel: ObservableObject {
     func load() {
         let settings = settingsService.load()
         webhookURL = settings.webhookURL ?? ""
-        webhookAuthToken = settings.webhookAuthToken
+        webhookAuthToken = settings.webhookAuthToken ?? ""
         loadStats()
     }
 
     func save() {
         let settings = Settings(
             webhookURL: webhookURL.isEmpty ? nil : webhookURL,
-            webhookAuthToken: webhookAuthToken
+            webhookAuthToken: webhookAuthToken.isEmpty ? nil : webhookAuthToken
         )
         settingsService.save(settings)
-    }
-
-    func regenerateAuthToken() {
-        webhookAuthToken = UUID().uuidString
-        save()
     }
 
     private func loadStats() {

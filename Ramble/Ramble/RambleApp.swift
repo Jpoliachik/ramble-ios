@@ -12,6 +12,7 @@ struct RambleApp: App {
     init() {
         BackgroundTaskService.shared.registerBackgroundTasks()
         _ = PhoneConnectivityService.shared
+        HapticService.prepare()
     }
 
     var body: some Scene {

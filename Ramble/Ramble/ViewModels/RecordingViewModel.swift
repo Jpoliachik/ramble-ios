@@ -3,6 +3,7 @@
 //  Ramble
 //
 
+import AVFoundation
 import Combine
 import Foundation
 import SwiftUI
@@ -12,6 +13,8 @@ final class RecordingViewModel: ObservableObject {
     @Published private(set) var recordings: [Recording] = []
     @Published private(set) var isRecording = false
     @Published private(set) var currentDuration: TimeInterval = 0
+    @Published private(set) var inputSourceName: String?
+    @Published private(set) var audioLevel: Float = 0
     @Published var showSavedConfirmation = false
 
     // Watch recording state (exposed from connectivity)
@@ -42,6 +45,8 @@ final class RecordingViewModel: ObservableObject {
     private func observeRecorder() {
         audioRecorder.$isRecording.assign(to: &$isRecording)
         audioRecorder.$currentDuration.assign(to: &$currentDuration)
+        audioRecorder.$inputSourceName.assign(to: &$inputSourceName)
+        audioRecorder.$audioLevel.assign(to: &$audioLevel)
     }
 
     private func observeConnectivity() {
@@ -56,17 +61,17 @@ final class RecordingViewModel: ObservableObject {
         connectivity.stopRequestReceived
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in
-                Task {
-                    await self?.stopRecordingFromWatch()
+                Task { @MainActor in
+                    self?.stopRecordingFromWatch()
                 }
             }
             .store(in: &cancellables)
     }
 
-    private func stopRecordingFromWatch() async {
+    private func stopRecordingFromWatch() {
         guard isRecording else { return }
         HapticService.recordStop()
-        await stopRecording()
+        stopRecording()
     }
 
     private func startRefreshTimer() {
@@ -84,7 +89,10 @@ final class RecordingViewModel: ObservableObject {
     func toggleRecording() async {
         if isRecording {
             HapticService.recordStop()
-            await stopRecording()
+            stopRecording()
+            showSavedConfirmation = true
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            showSavedConfirmation = false
         } else {
             HapticService.recordStart()
             await startRecording()
@@ -92,8 +100,15 @@ final class RecordingViewModel: ObservableObject {
     }
 
     private func startRecording() async {
-        let granted = await audioRecorder.requestPermission()
-        guard granted else {
+        // Check permission synchronously first; only prompt if undetermined
+        let session = AVAudioSession.sharedInstance()
+        if session.recordPermission == .undetermined {
+            let granted = await audioRecorder.requestPermission()
+            guard granted else {
+                print("Microphone permission denied")
+                return
+            }
+        } else if session.recordPermission == .denied {
             print("Microphone permission denied")
             return
         }
@@ -102,7 +117,7 @@ final class RecordingViewModel: ObservableObject {
         currentRecording = recording
 
         do {
-            try await audioRecorder.startRecording(to: recording.audioFileURL)
+            try audioRecorder.startRecording(to: recording.audioFileURL)
             connectivity.sendRecordingStarted()
         } catch {
             print("Failed to start recording: \(error)")
@@ -110,7 +125,7 @@ final class RecordingViewModel: ObservableObject {
         }
     }
 
-    private func stopRecording() async {
+    private func stopRecording() {
         let duration = audioRecorder.stopRecording()
         connectivity.sendRecordingStopped()
 
@@ -124,10 +139,6 @@ final class RecordingViewModel: ObservableObject {
         transcriptionQueue.enqueue(recordingId: recording.id)
 
         currentRecording = nil
-
-        showSavedConfirmation = true
-        try? await Task.sleep(nanoseconds: 1_500_000_000)
-        showSavedConfirmation = false
     }
 
     func stopWatchRecording() {

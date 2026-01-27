@@ -45,9 +45,12 @@ final class StorageService {
         return recordings.sorted { $0.createdAt > $1.createdAt }
     }
 
+    static let recordingsDidChangeNotification = Notification.Name("recordingsDidChange")
+
     func saveRecordings(_ recordings: [Recording]) {
         guard let data = try? encoder.encode(recordings) else { return }
         try? data.write(to: recordingsFile)
+        NotificationCenter.default.post(name: Self.recordingsDidChangeNotification, object: nil)
     }
 
     func addRecording(_ recording: Recording) {

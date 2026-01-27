@@ -47,6 +47,9 @@ struct RecordingDetailView: View {
         }
         .animation(.easeInOut(duration: 0.2), value: showCopied)
         .onAppear { refreshRecording() }
+        .onReceive(NotificationCenter.default.publisher(for: StorageService.recordingsDidChangeNotification)) { _ in
+            refreshRecording()
+        }
     }
 
     private func refreshRecording() {
@@ -152,45 +155,78 @@ struct RecordingDetailView: View {
                     .italic()
             }
 
-            if recording.transcriptionStatus == .failed {
-                if let error = recording.lastTranscriptionError {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Error:")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundColor(.red)
-                        Text(error)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.red.opacity(0.1))
-                    .cornerRadius(8)
+            if isTranscribing(recording) {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text(transcriptionProgressLabel(for: recording))
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
                 }
+                .padding(.vertical, 4)
+            }
 
-                Button {
-                    HapticService.buttonTap()
-                    isRetryingTranscription = true
-                    transcriptionQueue.retryTranscription(for: recording.id)
+            if recording.transcriptionStatus == .failed, let error = recording.lastTranscriptionError {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Error:")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.red)
+                    Text(error)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.red.opacity(0.1))
+                .cornerRadius(8)
+            }
+
+            Button {
+                HapticService.buttonTap()
+                isRetryingTranscription = true
+                transcriptionQueue.retryTranscription(for: recording.id)
+                Task {
+                    try? await Task.sleep(nanoseconds: 500_000_000)
                     refreshRecording()
                     isRetryingTranscription = false
-                } label: {
-                    HStack {
-                        if isRetryingTranscription {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                        } else {
-                            Image(systemName: "arrow.clockwise")
-                        }
-                        Text("Retry Transcription")
-                    }
-                    .font(.subheadline)
-                    .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
-                .disabled(isRetryingTranscription)
+            } label: {
+                HStack {
+                    if isRetryingTranscription {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    Text(retranscribeButtonLabel(for: recording))
+                }
+                .font(.subheadline)
+                .frame(maxWidth: .infinity)
             }
+            .buttonStyle(.bordered)
+            .disabled(isRetryingTranscription || isTranscribing(recording))
+        }
+    }
+
+    private func isTranscribing(_ recording: Recording) -> Bool {
+        [.uploading, .processing].contains(recording.transcriptionStatus)
+    }
+
+    private func transcriptionProgressLabel(for recording: Recording) -> String {
+        switch recording.transcriptionStatus {
+        case .uploading: return "Uploading audio..."
+        case .processing: return "Transcribing..."
+        default: return "Processing..."
+        }
+    }
+
+    private func retranscribeButtonLabel(for recording: Recording) -> String {
+        switch recording.transcriptionStatus {
+        case .failed: return "Retry Transcription"
+        case .completed: return "Re-transcribe"
+        case .pending: return "Force Retry"
+        default: return "Transcribing..."
         }
     }
 
@@ -221,7 +257,10 @@ struct RecordingDetailView: View {
                     .italic()
             } else {
                 ForEach(recording.webhookAttempts) { attempt in
-                    webhookAttemptRow(attempt)
+                    NavigationLink(destination: WebhookAttemptDetailView(attempt: attempt)) {
+                        webhookAttemptRow(attempt)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
 
@@ -252,39 +291,45 @@ struct RecordingDetailView: View {
     }
 
     private func webhookAttemptRow(_ attempt: WebhookAttempt) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 10) {
             Image(systemName: attempt.success ? "checkmark.circle.fill" : "xmark.circle.fill")
                 .foregroundColor(attempt.success ? .green : .red)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(attempt.url)
-                    .font(.system(.caption, design: .monospaced))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+                Text(attempt.success ? "Sent" : "Failed")
+                    .font(.subheadline)
+                    .foregroundColor(.primary)
 
-                HStack(spacing: 8) {
-                    Text(DateFormatters.timeFormatter.string(from: attempt.timestamp))
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-
-                    if let statusCode = attempt.statusCode {
-                        Text("HTTP \(statusCode)")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
-
-                    if let error = attempt.errorMessage, !attempt.success {
-                        Text(error)
-                            .font(.caption2)
-                            .foregroundColor(.red)
-                            .lineLimit(1)
-                    }
-                }
+                Text(DateFormatters.timeFormatter.string(from: attempt.timestamp))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
 
             Spacer()
+
+            if let durationMs = attempt.durationMs {
+                Text(formatDurationMs(durationMs))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundColor(.secondary)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 6)
+        .padding(.horizontal, 12)
+        .background(Color(uiColor: .secondarySystemBackground))
+        .cornerRadius(8)
+    }
+
+    private func formatDurationMs(_ ms: Int) -> String {
+        if ms < 1000 {
+            return "\(ms)ms"
+        } else {
+            let seconds = Double(ms) / 1000.0
+            return String(format: "%.1fs", seconds)
+        }
     }
 
     private var copiedConfirmation: some View {
@@ -312,8 +357,8 @@ struct RecordingDetailView: View {
             transcription: "This is a sample transcription.",
             transcriptionStatus: .completed,
             webhookAttempts: [
-                WebhookAttempt(url: "https://example.com/webhook", success: true, statusCode: 200),
-                WebhookAttempt(url: "https://example.com/webhook", success: false, statusCode: 500)
+                WebhookAttempt(url: "https://example.com/webhook", success: true, statusCode: 200, durationMs: 234),
+                WebhookAttempt(url: "https://example.com/webhook", success: false, statusCode: 500, errorMessage: "Internal Server Error", durationMs: 1523)
             ]
         ))
     }

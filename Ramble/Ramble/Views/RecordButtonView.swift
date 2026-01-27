@@ -7,6 +7,7 @@ import SwiftUI
 
 struct RecordButtonView: View {
     let isRecording: Bool
+    var audioLevel: Float = 0
     let action: () -> Void
 
     @State private var pulseScale: CGFloat = 1.0
@@ -14,9 +15,28 @@ struct RecordButtonView: View {
     private let buttonSize: CGFloat = 72
     private let innerSize: CGFloat = 64
 
+    private var glowScale: CGFloat {
+        guard isRecording else { return 1.0 }
+        return 1.0 + CGFloat(audioLevel) * 0.4
+    }
+
+    private var glowOpacity: Double {
+        guard isRecording else { return 0 }
+        return Double(audioLevel) * 0.5
+    }
+
     var body: some View {
         Button(action: action) {
             ZStack {
+                // Audio level glow
+                Circle()
+                    .fill(Color.red)
+                    .frame(width: buttonSize, height: buttonSize)
+                    .scaleEffect(glowScale)
+                    .opacity(glowOpacity)
+                    .blur(radius: 8)
+                    .animation(.easeOut(duration: 0.1), value: audioLevel)
+
                 // Outer ring
                 Circle()
                     .stroke(Color.red, lineWidth: 4)

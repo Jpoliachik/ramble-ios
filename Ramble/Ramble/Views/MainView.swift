@@ -37,6 +37,8 @@ struct MainView: View {
                 RecordingControlsView(
                     isRecording: viewModel.isRecording,
                     duration: viewModel.currentDuration,
+                    inputSourceName: viewModel.inputSourceName,
+                    audioLevel: viewModel.audioLevel,
                     onToggleRecording: {
                         Task {
                             await viewModel.toggleRecording()

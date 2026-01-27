@@ -11,20 +11,39 @@ import Foundation
 final class WatchAudioRecorderService: NSObject, ObservableObject {
     @Published private(set) var isRecording = false
     @Published private(set) var currentDuration: TimeInterval = 0
+    @Published private(set) var audioLevel: Float = 0
 
     private var audioRecorder: AVAudioRecorder?
     private var recordingStartTime: Date?
     private var timer: Timer?
     private(set) var currentRecordingURL: URL?
 
+    private var isSessionActive = false
+
     override init() {
         super.init()
+        prepareAudioSession()
     }
 
-    func startRecording() async throws -> URL {
+    func prepareAudioSession() {
+        guard !isSessionActive else { return }
         let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.playAndRecord, mode: .default)
-        try session.setActive(true)
+        do {
+            try session.setCategory(.playAndRecord, mode: .default)
+            try session.setActive(true)
+            isSessionActive = true
+        } catch {
+            print("Failed to prepare watch audio session: \(error)")
+        }
+    }
+
+    func startRecording() throws -> URL {
+        let session = AVAudioSession.sharedInstance()
+        if !isSessionActive {
+            try session.setCategory(.playAndRecord, mode: .default)
+            try session.setActive(true)
+            isSessionActive = true
+        }
 
         let recordingId = UUID().uuidString
         let documentsPath = FileManager.default.urls(
@@ -41,6 +60,7 @@ final class WatchAudioRecorderService: NSObject, ObservableObject {
         ]
 
         audioRecorder = try AVAudioRecorder(url: audioURL, settings: settings)
+        audioRecorder?.isMeteringEnabled = true
         audioRecorder?.delegate = self
         audioRecorder?.record()
 
@@ -65,6 +85,7 @@ final class WatchAudioRecorderService: NSObject, ObservableObject {
         audioRecorder = nil
         isRecording = false
         currentDuration = 0
+        audioLevel = 0
         recordingStartTime = nil
         currentRecordingURL = nil
 
@@ -77,8 +98,15 @@ final class WatchAudioRecorderService: NSObject, ObservableObject {
             Task { @MainActor in
                 guard let self = self, let startTime = self.recordingStartTime else { return }
                 self.currentDuration = Date().timeIntervalSince(startTime)
+                self.audioRecorder?.updateMeters()
+                let dB = self.audioRecorder?.averagePower(forChannel: 0) ?? -160
+                self.audioLevel = Self.normalizeAudioLevel(dB)
             }
         }
+    }
+
+    private static func normalizeAudioLevel(_ dB: Float) -> Float {
+        max(0, min(1, (dB + 50) / 50))
     }
 
     func deleteLocalFile(at url: URL) {

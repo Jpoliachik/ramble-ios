@@ -8,6 +8,8 @@ import SwiftUI
 struct RecordingControlsView: View {
     let isRecording: Bool
     let duration: TimeInterval
+    var inputSourceName: String? = nil
+    var audioLevel: Float = 0
     let onToggleRecording: () -> Void
 
     var body: some View {
@@ -18,7 +20,13 @@ struct RecordingControlsView: View {
                 .foregroundColor(isRecording ? .red : .secondary)
                 .opacity(isRecording || duration > 0 ? 1 : 0.3)
 
-            RecordButtonView(isRecording: isRecording, action: onToggleRecording)
+            RecordButtonView(isRecording: isRecording, audioLevel: audioLevel, action: onToggleRecording)
+
+            if isRecording, let source = inputSourceName {
+                Text("via \(source)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
         }
         .padding(.vertical, 24)
     }

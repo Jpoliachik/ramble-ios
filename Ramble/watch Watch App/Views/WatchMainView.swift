@@ -28,7 +28,10 @@ struct WatchMainView: View {
             Spacer()
 
             // Record button
-            WatchRecordButtonView(isRecording: audioRecorder.isRecording || connectivity.phoneIsRecording) {
+            WatchRecordButtonView(
+                isRecording: audioRecorder.isRecording || connectivity.phoneIsRecording,
+                audioLevel: audioRecorder.audioLevel
+            ) {
                 Task {
                     await toggleRecording()
                 }
@@ -147,13 +150,13 @@ struct WatchMainView: View {
             await stopAndTransfer()
         } else {
             WatchHapticService.recordStart()
-            await startRecording()
+            startRecording()
         }
     }
 
-    private func startRecording() async {
+    private func startRecording() {
         do {
-            _ = try await audioRecorder.startRecording()
+            _ = try audioRecorder.startRecording()
             connectivity.sendRecordingStarted()
         } catch {
             print("Failed to start recording: \(error)")
