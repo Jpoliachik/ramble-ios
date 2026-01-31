@@ -33,6 +33,7 @@ final class AudioRecorderService: NSObject, ObservableObject {
         do {
             try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
             try session.setActive(true)
+            configurePreferredInput(session: session)
             isSessionActive = true
         } catch {
             print("Failed to prepare audio session: \(error)")
@@ -46,6 +47,7 @@ final class AudioRecorderService: NSObject, ObservableObject {
         if !isSessionActive {
             try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
             try session.setActive(true)
+            configurePreferredInput(session: session)
             isSessionActive = true
         }
 
@@ -85,6 +87,32 @@ final class AudioRecorderService: NSObject, ObservableObject {
         audioLevel = 0
 
         return duration
+    }
+
+    /// Configure the audio session to prefer external inputs (AirPods, headsets) over built-in mic
+    private func configurePreferredInput(session: AVAudioSession) {
+        do {
+            let availableInputs = session.availableInputs ?? []
+
+            // Prioritize external inputs (Bluetooth, wired headsets) over built-in microphone
+            // Port types ranked by preference:
+            // 1. Bluetooth (AirPods, etc.)
+            // 2. Wired headset
+            // 3. Built-in mic (fallback)
+            let preferredInput = availableInputs.first { input in
+                input.portType == .bluetoothHFP || // Bluetooth headset (AirPods)
+                input.portType == .bluetoothA2DP || // Bluetooth audio
+                input.portType == .headsetMic // Wired headset with mic
+            } ?? availableInputs.first { input in
+                input.portType == .builtInMic // Built-in mic as fallback
+            }
+
+            if let preferredInput = preferredInput {
+                try session.setPreferredInput(preferredInput)
+            }
+        } catch {
+            print("Failed to configure preferred input: \(error)")
+        }
     }
 
     private func startTimer() {
