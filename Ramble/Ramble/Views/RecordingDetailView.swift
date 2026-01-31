@@ -89,6 +89,32 @@ struct RecordingDetailView: View {
 
                 statusBadge(for: recording)
             }
+
+            if let noSpeechProb = recording.noSpeechProbability {
+                HStack {
+                    Label("Quality", systemImage: "waveform.badge.checkmark")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+
+                    Spacer()
+
+                    qualityBadge(noSpeechProb: noSpeechProb)
+                }
+            }
+
+            if let language = recording.transcriptionLanguage {
+                HStack {
+                    Label("Language", systemImage: "globe")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+
+                    Spacer()
+
+                    Text(language.uppercased())
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
         }
     }
 
@@ -115,6 +141,24 @@ struct RecordingDetailView: View {
                     .foregroundColor(.red)
                 Text("Failed")
             }
+        }
+        .font(.caption)
+        .foregroundColor(.secondary)
+    }
+
+    private func qualityBadge(noSpeechProb: Double) -> some View {
+        let quality = 1.0 - noSpeechProb
+        let (label, color): (String, Color) = {
+            if quality >= 0.7 { return ("Good", .green) }
+            if quality >= 0.4 { return ("Fair", .orange) }
+            return ("Poor", .red)
+        }()
+
+        return HStack(spacing: 4) {
+            Circle()
+                .fill(color)
+                .frame(width: 8, height: 8)
+            Text(label)
         }
         .font(.caption)
         .foregroundColor(.secondary)

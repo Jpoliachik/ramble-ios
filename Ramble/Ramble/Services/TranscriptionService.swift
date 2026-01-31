@@ -13,12 +13,19 @@ enum TranscriptionError: Error {
     case apiError(String)
 }
 
+struct TranscriptionResult {
+    let text: String
+    let noSpeechProbability: Double?
+    let language: String?
+    let duration: Double?
+}
+
 final class TranscriptionService {
     static let shared = TranscriptionService()
 
     private init() {}
 
-    func transcribe(audioURL: URL) async throws -> String {
+    func transcribe(audioURL: URL) async throws -> TranscriptionResult {
         let apiKey = Secrets.groqAPIKey
         guard apiKey != "YOUR_GROQ_API_KEY_HERE" && !apiKey.isEmpty else {
             throw TranscriptionError.invalidAPIKey
@@ -46,6 +53,11 @@ final class TranscriptionService {
         body.append("Content-Disposition: form-data; name=\"model\"\r\n\r\n")
         body.append("\(Constants.groqModel)\r\n")
 
+        // Response format field (verbose_json to get quality metrics)
+        body.append("--\(boundary)\r\n")
+        body.append("Content-Disposition: form-data; name=\"response_format\"\r\n\r\n")
+        body.append("verbose_json\r\n")
+
         // File field
         body.append("--\(boundary)\r\n")
         body.append("Content-Disposition: form-data; name=\"file\"; filename=\"audio.m4a\"\r\n")
@@ -69,13 +81,35 @@ final class TranscriptionService {
             throw TranscriptionError.apiError("Status \(httpResponse.statusCode): \(errorMessage)")
         }
 
-        let result = try JSONDecoder().decode(TranscriptionResponse.self, from: data)
-        return result.text
+        let result = try JSONDecoder().decode(VerboseTranscriptionResponse.self, from: data)
+
+        // Calculate average no_speech_prob across all segments
+        let noSpeechProb: Double?
+        if !result.segments.isEmpty {
+            let total = result.segments.reduce(0.0) { $0 + $1.no_speech_prob }
+            noSpeechProb = total / Double(result.segments.count)
+        } else {
+            noSpeechProb = nil
+        }
+
+        return TranscriptionResult(
+            text: result.text,
+            noSpeechProbability: noSpeechProb,
+            language: result.language,
+            duration: result.duration
+        )
     }
 }
 
-private struct TranscriptionResponse: Decodable {
+private struct VerboseTranscriptionResponse: Decodable {
     let text: String
+    let language: String?
+    let duration: Double?
+    let segments: [TranscriptionSegment]
+}
+
+private struct TranscriptionSegment: Decodable {
+    let no_speech_prob: Double
 }
 
 private extension Data {
