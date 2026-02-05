@@ -84,6 +84,23 @@ struct Recording: Identifiable, Codable, Hashable {
         self.nextWebhookRetryAt = nextWebhookRetryAt
     }
 
+    // Custom decoder to handle backward compatibility when new fields are added
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        duration = try container.decode(TimeInterval.self, forKey: .duration)
+        audioFileName = try container.decode(String.self, forKey: .audioFileName)
+        transcription = try container.decodeIfPresent(String.self, forKey: .transcription)
+        transcriptionStatus = try container.decode(TranscriptionStatus.self, forKey: .transcriptionStatus)
+        lastTranscriptionError = try container.decodeIfPresent(String.self, forKey: .lastTranscriptionError)
+        webhookAttempts = try container.decodeIfPresent([WebhookAttempt].self, forKey: .webhookAttempts) ?? []
+        noSpeechProbability = try container.decodeIfPresent(Double.self, forKey: .noSpeechProbability)
+        transcriptionLanguage = try container.decodeIfPresent(String.self, forKey: .transcriptionLanguage)
+        webhookRetryCount = try container.decodeIfPresent(Int.self, forKey: .webhookRetryCount) ?? 0
+        nextWebhookRetryAt = try container.decodeIfPresent(Date.self, forKey: .nextWebhookRetryAt)
+    }
+
     var audioFileURL: URL {
         StorageService.audioDirectory.appendingPathComponent(audioFileName)
     }

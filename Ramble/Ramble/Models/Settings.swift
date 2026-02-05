@@ -20,5 +20,12 @@ struct Settings: Codable {
         self.transcriptionQualityThreshold = transcriptionQualityThreshold
     }
 
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        webhookURL = try container.decodeIfPresent(String.self, forKey: .webhookURL)
+        webhookAuthToken = try container.decodeIfPresent(String.self, forKey: .webhookAuthToken)
+        transcriptionQualityThreshold = try container.decodeIfPresent(Double.self, forKey: .transcriptionQualityThreshold) ?? 0.6
+    }
+
     static let `default` = Settings()
 }
