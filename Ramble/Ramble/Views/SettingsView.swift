@@ -67,6 +67,19 @@ struct SettingsView: View {
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .font(.system(.body, design: .monospaced))
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Quality Threshold")
+                    Spacer()
+                    Text(String(format: "%.2f", viewModel.qualityThreshold))
+                        .foregroundColor(.secondary)
+                }
+                Slider(value: $viewModel.qualityThreshold, in: 0.0...1.0, step: 0.05)
+                Text("Higher values = more tolerant of noise. Transcriptions below this threshold won't be sent to webhook.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
         } header: {
             Text("Webhook")
         } footer: {

@@ -48,6 +48,8 @@ struct Recording: Identifiable, Codable, Hashable {
     var transcriptionStatus: TranscriptionStatus
     var lastTranscriptionError: String?
     var webhookAttempts: [WebhookAttempt]
+    var noSpeechProbability: Double?
+    var transcriptionLanguage: String?
 
     init(
         id: UUID = UUID(),
@@ -57,7 +59,9 @@ struct Recording: Identifiable, Codable, Hashable {
         transcription: String? = nil,
         transcriptionStatus: TranscriptionStatus = .pending,
         lastTranscriptionError: String? = nil,
-        webhookAttempts: [WebhookAttempt] = []
+        webhookAttempts: [WebhookAttempt] = [],
+        noSpeechProbability: Double? = nil,
+        transcriptionLanguage: String? = nil
     ) {
         self.id = id
         self.createdAt = createdAt
@@ -67,9 +71,20 @@ struct Recording: Identifiable, Codable, Hashable {
         self.transcriptionStatus = transcriptionStatus
         self.lastTranscriptionError = lastTranscriptionError
         self.webhookAttempts = webhookAttempts
+        self.noSpeechProbability = noSpeechProbability
+        self.transcriptionLanguage = transcriptionLanguage
     }
 
     var audioFileURL: URL {
         StorageService.audioDirectory.appendingPathComponent(audioFileName)
+    }
+
+    /// Check if transcription quality is acceptable based on threshold
+    func isQualityAcceptable(threshold: Double) -> Bool {
+        guard let noSpeechProb = noSpeechProbability else {
+            // If no quality data, assume acceptable (backward compatibility)
+            return true
+        }
+        return noSpeechProb < threshold
     }
 }

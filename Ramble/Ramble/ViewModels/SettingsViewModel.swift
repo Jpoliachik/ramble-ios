@@ -10,6 +10,7 @@ import Foundation
 final class SettingsViewModel: ObservableObject {
     @Published var webhookURL: String = ""
     @Published var webhookAuthToken: String = ""
+    @Published var qualityThreshold: Double = 0.6
     @Published var totalRecordings: Int = 0
     @Published var totalDuration: TimeInterval = 0
 
@@ -24,13 +25,15 @@ final class SettingsViewModel: ObservableObject {
         let settings = settingsService.load()
         webhookURL = settings.webhookURL ?? ""
         webhookAuthToken = settings.webhookAuthToken ?? ""
+        qualityThreshold = settings.transcriptionQualityThreshold
         loadStats()
     }
 
     func save() {
         let settings = Settings(
             webhookURL: webhookURL.isEmpty ? nil : webhookURL,
-            webhookAuthToken: webhookAuthToken.isEmpty ? nil : webhookAuthToken
+            webhookAuthToken: webhookAuthToken.isEmpty ? nil : webhookAuthToken,
+            transcriptionQualityThreshold: qualityThreshold
         )
         settingsService.save(settings)
     }

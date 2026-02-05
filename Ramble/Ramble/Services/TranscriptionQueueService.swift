@@ -15,6 +15,7 @@ final class TranscriptionQueueService: ObservableObject {
     private let transcriptionService = TranscriptionService.shared
     private let storageService = StorageService.shared
     private let webhookService = WebhookService.shared
+    private let settingsService = SettingsService.shared
     private var queue: [TranscriptionJob] = []
     private let queueFile = StorageService.documentsDirectory
         .appendingPathComponent("transcription_queue.json")
@@ -84,17 +85,25 @@ final class TranscriptionQueueService: ObservableObject {
                 recordings[index].transcriptionStatus = .processing
                 storageService.saveRecordings(recordings)
 
-                let transcription = try await transcriptionService.transcribe(audioURL: audioURL)
+                let result = try await transcriptionService.transcribe(audioURL: audioURL)
 
                 var updatedRecordings = storageService.loadRecordings()
                 if let idx = updatedRecordings.firstIndex(where: { $0.id == job.recordingId }) {
-                    updatedRecordings[idx].transcription = transcription
+                    updatedRecordings[idx].transcription = result.text
                     updatedRecordings[idx].transcriptionStatus = .completed
                     updatedRecordings[idx].lastTranscriptionError = nil
+                    updatedRecordings[idx].noSpeechProbability = result.noSpeechProbability
+                    updatedRecordings[idx].transcriptionLanguage = result.language
 
-                    // Send to webhook and record attempt
-                    if let attempt = await webhookService.sendRecording(updatedRecordings[idx]) {
-                        updatedRecordings[idx].webhookAttempts.append(attempt)
+                    // Only send to webhook if quality is acceptable
+                    let settings = settingsService.load()
+                    let recording = updatedRecordings[idx]
+                    if recording.isQualityAcceptable(threshold: settings.transcriptionQualityThreshold) {
+                        if let attempt = await webhookService.sendRecording(recording) {
+                            updatedRecordings[idx].webhookAttempts.append(attempt)
+                        }
+                    } else {
+                        print("Skipping webhook for low-quality transcription (no_speech_prob: \(result.noSpeechProbability ?? 0))")
                     }
 
                     storageService.saveRecordings(updatedRecordings)
