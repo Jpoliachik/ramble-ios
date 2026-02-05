@@ -150,12 +150,6 @@ final class RecordingViewModel: ObservableObject {
         loadRecordings()
     }
 
-    func selectAudioInput(_ input: AudioInput) {
-        audioRecorder.switchInput(to: input)
-        // Update displayed input name
-        inputSourceName = input.displayName
-    }
-
     var recordingsByDay: [(date: Date, recordings: [Recording])] {
         let calendar = Calendar.current
         let grouped = Dictionary(grouping: recordings) { recording in

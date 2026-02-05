@@ -20,7 +20,6 @@ final class AudioRecorderService: NSObject, ObservableObject {
     private var currentRecordingURL: URL?
 
     private var isSessionActive = false
-    private let audioInputService = AudioInputService.shared
 
     override init() {
         super.init()
@@ -32,17 +31,14 @@ final class AudioRecorderService: NSObject, ObservableObject {
         guard !isSessionActive else { return }
         let session = AVAudioSession.sharedInstance()
         do {
-            // Use allowBluetooth to enable AirPods/Bluetooth mic input
+            // allowBluetooth enables AirPods/Bluetooth HFP mic input
             try session.setCategory(
                 .playAndRecord,
                 mode: .default,
-                options: [.defaultToSpeaker, .allowBluetooth, .allowBluetoothA2DP]
+                options: [.defaultToSpeaker, .allowBluetooth]
             )
             try session.setActive(true)
             isSessionActive = true
-
-            // Apply user's preferred input or auto-select best available
-            audioInputService.applyPreferredInput()
         } catch {
             print("Failed to prepare audio session: \(error)")
         }
@@ -56,14 +52,11 @@ final class AudioRecorderService: NSObject, ObservableObject {
             try session.setCategory(
                 .playAndRecord,
                 mode: .default,
-                options: [.defaultToSpeaker, .allowBluetooth, .allowBluetoothA2DP]
+                options: [.defaultToSpeaker, .allowBluetooth]
             )
             try session.setActive(true)
             isSessionActive = true
         }
-
-        // Apply preferred input before recording
-        audioInputService.applyPreferredInput()
 
         let settings: [String: Any] = [
             AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
@@ -81,20 +74,24 @@ final class AudioRecorderService: NSObject, ObservableObject {
         recordingStartTime = Date()
         isRecording = true
         currentDuration = 0
-
-        // Use AudioInputService for better display name
-        audioInputService.refreshAvailableInputs()
-        inputSourceName = audioInputService.currentInput?.displayName
-            ?? session.currentRoute.inputs.first?.portName
+        inputSourceName = Self.friendlyInputName(session.currentRoute.inputs.first)
 
         startTimer()
     }
 
-    /// Switch audio input while recording
-    /// Note: This may cause a brief audio glitch
-    func switchInput(to input: AudioInput) {
-        if audioInputService.selectInput(input) {
-            inputSourceName = input.displayName
+    /// Convert port description to user-friendly name
+    private static func friendlyInputName(_ port: AVAudioSessionPortDescription?) -> String? {
+        guard let port = port else { return nil }
+        switch port.portType {
+        case .builtInMic:
+            return "iPhone"
+        case .bluetoothHFP:
+            // Use device name (e.g., "AirPods Pro")
+            return port.portName
+        case .headsetMic:
+            return "Headset"
+        default:
+            return port.portName
         }
     }
 

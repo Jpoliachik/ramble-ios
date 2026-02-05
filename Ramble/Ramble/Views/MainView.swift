@@ -43,9 +43,6 @@ struct MainView: View {
                         Task {
                             await viewModel.toggleRecording()
                         }
-                    },
-                    onSelectInput: { input in
-                        viewModel.selectAudioInput(input)
                     }
                 )
                 .background(Color(uiColor: .systemBackground))
