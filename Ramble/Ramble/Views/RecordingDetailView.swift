@@ -3,6 +3,7 @@
 //  Ramble
 //
 
+import Combine
 import SwiftUI
 
 struct RecordingDetailView: View {
@@ -11,10 +12,13 @@ struct RecordingDetailView: View {
     @State private var showCopied = false
     @State private var isRetryingWebhook = false
     @State private var isRetryingTranscription = false
+    @State private var now = Date()
 
     private let storageService = StorageService.shared
     private let transcriptionQueue = TranscriptionQueueService.shared
     private let webhookService = WebhookService.shared
+
+    private let countdownTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     init(recording: Recording) {
         self.recordingId = recording.id
@@ -49,6 +53,9 @@ struct RecordingDetailView: View {
         .onAppear { refreshRecording() }
         .onReceive(NotificationCenter.default.publisher(for: StorageService.recordingsDidChangeNotification)) { _ in
             refreshRecording()
+        }
+        .onReceive(countdownTimer) { date in
+            now = date
         }
     }
 
@@ -164,6 +171,8 @@ struct RecordingDetailView: View {
         .foregroundColor(.secondary)
     }
 
+    // MARK: - Transcript Section
+
     private func transcriptSection(_ recording: Recording) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -208,6 +217,19 @@ struct RecordingDetailView: View {
                         .foregroundColor(.secondary)
                 }
                 .padding(.vertical, 4)
+            }
+
+            // Transcription retry countdown
+            if recording.transcriptionStatus == .pending,
+               let job = transcriptionQueue.transcriptionJob(for: recording.id),
+               job.retryCount > 0,
+               let nextRetry = job.nextRetryAt {
+                retryCountdownBanner(
+                    nextRetryAt: nextRetry,
+                    retryCount: job.retryCount,
+                    maxRetries: TranscriptionJob.maxRetries,
+                    label: "transcription"
+                )
             }
 
             if recording.transcriptionStatus == .failed, let error = recording.lastTranscriptionError {
@@ -289,6 +311,8 @@ struct RecordingDetailView: View {
         }
     }
 
+    // MARK: - Webhook Section
+
     private func webhookSection(_ recording: Recording) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Webhook")
@@ -307,6 +331,9 @@ struct RecordingDetailView: View {
                     .buttonStyle(.plain)
                 }
             }
+
+            // Webhook retry status
+            webhookRetryStatus(recording)
 
             Button {
                 HapticService.buttonTap()
@@ -333,6 +360,75 @@ struct RecordingDetailView: View {
             .disabled(isRetryingWebhook)
         }
     }
+
+    @ViewBuilder
+    private func webhookRetryStatus(_ recording: Recording) -> some View {
+        let lastFailed = recording.webhookAttempts.last.map { !$0.success } ?? false
+
+        if lastFailed && recording.webhookRetriesExhausted {
+            retryStatusBanner(
+                icon: "xmark.circle",
+                text: "All automatic retries exhausted",
+                color: .red
+            )
+        } else if lastFailed && recording.webhookRetryCount > Recording.maxInAppWebhookRetries {
+            retryStatusBanner(
+                icon: "clock.arrow.circlepath",
+                text: "Will retry in background",
+                color: .orange
+            )
+        } else if let nextRetry = recording.nextWebhookRetryAt, lastFailed {
+            retryCountdownBanner(
+                nextRetryAt: nextRetry,
+                retryCount: recording.webhookRetryCount,
+                maxRetries: Recording.maxTotalWebhookRetries,
+                label: "webhook"
+            )
+        }
+    }
+
+    // MARK: - Retry UI Components
+
+    private func retryCountdownBanner(
+        nextRetryAt: Date,
+        retryCount: Int,
+        maxRetries: Int,
+        label: String
+    ) -> some View {
+        let remaining = max(0, Int(nextRetryAt.timeIntervalSince(now)))
+
+        return HStack(spacing: 8) {
+            Image(systemName: "arrow.clockwise")
+                .foregroundColor(.orange)
+            if remaining > 0 {
+                Text("Auto-retrying \(label) in \(remaining)s (attempt \(retryCount + 1)/\(maxRetries))")
+            } else {
+                Text("Retrying \(label)...")
+            }
+        }
+        .font(.caption)
+        .foregroundColor(.secondary)
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.orange.opacity(0.1))
+        .cornerRadius(8)
+    }
+
+    private func retryStatusBanner(icon: String, text: String, color: Color) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .foregroundColor(color)
+            Text(text)
+        }
+        .font(.caption)
+        .foregroundColor(.secondary)
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(color.opacity(0.1))
+        .cornerRadius(8)
+    }
+
+    // MARK: - Webhook Attempt Row
 
     private func webhookAttemptRow(_ attempt: WebhookAttempt) -> some View {
         HStack(spacing: 10) {

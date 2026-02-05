@@ -28,23 +28,36 @@ final class BackgroundTaskService {
 
         do {
             try BGTaskScheduler.shared.submit(request)
-            print("Background transcription task scheduled")
+            print("Background task scheduled")
         } catch {
             print("Failed to schedule background task: \(error)")
         }
     }
 
     private func handleTranscriptionTask(_ task: BGProcessingTask) {
+        // Re-schedule so we keep running while there's pending work
+        scheduleTranscriptionTask()
+
+        let workTask = Task { @MainActor in
+            let queue = TranscriptionQueueService.shared
+
+            // Process pending transcriptions
+            queue.resumePendingJobs()
+
+            // Wait for processing with a timeout (up to 25s to leave margin)
+            let deadline = Date().addingTimeInterval(25)
+            while queue.isProcessing && Date() < deadline {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+            }
+        }
+
         task.expirationHandler = {
+            workTask.cancel()
             task.setTaskCompleted(success: false)
         }
 
-        Task { @MainActor in
-            TranscriptionQueueService.shared.resumePendingJobs()
-
-            // Give some time for processing
-            try? await Task.sleep(nanoseconds: 30_000_000_000)
-
+        Task {
+            _ = await workTask.result
             task.setTaskCompleted(success: true)
         }
     }

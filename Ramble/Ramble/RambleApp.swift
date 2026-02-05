@@ -25,6 +25,13 @@ struct RambleApp: App {
                 ) { _ in
                     BackgroundTaskService.shared.scheduleTranscriptionTask()
                 }
+                .onReceive(
+                    NotificationCenter.default.publisher(
+                        for: UIApplication.willEnterForegroundNotification
+                    )
+                ) { _ in
+                    TranscriptionQueueService.shared.resumePendingJobs()
+                }
         }
     }
 }

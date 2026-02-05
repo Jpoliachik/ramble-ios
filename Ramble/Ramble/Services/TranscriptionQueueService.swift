@@ -19,10 +19,13 @@ final class TranscriptionQueueService: ObservableObject {
     private var queue: [TranscriptionJob] = []
     private let queueFile = StorageService.documentsDirectory
         .appendingPathComponent("transcription_queue.json")
+    private var activeWebhookRetryTasks: Set<UUID> = []
 
     private init() {
         loadQueue()
     }
+
+    // MARK: - Transcription Queue
 
     func enqueue(recordingId: UUID) {
         let job = TranscriptionJob(recordingId: recordingId)
@@ -38,11 +41,11 @@ final class TranscriptionQueueService: ObservableObject {
 
     func resumePendingJobs() {
         processNextIfNeeded()
+        processWebhookRetries()
     }
 
     /// Manually retry a failed transcription by re-enqueuing it
     func retryTranscription(for recordingId: UUID) {
-        // Reset the recording status and clear any previous error
         var recordings = storageService.loadRecordings()
         guard let idx = recordings.firstIndex(where: { $0.id == recordingId }) else { return }
 
@@ -50,19 +53,94 @@ final class TranscriptionQueueService: ObservableObject {
         recordings[idx].lastTranscriptionError = nil
         storageService.saveRecordings(recordings)
 
-        // Enqueue a fresh job (retryCount starts at 0)
         enqueue(recordingId: recordingId)
     }
 
+    // MARK: - Webhook Retry
+
+    /// Manually retry webhook — resets retry counter and fires immediately
     func retryWebhook(for recordingId: UUID) async {
         var recordings = storageService.loadRecordings()
         guard let idx = recordings.firstIndex(where: { $0.id == recordingId }) else { return }
 
-        if let attempt = await webhookService.sendRecording(recordings[idx]) {
-            recordings[idx].webhookAttempts.append(attempt)
+        // Reset automatic retry state
+        recordings[idx].webhookRetryCount = 0
+        recordings[idx].nextWebhookRetryAt = nil
+        storageService.saveRecordings(recordings)
+
+        await sendWebhookWithRetry(recordingId: recordingId)
+    }
+
+    /// Check all recordings for pending webhook retries and process them
+    func processWebhookRetries() {
+        let recordings = storageService.loadRecordings()
+        for recording in recordings where recording.needsWebhookRetry {
+            guard !activeWebhookRetryTasks.contains(recording.id) else { continue }
+            scheduleWebhookRetry(for: recording.id, delay: 0)
+        }
+    }
+
+    /// Schedule a webhook retry after a delay (runs independently from transcription queue)
+    private func scheduleWebhookRetry(for recordingId: UUID, delay: TimeInterval) {
+        guard !activeWebhookRetryTasks.contains(recordingId) else { return }
+        activeWebhookRetryTasks.insert(recordingId)
+
+        Task {
+            if delay > 0 {
+                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            }
+            await sendWebhookWithRetry(recordingId: recordingId)
+            activeWebhookRetryTasks.remove(recordingId)
+        }
+    }
+
+    /// Send webhook and handle retry logic
+    private func sendWebhookWithRetry(recordingId: UUID) async {
+        var recordings = storageService.loadRecordings()
+        guard let idx = recordings.firstIndex(where: { $0.id == recordingId }) else { return }
+
+        let recording = recordings[idx]
+        guard let attempt = await webhookService.sendRecording(recording) else { return }
+
+        // Re-load to avoid stale data
+        recordings = storageService.loadRecordings()
+        guard let idx = recordings.firstIndex(where: { $0.id == recordingId }) else { return }
+
+        recordings[idx].webhookAttempts.append(attempt)
+
+        if attempt.success {
+            recordings[idx].webhookRetryCount = 0
+            recordings[idx].nextWebhookRetryAt = nil
+            storageService.saveRecordings(recordings)
+            return
+        }
+
+        // Webhook failed — schedule retry if under the limit
+        recordings[idx].webhookRetryCount += 1
+        let retryCount = recordings[idx].webhookRetryCount
+
+        if retryCount < Recording.maxTotalWebhookRetries {
+            let delay = recordings[idx].webhookRetryDelaySeconds
+            let retryAt = Date().addingTimeInterval(delay)
+            recordings[idx].nextWebhookRetryAt = retryAt
+
+            let phase = retryCount <= Recording.maxInAppWebhookRetries ? "in-app" : "background"
+            print("Webhook retry \(retryCount)/\(Recording.maxTotalWebhookRetries) (\(phase)) in \(Int(delay))s for recording \(recordingId)")
+
+            storageService.saveRecordings(recordings)
+
+            // Only schedule in-app retries automatically; background retries handled by BGTask
+            if retryCount <= Recording.maxInAppWebhookRetries {
+                scheduleWebhookRetry(for: recordingId, delay: delay)
+            }
+        } else {
+            recordings[idx].nextWebhookRetryAt = nil
+            print("All webhook retries exhausted for recording \(recordingId)")
             storageService.saveRecordings(recordings)
         }
     }
+
+    // MARK: - Transcription Processing
 
     private func processJob(_ job: TranscriptionJob) {
         isProcessing = true
@@ -94,19 +172,16 @@ final class TranscriptionQueueService: ObservableObject {
                     updatedRecordings[idx].lastTranscriptionError = nil
                     updatedRecordings[idx].noSpeechProbability = result.noSpeechProbability
                     updatedRecordings[idx].transcriptionLanguage = result.language
+                    storageService.saveRecordings(updatedRecordings)
 
-                    // Only send to webhook if quality is acceptable
+                    // Send webhook (with automatic retry on failure)
                     let settings = settingsService.load()
                     let recording = updatedRecordings[idx]
                     if recording.isQualityAcceptable(threshold: settings.transcriptionQualityThreshold) {
-                        if let attempt = await webhookService.sendRecording(recording) {
-                            updatedRecordings[idx].webhookAttempts.append(attempt)
-                        }
+                        await sendWebhookWithRetry(recordingId: job.recordingId)
                     } else {
                         print("Skipping webhook for low-quality transcription (no_speech_prob: \(result.noSpeechProbability ?? 0))")
                     }
-
-                    storageService.saveRecordings(updatedRecordings)
                 }
 
                 removeJob(job)
@@ -128,6 +203,8 @@ final class TranscriptionQueueService: ObservableObject {
                         removeJob(job)
                     } else {
                         updatedRecordings[idx].transcriptionStatus = .pending
+                        let delay = updatedJob.retryDelaySeconds
+                        updatedJob.nextRetryAt = Date().addingTimeInterval(delay)
                         updateJob(updatedJob)
                     }
                     storageService.saveRecordings(updatedRecordings)
@@ -137,7 +214,7 @@ final class TranscriptionQueueService: ObservableObject {
 
                 if updatedJob.retryCount < TranscriptionJob.maxRetries {
                     let delay = updatedJob.retryDelayNanoseconds
-                    print("Retrying in \(delay / 1_000_000_000) seconds (attempt \(updatedJob.retryCount + 1)/\(TranscriptionJob.maxRetries))")
+                    print("Transcription retry \(updatedJob.retryCount)/\(TranscriptionJob.maxRetries) in \(Int(updatedJob.retryDelaySeconds))s")
                     try? await Task.sleep(nanoseconds: delay)
                     processNextIfNeeded()
                 } else {
@@ -146,6 +223,14 @@ final class TranscriptionQueueService: ObservableObject {
             }
         }
     }
+
+    // MARK: - Queue access for UI
+
+    func transcriptionJob(for recordingId: UUID) -> TranscriptionJob? {
+        queue.first { $0.recordingId == recordingId }
+    }
+
+    // MARK: - Queue Persistence
 
     private func removeJob(_ job: TranscriptionJob) {
         queue.removeAll { $0.id == job.id }
