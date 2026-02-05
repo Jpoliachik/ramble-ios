@@ -50,6 +50,11 @@ struct Recording: Identifiable, Codable, Hashable {
     var webhookAttempts: [WebhookAttempt]
     var noSpeechProbability: Double?
     var transcriptionLanguage: String?
+    var webhookRetryCount: Int
+    var nextWebhookRetryAt: Date?
+
+    static let maxInAppWebhookRetries = 5
+    static let maxTotalWebhookRetries = 15
 
     init(
         id: UUID = UUID(),
@@ -61,7 +66,9 @@ struct Recording: Identifiable, Codable, Hashable {
         lastTranscriptionError: String? = nil,
         webhookAttempts: [WebhookAttempt] = [],
         noSpeechProbability: Double? = nil,
-        transcriptionLanguage: String? = nil
+        transcriptionLanguage: String? = nil,
+        webhookRetryCount: Int = 0,
+        nextWebhookRetryAt: Date? = nil
     ) {
         self.id = id
         self.createdAt = createdAt
@@ -73,6 +80,8 @@ struct Recording: Identifiable, Codable, Hashable {
         self.webhookAttempts = webhookAttempts
         self.noSpeechProbability = noSpeechProbability
         self.transcriptionLanguage = transcriptionLanguage
+        self.webhookRetryCount = webhookRetryCount
+        self.nextWebhookRetryAt = nextWebhookRetryAt
     }
 
     var audioFileURL: URL {
@@ -82,9 +91,36 @@ struct Recording: Identifiable, Codable, Hashable {
     /// Check if transcription quality is acceptable based on threshold
     func isQualityAcceptable(threshold: Double) -> Bool {
         guard let noSpeechProb = noSpeechProbability else {
-            // If no quality data, assume acceptable (backward compatibility)
             return true
         }
         return noSpeechProb < threshold
+    }
+
+    /// Whether the webhook needs an automatic retry
+    var needsWebhookRetry: Bool {
+        guard let retryAt = nextWebhookRetryAt else { return false }
+        return webhookRetryCount < Self.maxTotalWebhookRetries && retryAt <= Date()
+    }
+
+    /// Whether all automatic webhook retries have been exhausted
+    var webhookRetriesExhausted: Bool {
+        let lastFailed = webhookAttempts.last.map { !$0.success } ?? false
+        return lastFailed && webhookRetryCount >= Self.maxTotalWebhookRetries
+    }
+
+    /// Delay in seconds for the next webhook retry based on exponential backoff
+    var webhookRetryDelaySeconds: TimeInterval {
+        if webhookRetryCount < Self.maxInAppWebhookRetries {
+            // In-app: 5s, 15s, 45s, 90s, 180s
+            let baseDelay: TimeInterval = 5
+            let multiplier = pow(Double(3), Double(webhookRetryCount))
+            return min(baseDelay * multiplier, 180)
+        } else {
+            // Background: 5min, 10min, 15min, 30min (capped)
+            let bgRetryIndex = webhookRetryCount - Self.maxInAppWebhookRetries
+            let baseDelay: TimeInterval = 300 // 5 minutes
+            let multiplier = Double(bgRetryIndex + 1)
+            return min(baseDelay * multiplier, 1800) // cap at 30 min
+        }
     }
 }

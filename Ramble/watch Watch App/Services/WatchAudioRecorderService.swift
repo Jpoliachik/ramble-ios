@@ -29,7 +29,8 @@ final class WatchAudioRecorderService: NSObject, ObservableObject {
         guard !isSessionActive else { return }
         let session = AVAudioSession.sharedInstance()
         do {
-            try session.setCategory(.playAndRecord, mode: .default)
+            // allowBluetooth enables AirPods/Bluetooth HFP mic input
+            try session.setCategory(.playAndRecord, mode: .default, options: [.allowBluetooth])
             try session.setActive(true)
             isSessionActive = true
         } catch {
@@ -40,7 +41,7 @@ final class WatchAudioRecorderService: NSObject, ObservableObject {
     func startRecording() throws -> URL {
         let session = AVAudioSession.sharedInstance()
         if !isSessionActive {
-            try session.setCategory(.playAndRecord, mode: .default)
+            try session.setCategory(.playAndRecord, mode: .default, options: [.allowBluetooth])
             try session.setActive(true)
             isSessionActive = true
         }
