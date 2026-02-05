@@ -11,6 +11,9 @@ struct RecordingControlsView: View {
     var inputSourceName: String? = nil
     var audioLevel: Float = 0
     let onToggleRecording: () -> Void
+    var onSelectInput: ((AudioInput) -> Void)? = nil
+
+    @ObservedObject private var audioInputService = AudioInputService.shared
 
     var body: some View {
         VStack(spacing: 16) {
@@ -22,13 +25,19 @@ struct RecordingControlsView: View {
 
             RecordButtonView(isRecording: isRecording, audioLevel: audioLevel, action: onToggleRecording)
 
-            if isRecording, let source = inputSourceName {
-                Text("via \(source)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
+            // Audio input picker - always visible for easy selection
+            AudioInputPickerView(
+                inputService: audioInputService,
+                isRecording: isRecording,
+                onSelect: { input in
+                    onSelectInput?(input)
+                }
+            )
         }
         .padding(.vertical, 24)
+        .onAppear {
+            audioInputService.refreshAvailableInputs()
+        }
     }
 }
 
@@ -37,12 +46,14 @@ struct RecordingControlsView: View {
         RecordingControlsView(
             isRecording: false,
             duration: 0,
-            onToggleRecording: {}
+            onToggleRecording: {},
+            onSelectInput: { _ in }
         )
         RecordingControlsView(
             isRecording: true,
             duration: 65,
-            onToggleRecording: {}
+            onToggleRecording: {},
+            onSelectInput: { _ in }
         )
     }
 }
