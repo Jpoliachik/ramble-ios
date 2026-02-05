@@ -31,7 +31,12 @@ final class AudioRecorderService: NSObject, ObservableObject {
         guard !isSessionActive else { return }
         let session = AVAudioSession.sharedInstance()
         do {
-            try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
+            // allowBluetooth enables AirPods/Bluetooth HFP mic input
+            try session.setCategory(
+                .playAndRecord,
+                mode: .default,
+                options: [.defaultToSpeaker, .allowBluetooth]
+            )
             try session.setActive(true)
             isSessionActive = true
         } catch {
@@ -44,7 +49,11 @@ final class AudioRecorderService: NSObject, ObservableObject {
 
         // Ensure session is active (should already be from init)
         if !isSessionActive {
-            try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
+            try session.setCategory(
+                .playAndRecord,
+                mode: .default,
+                options: [.defaultToSpeaker, .allowBluetooth]
+            )
             try session.setActive(true)
             isSessionActive = true
         }
@@ -65,9 +74,25 @@ final class AudioRecorderService: NSObject, ObservableObject {
         recordingStartTime = Date()
         isRecording = true
         currentDuration = 0
-        inputSourceName = session.currentRoute.inputs.first?.portName
+        inputSourceName = Self.friendlyInputName(session.currentRoute.inputs.first)
 
         startTimer()
+    }
+
+    /// Convert port description to user-friendly name
+    private static func friendlyInputName(_ port: AVAudioSessionPortDescription?) -> String? {
+        guard let port = port else { return nil }
+        switch port.portType {
+        case .builtInMic:
+            return "iPhone"
+        case .bluetoothHFP:
+            // Use device name (e.g., "AirPods Pro")
+            return port.portName
+        case .headsetMic:
+            return "Headset"
+        default:
+            return port.portName
+        }
     }
 
     func stopRecording() -> TimeInterval {

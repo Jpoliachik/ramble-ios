@@ -22,11 +22,11 @@ struct RecordingControlsView: View {
 
             RecordButtonView(isRecording: isRecording, audioLevel: audioLevel, action: onToggleRecording)
 
-            if isRecording, let source = inputSourceName {
-                Text("via \(source)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
+            // Input source indicator - fixed height so button never moves
+            Text(isRecording ? "via \(inputSourceName ?? "...")" : " ")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .frame(height: 16)
         }
         .padding(.vertical, 24)
     }
@@ -42,6 +42,7 @@ struct RecordingControlsView: View {
         RecordingControlsView(
             isRecording: true,
             duration: 65,
+            inputSourceName: "AirPods Pro",
             onToggleRecording: {}
         )
     }
