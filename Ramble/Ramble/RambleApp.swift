@@ -23,6 +23,9 @@ struct RambleApp: App {
                         for: UIApplication.didEnterBackgroundNotification
                     )
                 ) { _ in
+                    // Immediate ~30s background time for in-flight transcription + webhook
+                    BackgroundTaskService.shared.beginImmediateBackgroundProcessing()
+                    // Also schedule deferred BGProcessingTask as fallback for retries
                     BackgroundTaskService.shared.scheduleTranscriptionTask()
                 }
                 .onReceive(

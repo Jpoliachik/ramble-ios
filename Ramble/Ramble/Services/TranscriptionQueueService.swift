@@ -12,6 +12,11 @@ final class TranscriptionQueueService: ObservableObject {
 
     @Published private(set) var isProcessing = false
 
+    /// True when any transcription or webhook work is actively running
+    var hasActiveWork: Bool {
+        isProcessing || !activeWebhookRetryTasks.isEmpty
+    }
+
     private let transcriptionService = TranscriptionService.shared
     private let storageService = StorageService.shared
     private let webhookService = WebhookService.shared
