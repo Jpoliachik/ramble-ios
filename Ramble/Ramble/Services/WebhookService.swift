@@ -24,6 +24,25 @@ final class WebhookService {
     }
 
     func sendRecording(_ recording: Recording) async -> WebhookAttempt? {
+        let payload = RecordingWebhookPayload(
+            event: "recording.transcribed",
+            id: recording.id.uuidString,
+            createdAt: ISO8601DateFormatter().string(from: recording.createdAt),
+            duration: recording.duration,
+            transcript: recording.transcription
+        )
+        return await send(payload: payload)
+    }
+
+    func sendDelete(recordingId: UUID) async -> WebhookAttempt? {
+        let payload = DeleteWebhookPayload(
+            event: "recording.deleted",
+            id: recordingId.uuidString
+        )
+        return await send(payload: payload)
+    }
+
+    private func send<T: Encodable>(payload: T) async -> WebhookAttempt? {
         let settings = settingsService.load()
 
         guard let webhookURLString = settings.webhookURL,
@@ -38,13 +57,6 @@ final class WebhookService {
         if let authToken = settings.webhookAuthToken, !authToken.isEmpty {
             request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
         }
-
-        let payload = WebhookPayload(
-            id: recording.id.uuidString,
-            createdAt: ISO8601DateFormatter().string(from: recording.createdAt),
-            duration: recording.duration,
-            transcript: recording.transcription
-        )
 
         guard let data = try? JSONEncoder().encode(payload) else {
             return WebhookAttempt(
@@ -81,9 +93,15 @@ final class WebhookService {
     }
 }
 
-private struct WebhookPayload: Encodable {
+private struct RecordingWebhookPayload: Encodable {
+    let event: String
     let id: String
     let createdAt: String
     let duration: TimeInterval
     let transcript: String?
+}
+
+private struct DeleteWebhookPayload: Encodable {
+    let event: String
+    let id: String
 }

@@ -64,7 +64,18 @@ final class SettingsViewModel: ObservableObject {
     }
 
     func deleteAllData() {
+        let recordings = storageService.loadRecordings()
         storageService.deleteAllRecordings()
         loadStats()
+
+        Task {
+            await withTaskGroup(of: Void.self) { group in
+                for recording in recordings {
+                    group.addTask {
+                        _ = await WebhookService.shared.sendDelete(recordingId: recording.id)
+                    }
+                }
+            }
+        }
     }
 }

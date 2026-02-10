@@ -146,8 +146,13 @@ final class RecordingViewModel: ObservableObject {
     }
 
     func deleteRecording(_ recording: Recording) {
+        let recordingId = recording.id
         storageService.deleteRecording(recording)
         loadRecordings()
+
+        Task {
+            _ = await WebhookService.shared.sendDelete(recordingId: recordingId)
+        }
     }
 
     var recordingsByDay: [(date: Date, recordings: [Recording])] {
