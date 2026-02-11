@@ -7,7 +7,7 @@ import Combine
 import SwiftUI
 
 struct WatchMainView: View {
-    @StateObject private var audioRecorder = WatchAudioRecorderService()
+    @StateObject private var recordingManager = WatchRecordingManager.shared
     @StateObject private var connectivity = WatchConnectivityService.shared
 
     @State private var showSaved = false
@@ -29,8 +29,8 @@ struct WatchMainView: View {
 
             // Record button
             WatchRecordButtonView(
-                isRecording: audioRecorder.isRecording || connectivity.phoneIsRecording,
-                audioLevel: audioRecorder.audioLevel
+                isRecording: recordingManager.isRecording || connectivity.phoneIsRecording,
+                audioLevel: recordingManager.audioLevel
             ) {
                 Task {
                     await toggleRecording()
@@ -88,8 +88,8 @@ struct WatchMainView: View {
 
     @ViewBuilder
     private var timerView: some View {
-        if audioRecorder.isRecording {
-            Text(formatDuration(audioRecorder.currentDuration))
+        if recordingManager.isRecording {
+            Text(formatDuration(recordingManager.currentDuration))
                 .font(.system(size: 28, weight: .medium, design: .monospaced))
                 .foregroundColor(.red)
         } else if connectivity.phoneIsRecording {
@@ -114,9 +114,10 @@ struct WatchMainView: View {
     }
 
     private func stopFromPhoneRequest() async {
-        guard audioRecorder.isRecording else { return }
+        guard recordingManager.isRecording else { return }
         WatchHapticService.recordStop()
-        await stopAndTransfer()
+        recordingManager.stopRecordingAndTransfer()
+        await showSavedConfirmation()
     }
 
     private func startPhoneDurationTimer() {
@@ -145,32 +146,18 @@ struct WatchMainView: View {
             return
         }
 
-        if audioRecorder.isRecording {
+        if recordingManager.isRecording {
             WatchHapticService.recordStop()
-            await stopAndTransfer()
+            recordingManager.stopRecordingAndTransfer()
+            await showSavedConfirmation()
         } else {
             WatchHapticService.recordStart()
-            startRecording()
+            recordingManager.startRecording()
         }
     }
 
-    private func startRecording() {
-        do {
-            _ = try audioRecorder.startRecording()
-            connectivity.sendRecordingStarted()
-        } catch {
-            print("Failed to start recording: \(error)")
-        }
-    }
-
-    private func stopAndTransfer() async {
-        guard let result = audioRecorder.stopRecording() else { return }
-        connectivity.sendRecordingStopped()
-
+    private func showSavedConfirmation() async {
         showSaved = true
-
-        connectivity.transferRecording(url: result.url, duration: result.duration)
-
         try? await Task.sleep(nanoseconds: 1_500_000_000)
         showSaved = false
     }
