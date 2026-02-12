@@ -33,6 +33,11 @@ final class TranscriptionQueueService: ObservableObject {
     // MARK: - Transcription Queue
 
     func enqueue(recordingId: UUID) {
+        // Prevent duplicate jobs for the same recording
+        guard !queue.contains(where: { $0.recordingId == recordingId }) else {
+            processNextIfNeeded()
+            return
+        }
         let job = TranscriptionJob(recordingId: recordingId)
         queue.append(job)
         saveQueue()
@@ -57,6 +62,10 @@ final class TranscriptionQueueService: ObservableObject {
         recordings[idx].transcriptionStatus = .pending
         recordings[idx].lastTranscriptionError = nil
         storageService.saveRecordings(recordings)
+
+        // Remove any existing jobs for this recording to prevent duplicate processing
+        queue.removeAll { $0.recordingId == recordingId }
+        saveQueue()
 
         enqueue(recordingId: recordingId)
     }
