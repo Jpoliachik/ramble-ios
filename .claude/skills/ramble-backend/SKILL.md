@@ -7,6 +7,20 @@ description: Implement a Ramble-compatible backend API that receives audio recor
 
 This skill describes how to implement a backend that works with the Ramble iOS voice journaling app. The app uploads raw audio recordings to the backend, which handles transcription and optional LLM processing.
 
+## Setup: API Key Generation
+
+On first deploy (or when no key exists yet), the backend MUST:
+
+1. **Generate a secure random API key** — e.g. 64-character hex string or UUID v4. This is a shared secret between the backend and the iOS app.
+2. **Store it privately** — Save the key wherever the backend keeps private config (environment variable, `.env` file, secrets manager, encrypted config file — whatever fits the stack). It must NOT be committed to source control.
+3. **Display it to the user exactly once** — Print the key to stdout on first run, or write it to a setup output file, so the user can copy it. Make it obvious: `"Your Ramble API key: <key> — paste this into the iOS app Settings."`
+
+The user then opens the Ramble iOS app → Settings → pastes two things:
+- **Base URL** — the host where the backend is running (e.g. `https://my-server.com`)
+- **Auth Token** — the API key generated above
+
+That's it. Those two values are all the app needs to connect.
+
 ## API Contract
 
 ### Authentication
@@ -16,7 +30,7 @@ All endpoints require:
 Authorization: Bearer <token>
 ```
 
-Return `401 Unauthorized` if the token is missing or invalid.
+The `<token>` is the API key generated during setup. Compare it against the stored key. Return `401 Unauthorized` if the token is missing or doesn't match.
 
 ### POST /ramble/recordings
 
@@ -25,8 +39,8 @@ Upload a new audio recording for processing.
 **Content-Type:** `multipart/form-data`
 
 **Parts:**
-- `audio` — The audio file (.m4a, 16kHz mono AAC)
-- `metadata` — JSON object:
+- `audio` — The audio file (.m4a, 16kHz mono AAC). Has `Content-Type: audio/m4a` and a `filename`.
+- `metadata` — A plain text form field containing a JSON string (no `Content-Type` header — defaults to `text/plain` per RFC 7578). Parse it with `JSON.parse()` or equivalent on the server side.
   ```json
   {
     "id": "uuid-string",

@@ -121,15 +121,26 @@ struct SettingsView: View {
 
     private var apiSection: some View {
         Section {
-            TextField("https://example.com", text: $viewModel.apiBaseURL)
-                .keyboardType(.URL)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Base URL")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                TextField("Enter your server URL", text: $viewModel.apiBaseURL)
+                    .keyboardType(.URL)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .foregroundColor(viewModel.apiBaseURL.isEmpty ? .red : .primary)
+            }
 
-            TextField("Bearer token", text: $viewModel.apiToken)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .font(.system(.body, design: .monospaced))
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Auth Token")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                TextField("Enter your bearer token", text: $viewModel.apiToken)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .font(.system(.body, design: .monospaced))
+            }
         } header: {
             Text("Ramble API")
         } footer: {

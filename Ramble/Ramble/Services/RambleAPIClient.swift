@@ -97,8 +97,7 @@ final class RambleAPIClient {
         ]
         let metadataJSON = try JSONSerialization.data(withJSONObject: metadata)
         body.appendString("--\(boundary)\r\n")
-        body.appendString("Content-Disposition: form-data; name=\"metadata\"\r\n")
-        body.appendString("Content-Type: application/json\r\n\r\n")
+        body.appendString("Content-Disposition: form-data; name=\"metadata\"\r\n\r\n")
         body.append(metadataJSON)
         body.appendString("\r\n")
 
