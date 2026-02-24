@@ -18,7 +18,7 @@ final class RecordingManager: ObservableObject {
 
     private let audioRecorder = AudioRecorderService()
     private let storageService = StorageService.shared
-    private let transcriptionQueue = TranscriptionQueueService.shared
+    private let syncQueue = SyncQueueService.shared
     private let connectivity = PhoneConnectivityService.shared
     private var currentRecording: Recording?
     private var cancellables = Set<AnyCancellable>()
@@ -68,7 +68,7 @@ final class RecordingManager: ObservableObject {
 
         storageService.addRecording(recording)
 
-        transcriptionQueue.enqueue(recordingId: recording.id)
+        syncQueue.enqueue(recordingId: recording.id)
 
         currentRecording = nil
     }

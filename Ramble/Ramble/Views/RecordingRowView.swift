@@ -41,8 +41,8 @@ struct RecordingRowView: View {
 
     @ViewBuilder
     private var statusView: some View {
-        switch recording.transcriptionStatus {
-        case .pending:
+        switch recording.status {
+        case .recorded:
             EmptyView()
         case .uploading, .processing:
             ProgressView()
@@ -63,16 +63,16 @@ struct RecordingRowView: View {
     List {
         RecordingRowView(recording: Recording(
             duration: 125,
-            transcription: "This is a sample transcription that shows what the text might look like.",
-            transcriptionStatus: .completed
+            status: .completed,
+            transcription: "This is a sample transcription that shows what the text might look like."
         ))
         RecordingRowView(recording: Recording(
             duration: 45,
-            transcriptionStatus: .processing
+            status: .processing
         ))
         RecordingRowView(recording: Recording(
             duration: 200,
-            transcriptionStatus: .pending
+            status: .recorded
         ))
     }
 }

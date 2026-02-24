@@ -63,8 +63,8 @@ struct RecordingListView: View {
             (
                 date: Date(),
                 recordings: [
-                    Recording(duration: 125, transcription: "Test", transcriptionStatus: .completed),
-                    Recording(duration: 45, transcriptionStatus: .processing)
+                    Recording(duration: 125, status: .completed, transcription: "Test"),
+                    Recording(duration: 45, status: .processing)
                 ]
             )
         ],

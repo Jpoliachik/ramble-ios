@@ -22,7 +22,7 @@ final class RecordingViewModel: ObservableObject {
 
     private let recordingManager = RecordingManager.shared
     private let storageService = StorageService.shared
-    private let transcriptionQueue = TranscriptionQueueService.shared
+    private let syncQueue = SyncQueueService.shared
     private let connectivity = PhoneConnectivityService.shared
     private var refreshTimer: Timer?
     private var cancellables = Set<AnyCancellable>()
@@ -37,7 +37,7 @@ final class RecordingViewModel: ObservableObject {
         observeRecordingManager()
         observeConnectivity()
         startRefreshTimer()
-        transcriptionQueue.resumePendingJobs()
+        syncQueue.resumePendingJobs()
     }
 
     private func observeRecordingManager() {

@@ -8,9 +8,8 @@ import Foundation
 
 @MainActor
 final class SettingsViewModel: ObservableObject {
-    @Published var webhookURL: String = ""
-    @Published var webhookAuthToken: String = ""
-    @Published var qualityThreshold: Double = 0.6
+    @Published var apiBaseURL: String = ""
+    @Published var apiToken: String = ""
     @Published var totalRecordings: Int = 0
     @Published var totalDuration: TimeInterval = 0
 
@@ -23,17 +22,15 @@ final class SettingsViewModel: ObservableObject {
 
     func load() {
         let settings = settingsService.load()
-        webhookURL = settings.webhookURL ?? ""
-        webhookAuthToken = settings.webhookAuthToken ?? ""
-        qualityThreshold = settings.transcriptionQualityThreshold
+        apiBaseURL = settings.apiBaseURL ?? ""
+        apiToken = settings.apiToken ?? ""
         loadStats()
     }
 
     func save() {
         let settings = Settings(
-            webhookURL: webhookURL.isEmpty ? nil : webhookURL,
-            webhookAuthToken: webhookAuthToken.isEmpty ? nil : webhookAuthToken,
-            transcriptionQualityThreshold: qualityThreshold
+            apiBaseURL: apiBaseURL.isEmpty ? nil : apiBaseURL,
+            apiToken: apiToken.isEmpty ? nil : apiToken
         )
         settingsService.save(settings)
     }
@@ -42,11 +39,6 @@ final class SettingsViewModel: ObservableObject {
         let recordings = storageService.loadRecordings()
         totalRecordings = recordings.count
         totalDuration = recordings.reduce(0) { $0 + $1.duration }
-    }
-
-    var estimatedCost: Double {
-        let hours = totalDuration / 3600
-        return hours * Constants.costPerHour
     }
 
     func exportJSON() -> URL? {

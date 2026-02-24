@@ -3,22 +3,16 @@
 //  Ramble
 //
 
-import Combine
 import SwiftUI
 
 struct RecordingDetailView: View {
     let recordingId: UUID
     @State private var recording: Recording?
     @State private var showCopied = false
-    @State private var isRetryingWebhook = false
-    @State private var isRetryingTranscription = false
-    @State private var now = Date()
+    @State private var isRetrying = false
 
     private let storageService = StorageService.shared
-    private let transcriptionQueue = TranscriptionQueueService.shared
-    private let webhookService = WebhookService.shared
-
-    private let countdownTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    private let syncQueue = SyncQueueService.shared
 
     init(recording: Recording) {
         self.recordingId = recording.id
@@ -33,9 +27,9 @@ struct RecordingDetailView: View {
                     Divider()
                     transcriptSection(recording)
 
-                    if webhookService.isWebhookConfigured {
+                    if let agentNotes = recording.agentNotes, !agentNotes.isEmpty {
                         Divider()
-                        webhookSection(recording)
+                        agentNotesSection(agentNotes)
                     }
                 }
                 .padding()
@@ -54,15 +48,14 @@ struct RecordingDetailView: View {
         .onReceive(NotificationCenter.default.publisher(for: StorageService.recordingsDidChangeNotification)) { _ in
             refreshRecording()
         }
-        .onReceive(countdownTimer) { date in
-            now = date
-        }
     }
 
     private func refreshRecording() {
         let recordings = storageService.loadRecordings()
         recording = recordings.first { $0.id == recordingId }
     }
+
+    // MARK: - Metadata Section
 
     private func metadataSection(_ recording: Recording) -> some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -96,41 +89,15 @@ struct RecordingDetailView: View {
 
                 statusBadge(for: recording)
             }
-
-            if let noSpeechProb = recording.noSpeechProbability {
-                HStack {
-                    Label("Quality", systemImage: "waveform.badge.checkmark")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-
-                    Spacer()
-
-                    qualityBadge(noSpeechProb: noSpeechProb)
-                }
-            }
-
-            if let language = recording.transcriptionLanguage {
-                HStack {
-                    Label("Language", systemImage: "globe")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-
-                    Spacer()
-
-                    Text(language.uppercased())
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
         }
     }
 
     private func statusBadge(for recording: Recording) -> some View {
         HStack(spacing: 4) {
-            switch recording.transcriptionStatus {
-            case .pending:
+            switch recording.status {
+            case .recorded:
                 Image(systemName: "clock")
-                Text("Pending")
+                Text("Recorded")
             case .uploading:
                 ProgressView()
                     .scaleEffect(0.7)
@@ -148,24 +115,6 @@ struct RecordingDetailView: View {
                     .foregroundColor(.red)
                 Text("Failed")
             }
-        }
-        .font(.caption)
-        .foregroundColor(.secondary)
-    }
-
-    private func qualityBadge(noSpeechProb: Double) -> some View {
-        let quality = 1.0 - noSpeechProb
-        let (label, color): (String, Color) = {
-            if quality >= 0.7 { return ("Good", .green) }
-            if quality >= 0.4 { return ("Fair", .orange) }
-            return ("Poor", .red)
-        }()
-
-        return HStack(spacing: 4) {
-            Circle()
-                .fill(color)
-                .frame(width: 8, height: 8)
-            Text(label)
         }
         .font(.caption)
         .foregroundColor(.secondary)
@@ -208,31 +157,18 @@ struct RecordingDetailView: View {
                     .italic()
             }
 
-            if isTranscribing(recording) {
+            if isActive(recording) {
                 HStack(spacing: 8) {
                     ProgressView()
                         .scaleEffect(0.8)
-                    Text(transcriptionProgressLabel(for: recording))
+                    Text(progressLabel(for: recording))
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
                 .padding(.vertical, 4)
             }
 
-            // Transcription retry countdown
-            if recording.transcriptionStatus == .pending,
-               let job = transcriptionQueue.transcriptionJob(for: recording.id),
-               job.retryCount > 0,
-               let nextRetry = job.nextRetryAt {
-                retryCountdownBanner(
-                    nextRetryAt: nextRetry,
-                    retryCount: job.retryCount,
-                    maxRetries: TranscriptionJob.maxRetries,
-                    label: "transcription"
-                )
-            }
-
-            if recording.transcriptionStatus == .failed, let error = recording.lastTranscriptionError {
+            if recording.status == .failed, let error = recording.lastError {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Error:")
                         .font(.caption)
@@ -250,225 +186,74 @@ struct RecordingDetailView: View {
 
             Button {
                 HapticService.buttonTap()
-                isRetryingTranscription = true
-                transcriptionQueue.retryTranscription(for: recording.id)
+                isRetrying = true
+                syncQueue.retry(recordingId: recording.id)
                 Task {
                     try? await Task.sleep(nanoseconds: 500_000_000)
                     refreshRecording()
-                    isRetryingTranscription = false
+                    isRetrying = false
                 }
             } label: {
                 HStack {
-                    if isRetryingTranscription {
+                    if isRetrying {
                         ProgressView()
                             .scaleEffect(0.8)
                     } else {
                         Image(systemName: "arrow.clockwise")
                     }
-                    Text(retranscribeButtonLabel(for: recording))
+                    Text(retryButtonLabel(for: recording))
                 }
                 .font(.subheadline)
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
-            .disabled(isRetryingTranscription || isTranscribing(recording))
+            .disabled(isRetrying || isActive(recording))
         }
     }
 
-    private func isTranscribing(_ recording: Recording) -> Bool {
-        [.uploading, .processing].contains(recording.transcriptionStatus)
+    // MARK: - Agent Notes Section
+
+    private func agentNotesSection(_ notes: String) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Agent Notes")
+                .font(.headline)
+
+            Text(notes)
+                .font(.body)
+                .textSelection(.enabled)
+        }
     }
 
-    private func transcriptionProgressLabel(for recording: Recording) -> String {
-        switch recording.transcriptionStatus {
+    // MARK: - Helpers
+
+    private func isActive(_ recording: Recording) -> Bool {
+        [.uploading, .processing].contains(recording.status)
+    }
+
+    private func progressLabel(for recording: Recording) -> String {
+        switch recording.status {
         case .uploading: return "Uploading audio..."
-        case .processing: return "Transcribing..."
+        case .processing: return "Processing..."
+        default: return "Working..."
+        }
+    }
+
+    private func retryButtonLabel(for recording: Recording) -> String {
+        switch recording.status {
+        case .failed: return "Retry"
+        case .completed: return "Re-process"
+        case .recorded: return "Upload"
         default: return "Processing..."
         }
     }
 
-    private func retranscribeButtonLabel(for recording: Recording) -> String {
-        switch recording.transcriptionStatus {
-        case .failed: return "Retry Transcription"
-        case .completed: return "Re-transcribe"
-        case .pending: return "Force Retry"
-        default: return "Transcribing..."
-        }
-    }
-
     private func transcriptPlaceholder(for recording: Recording) -> String {
-        switch recording.transcriptionStatus {
-        case .pending:
-            return "Transcription pending..."
-        case .uploading:
-            return "Uploading audio..."
-        case .processing:
-            return "Transcribing..."
-        case .completed:
-            return "No transcription available."
-        case .failed:
-            return "Transcription failed. Please try again."
-        }
-    }
-
-    // MARK: - Webhook Section
-
-    private func webhookSection(_ recording: Recording) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Webhook")
-                .font(.headline)
-
-            if recording.webhookAttempts.isEmpty {
-                Text("No webhook attempts yet")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .italic()
-            } else {
-                ForEach(recording.webhookAttempts) { attempt in
-                    NavigationLink(destination: WebhookAttemptDetailView(attempt: attempt)) {
-                        webhookAttemptRow(attempt)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-
-            // Webhook retry status
-            webhookRetryStatus(recording)
-
-            Button {
-                HapticService.buttonTap()
-                isRetryingWebhook = true
-                Task {
-                    await transcriptionQueue.retryWebhook(for: recording.id)
-                    refreshRecording()
-                    isRetryingWebhook = false
-                }
-            } label: {
-                HStack {
-                    if isRetryingWebhook {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                    } else {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                    Text(recording.webhookAttempts.isEmpty ? "Send Webhook" : "Retry Webhook")
-                }
-                .font(.subheadline)
-                .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered)
-            .disabled(isRetryingWebhook)
-        }
-    }
-
-    @ViewBuilder
-    private func webhookRetryStatus(_ recording: Recording) -> some View {
-        let lastFailed = recording.webhookAttempts.last.map { !$0.success } ?? false
-
-        if lastFailed && recording.webhookRetriesExhausted {
-            retryStatusBanner(
-                icon: "xmark.circle",
-                text: "All automatic retries exhausted",
-                color: .red
-            )
-        } else if lastFailed && recording.webhookRetryCount > Recording.maxInAppWebhookRetries {
-            retryStatusBanner(
-                icon: "clock.arrow.circlepath",
-                text: "Will retry in background",
-                color: .orange
-            )
-        } else if let nextRetry = recording.nextWebhookRetryAt, lastFailed {
-            retryCountdownBanner(
-                nextRetryAt: nextRetry,
-                retryCount: recording.webhookRetryCount,
-                maxRetries: Recording.maxTotalWebhookRetries,
-                label: "webhook"
-            )
-        }
-    }
-
-    // MARK: - Retry UI Components
-
-    private func retryCountdownBanner(
-        nextRetryAt: Date,
-        retryCount: Int,
-        maxRetries: Int,
-        label: String
-    ) -> some View {
-        let remaining = max(0, Int(nextRetryAt.timeIntervalSince(now)))
-
-        return HStack(spacing: 8) {
-            Image(systemName: "arrow.clockwise")
-                .foregroundColor(.orange)
-            if remaining > 0 {
-                Text("Auto-retrying \(label) in \(remaining)s (attempt \(retryCount + 1)/\(maxRetries))")
-            } else {
-                Text("Retrying \(label)...")
-            }
-        }
-        .font(.caption)
-        .foregroundColor(.secondary)
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.orange.opacity(0.1))
-        .cornerRadius(8)
-    }
-
-    private func retryStatusBanner(icon: String, text: String, color: Color) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: icon)
-                .foregroundColor(color)
-            Text(text)
-        }
-        .font(.caption)
-        .foregroundColor(.secondary)
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(color.opacity(0.1))
-        .cornerRadius(8)
-    }
-
-    // MARK: - Webhook Attempt Row
-
-    private func webhookAttemptRow(_ attempt: WebhookAttempt) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: attempt.success ? "checkmark.circle.fill" : "xmark.circle.fill")
-                .foregroundColor(attempt.success ? .green : .red)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(attempt.success ? "Sent" : "Failed")
-                    .font(.subheadline)
-                    .foregroundColor(.primary)
-
-                Text(DateFormatters.timeFormatter.string(from: attempt.timestamp))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-
-            Spacer()
-
-            if let durationMs = attempt.durationMs {
-                Text(formatDurationMs(durationMs))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-
-            Image(systemName: "chevron.right")
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 12)
-        .background(Color(uiColor: .secondarySystemBackground))
-        .cornerRadius(8)
-    }
-
-    private func formatDurationMs(_ ms: Int) -> String {
-        if ms < 1000 {
-            return "\(ms)ms"
-        } else {
-            let seconds = Double(ms) / 1000.0
-            return String(format: "%.1fs", seconds)
+        switch recording.status {
+        case .recorded: return "Waiting to upload..."
+        case .uploading: return "Uploading audio..."
+        case .processing: return "Processing..."
+        case .completed: return "No transcription available."
+        case .failed: return "Processing failed. Tap Retry below."
         }
     }
 
@@ -494,12 +279,9 @@ struct RecordingDetailView: View {
     NavigationStack {
         RecordingDetailView(recording: Recording(
             duration: 125,
+            status: .completed,
             transcription: "This is a sample transcription.",
-            transcriptionStatus: .completed,
-            webhookAttempts: [
-                WebhookAttempt(url: "https://example.com/webhook", success: true, statusCode: 200, durationMs: 234),
-                WebhookAttempt(url: "https://example.com/webhook", success: false, statusCode: 500, errorMessage: "Internal Server Error", durationMs: 1523)
-            ]
+            agentNotes: "## Summary\nDiscussed project plans for the weekend.\n\n## Tags\n#planning #personal"
         ))
     }
 }

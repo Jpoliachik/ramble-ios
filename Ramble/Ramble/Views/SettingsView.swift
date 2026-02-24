@@ -16,7 +16,7 @@ struct SettingsView: View {
         NavigationView {
             Form {
                 statsSection
-                webhookSection
+                apiSection
                 exportSection
                 dangerZoneSection
             }
@@ -47,43 +47,24 @@ struct SettingsView: View {
                 Text(formatTotalDuration(viewModel.totalDuration))
                     .foregroundColor(.secondary)
             }
-            HStack {
-                Text("Estimated Cost")
-                Spacer()
-                Text(String(format: "$%.2f", viewModel.estimatedCost))
-                    .foregroundColor(.secondary)
-            }
         }
     }
 
-    private var webhookSection: some View {
+    private var apiSection: some View {
         Section {
-            TextField("https://example.com/webhook", text: $viewModel.webhookURL)
+            TextField("https://example.com", text: $viewModel.apiBaseURL)
                 .keyboardType(.URL)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
 
-            TextField("Bearer token (optional)", text: $viewModel.webhookAuthToken)
+            TextField("Bearer token", text: $viewModel.apiToken)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .font(.system(.body, design: .monospaced))
-
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text("Quality Threshold")
-                    Spacer()
-                    Text(String(format: "%.2f", viewModel.qualityThreshold))
-                        .foregroundColor(.secondary)
-                }
-                Slider(value: $viewModel.qualityThreshold, in: 0.0...1.0, step: 0.05)
-                Text("Higher values = more tolerant of noise. Transcriptions below this threshold won't be sent to webhook.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
         } header: {
-            Text("Webhook")
+            Text("Ramble API")
         } footer: {
-            Text("Completed transcriptions will be POSTed to this URL. If a token is provided, it will be sent as a Bearer token in the Authorization header.")
+            Text("Recordings are uploaded to \(viewModel.apiBaseURL.isEmpty ? "<base URL>" : viewModel.apiBaseURL)/ramble/recordings for processing.")
         }
     }
 

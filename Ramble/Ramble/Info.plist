@@ -4,7 +4,7 @@
 <dict>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
-		<string>dev.goodloop.ramble.transcription</string>
+		<string>dev.goodloop.ramble.sync</string>
 	</array>
 	<key>UIBackgroundModes</key>
 	<array>

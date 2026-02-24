@@ -23,17 +23,17 @@ struct RambleApp: App {
                         for: UIApplication.didEnterBackgroundNotification
                     )
                 ) { _ in
-                    // Immediate ~30s background time for in-flight transcription + webhook
+                    // Immediate ~30s background time for in-flight upload + poll
                     BackgroundTaskService.shared.beginImmediateBackgroundProcessing()
-                    // Also schedule deferred BGProcessingTask as fallback for retries
-                    BackgroundTaskService.shared.scheduleTranscriptionTask()
+                    // Also schedule deferred BGProcessingTask as fallback
+                    BackgroundTaskService.shared.scheduleSyncTask()
                 }
                 .onReceive(
                     NotificationCenter.default.publisher(
                         for: UIApplication.willEnterForegroundNotification
                     )
                 ) { _ in
-                    TranscriptionQueueService.shared.resumePendingJobs()
+                    SyncQueueService.shared.resumePendingJobs()
                 }
         }
     }

@@ -22,7 +22,7 @@ final class PhoneConnectivityService: NSObject, ObservableObject {
     let stopRequestReceived = PassthroughSubject<Void, Never>()
 
     private let storageService = StorageService.shared
-    private let transcriptionQueue = TranscriptionQueueService.shared
+    private let syncQueue = SyncQueueService.shared
 
     override init() {
         super.init()
@@ -74,7 +74,6 @@ final class PhoneConnectivityService: NSObject, ObservableObject {
                 print("Failed to send message: \(error)")
             }
         } else {
-            // Fallback: update application context for when watch becomes reachable
             try? WCSession.default.updateApplicationContext(message)
         }
     }
@@ -130,7 +129,6 @@ extension PhoneConnectivityService: WCSessionDelegate {
         }
         print("Phone WCSession activated: \(activationState.rawValue)")
 
-        // Load any pending state from application context
         if activationState == .activated {
             let context = session.receivedApplicationContext
             if !context.isEmpty {
@@ -186,7 +184,7 @@ extension PhoneConnectivityService: WCSessionDelegate {
 
             Task { @MainActor in
                 storageService.addRecording(recording)
-                transcriptionQueue.enqueue(recordingId: recording.id)
+                syncQueue.enqueue(recordingId: recording.id)
             }
 
             print("Received recording from watch: \(metadata.recordingId)")

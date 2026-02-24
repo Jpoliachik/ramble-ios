@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Ramble** is a personal voice journaling iOS app for Justin. Core flow: voice recording → transcription → LLM extraction → searchable archive. The goal is frictionless daily capture (< 3 seconds from intent to talking) that builds a rich, searchable record of thoughts and activities.
+**Ramble** is a personal voice journaling iOS app for Justin. Core flow: voice recording → upload to backend → transcription + LLM extraction → searchable archive. The goal is frictionless daily capture (< 3 seconds from intent to talking) that builds a rich, searchable record of thoughts and activities.
 
 ### Key Principles
 
@@ -24,11 +24,11 @@ This is a native iOS project using Xcode. No CocoaPods or SPM dependencies.
 # Open in Xcode
 open Ramble/Ramble.xcodeproj
 
-# Build from command line
-xcodebuild -project Ramble/Ramble.xcodeproj -scheme Ramble -destination 'platform=iOS Simulator,name=iPhone 16'
+# Build iOS app
+xcodebuild -project Ramble/Ramble.xcodeproj -scheme Ramble -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
 
-# Build and run tests (when tests exist)
-xcodebuild test -project Ramble/Ramble.xcodeproj -scheme Ramble -destination 'platform=iOS Simulator,name=iPhone 16'
+# Build watch app
+xcodebuild -project Ramble/Ramble.xcodeproj -scheme "watch Watch App" -destination 'platform=watchOS Simulator,name=Apple Watch Series 11 (46mm)'
 ```
 
 ## Architecture
@@ -36,7 +36,6 @@ xcodebuild test -project Ramble/Ramble.xcodeproj -scheme Ramble -destination 'pl
 ### Targets
 
 - **Ramble** — Main iOS app (SwiftUI)
-- **widgetsExtension** — WidgetKit extension with Live Activities support
 - **watch Watch App** — watchOS companion app
 
 ### Source Layout
@@ -44,18 +43,48 @@ xcodebuild test -project Ramble/Ramble.xcodeproj -scheme Ramble -destination 'pl
 ```
 Ramble/
 ├── Ramble/           # Main iOS app source
-├── widgets/          # Widget extension (WidgetKit + ActivityKit)
 ├── watch Watch App/  # watchOS companion
 └── Ramble.xcodeproj/
 ```
 
+### Data Flow
+
+1. **Record** — AudioRecorderService captures 16kHz mono AAC audio
+2. **Upload** — SyncQueueService uploads audio + metadata to backend via RambleAPIClient
+3. **Poll** — SyncQueueService polls GET /ramble/recordings/{id} for results
+4. **Display** — Recording model updated with transcription + agent_notes from backend
+
+### Key Services
+
+| Service | Role |
+|---------|------|
+| `RambleAPIClient` | HTTP client — multipart upload + JSON polling |
+| `SyncQueueService` | Persistent job queue — upload phase then poll phase with backoff |
+| `BackgroundTaskService` | UIKit + BGProcessingTask for background sync |
+| `RecordingManager` | Coordinates audio recording lifecycle |
+| `StorageService` | JSON file persistence for recordings |
+| `PhoneConnectivityService` | WatchConnectivity bridge for watch recordings |
+
+### Models
+
+- `Recording` — Core model: id, createdAt, duration, audioFileName, status, transcription, agentNotes, lastError
+- `RecordingStatus` — recorded → uploading → processing → completed / failed
+- `UploadJob` — Two-phase job (upload then poll) with retry backoff
+- `Settings` — apiBaseURL + apiToken
+
 ### Tech Stack
 
 - SwiftUI for all UI
-- WidgetKit for home screen widgets
-- ActivityKit for Live Activities / Dynamic Island
 - Deployment target: iOS 26.2, watchOS 26.2
+
+### Backend API
+
+The app communicates with a backend via 2 endpoints:
+- `POST /ramble/recordings` — Upload audio (multipart)
+- `GET /ramble/recordings/{id}` — Poll for transcription + agent notes
+
+Full API spec: `.claude/skills/ramble-backend/SKILL.md`
 
 ## Current Phase
 
-**Phase 1: Capture** — Building the recording → transcription → extraction flow. Focus on making it fast and reliable enough for daily use.
+**Phase 1: Capture** — Building the recording → upload → processing flow. Focus on making it fast and reliable enough for daily use.
