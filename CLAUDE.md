@@ -79,9 +79,10 @@ Ramble/
 
 ### Backend API
 
-The app communicates with a backend via 2 endpoints:
+The app communicates with a backend via 3 endpoints:
 - `POST /ramble/recordings` — Upload audio (multipart)
 - `GET /ramble/recordings/{id}` — Poll for transcription + agent notes
+- `DELETE /ramble/recordings/{id}` — Delete recording from backend
 
 Full API spec: `.claude/skills/ramble-backend/SKILL.md`
 

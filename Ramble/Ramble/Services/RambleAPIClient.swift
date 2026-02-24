@@ -27,6 +27,14 @@ enum APIError: Error, LocalizedError {
     }
 }
 
+enum ConnectionTestResult {
+    case success
+    case notConfigured
+    case unauthorized
+    case networkError(String)
+    case serverError(Int, String?)
+}
+
 struct UploadResponse: Decodable {
     let id: String
     let status: String
@@ -142,6 +150,81 @@ final class RambleAPIClient {
             return try JSONDecoder().decode(RecordingResponse.self, from: data)
         case 401:
             throw APIError.unauthorized
+        default:
+            let msg = String(data: data, encoding: .utf8)
+            throw APIError.serverError(httpResponse.statusCode, msg)
+        }
+    }
+
+    // MARK: - Test Connection
+
+    func testConnection() async -> ConnectionTestResult {
+        guard isConfigured else { return .notConfigured }
+
+        do {
+            let (baseURL, token) = try resolveEndpoint()
+            let url = baseURL.appendingPathComponent(Constants.recordingsPath)
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "GET"
+            if let token = token {
+                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            }
+
+            let (data, response) = try await performRequest(request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                return .serverError(0, "Invalid response")
+            }
+
+            switch httpResponse.statusCode {
+            case 200...299, 404:
+                return .success
+            case 401:
+                return .unauthorized
+            default:
+                let msg = String(data: data, encoding: .utf8)
+                return .serverError(httpResponse.statusCode, msg)
+            }
+        } catch let error as APIError {
+            switch error {
+            case .notConfigured: return .notConfigured
+            case .unauthorized: return .unauthorized
+            case .networkError(let err): return .networkError(err.localizedDescription)
+            case .serverError(let code, let msg): return .serverError(code, msg)
+            default: return .networkError(error.localizedDescription)
+            }
+        } catch {
+            return .networkError(error.localizedDescription)
+        }
+    }
+
+    // MARK: - DELETE /ramble/recordings/{id}
+
+    func deleteRecording(id: UUID) async throws {
+        let (baseURL, token) = try resolveEndpoint()
+        let url = baseURL.appendingPathComponent(Constants.recordingsPath)
+            .appendingPathComponent(id.uuidString)
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        if let token = token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        let (data, response) = try await performRequest(request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+
+        switch httpResponse.statusCode {
+        case 200...299:
+            return
+        case 401:
+            throw APIError.unauthorized
+        case 404:
+            return // Already deleted, treat as success
         default:
             let msg = String(data: data, encoding: .utf8)
             throw APIError.serverError(httpResponse.statusCode, msg)

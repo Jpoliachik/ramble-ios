@@ -15,6 +15,7 @@ struct SettingsView: View {
     var body: some View {
         NavigationView {
             Form {
+                connectionSection
                 statsSection
                 apiSection
                 exportSection
@@ -22,6 +23,11 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                if !viewModel.apiBaseURL.isEmpty {
+                    Task { await viewModel.testConnection() }
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
@@ -30,6 +36,69 @@ struct SettingsView: View {
                     }
                 }
             }
+        }
+    }
+
+    private var connectionSection: some View {
+        Section("Connection") {
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(connectionDotColor)
+                    .frame(width: 10, height: 10)
+                Text(connectionLabel)
+                Spacer()
+            }
+
+            if viewModel.pendingUploads > 0 {
+                HStack {
+                    Text("Pending Uploads")
+                    Spacer()
+                    Text("\(viewModel.pendingUploads)")
+                        .foregroundColor(.secondary)
+                }
+            }
+
+            if viewModel.failedUploads > 0 {
+                HStack {
+                    Text("Failed Uploads")
+                    Spacer()
+                    Text("\(viewModel.failedUploads)")
+                        .foregroundColor(.red)
+                }
+            }
+
+            Button {
+                Task { await viewModel.testConnection() }
+            } label: {
+                HStack {
+                    Text("Test Connection")
+                    Spacer()
+                    if viewModel.isTesting {
+                        ProgressView()
+                    }
+                }
+            }
+            .disabled(viewModel.apiBaseURL.isEmpty || viewModel.isTesting)
+        }
+    }
+
+    private var connectionDotColor: Color {
+        guard let status = viewModel.connectionStatus else { return .gray }
+        switch status {
+        case .success: return .green
+        case .notConfigured: return .gray
+        case .unauthorized, .networkError, .serverError: return .red
+        }
+    }
+
+    private var connectionLabel: String {
+        guard let status = viewModel.connectionStatus else { return "Not tested" }
+        switch status {
+        case .success: return "Connected"
+        case .notConfigured: return "Not configured"
+        case .unauthorized: return "Unauthorized — check token"
+        case .networkError(let msg): return "Network error: \(msg)"
+        case .serverError(let code, _): return "Server error (\(code))"
         }
     }
 
@@ -64,7 +133,7 @@ struct SettingsView: View {
         } header: {
             Text("Ramble API")
         } footer: {
-            Text("Recordings are uploaded to \(viewModel.apiBaseURL.isEmpty ? "<base URL>" : viewModel.apiBaseURL)/ramble/recordings for processing.")
+            Text("Enter your backend URL and auth token. Recordings upload to <base>/ramble/recordings for transcription and processing.")
         }
     }
 

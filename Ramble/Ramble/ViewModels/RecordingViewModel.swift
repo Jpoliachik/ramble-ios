@@ -106,6 +106,21 @@ final class RecordingViewModel: ObservableObject {
     func deleteRecording(_ recording: Recording) {
         storageService.deleteRecording(recording)
         loadRecordings()
+
+        // Fire-and-forget backend delete if the recording was uploaded
+        if [.processing, .completed, .failed].contains(recording.status) {
+            Task {
+                try? await RambleAPIClient.shared.deleteRecording(id: recording.id)
+            }
+        }
+    }
+
+    var pendingCount: Int {
+        recordings.filter { [.recorded, .uploading, .processing].contains($0.status) }.count
+    }
+
+    var failedCount: Int {
+        recordings.filter { $0.status == .failed }.count
     }
 
     var recordingsByDay: [(date: Date, recordings: [Recording])] {

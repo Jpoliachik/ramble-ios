@@ -66,6 +66,17 @@ Poll for processing results.
 - `401 Unauthorized`
 - `404 Not Found`
 
+### DELETE /ramble/recordings/{id}
+
+Delete a recording and its associated audio/data.
+
+**Responses:**
+- `200 OK` or `204 No Content` — Recording deleted
+- `401 Unauthorized`
+- `404 Not Found` — Recording doesn't exist (treat as success — already deleted)
+
+The app sends a fire-and-forget DELETE when a user deletes a recording locally. The backend should delete the audio file, metadata, transcription, and agent notes associated with the recording.
+
 ### GET /ramble/recordings (future)
 
 List all recordings. Not currently used by the app but reserved for future sync.
@@ -137,6 +148,10 @@ Background:
 
 GET /ramble/recordings/{id}
   → Return current status + results
+
+DELETE /ramble/recordings/{id}
+  → Delete audio file + metadata + results
+  → Return 200/204
 ```
 
 ### Error Handling

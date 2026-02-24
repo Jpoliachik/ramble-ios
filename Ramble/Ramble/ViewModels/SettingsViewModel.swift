@@ -12,9 +12,14 @@ final class SettingsViewModel: ObservableObject {
     @Published var apiToken: String = ""
     @Published var totalRecordings: Int = 0
     @Published var totalDuration: TimeInterval = 0
+    @Published var connectionStatus: ConnectionTestResult?
+    @Published var isTesting = false
+    @Published var pendingUploads: Int = 0
+    @Published var failedUploads: Int = 0
 
     private let settingsService = SettingsService.shared
     private let storageService = StorageService.shared
+    private let apiClient = RambleAPIClient.shared
 
     init() {
         load()
@@ -39,6 +44,14 @@ final class SettingsViewModel: ObservableObject {
         let recordings = storageService.loadRecordings()
         totalRecordings = recordings.count
         totalDuration = recordings.reduce(0) { $0 + $1.duration }
+        pendingUploads = recordings.filter { [.recorded, .uploading, .processing].contains($0.status) }.count
+        failedUploads = recordings.filter { $0.status == .failed }.count
+    }
+
+    func testConnection() async {
+        isTesting = true
+        connectionStatus = await apiClient.testConnection()
+        isTesting = false
     }
 
     func exportJSON() -> URL? {
