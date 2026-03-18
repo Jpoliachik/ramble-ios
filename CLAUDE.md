@@ -4,17 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Ramble** is a personal voice journaling iOS app for Justin. Core flow: voice recording → upload to backend → transcription + LLM extraction → searchable archive. The goal is frictionless daily capture (< 3 seconds from intent to talking) that builds a rich, searchable record of thoughts and activities.
+**Ramble** is a voice-to-text capture app for iOS + watchOS. Core flow: tap record → talk → transcript appears. The goal is frictionless capture (< 3 seconds from intent to talking) from any surface — phone, watch, CarPlay, Siri.
 
 ### Key Principles
 
-- **For Justin only** — Optimize for one person's workflow, not generic "users"
+- **Nothing ever gets lost** — Offline-first, persistent queues, clear status
 - **Capture over organization** — Messy input beats no input; structure comes later
-- **LLM-native** — Design data formats assuming LLMs will process them
-- **Plain text wins** — Markdown files, no proprietary formats or complex databases
-- **Don't overbuild** — Ship minimal, use it, iterate based on real use
+- **No user data on servers** — Privacy by architecture. No login, no accounts.
+- **Pluggable, not opinionated** — Users choose transcription provider. Webhook for downstream.
+- **Ship and iterate** — Don't overbuild. Use it, notice what's missing, add that.
 
-See `docs/VISION.md` for full product vision and iteration phases.
+See `docs/VISION.md` for product vision, `docs/BRAND.md` for brand guide.
 
 ## Build & Development
 
@@ -50,42 +50,45 @@ Ramble/
 ### Data Flow
 
 1. **Record** — AudioRecorderService captures 16kHz mono AAC audio
-2. **Upload** — SyncQueueService uploads audio + metadata to backend via RambleAPIClient
-3. **Poll** — SyncQueueService polls GET /ramble/recordings/{id} for results
-4. **Display** — Recording model updated with transcription + agent_notes from backend
+2. **Transcribe** — TranscriptionQueueService dispatches to on-device (Apple Speech) or proxy API
+3. **Store** — Transcript saved locally to Recording model
+4. **Webhook** — Optional POST of transcript to user-configured URL
 
 ### Key Services
 
 | Service | Role |
 |---------|------|
-| `RambleAPIClient` | HTTP client — multipart upload + JSON polling |
-| `SyncQueueService` | Persistent job queue — upload phase then poll phase with backoff |
-| `BackgroundTaskService` | UIKit + BGProcessingTask for background sync |
+| `TranscriptionQueueService` | Persistent job queue — single-phase transcription with retry |
+| `AppleSpeechTranscriptionService` | On-device transcription via SFSpeechRecognizer |
+| `ProxyTranscriptionService` | HTTP client — sends audio to stateless proxy API |
+| `WebhookQueueService` | Independent queue for webhook delivery |
+| `BackgroundTaskService` | UIKit + BGProcessingTask for background processing |
 | `RecordingManager` | Coordinates audio recording lifecycle |
 | `StorageService` | JSON file persistence for recordings |
 | `PhoneConnectivityService` | WatchConnectivity bridge for watch recordings |
 
 ### Models
 
-- `Recording` — Core model: id, createdAt, duration, audioFileName, status, transcription, agentNotes, lastError
-- `RecordingStatus` — recorded → uploading → processing → completed / failed
-- `UploadJob` — Two-phase job (upload then poll) with retry backoff
-- `Settings` — apiBaseURL + apiToken
+- `Recording` — Core model: id, createdAt, duration, audioFileName, status, transcription, webhookStatus, lastError
+- `RecordingStatus` — recorded → transcribing → completed / failed
+- `TranscriptionJob` — Single-phase job with retry backoff
+- `WebhookJob` — Webhook delivery job with retry
+- `Settings` — transcriptionProvider, proxyBaseURL, webhookURL, deviceId
 
 ### Tech Stack
 
 - SwiftUI for all UI
 - Deployment target: iOS 26.2, watchOS 26.2
 
-### Backend API
+### Proxy API
 
-The app communicates with a backend via 3 endpoints:
-- `POST /ramble/recordings` — Upload audio (multipart)
-- `GET /ramble/recordings/{id}` — Poll for transcription + agent notes
-- `DELETE /ramble/recordings/{id}` — Delete recording from backend
+Thin stateless function (Cloudflare Worker or similar). Receives audio, forwards to transcription provider, returns text. Stores nothing.
 
-Full API spec: `.claude/skills/ramble-backend/SKILL.md`
+- `POST /transcribe` — Multipart audio in, `{"text": "..."}` out
+- `X-Device-ID` header for usage tracking
+
+Full architecture spec: `docs/spec-architecture.md`
 
 ## Current Phase
 
-**Phase 1: Capture** — Building the recording → upload → processing flow. Focus on making it fast and reliable enough for daily use.
+**Architecture rewrite** — Migrating from backend-dependent upload→poll model to local-first transcription with optional webhook. See `docs/spec-architecture.md`.

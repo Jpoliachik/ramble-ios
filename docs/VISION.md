@@ -2,95 +2,131 @@
 
 ## What is this?
 
-A personal voice journaling app that captures daily thoughts through short voice recordings, automatically transcribes them, and extracts meaningful insights. Built for one person (Justin), optimized for his specific workflow and needs.
+Voice-to-text capture. Tap, talk, get a transcript. That's the whole thing.
+
+Ramble is an iOS + watchOS app for capturing thoughts by voice. It records, transcribes, and stores a history of everything you say. The value is speed, reliability, and a searchable text log of your spoken thoughts.
 
 ## The Problem
 
-Justin has always struggled with:
+Typing is slow. Thoughts are fast. By the time you open a notes app and start typing, you've already lost half of what you wanted to say — or you just don't bother.
 
-- Remembering what he did, thought, and felt on any given day
-- Finding time to journal — writing feels like a chore
-- Inconsistent systems — past attempts scattered across apps, formats, and abandoned habits
-- Getting value from captured data — even when he does journal, it's hard to look back and find patterns
-
-The insight: talking is easier than writing. A 2-3 minute voice ramble captures more than 20 minutes of reluctant typing ever would.
+Voice capture solves this, but existing solutions are either unreliable, require too much setup, or lock your data into a platform.
 
 ## The North Star
 
-> At the end of each day, Justin has a rich, searchable, structured record of what he did, discovered, thought about, and how he felt — without it feeling like work.
+> Quick tap → record → transcript appears → always findable. Nothing ever gets lost.
 
 The app succeeds if:
 
-- Recording feels frictionless (< 3 seconds from intent to talking)
-- The output is genuinely useful to look back on
-- The habit sticks
+- Recording starts in < 3 seconds from intent
+- Transcription is fast and accurate
+- The transcript log is easy to browse and copy from
+- It works from phone, watch, CarPlay, and Siri — wherever you are
+- Nothing ever gets lost, even offline
 
 ## Core Loop
 
 ```
-Feel like talking → Open app → Tap → Ramble → Done
+Have a thought → Tap record → Talk → Stop → Transcript appears
 ```
 
-(Behind the scenes: transcribe → extract → store)
+Later: Browse the log → Find what you said → Copy/paste it wherever you need it
 
-Later: Browse past entries → Remember, reflect, spot patterns
+## Who is this for?
 
-## What to Focus On (Iteration Priorities)
+Ramble is growing toward a product. Primary audience:
 
-### Phase 1: Capture (current)
+- **Anyone who thinks faster than they type** — capture ideas, notes, reminders, reflections by voice
+- **People who are living, not sitting at a desk** — driving, walking, running, cooking, carrying things. Moments where you can't type but you can talk.
+- **No technical knowledge required** — should work out of the box
+- **Privacy-conscious** — no login, no user data stored on servers
 
-- Get the recording → transcription → extraction flow working
-- Make it fast and reliable
-- Actually use it daily and see what's missing
+## Brand & Positioning
 
-### Phase 2: Habit Formation
+Ramble is a **lifestyle brand**, not an indie dev project.
 
-- Experiment with reminders/nudges (what time? what trigger?)
-- Widget for quick access
-- Reduce any friction discovered in Phase 1
+The core feeling: you're out in the world, living your life, and your thoughts don't get lost. The app disappears — what remains is the freedom to capture anything, anywhere.
 
-### Phase 3: Retrieval & Value
+**Brand position:** Capture while living. Not at your desk. Not in front of a screen. Out there.
 
-- Make past entries browsable and searchable
-- Surface patterns (energy trends, recurring themes)
-- Daily/weekly summaries across multiple recordings
+**Marketing approach:** All content is outdoors. Videos of recording while walking, on a run with the watch, driving with CarPlay, hiking. Never indoors. The brand lives where the user lives — outside, in motion, hands busy.
 
-### Phase 4: Integration
+**Visual direction:** Natural color palette. Soft, outdoorsy. Think earth tones, muted greens, warm neutrals. Not techy, not startup-blue. The aesthetic says "go outside" not "open another app."
 
-- Export to Obsidian (via cloud storage + Remotely Save)
-- Build knowledge graph connections
-- Cross-reference with other data sources
+**Channel:** Dedicated Instagram. Make it legit — not personal account, not dev log. A proper brand presence that evokes the lifestyle.
+
+See `docs/BRAND.md` for full brand guide.
+
+## Architecture
+
+Record → Transcribe (on-device or via proxy) → Store locally → Optionally POST to webhook.
+
+No login. No accounts. No server-side user data.
+
+**Two selling points:**
+1. Quick, easy transcription from any device — phone, watch, CarPlay, Siri. Get a log of your thoughts you can browse and copy from.
+2. First app that integrates with AI agents in a generic way. Configure a webhook, POST your transcripts to anything.
+
+Full architecture spec: `docs/spec-architecture.md`
+
+## Roadmap
+
+### Now: Reliability & Core Polish
+
+The capture flow works. Focus is making it **bulletproof**.
+
+**Watch reliability pass (top priority):**
+- Offline recording must work without connection
+- Sync queue — when connection available, sync everything; never drop a recording
+- Watch face status — show pending/syncing queue on watch
+- Phone status view — every recording shows exact status at all times
+
+**Bugs:**
+- Haptics not firing on record start/stop (code exists but broken)
+- Record button layout shift on press
+- Screen doesn't auto-update when transcript completes
+- Mic input indicator needs work
+
+**Missing:**
+- Manual retry button for stuck transcriptions
+- Transcript list polish (easy browsing + copy)
+
+### Next: New Surfaces
+
+- **CarPlay support** — record while driving
+- **Widget** — quick access from home screen
+- **Better onboarding** — non-technical users should be able to set up without help
+
+### Later: Search & Browse
+
+- Full-text search across transcripts
+- Timeline browsing
+
+### Future: Distribution
+
+- **Open source release**
+- **Business model TBD** — likely: free (BYOK / on-device) + paid (hosted transcription proxy)
 
 ## Design Principles
 
-1. **For Justin, not for "users"** — No need to generalize. Optimize for one person's preferences, workflow, and quirks. If something feels wrong, change it immediately.
+1. **Nothing ever gets lost** — Offline-first, persistent queues, clear status at all times. This is the core promise.
 
-2. **Capture over organization** — The biggest failure mode is not capturing at all. Organization can come later. Don't let perfect structure prevent messy input.
+2. **Capture over organization** — Messy input beats no input. Structure comes later.
 
-3. **LLM-native from the start** — Raw transcripts are valuable, but the real magic is in extraction, summarization, and pattern recognition. Design data formats assuming LLMs will process them.
+3. **No user data on servers** — Privacy by architecture. No login, no accounts, no server-side storage.
 
-4. **Plain text wins** — Markdown files are portable, future-proof, and greppable. Avoid proprietary formats or complex databases.
+4. **Pluggable, not opinionated** — Users choose their transcription provider. Webhook for downstream processing. Don't lock anyone in.
 
-5. **Iterate based on real use** — Don't overbuild. Ship the minimal thing, use it, notice what's missing, add that. Repeat.
-
-## What Success Looks Like
-
-- **1 week**: App works. Justin has recorded 5+ entries. Transcription and extraction feel useful.
-- **1 month**: Habit is forming. Justin reaches for the app naturally. Looking back at entries provides genuine value ("oh right, I was thinking about that").
-- **3 months**: A meaningful archive exists. Patterns emerge. The data feeds into broader personal knowledge management. Justin can't imagine not having this.
+5. **Ship and iterate** — Don't overbuild. Use it, notice what's missing, add that.
 
 ## What This is NOT
 
-- A product for other people (yet)
-- A polished, designed experience
-- A replacement for deep writing/reflection
-- A complete PKM system (it's one input into a larger system)
+- A note-taking app (it captures voice, gives you text — what you do with it is up to you)
+- An AI assistant (no built-in LLM features — webhook is the extensibility model)
+- A platform that stores your data (transcripts live on your device)
 
-## Open Questions (to answer through use)
+## Open Questions
 
-- When is the best time to record? End of day? Multiple times? On-demand only?
-- How much extraction is useful vs. noise?
-- What prompts/questions help most when starting a ramble?
-- Should state tracking (energy, mood, etc.) be explicit prompts or inferred?
-- How important is audio playback vs. just reading transcripts?
-- What's the right level of structure in the extracted output?
+- On-device vs. API transcription — what's the right default experience?
+- Business model details — how does the paid tier work exactly?
+- How much should the app help with organization, or is raw transcript log enough?
