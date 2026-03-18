@@ -50,7 +50,7 @@ Upload a new audio recording for processing.
   ```
 
 **Responses:**
-- `202 Accepted` — Recording received, processing started
+- `202 Accepted` — Recording received, processing started. If a recording with this ID already exists, the job is reset and reprocessed (idempotent).
   ```json
   {
     "id": "uuid-string",
@@ -58,7 +58,6 @@ Upload a new audio recording for processing.
   }
   ```
 - `401 Unauthorized` — Bad or missing token
-- `409 Conflict` — Recording with this ID already exists
 
 ### GET /ramble/recordings/{id}
 
