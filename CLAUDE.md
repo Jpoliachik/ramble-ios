@@ -92,3 +92,12 @@ Full architecture spec: `docs/spec-architecture.md`
 ## Current Phase
 
 **Architecture rewrite** — Migrating from backend-dependent upload→poll model to local-first transcription with optional webhook. See `docs/spec-architecture.md`.
+
+## Product Notes — 2026-03-23
+
+### Strategy Pivot: Open Source Release
+- Dropping the wellness/lifestyle brand marketing angle — too much effort for the brand side
+- New plan: open source implementation, release on App Store as a clean, useful utility
+- Goal: put Justin's name on something polished, get community input, open source contribution visibility
+- Milestone target: get it on the App Store — that's the ship
+- Keep it simple: it's a good little project, don't over-engineer the brand story around it
