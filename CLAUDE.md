@@ -42,7 +42,7 @@ xcodebuild -project Ramble/Ramble.xcodeproj -scheme "watch Watch App" -destinati
 
 ```
 Ramble/
-├── Ramble/           # Main iOS app source
+├── Ramble/          # Main iOS app source
 ├── watch Watch App/  # watchOS companion
 └── Ramble.xcodeproj/
 ```
@@ -72,7 +72,7 @@ Ramble/
 - `Recording` — Core model: id, createdAt, duration, audioFileName, status, transcription, webhookStatus, lastError
 - `RecordingStatus` — recorded → transcribing → completed / failed
 - `TranscriptionJob` — Single-phase job with retry backoff
-- `WebhookJob` — Webhook delivery job with retry
+- `WebhookJob`  — Webhook delivery job with retry
 - `Settings` — transcriptionProvider, proxyBaseURL, webhookURL, deviceId
 
 ### Tech Stack
@@ -101,3 +101,14 @@ Full architecture spec: `docs/spec-architecture.md`
 - Goal: put Justin's name on something polished, get community input, open source contribution visibility
 - Milestone target: get it on the App Store — that's the ship
 - Keep it simple: it's a good little project, don't over-engineer the brand story around it
+
+## Product Notes — 2026-03-24
+
+### Consistency & Cadence
+- Goal: spend ~1 hour/day on Ramble, every day — block the time, treat it as a dedicated slot
+- No urgency to ship fast, but don't let it drop. Slow and steady is fine.
+- "I just don't want to let it drop" — shipping to App Store is the milestone, not a race
+
+### Confirmed Direction
+- Open source App Store release is still the plan — clean utility, Justin's name on something polished
+- No need to over-engineer the brand story; the project speaks for itself
