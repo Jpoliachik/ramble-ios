@@ -91,13 +91,33 @@ Full architecture spec: `docs/spec-architecture.md`
 
 ## Current Phase
 
-**Architecture rewrite** — Migrating from backend-dependent upload→poll model to local-first transcription with optional webhook. See `docs/spec-architecture.md`.
+**v1 push to App Store** — Local-first architecture is in place. Focus is reliability (queues, retry, status transparency), watch sync, and UX polish. Then ship.
 
-## Product Notes — 2026-03-23
+## Product Direction
 
-### Strategy Pivot: Open Source Release
-- Dropping the wellness/lifestyle brand marketing angle — too much effort for the brand side
-- New plan: open source implementation, release on App Store as a clean, useful utility
-- Goal: put Justin's name on something polished, get community input, open source contribution visibility
-- Milestone target: get it on the App Store — that's the ship
-- Keep it simple: it's a good little project, don't over-engineer the brand story around it
+### What Ramble is
+An open-source voice capture utility. Record, transcribe, store locally, optionally POST to webhook. A "dumb pipe" with a great UX — it's the input device, not the brain.
+
+### Two audiences
+1. **General users** — want fast voice-to-text capture that works out of the box (Apple Speech, no setup)
+2. **Technical users** — want to pipe voice into their agent/automation via webhook (OpenClaw, custom setups, etc.)
+
+### Strategy
+- Open source the repo — privacy proof is in the codebase, no backend
+- Free app on App Store
+- Apple Speech as default transcription (free, private, improving)
+- Optional custom transcription endpoint URL (Groq, Deepgram, self-hosted, etc.)
+- Optional webhook URL for downstream processing (fire and forget)
+- Reference Cloudflare Worker proxy for users who want third-party transcription APIs
+
+### Core promise: nothing ever gets lost
+- Persistent queues with retry for transcription and webhook delivery
+- Clear status on every recording at all times — no mystery spinners
+- Transparent errors with manual retry
+- Background processing via scheduled jobs
+- Watch recordings sync reliably to phone
+
+### v1 scope
+- iOS: record → transcribe → browse/copy transcripts, settings for proxy + webhook
+- Watch: record, sync to phone, queue status visible
+- NOT in v1: CarPlay, widgets, Siri, full-text search, tags/folders
