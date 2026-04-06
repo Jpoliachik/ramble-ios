@@ -8,12 +8,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 No accounts, no servers, no data leaving your device unless you tell it to. Open source — the codebase is the proof.
 
-### Two audiences
+### Three audiences
 
-1. **General users** — want fast voice-to-text capture that works out of the box (Apple Speech, no setup)
-2. **Technical users** — want to pipe voice into their agent/automation via webhook (OpenClaw, custom setups, etc.)
+1. **General users** — want reliable Apple Watch voice notes. Record a thought on a hike, get a clean transcript when you get home. Apple Speech, no setup, just works.
+2. **Power users** — want better transcription quality and are willing to pay for it. Upgrade to a hosted transcription service (Groq Whisper, etc.) for more accurate results.
+3. **Technical users** — want to pipe voice into their agent/automation via webhook (OpenClaw, custom setups, etc.) or point at their own transcription endpoint.
 
-Both need fast, reliable, private voice capture. What happens *after* capture is up to the user.
+The primary marketing pitch is **Apple Watch voice capture**. Record anywhere, get your transcript back. That's the hook. The power user upgrade and webhook/automation stuff is there for people who want it, but the core story is simple and universal.
 
 ### What Ramble is
 
@@ -52,11 +53,10 @@ A voice input device with a great UX. A dumb pipe that captures beautifully and 
 ## Strategy
 
 - Open source the repo — privacy proof is in the codebase, no backend
-- Free app on App Store
-- Apple Speech as default transcription (free, private, improving)
-- Optional custom transcription endpoint URL (Groq, Deepgram, self-hosted, etc.)
+- Free app on App Store, Apple Speech default (free, private, improving)
+- Paid transcription upgrade via Cloudflare Worker proxy (better models, open source backend so users can verify)
+- Optional custom transcription endpoint URL (bring your own: Groq, Deepgram, self-hosted, etc.)
 - Optional webhook URL for downstream processing (fire and forget)
-- Reference Cloudflare Worker proxy for users who want third-party transcription APIs
 
 ### The trust contract: nothing ever gets lost
 
@@ -72,7 +72,9 @@ If someone records a thought on their watch during a hike and the transcript isn
 
 **Default: Apple Speech (on-device).** Free, private, zero setup. Out-of-box experience.
 
-**Optional: Custom transcription endpoint.** Point Ramble at any URL that accepts audio and returns text. Same pattern as webhook: just a URL in settings.
+**Upgrade: Hosted transcription service.** For users who want better accuracy, offer a paid upgrade that routes through our Cloudflare Worker proxy to a higher-quality model (e.g. Groq Whisper). The proxy is open source — users can verify no data is stored.
+
+**Custom endpoint: Bring your own.** Point Ramble at any URL that accepts audio and returns text. Same pattern: just a URL in settings.
 
 ### Privacy
 
@@ -163,19 +165,6 @@ Full architecture spec: `docs/spec-architecture.md`
 
 **Visual:** Clean and warm. Sage/stone/cream palette. SF Pro. Simple waveform logo that works at watch-complication size.
 
-### Color Palette
-
-| Name | Hex | Usage |
-|------|-----|-------|
-| Stone | `#78716C` | Primary text, UI elements |
-| Warm Sand | `#D6CFC7` | Backgrounds, cards |
-| Sage | `#87A878` | Accents, success states, record button |
-| Deep Forest | `#3D5A3E` | Headers, emphasis |
-| Cream | `#F5F0EB` | Page backgrounds |
-| Terracotta | `#C67B5C` | Warm accents, alerts |
-| Sky | `#8FAFCA` | Links, info states |
-| Dusk | `#9B8FA0` | Muted secondary text |
-| Bark | `#5C4B3C` | Dark mode text |
 
 ### App Store Description (draft)
 
@@ -192,20 +181,4 @@ Full architecture spec: `docs/spec-architecture.md`
 - How much transcript browsing/search UX is needed for v1 vs. "just scroll the list"?
 - Should the webhook configuration support custom headers (for auth tokens)?
 - Watch complication — worth it for v1?
-### Strategy Pivot: Open Source Release
-- Dropping the wellness/lifestyle brand marketing angle — too much effort for the brand side
-- New plan: open source implementation, release on App Store as a clean, useful utility
-- Goal: put Justin's name on something polished, get community input, open source contribution visibility
-- Milestone target: get it on the App Store — that's the ship
-- Keep it simple: it's a good little project, don't over-engineer the brand story around it
-
-## Product Notes — 2026-03-24
-
-### Consistency & Cadence
-- Goal: spend ~1 hour/day on Ramble, every day — block the time, treat it as a dedicated slot
-- No urgency to ship fast, but don't let it drop. Slow and steady is fine.
-- "I just don't want to let it drop" — shipping to App Store is the milestone, not a race
-
-### Confirmed Direction
-- Open source App Store release is still the plan — clean utility, Justin's name on something polished
-- No need to over-engineer the brand story; the project speaks for itself
+- Pricing/model for the paid transcription upgrade?

@@ -1,10 +1,10 @@
 # Ramble
 
-A personal voice journaling iOS app. Record your thoughts, get them transcribed and processed by AI, and build a searchable archive of your life.
+An open-source voice-to-text capture app for iOS + watchOS. Tap record, talk, get a transcript. That's the whole thing.
 
-**Core flow:** Voice recording → Upload to backend → Transcription + LLM extraction → Searchable archive
+**Core flow:** Record → Transcribe locally (Apple Speech) → Browse/copy transcripts
 
-The goal is frictionless daily capture — under 3 seconds from intent to talking.
+No accounts, no servers, no data leaving your device unless you tell it to. Open source — the codebase is the proof.
 
 ## Setup
 
@@ -12,7 +12,6 @@ The goal is frictionless daily capture — under 3 seconds from intent to talkin
 
 - Xcode 16+
 - iOS 18+ / watchOS 11+ device or simulator
-- A Ramble-compatible backend (see [Backend API](#ramble-backend-api) below)
 
 ### Getting Started
 
@@ -27,21 +26,18 @@ The goal is frictionless daily capture — under 3 seconds from intent to talkin
    open Ramble/Ramble.xcodeproj
    ```
 
-3. Build and run on a simulator or device.
-
-4. Open Settings in the app and configure your backend API base URL and auth token.
+3. Build and run on a simulator or device. Works out of the box with Apple Speech transcription.
 
 ## Project Structure
 
 ```
 Ramble/
 ├── Ramble/              # Main iOS app (SwiftUI)
-│   ├── Models/          # Data models (Recording, UploadJob, Settings)
-│   ├── Services/        # Audio, API client, sync queue, storage
+│   ├── Models/          # Data models (Recording, Settings)
+│   ├── Services/        # Audio, transcription, storage, sync
 │   ├── ViewModels/      # Recording and settings view models
 │   ├── Views/           # SwiftUI views
 │   └── Utilities/       # Haptics, constants
-├── widgets/             # WidgetKit extension with Live Activities
 └── watch Watch App/     # watchOS companion app
 ```
 
@@ -55,36 +51,13 @@ xcodebuild -project Ramble/Ramble.xcodeproj -scheme Ramble -destination 'platfor
 xcodebuild -project Ramble/Ramble.xcodeproj -scheme "watch Watch App" -destination 'platform=watchOS Simulator,name=Apple Watch Series 11 (46mm)'
 ```
 
-## Ramble Backend API
+## Transcription
 
-Ramble uploads audio recordings to a backend for processing. The backend handles transcription and optionally runs LLM extraction (summaries, action items, tags, etc.). This means you can swap or upgrade the processing pipeline without changing the app.
+**Default:** Apple Speech (on-device). Free, private, zero setup.
 
-### API Endpoints
+**Optional:** Point Ramble at a custom transcription endpoint for higher-quality models. A reference Cloudflare Worker proxy is included in `proxy/` — it forwards audio to Groq Whisper and returns text. See `proxy/README.md` for setup.
 
-#### POST /ramble/recordings
-
-Upload audio for processing. Multipart form-data with:
-- `audio` part: .m4a file (16kHz mono AAC)
-- `metadata` part: JSON `{ "id": "uuid", "created_at": "ISO8601", "duration": 125.3 }`
-- Auth: `Authorization: Bearer <token>`
-- Returns: `202 { "id", "status": "processing" }` or `409` if already exists
-
-#### GET /ramble/recordings/{id}
-
-Poll for results.
-- Returns: `200 { "id", "status", "transcription?", "agent_notes?", "error?" }`
-- `status`: `"processing"` | `"completed"` | `"failed"`
-- `agent_notes`: open-ended markdown (summaries, tags, action items, etc.)
-
-#### GET /ramble/recordings (future)
-
-List endpoint for sync — defined in spec but not yet used by the app.
-
-### For AI Agents
-
-If you are an AI agent and want to build a Ramble-compatible backend, the complete API specification and implementation guide is available at `.claude/skills/ramble-backend/SKILL.md` in this repository. That file contains the full contract including audio format details, authentication requirements, example responses, and processing flow recommendations.
-
-The backend can be implemented in any language or framework. The minimum requirement is: receive an audio upload, transcribe it, and return results via the polling endpoint.
+**Webhook:** Optionally POST transcripts to any URL for downstream processing (agents, automations, etc.). Configure in Settings.
 
 ## License
 
