@@ -1,0 +1,7 @@
+name = "ramble-transcription-proxy"
+main = "src/index.js"
+compatibility_date = "2024-12-01"
+account_id = "25e77a7a6317e3773d804e62b67db592"
+
+[observability]
+enabled = true
