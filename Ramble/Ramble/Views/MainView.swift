@@ -25,10 +25,8 @@ struct MainView: View {
                 .padding(.horizontal)
                 .padding(.top, 8)
 
-                // Setup / sync status
-                if !RambleAPIClient.shared.isConfigured {
-                    SetupCardView { showSettings = true }
-                } else if viewModel.failedCount > 0 || viewModel.pendingCount > 0 {
+                // Sync status
+                if viewModel.failedCount > 0 || viewModel.pendingCount > 0 {
                     SyncStatusBannerView(
                         pendingCount: viewModel.pendingCount,
                         failedCount: viewModel.failedCount,

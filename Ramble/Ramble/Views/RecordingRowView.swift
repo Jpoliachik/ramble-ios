@@ -44,7 +44,7 @@ struct RecordingRowView: View {
         switch recording.status {
         case .recorded:
             EmptyView()
-        case .uploading, .processing:
+        case .transcribing:
             ProgressView()
                 .scaleEffect(0.8)
         case .completed:
@@ -68,7 +68,7 @@ struct RecordingRowView: View {
         ))
         RecordingRowView(recording: Recording(
             duration: 45,
-            status: .processing
+            status: .transcribing
         ))
         RecordingRowView(recording: Recording(
             duration: 200,

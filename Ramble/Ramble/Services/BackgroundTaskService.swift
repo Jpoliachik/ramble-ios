@@ -28,7 +28,7 @@ final class BackgroundTaskService {
     // MARK: - Immediate Background Processing
 
     /// Begin a UIKit background task for immediate execution time (~30s).
-    /// Call this when entering background to finish in-flight upload + poll work.
+    /// Call this when entering background to finish in-flight transcription + webhook work.
     func beginImmediateBackgroundProcessing() {
         guard backgroundTaskID == .invalid else {
             print("[Background] Immediate background task already active")
@@ -48,14 +48,16 @@ final class BackgroundTaskService {
         print("[Background] Immediate background task started (remaining: \(String(format: "%.0f", UIApplication.shared.backgroundTimeRemaining))s)")
 
         Task { @MainActor in
-            let queue = SyncQueueService.shared
+            let transcriptionQueue = TranscriptionQueueService.shared
+            let webhookQueue = WebhookQueueService.shared
 
-            queue.resumePendingJobs()
+            transcriptionQueue.resumePendingJobs()
+            webhookQueue.resumePendingJobs()
 
-            while queue.hasActiveWork {
+            while transcriptionQueue.hasActiveWork || webhookQueue.hasActiveWork {
                 let remaining = UIApplication.shared.backgroundTimeRemaining
                 if remaining < 5 {
-                    print("[Background] Running low on time (\(String(format: "%.0f", remaining))s), stopping poll")
+                    print("[Background] Running low on time (\(String(format: "%.0f", remaining))s), stopping")
                     break
                 }
                 try? await Task.sleep(nanoseconds: 500_000_000)
@@ -91,12 +93,14 @@ final class BackgroundTaskService {
         scheduleSyncTask()
 
         let workTask = Task { @MainActor in
-            let queue = SyncQueueService.shared
+            let transcriptionQueue = TranscriptionQueueService.shared
+            let webhookQueue = WebhookQueueService.shared
 
-            queue.resumePendingJobs()
+            transcriptionQueue.resumePendingJobs()
+            webhookQueue.resumePendingJobs()
 
             let deadline = Date().addingTimeInterval(25)
-            while queue.hasActiveWork && Date() < deadline {
+            while (transcriptionQueue.hasActiveWork || webhookQueue.hasActiveWork) && Date() < deadline {
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
             }
         }

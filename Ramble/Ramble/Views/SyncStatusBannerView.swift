@@ -16,12 +16,12 @@ struct SyncStatusBannerView: View {
                 if failedCount > 0 {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundColor(.orange)
-                    Text("\(failedCount) upload\(failedCount == 1 ? "" : "s") failed")
+                    Text("\(failedCount) transcription\(failedCount == 1 ? "" : "s") failed")
                         .font(.subheadline.weight(.medium))
                 } else {
                     ProgressView()
                         .controlSize(.small)
-                    Text("\(pendingCount) recording\(pendingCount == 1 ? "" : "s") syncing...")
+                    Text("\(pendingCount) recording\(pendingCount == 1 ? "" : "s") transcribing...")
                         .font(.subheadline.weight(.medium))
                 }
 

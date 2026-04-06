@@ -8,18 +8,18 @@ import Foundation
 
 @MainActor
 final class SettingsViewModel: ObservableObject {
-    @Published var apiBaseURL: String = ""
-    @Published var apiToken: String = ""
+    @Published var transcriptionProvider: TranscriptionProvider = .appleSpeech
+    @Published var webhookEnabled: Bool = false
+    @Published var webhookURL: String = ""
+    @Published var webhookSecret: String = ""
+    @Published var deviceId: String = ""
     @Published var totalRecordings: Int = 0
     @Published var totalDuration: TimeInterval = 0
-    @Published var connectionStatus: ConnectionTestResult?
-    @Published var isTesting = false
-    @Published var pendingUploads: Int = 0
-    @Published var failedUploads: Int = 0
+    @Published var pendingTranscriptions: Int = 0
+    @Published var failedTranscriptions: Int = 0
 
     private let settingsService = SettingsService.shared
     private let storageService = StorageService.shared
-    private let apiClient = RambleAPIClient.shared
 
     init() {
         load()
@@ -27,31 +27,35 @@ final class SettingsViewModel: ObservableObject {
 
     func load() {
         let settings = settingsService.load()
-        apiBaseURL = settings.apiBaseURL ?? ""
-        apiToken = settings.apiToken ?? ""
+        transcriptionProvider = settings.transcriptionProvider
+        webhookEnabled = settings.webhookEnabled
+        webhookURL = settings.webhookURL ?? ""
+        webhookSecret = settings.webhookSecret
+        deviceId = settings.deviceId
         loadStats()
     }
 
     func save() {
         let settings = Settings(
-            apiBaseURL: apiBaseURL.isEmpty ? nil : apiBaseURL,
-            apiToken: apiToken.isEmpty ? nil : apiToken
+            transcriptionProvider: transcriptionProvider,
+            webhookEnabled: webhookEnabled,
+            webhookURL: webhookURL.isEmpty ? nil : webhookURL,
+            webhookSecret: webhookSecret,
+            deviceId: deviceId
         )
         settingsService.save(settings)
+    }
+
+    func regenerateWebhookSecret() {
+        webhookSecret = Settings.generateSecret()
     }
 
     private func loadStats() {
         let recordings = storageService.loadRecordings()
         totalRecordings = recordings.count
         totalDuration = recordings.reduce(0) { $0 + $1.duration }
-        pendingUploads = recordings.filter { [.recorded, .uploading, .processing].contains($0.status) }.count
-        failedUploads = recordings.filter { $0.status == .failed }.count
-    }
-
-    func testConnection() async {
-        isTesting = true
-        connectionStatus = await apiClient.testConnection()
-        isTesting = false
+        pendingTranscriptions = recordings.filter { [.recorded, .transcribing].contains($0.status) }.count
+        failedTranscriptions = recordings.filter { $0.status == .failed }.count
     }
 
     func exportJSON() -> URL? {

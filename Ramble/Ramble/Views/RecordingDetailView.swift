@@ -12,7 +12,7 @@ struct RecordingDetailView: View {
     @State private var isRetrying = false
 
     private let storageService = StorageService.shared
-    private let syncQueue = SyncQueueService.shared
+    private let transcriptionQueue = TranscriptionQueueService.shared
 
     init(recording: Recording) {
         self.recordingId = recording.id
@@ -26,11 +26,6 @@ struct RecordingDetailView: View {
                     metadataSection(recording)
                     Divider()
                     transcriptSection(recording)
-
-                    if let agentNotes = recording.agentNotes, !agentNotes.isEmpty {
-                        Divider()
-                        agentNotesSection(agentNotes)
-                    }
                 }
                 .padding()
             }
@@ -98,14 +93,10 @@ struct RecordingDetailView: View {
             case .recorded:
                 Image(systemName: "clock")
                 Text("Recorded")
-            case .uploading:
+            case .transcribing:
                 ProgressView()
                     .scaleEffect(0.7)
-                Text("Uploading")
-            case .processing:
-                ProgressView()
-                    .scaleEffect(0.7)
-                Text("Processing")
+                Text("Transcribing")
             case .completed:
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundColor(.green)
@@ -157,11 +148,11 @@ struct RecordingDetailView: View {
                     .italic()
             }
 
-            if isActive(recording) {
+            if recording.status == .transcribing {
                 HStack(spacing: 8) {
                     ProgressView()
                         .scaleEffect(0.8)
-                    Text(progressLabel(for: recording))
+                    Text("Transcribing...")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
@@ -184,10 +175,15 @@ struct RecordingDetailView: View {
                 .cornerRadius(8)
             }
 
+            // Webhook status
+            if let webhookStatus = recording.webhookStatus {
+                webhookStatusView(webhookStatus)
+            }
+
             Button {
                 HapticService.buttonTap()
                 isRetrying = true
-                syncQueue.retry(recordingId: recording.id)
+                transcriptionQueue.retry(recordingId: recording.id)
                 Task {
                     try? await Task.sleep(nanoseconds: 500_000_000)
                     refreshRecording()
@@ -207,53 +203,51 @@ struct RecordingDetailView: View {
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
-            .disabled(isRetrying || isActive(recording))
+            .disabled(isRetrying || recording.status == .transcribing)
         }
     }
 
-    // MARK: - Agent Notes Section
+    // MARK: - Webhook Status
 
-    private func agentNotesSection(_ notes: String) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Agent Notes")
-                .font(.headline)
-
-            Text(notes)
-                .font(.body)
-                .textSelection(.enabled)
+    private func webhookStatusView(_ status: WebhookStatus) -> some View {
+        HStack(spacing: 6) {
+            switch status {
+            case .pending, .sending:
+                ProgressView()
+                    .scaleEffect(0.7)
+                Text("Sending to webhook...")
+            case .delivered:
+                Image(systemName: "paperplane.circle.fill")
+                    .foregroundColor(.green)
+                Text("Webhook delivered")
+            case .failed:
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundColor(.orange)
+                Text("Webhook failed")
+            }
         }
+        .font(.caption)
+        .foregroundColor(.secondary)
+        .padding(.vertical, 2)
     }
 
     // MARK: - Helpers
 
-    private func isActive(_ recording: Recording) -> Bool {
-        [.uploading, .processing].contains(recording.status)
-    }
-
-    private func progressLabel(for recording: Recording) -> String {
-        switch recording.status {
-        case .uploading: return "Uploading audio..."
-        case .processing: return "Processing..."
-        default: return "Working..."
-        }
-    }
-
     private func retryButtonLabel(for recording: Recording) -> String {
         switch recording.status {
         case .failed: return "Retry"
-        case .completed: return "Re-process"
-        case .recorded: return "Upload"
-        default: return "Processing..."
+        case .completed: return "Re-transcribe"
+        case .recorded: return "Transcribe"
+        default: return "Transcribing..."
         }
     }
 
     private func transcriptPlaceholder(for recording: Recording) -> String {
         switch recording.status {
-        case .recorded: return "Waiting to upload..."
-        case .uploading: return "Uploading audio..."
-        case .processing: return "Processing..."
+        case .recorded: return "Waiting to transcribe..."
+        case .transcribing: return "Transcribing..."
         case .completed: return "No transcription available."
-        case .failed: return "Processing failed. Tap Retry below."
+        case .failed: return "Transcription failed. Tap Retry below."
         }
     }
 
@@ -280,8 +274,7 @@ struct RecordingDetailView: View {
         RecordingDetailView(recording: Recording(
             duration: 125,
             status: .completed,
-            transcription: "This is a sample transcription.",
-            agentNotes: "## Summary\nDiscussed project plans for the weekend.\n\n## Tags\n#planning #personal"
+            transcription: "This is a sample transcription."
         ))
     }
 }

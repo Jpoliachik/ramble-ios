@@ -22,7 +22,6 @@ final class PhoneConnectivityService: NSObject, ObservableObject {
     let stopRequestReceived = PassthroughSubject<Void, Never>()
 
     private let storageService = StorageService.shared
-    private let syncQueue = SyncQueueService.shared
 
     override init() {
         super.init()
@@ -184,7 +183,7 @@ extension PhoneConnectivityService: WCSessionDelegate {
 
             Task { @MainActor in
                 storageService.addRecording(recording)
-                syncQueue.enqueue(recordingId: recording.id)
+                TranscriptionQueueService.shared.enqueue(recordingId: recording.id)
             }
 
             print("Received recording from watch: \(metadata.recordingId)")

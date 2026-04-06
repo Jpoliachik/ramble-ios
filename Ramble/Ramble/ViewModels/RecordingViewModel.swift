@@ -22,9 +22,8 @@ final class RecordingViewModel: ObservableObject {
 
     private let recordingManager = RecordingManager.shared
     private let storageService = StorageService.shared
-    private let syncQueue = SyncQueueService.shared
+    private let transcriptionQueue = TranscriptionQueueService.shared
     private let connectivity = PhoneConnectivityService.shared
-    private var refreshTimer: Timer?
     private var cancellables = Set<AnyCancellable>()
 
     var watchRecordingDuration: TimeInterval {
@@ -36,8 +35,8 @@ final class RecordingViewModel: ObservableObject {
         loadRecordings()
         observeRecordingManager()
         observeConnectivity()
-        startRefreshTimer()
-        syncQueue.resumePendingJobs()
+        observeStorageChanges()
+        transcriptionQueue.resumePendingJobs()
     }
 
     private func observeRecordingManager() {
@@ -73,12 +72,13 @@ final class RecordingViewModel: ObservableObject {
         loadRecordings()
     }
 
-    private func startRefreshTimer() {
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            Task { @MainActor in
+    private func observeStorageChanges() {
+        NotificationCenter.default.publisher(for: StorageService.recordingsDidChangeNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
                 self?.loadRecordings()
             }
-        }
+            .store(in: &cancellables)
     }
 
     func loadRecordings() {
@@ -106,17 +106,10 @@ final class RecordingViewModel: ObservableObject {
     func deleteRecording(_ recording: Recording) {
         storageService.deleteRecording(recording)
         loadRecordings()
-
-        // Fire-and-forget backend delete if the recording was uploaded
-        if [.processing, .completed, .failed].contains(recording.status) {
-            Task {
-                try? await RambleAPIClient.shared.deleteRecording(id: recording.id)
-            }
-        }
     }
 
     var pendingCount: Int {
-        recordings.filter { [.recorded, .uploading, .processing].contains($0.status) }.count
+        recordings.filter { [.recorded, .transcribing].contains($0.status) }.count
     }
 
     var failedCount: Int {

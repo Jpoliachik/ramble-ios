@@ -141,7 +141,7 @@ Ramble/
 - `RecordingStatus` — recorded → transcribing → completed / failed
 - `TranscriptionJob` — Single-phase job with retry backoff
 - `WebhookJob`  — Webhook delivery job with retry
-- `Settings` — transcriptionProvider, proxyBaseURL, webhookURL, deviceId
+- `Settings` — transcriptionProvider, webhookEnabled, webhookURL, webhookSecret, deviceId
 
 ### Tech Stack
 
@@ -176,9 +176,26 @@ Full architecture spec: `docs/spec-architecture.md`
 >
 > Open source. No servers. Your thoughts, your data.
 
+## Pre-Launch Checklist
+
+### Proxy endpoint authentication (REQUIRED before public release)
+
+The Cloudflare Worker transcription proxy is currently an open endpoint — anyone with the URL can send audio for transcription at our cost. This must be locked down before shipping publicly.
+
+**Recommended approach (two layers):**
+
+1. **Apple App Attest** — Use `DCAppAttestService` on the client to generate a hardware-backed attestation proving the request comes from a legitimate copy of Ramble on a real Apple device. Send the attestation as an `X-App-Attest` header. The worker verifies it against Apple's attestation servers before processing. This is the primary defense.
+
+2. **Rate limiting per device ID** — Use Cloudflare KV or Durable Objects to cap requests per device per hour (e.g. 60/hour). Even with valid attestation, this prevents a single device from running up costs. Also protects during the window before App Attest is implemented.
+
+**Where the TODOs live:**
+- `Ramble/Services/ProxyTranscriptionService.swift` — client-side: add attestation header to requests
+- `proxy/src/index.js` — server-side: verify attestation + enforce rate limits
+
+**Implementation order:** Rate limiting first (quick win, worker-only change), then App Attest (requires client + server changes).
+
 ## Open Questions
 
 - How much transcript browsing/search UX is needed for v1 vs. "just scroll the list"?
-- Should the webhook configuration support custom headers (for auth tokens)?
 - Watch complication — worth it for v1?
 - Pricing/model for the paid transcription upgrade?

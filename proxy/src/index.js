@@ -19,6 +19,11 @@ export default {
   },
 };
 
+// TODO: Before public launch, add request authentication:
+// 1. Verify Apple App Attest token (X-App-Attest header) against Apple's attestation servers
+//    to prove requests come from a legitimate app install on a real device.
+// 2. Add rate limiting per device ID (e.g. Cloudflare KV or Durable Objects)
+//    to cap requests per device per hour and prevent abuse even with valid attestation.
 async function handleTranscribe(request, env) {
   const deviceId = request.headers.get('X-Device-ID') || 'unknown';
 
