@@ -3,13 +3,15 @@
 //  Ramble
 //
 
+import AVFAudio
 import Foundation
 import Speech
 
 enum TranscriptionError: Error, LocalizedError {
     case audioFileNotFound
-    case recognitionUnavailable
-    case recognitionDenied
+    case modelNotInstalled
+    case localeNotSupported
+    case speechAnalyzerUnavailable
     case recognitionFailed(String)
     case proxyNotConfigured
     case proxyError(statusCode: Int, message: String)
@@ -19,10 +21,12 @@ enum TranscriptionError: Error, LocalizedError {
         switch self {
         case .audioFileNotFound:
             return "Audio file not found"
-        case .recognitionUnavailable:
-            return "Speech recognition is not available on this device"
-        case .recognitionDenied:
-            return "Speech recognition permission denied. Enable in Settings > Privacy > Speech Recognition"
+        case .modelNotInstalled:
+            return SpeechAnalyzerTranscriptionService.modelNotInstalledError
+        case .localeNotSupported:
+            return "Speech recognition is not supported for your language"
+        case .speechAnalyzerUnavailable:
+            return "On-device transcription requires iOS 26 or later"
         case .recognitionFailed(let message):
             return "Transcription failed: \(message)"
         case .proxyNotConfigured:
@@ -35,55 +39,111 @@ enum TranscriptionError: Error, LocalizedError {
     }
 }
 
-// MARK: - Apple Speech (On-Device)
+// MARK: - SpeechAnalyzer (On-Device, iOS 26+)
 
-final class AppleSpeechTranscriptionService {
-    private let recognizer = SFSpeechRecognizer()
+final class SpeechAnalyzerTranscriptionService {
+    static let modelNotInstalledError = "Speech model not downloaded. Tap to download and retry."
 
+    /// Check whether the speech model for the current locale is installed on-device.
+    func isModelInstalled() async -> Bool {
+        guard #available(iOS 26.0, *) else { return false }
+        let locale = Locale.current
+        let installed = await SpeechTranscriber.installedLocales
+        return installed.contains { $0.identifier(.bcp47) == locale.identifier(.bcp47) }
+    }
+
+    /// Check whether the current locale is supported at all.
+    func isLocaleSupported() async -> Bool {
+        guard #available(iOS 26.0, *) else { return false }
+        let locale = Locale.current
+        let supported = await SpeechTranscriber.supportedLocales
+        return supported.contains { $0.identifier(.bcp47) == locale.identifier(.bcp47) }
+    }
+
+    /// Download the speech model for the current locale. No-op if already installed.
+    func downloadModel() async throws {
+        guard #available(iOS 26.0, *) else {
+            throw TranscriptionError.speechAnalyzerUnavailable
+        }
+        let locale = Locale.current
+        let transcriber = SpeechTranscriber(
+            locale: locale,
+            transcriptionOptions: [],
+            reportingOptions: [],
+            attributeOptions: []
+        )
+        if let downloader = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
+            try await downloader.downloadAndInstall()
+        }
+    }
+
+    /// Proactively prepare the model on app launch — best-effort, silent failures.
+    func prepareModelIfNeeded() async {
+        async let localeSupported = isLocaleSupported()
+        async let modelInstalled = isModelInstalled()
+        guard await localeSupported else { return }
+        guard !(await modelInstalled) else { return }
+        do {
+            try await downloadModel()
+            print("Speech model downloaded successfully")
+        } catch {
+            print("Speech model preparation failed: \(error.localizedDescription)")
+        }
+    }
+
+    /// Transcribe an audio file using SpeechAnalyzer.
     func transcribe(audioURL: URL) async throws -> String {
+        guard #available(iOS 26.0, *) else {
+            throw TranscriptionError.speechAnalyzerUnavailable
+        }
+
         guard FileManager.default.fileExists(atPath: audioURL.path) else {
             throw TranscriptionError.audioFileNotFound
         }
 
-        guard let recognizer = recognizer, recognizer.isAvailable else {
-            throw TranscriptionError.recognitionUnavailable
+        async let localeSupported = isLocaleSupported()
+        async let modelInstalled = isModelInstalled()
+
+        guard await localeSupported else {
+            throw TranscriptionError.localeNotSupported
         }
 
-        // Check authorization
-        let authStatus = SFSpeechRecognizer.authorizationStatus()
-        switch authStatus {
-        case .notDetermined:
-            let granted = await withCheckedContinuation { continuation in
-                SFSpeechRecognizer.requestAuthorization { status in
-                    continuation.resume(returning: status == .authorized)
-                }
+        guard await modelInstalled else {
+            throw TranscriptionError.modelNotInstalled
+        }
+
+        let locale = Locale.current
+        let transcriber = SpeechTranscriber(
+            locale: locale,
+            transcriptionOptions: [],
+            reportingOptions: [],
+            attributeOptions: []
+        )
+
+        // Start collecting results before feeding audio
+        async let transcriptionFuture: String = {
+            var text = ""
+            for try await result in transcriber.results where result.isFinal {
+                text += String(result.text.characters)
             }
-            guard granted else { throw TranscriptionError.recognitionDenied }
-        case .denied, .restricted:
-            throw TranscriptionError.recognitionDenied
-        case .authorized:
-            break
-        @unknown default:
-            break
+            return text
+        }()
+
+        let analyzer = SpeechAnalyzer(modules: [transcriber])
+        let audioFile = try AVAudioFile(forReading: audioURL)
+
+        if let lastSample = try await analyzer.analyzeSequence(from: audioFile) {
+            try await analyzer.finalizeAndFinish(through: lastSample)
+        } else {
+            await analyzer.cancelAndFinishNow()
         }
 
-        let request = SFSpeechURLRecognitionRequest(url: audioURL)
-        request.shouldReportPartialResults = false
-        request.addsPunctuation = true
+        let result = try await transcriptionFuture
 
-        return try await withCheckedThrowingContinuation { continuation in
-            var hasResumed = false
-            recognizer.recognitionTask(with: request) { result, error in
-                guard !hasResumed else { return }
-                if let error = error {
-                    hasResumed = true
-                    continuation.resume(throwing: TranscriptionError.recognitionFailed(error.localizedDescription))
-                    return
-                }
-                guard let result = result, result.isFinal else { return }
-                hasResumed = true
-                continuation.resume(returning: result.bestTranscription.formattedString)
-            }
+        guard !result.isEmpty else {
+            throw TranscriptionError.recognitionFailed("No speech detected")
         }
+
+        return result
     }
 }

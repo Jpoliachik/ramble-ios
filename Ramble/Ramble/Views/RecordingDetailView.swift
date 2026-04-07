@@ -10,6 +10,7 @@ struct RecordingDetailView: View {
     @State private var recording: Recording?
     @State private var showCopied = false
     @State private var isRetrying = false
+    @State private var isDownloadingModel = false
 
     private let storageService = StorageService.shared
     private let transcriptionQueue = TranscriptionQueueService.shared
@@ -160,19 +161,23 @@ struct RecordingDetailView: View {
             }
 
             if recording.status == .failed, let error = recording.lastError {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Error:")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(.red)
-                    Text(error)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                if recording.isModelNotInstalled {
+                    modelNotInstalledView
+                } else {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Error:")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.red)
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.red.opacity(0.1))
+                    .clipShape(.rect(cornerRadius: 8))
                 }
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.red.opacity(0.1))
-                .cornerRadius(8)
             }
 
             // Webhook status
@@ -180,30 +185,61 @@ struct RecordingDetailView: View {
                 webhookStatusView(webhookStatus)
             }
 
-            Button {
-                HapticService.buttonTap()
-                isRetrying = true
-                transcriptionQueue.retry(recordingId: recording.id)
-                Task {
-                    try? await Task.sleep(nanoseconds: 500_000_000)
-                    refreshRecording()
-                    isRetrying = false
-                }
-            } label: {
-                HStack {
-                    if isRetrying {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                    } else {
-                        Image(systemName: "arrow.clockwise")
+            if recording.isModelNotInstalled {
+                Button {
+                    HapticService.buttonTap()
+                    isDownloadingModel = true
+                    Task {
+                        do {
+                            try await transcriptionQueue.downloadModelAndRetryPending()
+                        } catch {
+                            print("Model download failed: \(error)")
+                        }
+                        refreshRecording()
+                        isDownloadingModel = false
                     }
-                    Text(retryButtonLabel(for: recording))
+                } label: {
+                    HStack {
+                        if isDownloadingModel {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("Downloading Speech Model...")
+                        } else {
+                            Image(systemName: "arrow.down.circle")
+                            Text("Download Speech Model & Retry")
+                        }
+                    }
+                    .font(.subheadline)
+                    .frame(maxWidth: .infinity)
                 }
-                .font(.subheadline)
-                .frame(maxWidth: .infinity)
+                .buttonStyle(.borderedProminent)
+                .disabled(isDownloadingModel)
+            } else {
+                Button {
+                    HapticService.buttonTap()
+                    isRetrying = true
+                    transcriptionQueue.retry(recordingId: recording.id)
+                    Task {
+                        try? await Task.sleep(nanoseconds: 500_000_000)
+                        refreshRecording()
+                        isRetrying = false
+                    }
+                } label: {
+                    HStack {
+                        if isRetrying {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                        Text(retryButtonLabel(for: recording))
+                    }
+                    .font(.subheadline)
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(isRetrying || recording.status == .transcribing)
             }
-            .buttonStyle(.bordered)
-            .disabled(isRetrying || recording.status == .transcribing)
         }
     }
 
@@ -229,6 +265,27 @@ struct RecordingDetailView: View {
         .font(.caption)
         .foregroundColor(.secondary)
         .padding(.vertical, 2)
+    }
+
+    // MARK: - Model Not Installed
+
+    private var modelNotInstalledView: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label("Speech Model Required", systemImage: "arrow.down.circle")
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundStyle(.orange)
+            Text("The on-device speech model needs to be downloaded before transcription can work. This is a one-time download.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text("You can also switch to cloud transcription (Groq Whisper) in Settings.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.orange.opacity(0.1))
+        .clipShape(.rect(cornerRadius: 8))
     }
 
     // MARK: - Helpers

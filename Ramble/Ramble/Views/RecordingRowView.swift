@@ -49,12 +49,19 @@ struct RecordingRowView: View {
                 .scaleEffect(0.8)
         case .completed:
             Image(systemName: "checkmark.circle.fill")
-                .foregroundColor(.green)
+                .foregroundStyle(.green)
                 .font(.caption)
         case .failed:
-            Image(systemName: "exclamationmark.circle.fill")
-                .foregroundColor(.red)
-                .font(.caption)
+            Group {
+                if recording.isModelNotInstalled {
+                    Image(systemName: "arrow.down.circle.fill")
+                        .foregroundStyle(.orange)
+                } else {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .foregroundStyle(.red)
+                }
+            }
+            .font(.caption)
         }
     }
 }

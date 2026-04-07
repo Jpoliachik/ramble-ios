@@ -13,6 +13,11 @@ struct RambleApp: App {
         BackgroundTaskService.shared.registerBackgroundTasks()
         _ = PhoneConnectivityService.shared
         HapticService.prepare()
+
+        // Proactively download the speech model so transcription works immediately
+        Task {
+            await TranscriptionQueueService.shared.prepareModelIfNeeded()
+        }
     }
 
     var body: some Scene {

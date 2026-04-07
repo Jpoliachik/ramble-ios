@@ -91,6 +91,11 @@ struct Recording: Identifiable, Codable, Hashable {
         StorageService.audioDirectory.appendingPathComponent(audioFileName)
     }
 
+    var isModelNotInstalled: Bool {
+        status == .failed
+            && lastError == SpeechAnalyzerTranscriptionService.modelNotInstalledError
+    }
+
     private enum CodingKeys: String, CodingKey {
         case id, createdAt, duration, audioFileName
         case status

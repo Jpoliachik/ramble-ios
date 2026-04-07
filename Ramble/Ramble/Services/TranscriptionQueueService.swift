@@ -16,7 +16,7 @@ final class TranscriptionQueueService: ObservableObject {
         isProcessing || !queue.isEmpty
     }
 
-    private let appleSpeech = AppleSpeechTranscriptionService()
+    private let speechAnalyzer = SpeechAnalyzerTranscriptionService()
     private let proxyService = ProxyTranscriptionService()
     private let storageService = StorageService.shared
     private let settingsService = SettingsService.shared
@@ -54,6 +54,21 @@ final class TranscriptionQueueService: ObservableObject {
             }
         }
         processNextIfNeeded()
+    }
+
+    /// Download the speech model and retry all recordings that failed due to missing model.
+    func downloadModelAndRetryPending() async throws {
+        try await speechAnalyzer.downloadModel()
+
+        let recordings = storageService.loadRecordings()
+        for recording in recordings where recording.isModelNotInstalled {
+            retry(recordingId: recording.id)
+        }
+    }
+
+    /// Proactively prepare the speech model on app launch.
+    func prepareModelIfNeeded() async {
+        await speechAnalyzer.prepareModelIfNeeded()
     }
 
     /// Manually retry a failed recording by re-enqueuing it
@@ -111,7 +126,7 @@ final class TranscriptionQueueService: ObservableObject {
             if job.provider.isCloud {
                 text = try await proxyService.transcribe(audioURL: audioURL)
             } else {
-                text = try await appleSpeech.transcribe(audioURL: audioURL)
+                text = try await speechAnalyzer.transcribe(audioURL: audioURL)
             }
 
             // Success — update recording
@@ -132,6 +147,18 @@ final class TranscriptionQueueService: ObservableObject {
                 WebhookQueueService.shared.enqueue(recordingId: job.recordingId)
             }
 
+            processNextIfNeeded()
+
+        } catch TranscriptionError.modelNotInstalled {
+            // Model not downloaded — fail immediately, don't retry
+            var updatedRecordings = storageService.loadRecordings()
+            if let idx = updatedRecordings.firstIndex(where: { $0.id == job.recordingId }) {
+                updatedRecordings[idx].status = .failed
+                updatedRecordings[idx].lastError = TranscriptionError.modelNotInstalled.localizedDescription
+                storageService.saveRecordings(updatedRecordings)
+            }
+            removeJob(job)
+            isProcessing = false
             processNextIfNeeded()
 
         } catch {
