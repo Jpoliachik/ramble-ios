@@ -17,6 +17,7 @@ final class WatchRecordingManager: ObservableObject {
 
     private let audioRecorder = WatchAudioRecorderService()
     private let connectivity = WatchConnectivityService.shared
+    private let syncQueue = WatchSyncQueue.shared
     private var cancellables = Set<AnyCancellable>()
 
     private init() {
@@ -41,6 +42,14 @@ final class WatchRecordingManager: ObservableObject {
     func stopRecordingAndTransfer() {
         guard let result = audioRecorder.stopRecording() else { return }
         connectivity.sendRecordingStopped()
-        connectivity.transferRecording(url: result.url, duration: result.duration)
+
+        // Add to persistent queue FIRST, then attempt transfer
+        let audioFileName = result.url.lastPathComponent
+        let job = syncQueue.addJob(
+            audioFileName: audioFileName,
+            createdAt: Date(),
+            duration: result.duration
+        )
+        connectivity.transferJob(job)
     }
 }

@@ -9,6 +9,7 @@ import SwiftUI
 struct WatchMainView: View {
     @StateObject private var recordingManager = WatchRecordingManager.shared
     @StateObject private var connectivity = WatchConnectivityService.shared
+    @StateObject private var syncQueue = WatchSyncQueue.shared
 
     @State private var showSaved = false
     @State private var phoneRecordingDuration: TimeInterval = 0
@@ -43,6 +44,10 @@ struct WatchMainView: View {
         .onAppear {
             subscribeToStopRequests()
             connectivity.queryPhoneState()
+
+            // Retry any pending transfers from previous sessions
+            syncQueue.pruneOrphanedJobs()
+            connectivity.retryPendingTransfers()
         }
         .onDisappear {
             stopRequestCancellable?.cancel()
@@ -61,7 +66,7 @@ struct WatchMainView: View {
         if showSaved {
             HStack {
                 Image(systemName: "checkmark.circle.fill")
-                    .foregroundColor(.green)
+                    .foregroundStyle(.green)
                 Text("Saved")
                     .font(.caption)
             }
@@ -73,16 +78,27 @@ struct WatchMainView: View {
                 Text("Syncing...")
                     .font(.caption)
             }
+        } else if syncQueue.pendingCount > 0 && !connectivity.isTransferring {
+            HStack {
+                Image(systemName: "exclamationmark.arrow.trianglehead.counterclockwise.rotate.90")
+                    .foregroundStyle(.orange)
+                Text("\(syncQueue.pendingCount) unsent")
+                    .font(.caption)
+            }
+            .onTapGesture {
+                connectivity.retryPendingTransfers()
+            }
         } else if connectivity.phoneIsRecording {
             HStack {
                 Image(systemName: "iphone")
-                    .foregroundColor(.red)
+                    .foregroundStyle(.red)
                 Text("Recording")
                     .font(.caption)
             }
         } else {
             Text("Ramble")
-                .font(.headline)
+                .font(.system(.headline, design: .serif))
+                .italic()
         }
     }
 
@@ -90,16 +106,21 @@ struct WatchMainView: View {
     private var timerView: some View {
         if recordingManager.isRecording {
             Text(formatDuration(recordingManager.currentDuration))
-                .font(.system(size: 28, weight: .medium, design: .monospaced))
-                .foregroundColor(.red)
+                .font(.system(size: 32, weight: .bold, design: .serif))
+                .monospacedDigit()
+                .foregroundStyle(.red)
+                .contentTransition(.numericText())
         } else if connectivity.phoneIsRecording {
             Text(formatDuration(phoneRecordingDuration))
-                .font(.system(size: 28, weight: .medium, design: .monospaced))
-                .foregroundColor(.red)
+                .font(.system(size: 32, weight: .bold, design: .serif))
+                .monospacedDigit()
+                .foregroundStyle(.red)
+                .contentTransition(.numericText())
         } else {
             Text(formatDuration(0))
-                .font(.system(size: 28, weight: .medium, design: .monospaced))
-                .foregroundColor(.secondary)
+                .font(.system(size: 32, weight: .bold, design: .serif))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -139,7 +160,6 @@ struct WatchMainView: View {
     }
 
     private func toggleRecording() async {
-        // If phone is recording, stop it instead of starting watch recording
         if connectivity.phoneIsRecording {
             WatchHapticService.recordStop()
             connectivity.requestPhoneStopRecording()

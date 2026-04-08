@@ -7,6 +7,7 @@ import Combine
 import Foundation
 import WatchConnectivity
 
+@MainActor
 final class WatchConnectivityService: NSObject, ObservableObject {
     static let shared = WatchConnectivityService()
 
@@ -20,7 +21,11 @@ final class WatchConnectivityService: NSObject, ObservableObject {
     // Signal when phone requests watch to stop recording
     let stopRequestReceived = PassthroughSubject<Void, Never>()
 
-    private var pendingTransfers: [WCSessionFileTransfer] = []
+    /// Maps in-flight WCSessionFileTransfer to the job ID so we can update the queue on completion.
+    /// Ephemeral — if the app is killed, jobs stay in the persistent queue and retry on next launch.
+    private var activeTransfers: [WCSessionFileTransfer: UUID] = [:]
+
+    private let syncQueue = WatchSyncQueue.shared
 
     override init() {
         super.init()
@@ -110,16 +115,28 @@ final class WatchConnectivityService: NSObject, ObservableObject {
         }
     }
 
-    func transferRecording(url: URL, duration: TimeInterval) {
+    // MARK: - File Transfer (via persistent queue)
+
+    func transferJob(_ job: WatchSyncJob) {
         guard WCSession.default.activationState == .activated else {
-            print("WCSession not activated")
+            print("WCSession not activated, will retry later")
+            return
+        }
+
+        let documentsDir = FileManager.default.urls(
+            for: .documentDirectory, in: .userDomainMask
+        )[0]
+        let fileURL = documentsDir.appendingPathComponent(job.audioFileName)
+
+        guard FileManager.default.fileExists(atPath: fileURL.path) else {
+            print("Audio file missing for job \(job.id), skipping")
             return
         }
 
         let metadata = RecordingMetadata(
-            recordingId: url.deletingPathExtension().lastPathComponent,
-            createdAt: Date(),
-            duration: duration
+            recordingId: job.id.uuidString,
+            createdAt: job.createdAt,
+            duration: job.duration
         )
 
         guard let metadataData = try? JSONEncoder().encode(metadata),
@@ -127,20 +144,31 @@ final class WatchConnectivityService: NSObject, ObservableObject {
             return
         }
 
-        Task { @MainActor in
-            isTransferring = true
-        }
+        isTransferring = true
+        syncQueue.updateSyncingState(isActive: true)
 
         let transfer = WCSession.default.transferFile(
-            url,
+            fileURL,
             metadata: ["recording": metadataString]
         )
-        pendingTransfers.append(transfer)
+        activeTransfers[transfer] = job.id
+    }
+
+    func retryPendingTransfers() {
+        let pendingJobs = syncQueue.jobsNeedingRetry()
+        guard !pendingJobs.isEmpty else { return }
+
+        print("WatchConnectivityService: retrying \(pendingJobs.count) pending transfer(s)")
+        for job in pendingJobs {
+            // Don't re-send jobs already in-flight
+            guard !activeTransfers.values.contains(job.id) else { continue }
+            transferJob(job)
+        }
     }
 }
 
 extension WatchConnectivityService: WCSessionDelegate {
-    func session(
+    nonisolated func session(
         _ session: WCSession,
         activationDidCompleteWith activationState: WCSessionActivationState,
         error: Error?
@@ -155,37 +183,64 @@ extension WatchConnectivityService: WCSessionDelegate {
         if activationState == .activated {
             let context = session.receivedApplicationContext
             if !context.isEmpty {
-                handleReceivedMessage(context)
+                Task { @MainActor in
+                    self.handleReceivedMessage(context)
+                }
             }
         }
     }
 
-    func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
-        handleReceivedMessage(message)
+    nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
+        Task { @MainActor in
+            self.handleReceivedMessage(message)
+        }
     }
 
-    func session(
+    nonisolated func session(
         _ session: WCSession,
         didReceiveApplicationContext applicationContext: [String: Any]
     ) {
-        handleReceivedMessage(applicationContext)
+        Task { @MainActor in
+            self.handleReceivedMessage(applicationContext)
+        }
     }
 
-    func session(_ session: WCSession, didFinish fileTransfer: WCSessionFileTransfer, error: Error?) {
+    nonisolated func session(
+        _ session: WCSession,
+        didFinish fileTransfer: WCSessionFileTransfer,
+        error: Error?
+    ) {
         Task { @MainActor in
-            pendingTransfers.removeAll { $0 == fileTransfer }
-            isTransferring = !pendingTransfers.isEmpty
+            guard let jobId = activeTransfers.removeValue(forKey: fileTransfer) else {
+                // Transfer we don't know about (possibly from before app restart)
+                // Update UI state based on remaining transfers
+                isTransferring = !activeTransfers.isEmpty
+                return
+            }
 
             if let error = error {
-                print("File transfer failed: \(error)")
+                print("File transfer failed for job \(jobId): \(error)")
                 lastTransferSuccess = false
+                syncQueue.markFailed(jobId: jobId)
             } else {
-                print("File transfer succeeded")
+                print("File transfer succeeded for job \(jobId)")
                 lastTransferSuccess = true
 
                 // Delete local file after successful transfer
-                try? FileManager.default.removeItem(at: fileTransfer.file.fileURL)
+                let documentsDir = FileManager.default.urls(
+                    for: .documentDirectory, in: .userDomainMask
+                )[0]
+                let job = syncQueue.jobs.first { $0.id == jobId }
+                if let audioFileName = job?.audioFileName {
+                    let fileURL = documentsDir.appendingPathComponent(audioFileName)
+                    try? FileManager.default.removeItem(at: fileURL)
+                }
+
+                syncQueue.markCompleted(jobId: jobId)
             }
+
+            isTransferring = !activeTransfers.isEmpty
+            syncQueue.updateSyncingState(isActive: !activeTransfers.isEmpty)
         }
     }
 }
