@@ -9,3 +9,13 @@ enabled = true
 [vars]
 APPLE_BUNDLE_ID = "dev.goodloop.ramble"
 PREMIUM_PRODUCT_ID = "dev.goodloop.ramble.premium.monthly2"
+# Set to "true" to reject requests without valid App Attest assertions.
+# Leave unset or "false" during development/rollout to allow unauthenticated requests.
+# REQUIRE_ATTEST = "true"
+
+# KV namespace for App Attest state (challenges, attested device keys).
+# Create with: wrangler kv namespace create ATTEST_KV
+# Then paste the id below.
+[[kv_namespaces]]
+binding = "ATTEST_KV"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"

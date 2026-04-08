@@ -13,6 +13,7 @@ struct ProxyTranscriptionRequest {
 
 final class ProxyTranscriptionService {
     private let settingsService = SettingsService.shared
+    private let appAttestService = AppAttestService.shared
 
     func transcribe(_ request: ProxyTranscriptionRequest) async throws -> String {
         let settings = settingsService.load()
@@ -25,6 +26,9 @@ final class ProxyTranscriptionService {
         guard FileManager.default.fileExists(atPath: request.audioURL.path) else {
             throw TranscriptionError.audioFileNotFound
         }
+
+        // Best-effort attestation before the first request
+        try? await appAttestService.attestIfNeeded()
 
         let audioData = try Data(contentsOf: request.audioURL)
         let url = baseURL.appendingPathComponent("transcribe")
@@ -60,6 +64,15 @@ final class ProxyTranscriptionService {
         body.appendString("\r\n")
 
         body.appendString("--\(boundary)--\r\n")
+
+        // App Attest assertion — ties this specific request body to a verified device
+        if let attestResult = await appAttestService.generateAssertion(for: body) {
+            urlRequest.setValue(attestResult.keyId, forHTTPHeaderField: "X-App-Attest-Key-Id")
+            urlRequest.setValue(
+                attestResult.assertion.base64EncodedString(),
+                forHTTPHeaderField: "X-App-Attest"
+            )
+        }
 
         urlRequest.httpBody = body
 
