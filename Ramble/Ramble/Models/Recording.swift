@@ -28,6 +28,7 @@ struct Recording: Identifiable, Codable, Hashable {
     var transcription: String?
     var webhookStatus: WebhookStatus?
     var lastError: String?
+    var activityLog: [ActivityEntry]
 
     init(
         id: UUID = UUID(),
@@ -37,7 +38,8 @@ struct Recording: Identifiable, Codable, Hashable {
         status: RecordingStatus = .recorded,
         transcription: String? = nil,
         webhookStatus: WebhookStatus? = nil,
-        lastError: String? = nil
+        lastError: String? = nil,
+        activityLog: [ActivityEntry] = []
     ) {
         self.id = id
         self.createdAt = createdAt
@@ -47,6 +49,7 @@ struct Recording: Identifiable, Codable, Hashable {
         self.transcription = transcription
         self.webhookStatus = webhookStatus
         self.lastError = lastError
+        self.activityLog = activityLog
     }
 
     // Backward-compatible decoder: handles old status field names and values
@@ -85,6 +88,8 @@ struct Recording: Identifiable, Codable, Hashable {
         // New lastError field, or migrate from old lastTranscriptionError
         lastError = try container.decodeIfPresent(String.self, forKey: .lastError)
             ?? container.decodeIfPresent(String.self, forKey: .lastTranscriptionError)
+
+        activityLog = (try? container.decodeIfPresent([ActivityEntry].self, forKey: .activityLog)) ?? []
     }
 
     var audioFileURL: URL {
@@ -99,7 +104,7 @@ struct Recording: Identifiable, Codable, Hashable {
     private enum CodingKeys: String, CodingKey {
         case id, createdAt, duration, audioFileName
         case status
-        case transcription, webhookStatus, lastError
+        case transcription, webhookStatus, lastError, activityLog
         // Legacy keys for migration
         case transcriptionStatus
         case lastTranscriptionError
@@ -115,5 +120,8 @@ struct Recording: Identifiable, Codable, Hashable {
         try container.encodeIfPresent(transcription, forKey: .transcription)
         try container.encodeIfPresent(webhookStatus, forKey: .webhookStatus)
         try container.encodeIfPresent(lastError, forKey: .lastError)
+        if !activityLog.isEmpty {
+            try container.encode(activityLog, forKey: .activityLog)
+        }
     }
 }

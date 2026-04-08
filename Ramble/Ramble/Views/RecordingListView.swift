@@ -1,7 +1,6 @@
 //
 //  RecordingListView.swift
 //  Ramble
-//
 
 import SwiftUI
 
@@ -30,30 +29,22 @@ struct RecordingListView: View {
                         }
                     } header: {
                         Text(DateFormatters.formatDayHeader(for: day.date))
-                            .font(.headline)
-                            .foregroundColor(.primary)
+                            .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                            .foregroundStyle(.secondary)
                             .textCase(nil)
                     }
                 }
             }
-            .listStyle(.plain)
+            .listStyle(.insetGrouped)
         }
     }
 
     private var emptyStateView: some View {
-        VStack(spacing: 16) {
-            Spacer()
-            Image(systemName: "waveform")
-                .font(.system(size: 48))
-                .foregroundColor(.secondary)
-            Text("No recordings yet")
-                .font(.title3)
-                .foregroundColor(.secondary)
-            Text("Tap the record button to start")
-                .font(.body)
-                .foregroundColor(.secondary.opacity(0.8))
-            Spacer()
-        }
+        ContentUnavailableView(
+            "No recordings yet",
+            systemImage: "waveform",
+            description: Text("Tap record to start")
+        )
     }
 }
 

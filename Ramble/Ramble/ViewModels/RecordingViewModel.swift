@@ -14,7 +14,6 @@ final class RecordingViewModel: ObservableObject {
     @Published private(set) var currentDuration: TimeInterval = 0
     @Published private(set) var inputSourceName: String?
     @Published private(set) var audioLevel: Float = 0
-    @Published var showSavedConfirmation = false
 
     // Watch recording state (exposed from connectivity)
     @Published private(set) var watchIsRecording = false
@@ -74,7 +73,7 @@ final class RecordingViewModel: ObservableObject {
 
     private func observeStorageChanges() {
         NotificationCenter.default.publisher(for: StorageService.recordingsDidChangeNotification)
-            .receive(on: DispatchQueue.main)
+            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.loadRecordings()
             }
@@ -82,21 +81,24 @@ final class RecordingViewModel: ObservableObject {
     }
 
     func loadRecordings() {
-        recordings = storageService.loadRecordings()
+        withAnimation(.smooth) {
+            recordings = storageService.loadRecordings()
+        }
     }
 
     func toggleRecording() async {
         if isRecording {
             HapticService.recordStop()
             recordingManager.stopRecording()
-            loadRecordings()
-            showSavedConfirmation = true
-            try? await Task.sleep(nanoseconds: 1_500_000_000)
-            showSavedConfirmation = false
         } else {
             HapticService.recordStart()
             await recordingManager.startRecording()
         }
+    }
+
+    func cancelRecording() {
+        HapticService.recordStop()
+        recordingManager.cancelRecording()
     }
 
     func stopWatchRecording() {
@@ -104,8 +106,10 @@ final class RecordingViewModel: ObservableObject {
     }
 
     func deleteRecording(_ recording: Recording) {
-        storageService.deleteRecording(recording)
-        loadRecordings()
+        withAnimation(.smooth) {
+            storageService.deleteRecording(recording)
+            recordings = storageService.loadRecordings()
+        }
     }
 
     var pendingCount: Int {

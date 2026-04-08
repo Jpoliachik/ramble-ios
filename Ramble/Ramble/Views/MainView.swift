@@ -1,7 +1,6 @@
 //
 //  MainView.swift
 //  Ramble
-//
 
 import SwiftUI
 
@@ -11,38 +10,33 @@ struct MainView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                // Top bar
-                HStack {
-                    Text("Ramble")
-                        .font(.largeTitle.bold())
-                    Spacer()
-                    SettingsButtonView {
-                        HapticService.buttonTap()
-                        showSettings = true
+            ZStack(alignment: .bottom) {
+                VStack(spacing: 0) {
+                    // Top bar
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("Ramble")
+                            .font(.system(size: 28, weight: .bold, design: .serif))
+                            .italic()
+                        Spacer()
+                        SettingsButtonView {
+                            HapticService.buttonTap()
+                            showSettings = true
+                        }
                     }
-                }
-                .padding(.horizontal)
-                .padding(.top, 8)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                    .padding(.bottom, 4)
 
-                // Sync status
-                if viewModel.failedCount > 0 || viewModel.pendingCount > 0 {
-                    SyncStatusBannerView(
-                        pendingCount: viewModel.pendingCount,
-                        failedCount: viewModel.failedCount,
-                        onTap: { showSettings = true }
+                    // Recording list — full height, scrolls under the controls
+                    RecordingListView(
+                        recordingsByDay: viewModel.recordingsByDay,
+                        onDelete: viewModel.deleteRecording
                     )
+                    .contentMargins(.top, 8, for: .scrollContent)
+                    .contentMargins(.bottom, 120, for: .scrollContent)
                 }
 
-                // Recording list
-                RecordingListView(
-                    recordingsByDay: viewModel.recordingsByDay,
-                    onDelete: viewModel.deleteRecording
-                )
-
-                Divider()
-
-                // Bottom controls
+                // Floating bottom controls
                 RecordingControlsView(
                     isRecording: viewModel.isRecording,
                     duration: viewModel.currentDuration,
@@ -52,41 +46,28 @@ struct MainView: View {
                         Task {
                             await viewModel.toggleRecording()
                         }
+                    },
+                    onCancel: {
+                        viewModel.cancelRecording()
                     }
                 )
-                .background(Color(uiColor: .systemBackground))
+                .padding(.top, 16)
+                .padding(.bottom, 16)
+                .frame(maxWidth: .infinity)
+                .colorScheme(.dark)
+                .background {
+                    Rectangle()
+                        .fill(Color.black)
+                        .ignoresSafeArea(.container, edges: .bottom)
+                }
             }
             .navigationDestination(for: Recording.self) { recording in
                 RecordingDetailView(recording: recording)
             }
-            .overlay(alignment: .top) {
-                if viewModel.showSavedConfirmation {
-                    savedConfirmationView
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                }
-            }
-            .animation(.easeInOut(duration: 0.3), value: viewModel.showSavedConfirmation)
             .sheet(isPresented: $showSettings) {
                 SettingsView()
             }
         }
-    }
-
-    private var savedConfirmationView: some View {
-        HStack {
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundColor(.green)
-            Text("Saved")
-                .font(.subheadline.weight(.medium))
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(
-            Capsule()
-                .fill(Color(uiColor: .secondarySystemBackground))
-                .shadow(radius: 4)
-        )
-        .padding(.top, 60)
     }
 }
 

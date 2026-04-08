@@ -1,7 +1,6 @@
 //
 //  RecordingControlsView.swift
 //  Ramble
-//
 
 import SwiftUI
 
@@ -11,39 +10,66 @@ struct RecordingControlsView: View {
     var inputSourceName: String? = nil
     var audioLevel: Float = 0
     let onToggleRecording: () -> Void
+    var onCancel: (() -> Void)? = nil
 
     var body: some View {
-        VStack(spacing: 16) {
-            // Duration timer
-            Text(DateFormatters.formatDuration(duration))
-                .font(.system(size: 24, weight: .medium, design: .monospaced))
-                .foregroundColor(isRecording ? .red : .secondary)
-                .opacity(isRecording || duration > 0 ? 1 : 0.3)
+        VStack(spacing: 8) {
+            if isRecording {
+                Text(DateFormatters.formatDuration(duration))
+                    .font(.system(size: 52, weight: .bold, design: .serif))
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
 
-            RecordButtonView(isRecording: isRecording, audioLevel: audioLevel, action: onToggleRecording)
+            ZStack {
+                RecordButtonView(isRecording: isRecording, audioLevel: audioLevel, action: onToggleRecording)
 
-            // Input source indicator - fixed height so button never moves
-            Text(isRecording ? "via \(inputSourceName ?? "...")" : " ")
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .frame(height: 16)
+                if isRecording {
+                    HStack {
+                        Button {
+                            onCancel?()
+                        } label: {
+                            Text("Cancel")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .transition(.opacity)
+
+                        Spacer()
+                    }
+                    .padding(.leading, 20)
+                }
+            }
+
+            if isRecording, let source = inputSourceName {
+                Text("via \(source)")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .transition(.opacity)
+            }
         }
-        .padding(.vertical, 24)
+        .animation(.snappy(duration: 0.3), value: isRecording)
     }
 }
 
 #Preview {
     VStack {
+        Spacer()
         RecordingControlsView(
             isRecording: false,
             duration: 0,
             onToggleRecording: {}
         )
+        Spacer()
         RecordingControlsView(
             isRecording: true,
             duration: 65,
-            inputSourceName: "AirPods Pro",
-            onToggleRecording: {}
+            inputSourceName: "iPhone",
+            audioLevel: 0.5,
+            onToggleRecording: {},
+            onCancel: {}
         )
     }
 }

@@ -8,4 +8,4 @@ enabled = true
 
 [vars]
 APPLE_BUNDLE_ID = "com.goodloop.ramble"
-PREMIUM_PRODUCT_ID = "com.goodloop.ramble.premium.monthly"
+PREMIUM_PRODUCT_ID = "dev.goodloop.ramble.premium.monthly2"

@@ -72,4 +72,15 @@ final class RecordingManager: ObservableObject {
 
         currentRecording = nil
     }
+
+    func cancelRecording() {
+        _ = audioRecorder.stopRecording()
+        connectivity.sendRecordingStopped()
+
+        // Delete the audio file without saving the recording
+        if let recording = currentRecording {
+            try? FileManager.default.removeItem(at: recording.audioFileURL)
+        }
+        currentRecording = nil
+    }
 }

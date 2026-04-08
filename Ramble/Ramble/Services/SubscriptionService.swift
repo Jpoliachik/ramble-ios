@@ -11,7 +11,7 @@ import StoreKit
 final class SubscriptionService: ObservableObject {
     static let shared = SubscriptionService()
 
-    static let premiumProductId = "com.goodloop.ramble.premium.monthly"
+    static let premiumProductId = "dev.goodloop.ramble.premium.monthly2"
 
     @Published private(set) var isPremium = false
     @Published private(set) var product: Product?

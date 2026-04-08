@@ -19,44 +19,16 @@ final class AudioRecorderService: NSObject, ObservableObject {
     private var timer: Timer?
     private var currentRecordingURL: URL?
 
-    private var isSessionActive = false
-
-    override init() {
-        super.init()
-        prepareAudioSession()
-    }
-
-    /// Pre-warm the audio session so record starts instantly
-    func prepareAudioSession() {
-        guard !isSessionActive else { return }
-        let session = AVAudioSession.sharedInstance()
-        do {
-            // allowBluetooth enables AirPods/Bluetooth HFP mic input
-            try session.setCategory(
-                .playAndRecord,
-                mode: .default,
-                options: [.defaultToSpeaker, .allowBluetooth]
-            )
-            try session.setActive(true)
-            isSessionActive = true
-        } catch {
-            print("Failed to prepare audio session: \(error)")
-        }
-    }
-
     func startRecording(to url: URL) throws {
         let session = AVAudioSession.sharedInstance()
 
-        // Ensure session is active (should already be from init)
-        if !isSessionActive {
-            try session.setCategory(
-                .playAndRecord,
-                mode: .default,
-                options: [.defaultToSpeaker, .allowBluetooth]
-            )
-            try session.setActive(true)
-            isSessionActive = true
-        }
+        // allowBluetooth enables AirPods/Bluetooth HFP mic input
+        try session.setCategory(
+            .playAndRecord,
+            mode: .default,
+            options: [.defaultToSpeaker, .allowBluetooth]
+        )
+        try session.setActive(true)
 
         let settings: [String: Any] = [
             AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
@@ -108,6 +80,12 @@ final class AudioRecorderService: NSObject, ObservableObject {
         currentRecordingURL = nil
         inputSourceName = nil
         audioLevel = 0
+
+        // Deactivate session so other audio (music, podcasts) can resume
+        try? AVAudioSession.sharedInstance().setActive(
+            false,
+            options: .notifyOthersOnDeactivation
+        )
 
         return duration
     }
