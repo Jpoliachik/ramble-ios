@@ -9,6 +9,8 @@ import Foundation
 @MainActor
 final class SettingsViewModel: ObservableObject {
     @Published var transcriptionProvider: TranscriptionProvider = .appleSpeech
+    @Published var cloudModel: CloudModel = .whisperLargeV3Turbo
+    @Published var showSubscriptionPaywall = false
     @Published var webhookEnabled: Bool = false
     @Published var webhookURL: String = ""
     @Published var webhookSecret: String = ""
@@ -36,6 +38,7 @@ final class SettingsViewModel: ObservableObject {
     func load() {
         let settings = settingsService.load()
         transcriptionProvider = settings.transcriptionProvider
+        cloudModel = settings.cloudModel
         webhookEnabled = settings.webhookEnabled
         webhookURL = settings.webhookURL ?? ""
         webhookSecret = settings.webhookSecret
@@ -46,12 +49,21 @@ final class SettingsViewModel: ObservableObject {
     func save() {
         let settings = Settings(
             transcriptionProvider: transcriptionProvider,
+            cloudModel: cloudModel,
             webhookEnabled: webhookEnabled,
             webhookURL: webhookURL.isEmpty ? nil : webhookURL,
             webhookSecret: webhookSecret,
             deviceId: deviceId
         )
         settingsService.save(settings)
+    }
+
+    func selectCloudTranscription() {
+        if SubscriptionService.shared.isPremium {
+            transcriptionProvider = .cloudTranscription
+        } else {
+            showSubscriptionPaywall = true
+        }
     }
 
     func validateWebhookURL() {

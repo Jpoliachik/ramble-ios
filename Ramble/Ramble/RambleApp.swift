@@ -18,6 +18,11 @@ struct RambleApp: App {
         Task {
             await TranscriptionQueueService.shared.prepareModelIfNeeded()
         }
+
+        // Initialize subscription service and fetch products
+        Task {
+            await SubscriptionService.shared.start()
+        }
     }
 
     var body: some Scene {

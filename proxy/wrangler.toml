@@ -5,3 +5,7 @@ account_id = "25e77a7a6317e3773d804e62b67db592"
 
 [observability]
 enabled = true
+
+[vars]
+APPLE_BUNDLE_ID = "com.goodloop.ramble"
+PREMIUM_PRODUCT_ID = "com.goodloop.ramble.premium.monthly"

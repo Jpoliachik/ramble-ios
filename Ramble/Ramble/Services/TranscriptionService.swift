@@ -14,6 +14,7 @@ enum TranscriptionError: Error, LocalizedError {
     case speechAnalyzerUnavailable
     case recognitionFailed(String)
     case proxyNotConfigured
+    case subscriptionRequired
     case proxyError(statusCode: Int, message: String)
     case networkError(Error)
 
@@ -29,6 +30,8 @@ enum TranscriptionError: Error, LocalizedError {
             return "On-device transcription requires iOS 26 or later"
         case .recognitionFailed(let message):
             return "Transcription failed: \(message)"
+        case .subscriptionRequired:
+            return "Premium subscription required for cloud transcription"
         case .proxyNotConfigured:
             return "Cloud transcription not configured — set proxy URL in Settings"
         case .proxyError(let code, let message):

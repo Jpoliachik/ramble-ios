@@ -9,14 +9,16 @@ struct TranscriptionJob: Identifiable, Codable {
     let id: UUID
     let recordingId: UUID
     let provider: TranscriptionProvider
+    let cloudModel: CloudModel?
     var retryCount: Int
     let createdAt: Date
     var nextRetryAt: Date?
 
-    init(recordingId: UUID, provider: TranscriptionProvider) {
+    init(recordingId: UUID, provider: TranscriptionProvider, cloudModel: CloudModel? = nil) {
         self.id = UUID()
         self.recordingId = recordingId
         self.provider = provider
+        self.cloudModel = cloudModel
         self.retryCount = 0
         self.createdAt = Date()
         self.nextRetryAt = nil

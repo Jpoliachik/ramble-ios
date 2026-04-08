@@ -34,7 +34,12 @@ final class TranscriptionQueueService: ObservableObject {
         // Don't double-enqueue
         guard !queue.contains(where: { $0.recordingId == recordingId }) else { return }
         let settings = settingsService.load()
-        let job = TranscriptionJob(recordingId: recordingId, provider: settings.transcriptionProvider)
+        let cloudModel: CloudModel? = settings.transcriptionProvider.isCloud ? settings.cloudModel : nil
+        let job = TranscriptionJob(
+            recordingId: recordingId,
+            provider: settings.transcriptionProvider,
+            cloudModel: cloudModel
+        )
         queue.append(job)
         saveQueue()
         processNextIfNeeded()
@@ -58,7 +63,14 @@ final class TranscriptionQueueService: ObservableObject {
 
     /// Download the speech model and retry all recordings that failed due to missing model.
     func downloadModelAndRetryPending() async throws {
-        try await speechAnalyzer.downloadModel()
+        log(message: "Speech model download started")
+        do {
+            try await speechAnalyzer.downloadModel()
+            log(message: "Speech model downloaded")
+        } catch {
+            log(message: "Speech model download failed — \(error.localizedDescription)")
+            throw error
+        }
 
         let recordings = storageService.loadRecordings()
         for recording in recordings where recording.isModelNotInstalled {
@@ -78,6 +90,7 @@ final class TranscriptionQueueService: ObservableObject {
 
         recordings[idx].status = .recorded
         recordings[idx].lastError = nil
+        recordings[idx].activityLog.append(ActivityEntry("Manual retry requested"))
         storageService.saveRecordings(recordings)
 
         // Remove any existing job for this recording before re-enqueuing
@@ -124,7 +137,14 @@ final class TranscriptionQueueService: ObservableObject {
         do {
             let text: String
             if job.provider.isCloud {
-                text = try await proxyService.transcribe(audioURL: audioURL)
+                // Fetch fresh JWS at call time (not enqueue time) — tokens expire
+                let jws = SubscriptionService.shared.currentJWSTransaction
+                let request = ProxyTranscriptionRequest(
+                    audioURL: audioURL,
+                    model: job.cloudModel ?? .whisperLargeV3Turbo,
+                    jwsTransaction: jws
+                )
+                text = try await proxyService.transcribe(request)
             } else {
                 text = try await speechAnalyzer.transcribe(audioURL: audioURL)
             }
@@ -135,6 +155,9 @@ final class TranscriptionQueueService: ObservableObject {
                 updatedRecordings[i].status = .completed
                 updatedRecordings[i].transcription = text
                 updatedRecordings[i].lastError = nil
+                updatedRecordings[i].activityLog.append(
+                    ActivityEntry("Transcription completed", httpStatus: job.provider.isCloud ? 200 : nil)
+                )
                 storageService.saveRecordings(updatedRecordings)
             }
 
@@ -149,26 +172,49 @@ final class TranscriptionQueueService: ObservableObject {
 
             processNextIfNeeded()
 
-        } catch TranscriptionError.modelNotInstalled {
-            // Model not downloaded — fail immediately, don't retry
+        } catch TranscriptionError.subscriptionRequired {
+            // Subscription missing or expired — fail immediately, don't retry
             var updatedRecordings = storageService.loadRecordings()
             if let idx = updatedRecordings.firstIndex(where: { $0.id == job.recordingId }) {
                 updatedRecordings[idx].status = .failed
-                updatedRecordings[idx].lastError = TranscriptionError.modelNotInstalled.localizedDescription
+                updatedRecordings[idx].lastError = TranscriptionError.subscriptionRequired.localizedDescription
+                updatedRecordings[idx].activityLog.append(
+                    ActivityEntry("Transcription failed — premium subscription required", httpStatus: 403)
+                )
                 storageService.saveRecordings(updatedRecordings)
             }
             removeJob(job)
             isProcessing = false
             processNextIfNeeded()
 
+        } catch TranscriptionError.modelNotInstalled {
+            // Model not downloaded — fail immediately, don't retry
+            var updatedRecordings = storageService.loadRecordings()
+            if let idx = updatedRecordings.firstIndex(where: { $0.id == job.recordingId }) {
+                updatedRecordings[idx].status = .failed
+                updatedRecordings[idx].lastError = TranscriptionError.modelNotInstalled.localizedDescription
+                updatedRecordings[idx].activityLog.append(
+                    ActivityEntry("Transcription failed — speech model not downloaded")
+                )
+                storageService.saveRecordings(updatedRecordings)
+            }
+            removeJob(job)
+            isProcessing = false
+            processNextIfNeeded()
+
+        } catch let transcriptionError as TranscriptionError {
+            var httpStatus: Int?
+            if case .proxyError(let code, _) = transcriptionError {
+                httpStatus = code
+            }
+            await handleTranscriptionFailure(job: job, error: transcriptionError.localizedDescription, httpStatus: httpStatus)
+
         } catch {
             await handleTranscriptionFailure(job: job, error: error.localizedDescription)
         }
     }
 
-    private func handleTranscriptionFailure(job: TranscriptionJob, error: String) async {
-        print("Transcription failed: \(error)")
-
+    private func handleTranscriptionFailure(job: TranscriptionJob, error: String, httpStatus: Int? = nil) async {
         var updatedJob = job
         updatedJob.retryCount += 1
 
@@ -177,21 +223,42 @@ final class TranscriptionQueueService: ObservableObject {
             recordings[idx].lastError = error
             if updatedJob.retryCount >= TranscriptionJob.maxRetries {
                 recordings[idx].status = .failed
+                recordings[idx].activityLog.append(
+                    ActivityEntry("Transcription failed after \(TranscriptionJob.maxRetries) attempts — \(error)", httpStatus: httpStatus)
+                )
                 storageService.saveRecordings(recordings)
                 removeJob(job)
             } else {
                 recordings[idx].status = .recorded
                 let delay = updatedJob.retryDelaySeconds
                 updatedJob.nextRetryAt = Date().addingTimeInterval(delay)
+                recordings[idx].activityLog.append(
+                    ActivityEntry("Transcription failed — \(error) (attempt \(updatedJob.retryCount)/\(TranscriptionJob.maxRetries), retry in \(Int(delay))s)", httpStatus: httpStatus)
+                )
                 storageService.saveRecordings(recordings)
                 updateJob(updatedJob)
-                print("Transcription retry \(updatedJob.retryCount)/\(TranscriptionJob.maxRetries) in \(Int(delay))s")
                 try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
             }
         }
 
         isProcessing = false
         processNextIfNeeded()
+    }
+
+    // MARK: - Activity Log Helper
+
+    /// Log an activity entry for model download events (not tied to a specific recording)
+    private func log(message: String) {
+        // Model download events apply to all model-not-installed recordings
+        var recordings = storageService.loadRecordings()
+        var changed = false
+        for i in recordings.indices where recordings[i].isModelNotInstalled {
+            recordings[i].activityLog.append(ActivityEntry(message))
+            changed = true
+        }
+        if changed {
+            storageService.saveRecordings(recordings)
+        }
     }
 
     // MARK: - Queue Persistence
