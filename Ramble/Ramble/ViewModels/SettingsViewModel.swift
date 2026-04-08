@@ -17,6 +17,14 @@ final class SettingsViewModel: ObservableObject {
     @Published var totalDuration: TimeInterval = 0
     @Published var pendingTranscriptions: Int = 0
     @Published var failedTranscriptions: Int = 0
+    @Published var webhookURLError: String?
+    @Published var testWebhookResult: TestWebhookResult?
+
+    enum TestWebhookResult {
+        case loading
+        case success
+        case failure(String)
+    }
 
     private let settingsService = SettingsService.shared
     private let storageService = StorageService.shared
@@ -46,8 +54,42 @@ final class SettingsViewModel: ObservableObject {
         settingsService.save(settings)
     }
 
+    func validateWebhookURL() {
+        if webhookURL.isEmpty {
+            webhookURLError = nil
+            return
+        }
+        webhookURLError = WebhookQueueService.validateWebhookURL(webhookURL)
+    }
+
     func regenerateWebhookSecret() {
         webhookSecret = Settings.generateSecret()
+    }
+
+    func sendTestWebhook() {
+        // Validate first
+        validateWebhookURL()
+        guard webhookURLError == nil, !webhookURL.isEmpty else { return }
+
+        // Save current settings so the test uses latest values
+        save()
+
+        testWebhookResult = .loading
+        Task {
+            let error = await WebhookQueueService.shared.sendTestWebhook()
+            if let error {
+                testWebhookResult = .failure(error)
+            } else {
+                testWebhookResult = .success
+            }
+            // Auto-dismiss success after a delay
+            if case .success = testWebhookResult {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                if case .success = testWebhookResult {
+                    testWebhookResult = nil
+                }
+            }
+        }
     }
 
     private func loadStats() {

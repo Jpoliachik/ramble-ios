@@ -11,6 +11,7 @@ struct SettingsView: View {
     @State private var showDeleteConfirmation = false
     @State private var showExportShare = false
     @State private var showSecretCopied = false
+    @State private var showRegenerateConfirmation = false
     @State private var exportURL: URL?
 
     var body: some View {
@@ -57,25 +58,65 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Webhook URL")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                     TextField("https://your-webhook.example.com", text: $viewModel.webhookURL)
                         .keyboardType(.URL)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
+                        .onChange(of: viewModel.webhookURL) {
+                            viewModel.validateWebhookURL()
+                        }
+
+                    if let error = viewModel.webhookURLError {
+                        Label(error, systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+                }
+
+                // Test webhook button
+                if !viewModel.webhookURL.isEmpty && viewModel.webhookURLError == nil {
+                    Button {
+                        viewModel.sendTestWebhook()
+                    } label: {
+                        HStack {
+                            switch viewModel.testWebhookResult {
+                            case .loading:
+                                ProgressView()
+                                    .controlSize(.small)
+                                Text("Sending...")
+                            case .success:
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                                Text("Test delivered")
+                            case .failure(let error):
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.red)
+                                Text("Failed — \(error)")
+                            case nil:
+                                Image(systemName: "paperplane")
+                                Text("Send Test Webhook")
+                            }
+                        }
+                    }
+                    .disabled(viewModel.testWebhookResult != nil && {
+                        if case .loading = viewModel.testWebhookResult { return true }
+                        return false
+                    }())
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Secret")
+                    Text("Signing Secret")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
 
                     Text(viewModel.webhookSecret)
                         .font(.system(.caption, design: .monospaced))
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.middle)
 
-                    HStack(spacing: 12) {
+                    HStack(spacing: 8) {
                         Button {
                             UIPasteboard.general.string = viewModel.webhookSecret
                             showSecretCopied = true
@@ -84,28 +125,39 @@ struct SettingsView: View {
                                 showSecretCopied = false
                             }
                         } label: {
-                            Label(showSecretCopied ? "Copied" : "Copy", systemImage: showSecretCopied ? "checkmark" : "doc.on.doc")
-                                .font(.caption)
+                            Label {
+                                Text("Copy")
+                            } icon: {
+                                Image(systemName: showSecretCopied ? "checkmark" : "doc.on.doc")
+                            }
+                            .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.bordered)
-                        .controlSize(.small)
+                        .tint(showSecretCopied ? .green : nil)
 
                         Button {
-                            viewModel.regenerateWebhookSecret()
+                            showRegenerateConfirmation = true
                         } label: {
                             Label("Regenerate", systemImage: "arrow.clockwise")
-                                .font(.caption)
+                                .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.bordered)
-                        .controlSize(.small)
                     }
+                }
+                .alert("Regenerate Secret?", isPresented: $showRegenerateConfirmation) {
+                    Button("Regenerate", role: .destructive) {
+                        viewModel.regenerateWebhookSecret()
+                    }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("Your webhook endpoint will need to be updated with the new secret to continue accepting requests.")
                 }
             }
         } header: {
             Text("Webhook")
         } footer: {
             if viewModel.webhookEnabled {
-                Text("Each time a transcription completes, Ramble POSTs the text to your URL with an X-Webhook-Secret header. Use the secret to verify requests came from your device.")
+                Text("Each transcription is POSTed to your HTTPS endpoint with an HMAC-SHA256 signature in the X-Webhook-Signature header. Verify the signature using your secret to confirm authenticity.")
             } else {
                 Text("Send your transcriptions to another service automatically. Connect Ramble to an AI agent, a cloud workflow, or any custom automation that processes your voice notes.")
             }
@@ -118,13 +170,13 @@ struct SettingsView: View {
                 Text("Total Recordings")
                 Spacer()
                 Text("\(viewModel.totalRecordings)")
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
             }
             HStack {
                 Text("Total Duration")
                 Spacer()
                 Text(formatTotalDuration(viewModel.totalDuration))
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
             }
 
             if viewModel.pendingTranscriptions > 0 {
@@ -132,7 +184,7 @@ struct SettingsView: View {
                     Text("Pending Transcriptions")
                     Spacer()
                     Text("\(viewModel.pendingTranscriptions)")
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                 }
             }
 
@@ -141,7 +193,7 @@ struct SettingsView: View {
                     Text("Failed Transcriptions")
                     Spacer()
                     Text("\(viewModel.failedTranscriptions)")
-                        .foregroundColor(.red)
+                        .foregroundStyle(.red)
                 }
             }
         }
@@ -204,7 +256,7 @@ struct ProviderRowView: View {
             HStack(spacing: 14) {
                 Image(systemName: provider.iconName)
                     .font(.title3)
-                    .foregroundColor(provider.isCloud ? .blue : .green)
+                    .foregroundStyle(provider.isCloud ? .blue : .green)
                     .frame(width: 32, height: 32)
                     .background(
                         RoundedRectangle(cornerRadius: 8)
@@ -216,10 +268,10 @@ struct ProviderRowView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(provider.displayName)
                         .font(.body)
-                        .foregroundColor(.primary)
+                        .foregroundStyle(.primary)
                     Text(provider.subtitle)
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                 }
 
                 Spacer()
@@ -227,7 +279,7 @@ struct ProviderRowView: View {
                 if isSelected {
                     Image(systemName: "checkmark")
                         .font(.body.weight(.semibold))
-                        .foregroundColor(.accentColor)
+                        .foregroundStyle(.tint)
                 }
             }
             .contentShape(Rectangle())
