@@ -7,7 +7,7 @@ import Foundation
 import Security
 
 enum KeychainService {
-    private static let service = "com.goodloop.ramble"
+    private static let service = "dev.goodloop.ramble"
 
     static func string(forKey key: String) -> String? {
         let query: [String: Any] = [

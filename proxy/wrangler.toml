@@ -7,5 +7,5 @@ account_id = "25e77a7a6317e3773d804e62b67db592"
 enabled = true
 
 [vars]
-APPLE_BUNDLE_ID = "com.goodloop.ramble"
+APPLE_BUNDLE_ID = "dev.goodloop.ramble"
 PREMIUM_PRODUCT_ID = "dev.goodloop.ramble.premium.monthly2"

@@ -1,6 +1,6 @@
 const ALLOWED_MODELS = ['whisper-large-v3-turbo', 'whisper-large-v3'];
 const DEFAULT_MODEL = 'whisper-large-v3-turbo';
-const APPLE_BUNDLE_ID = 'com.goodloop.ramble';
+const APPLE_BUNDLE_ID = 'dev.goodloop.ramble';
 const PREMIUM_PRODUCT_ID = 'dev.goodloop.ramble.premium.monthly2';
 
 // Apple Root CA - G3 (public key SHA-256 fingerprint for chain validation)
