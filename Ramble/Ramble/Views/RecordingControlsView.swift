@@ -14,6 +14,11 @@ struct RecordingControlsView: View {
 
     @State private var showCancelConfirmation = false
 
+    private var durationWarning: String? {
+        guard isRecording, duration >= Constants.Recording.longWarningDuration else { return nil }
+        return "Long recording"
+    }
+
     var body: some View {
         VStack(spacing: 8) {
             if isRecording {
@@ -63,11 +68,18 @@ struct RecordingControlsView: View {
                 }
             }
 
-            if isRecording, let source = inputSourceName {
-                Text("via \(source)")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .transition(.opacity)
+            if isRecording {
+                if let warning = durationWarning {
+                    Text(warning)
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                        .transition(.opacity)
+                } else if let source = inputSourceName {
+                    Text("via \(source)")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .transition(.opacity)
+                }
             }
         }
         .animation(.snappy(duration: 0.3), value: isRecording)
