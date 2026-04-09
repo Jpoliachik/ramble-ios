@@ -47,8 +47,12 @@ struct RecordingDetailView: View {
                 }
             }
         }
-        .alert("Delete Recording?", isPresented: $showDeleteConfirmation) {
-            Button("Delete", role: .destructive) {
+        .confirmationDialog(
+            "Delete this recording?",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete Recording", role: .destructive) {
                 if let recording = recording {
                     storageService.deleteRecording(recording)
                 }
