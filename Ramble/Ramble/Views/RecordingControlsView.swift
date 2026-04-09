@@ -12,6 +12,8 @@ struct RecordingControlsView: View {
     let onToggleRecording: () -> Void
     var onCancel: (() -> Void)? = nil
 
+    @State private var showCancelConfirmation = false
+
     var body: some View {
         VStack(spacing: 8) {
             if isRecording {
@@ -28,14 +30,32 @@ struct RecordingControlsView: View {
                 if isRecording {
                     HStack {
                         Button {
-                            onCancel?()
+                            HapticService.buttonTap()
+                            if duration > 30 {
+                                showCancelConfirmation = true
+                            } else {
+                                onCancel?()
+                            }
                         } label: {
-                            Text("Cancel")
-                                .font(.caption2)
+                            Image(systemName: "xmark")
+                                .font(.caption2.weight(.semibold))
                                 .foregroundStyle(.secondary)
+                                .frame(width: 26, height: 26)
+                                .background(.ultraThinMaterial, in: Circle())
                         }
                         .buttonStyle(.plain)
                         .transition(.opacity)
+                        .confirmationDialog(
+                            "Discard recording?",
+                            isPresented: $showCancelConfirmation,
+                            titleVisibility: .visible
+                        ) {
+                            Button("Discard", role: .destructive) {
+                                onCancel?()
+                            }
+                        } message: {
+                            Text("This will delete \(DateFormatters.formatDuration(duration)) of audio.")
+                        }
 
                         Spacer()
                     }

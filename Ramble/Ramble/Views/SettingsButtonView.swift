@@ -16,6 +16,7 @@ struct SettingsButtonView: View {
                 .background(.ultraThinMaterial, in: Circle())
         }
         .buttonStyle(.plain)
+        .contentShape(Circle().scale(1.5))
     }
 }
 
