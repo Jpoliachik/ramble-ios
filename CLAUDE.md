@@ -26,6 +26,9 @@ For full brand positioning, audience, tone, and messaging guidelines, see **`doc
 - [ ] **Launch screen** — splash screen for app launch
 - [ ] **App Store assets** — screenshots (iPhone + Apple Watch), privacy policy URL, app description
 - [ ] **Marketing website** — simple landing page (separate session/repo)
+- [ ] **Documentation website** — host webhook API docs and setup guides; update in-app link in `SettingsView.swift` (currently points to GitHub raw markdown)
+- [ ] **End-to-end production testing** — verify real StoreKit subscription flow (sandbox/TestFlight), JWS verification on proxy, and cloud transcription without dev bypass
+- [ ] **Fix App Attest cert parsing bug** — proxy fails to import Apple intermediate CA public key ("P-256 curve mismatch") during attestation registration; `REQUIRE_ATTEST` is off so not blocking, but needs fixing before enabling
 
 ### Release plan
 

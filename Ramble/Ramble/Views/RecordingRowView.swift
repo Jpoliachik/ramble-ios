@@ -20,36 +20,24 @@ struct RecordingRowView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                // Status-aware content area
+                // Content area
                 switch recording.status {
                 case .transcribing, .recorded:
                     transcribingPlaceholder
-                case .completed:
+                case .completed, .failed:
                     if let transcription = recording.transcription, !transcription.isEmpty {
                         Text(transcription)
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
-                case .failed:
-                    if let transcription = recording.transcription, !transcription.isEmpty {
-                        Text(transcription)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                    failedLabel
                 }
             }
 
             Spacer(minLength: 4)
 
-            // Status icon — only for completed (checkmark)
-            if recording.status == .completed {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
-                    .font(.subheadline)
-            }
+            // Status icon
+            statusIcon
         }
         .padding(.vertical, 6)
     }
@@ -64,10 +52,20 @@ struct RecordingRowView: View {
         }
     }
 
-    private var failedLabel: some View {
-        Image(systemName: recording.isModelNotInstalled ? "arrow.down.circle.fill" : "exclamationmark.circle.fill")
-            .foregroundStyle(recording.isModelNotInstalled ? .orange : .red)
-            .font(.caption)
+    @ViewBuilder
+    private var statusIcon: some View {
+        switch recording.status {
+        case .completed:
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+                .font(.subheadline)
+        case .failed:
+            Image(systemName: recording.isModelNotInstalled ? "arrow.down.circle.fill" : "exclamationmark.circle.fill")
+                .foregroundStyle(recording.isModelNotInstalled ? .orange : .red)
+                .font(.subheadline)
+        case .transcribing, .recorded:
+            EmptyView()
+        }
     }
 }
 
