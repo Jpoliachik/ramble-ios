@@ -65,13 +65,13 @@ struct SettingsView: View {
             if viewModel.transcriptionProvider == .cloudTranscription
                 && SubscriptionService.shared.isPremium
             {
-                Picker("Model", selection: $viewModel.cloudModel) {
-                    ForEach(CloudModel.allCases) { model in
-                        Text(model.displayName)
-                            .tag(model)
-                    }
+                ForEach(CloudModel.allCases) { model in
+                    CloudModelRowView(
+                        model: model,
+                        isSelected: viewModel.cloudModel == model,
+                        onSelect: { viewModel.cloudModel = model }
+                    )
                 }
-                .pickerStyle(.menu)
             }
         } header: {
             Text("Transcription")
@@ -325,6 +325,38 @@ struct ProviderRowView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+struct CloudModelRowView: View {
+    let model: CloudModel
+    let isSelected: Bool
+    let onSelect: () -> Void
+
+    var body: some View {
+        Button(action: onSelect) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(model.displayName)
+                        .font(.subheadline)
+                        .foregroundStyle(.primary)
+                    Text(model.subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.tint)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .listRowInsets(EdgeInsets(top: 8, leading: 36, bottom: 8, trailing: 16))
     }
 }
 

@@ -67,20 +67,26 @@ enum TranscriptionProvider: String, Codable, CaseIterable, Identifiable {
 enum CloudModel: String, Codable, CaseIterable, Identifiable {
     case whisperLargeV3Turbo = "whisper-large-v3-turbo"
     case whisperLargeV3 = "whisper-large-v3"
+    case deepgramNova3 = "deepgram-nova-3"
+    case openAIGPT4oTranscribe = "openai-gpt-4o-transcribe"
 
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
-        case .whisperLargeV3Turbo: return "Whisper Large v3 Turbo"
-        case .whisperLargeV3: return "Whisper Large v3"
+        case .whisperLargeV3Turbo: return "Groq Whisper v3 Turbo"
+        case .whisperLargeV3: return "Groq Whisper v3"
+        case .deepgramNova3: return "Deepgram Nova-3"
+        case .openAIGPT4oTranscribe: return "OpenAI GPT-4o Transcribe"
         }
     }
 
     var subtitle: String {
         switch self {
-        case .whisperLargeV3Turbo: return "Fast and accurate (recommended)"
-        case .whisperLargeV3: return "Highest accuracy"
+        case .whisperLargeV3Turbo: return "Fastest cloud transcription (recommended)"
+        case .whisperLargeV3: return "Groq — highest Whisper accuracy"
+        case .deepgramNova3: return "Fast, accurate, per-second billing"
+        case .openAIGPT4oTranscribe: return "OpenAI — best overall accuracy"
         }
     }
 }
