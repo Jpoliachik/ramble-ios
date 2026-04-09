@@ -45,6 +45,12 @@ export default function RootLayout({
                 GitHub
               </a>
               <Link
+                href="/docs"
+                className="hover:text-stone-900 transition-colors"
+              >
+                Docs
+              </Link>
+              <Link
                 href="/privacy"
                 className="hover:text-stone-900 transition-colors"
               >
