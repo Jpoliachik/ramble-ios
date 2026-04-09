@@ -18,33 +18,11 @@ final class WatchAudioRecorderService: NSObject, ObservableObject {
     private var timer: Timer?
     private(set) var currentRecordingURL: URL?
 
-    private var isSessionActive = false
-
-    override init() {
-        super.init()
-        prepareAudioSession()
-    }
-
-    func prepareAudioSession() {
-        guard !isSessionActive else { return }
-        let session = AVAudioSession.sharedInstance()
-        do {
-            // allowBluetooth enables AirPods/Bluetooth HFP mic input
-            try session.setCategory(.playAndRecord, mode: .default, options: [.allowBluetooth])
-            try session.setActive(true)
-            isSessionActive = true
-        } catch {
-            print("Failed to prepare watch audio session: \(error)")
-        }
-    }
-
     func startRecording() throws -> URL {
         let session = AVAudioSession.sharedInstance()
-        if !isSessionActive {
-            try session.setCategory(.playAndRecord, mode: .default, options: [.allowBluetooth])
-            try session.setActive(true)
-            isSessionActive = true
-        }
+        // allowBluetooth enables AirPods/Bluetooth HFP mic input
+        try session.setCategory(.playAndRecord, mode: .default, options: [.allowBluetooth])
+        try session.setActive(true)
 
         let recordingId = UUID().uuidString
         let documentsPath = FileManager.default.urls(
@@ -89,6 +67,12 @@ final class WatchAudioRecorderService: NSObject, ObservableObject {
         audioLevel = 0
         recordingStartTime = nil
         currentRecordingURL = nil
+
+        // Deactivate session so other audio can resume
+        try? AVAudioSession.sharedInstance().setActive(
+            false,
+            options: .notifyOthersOnDeactivation
+        )
 
         guard let recordingURL = url else { return nil }
         return (url: recordingURL, duration: duration)

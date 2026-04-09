@@ -1,48 +1,59 @@
 //
 //  MainView.swift
 //  Ramble
-//
 
 import SwiftUI
 
 struct MainView: View {
     @StateObject private var viewModel = RecordingViewModel()
     @State private var showSettings = false
+    @State private var scrollOffset: CGFloat = 0
+
+    /// How far the user scrolls before the header is fully collapsed (in points)
+    private let scrollThreshold: CGFloat = 60
+
+    /// 0 = at top (fully expanded), 1 = scrolled past threshold (fully collapsed)
+    private var scrollProgress: CGFloat {
+        min(max(scrollOffset / scrollThreshold, 0), 1)
+    }
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                // Top bar
-                HStack {
-                    Text("Ramble")
-                        .font(.largeTitle.bold())
-                    Spacer()
-                    SettingsButtonView {
-                        HapticService.buttonTap()
-                        showSettings = true
-                    }
-                }
-                .padding(.horizontal)
-                .padding(.top, 8)
-
-                // Sync status
-                if viewModel.failedCount > 0 || viewModel.pendingCount > 0 {
-                    SyncStatusBannerView(
-                        pendingCount: viewModel.pendingCount,
-                        failedCount: viewModel.failedCount,
-                        onTap: { showSettings = true }
-                    )
-                }
-
-                // Recording list
+            ZStack(alignment: .bottom) {
+                // Recording list — full height, scrolls under header and controls
                 RecordingListView(
                     recordingsByDay: viewModel.recordingsByDay,
-                    onDelete: viewModel.deleteRecording
+                    onDelete: viewModel.deleteRecording,
+                    scrollOffset: $scrollOffset
                 )
+                .contentMargins(.top, 48, for: .scrollContent)
+                .contentMargins(.bottom, 120, for: .scrollContent)
 
-                Divider()
+                // Top bar — floats over list, slides apart and fades on scroll
+                VStack {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("Ramble")
+                            .font(.system(size: 28, weight: .bold, design: .serif))
+                            .italic()
+                            .offset(x: -80 * scrollProgress)
+                            .opacity(1 - scrollProgress)
+                        Spacer()
+                        SettingsButtonView {
+                            HapticService.buttonTap()
+                            showSettings = true
+                        }
+                        .offset(x: 80 * scrollProgress)
+                        .opacity(1 - scrollProgress)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                    .padding(.bottom, 4)
+                    .allowsHitTesting(scrollProgress < 0.5)
+                    .animation(.easeOut(duration: 0.15), value: scrollProgress)
+                    Spacer()
+                }
 
-                // Bottom controls
+                // Floating bottom controls
                 RecordingControlsView(
                     isRecording: viewModel.isRecording,
                     duration: viewModel.currentDuration,
@@ -52,41 +63,29 @@ struct MainView: View {
                         Task {
                             await viewModel.toggleRecording()
                         }
+                    },
+                    onCancel: {
+                        viewModel.cancelRecording()
                     }
                 )
-                .background(Color(uiColor: .systemBackground))
+                .padding(.top, 24)
+                .padding(.bottom, 16)
+                .frame(maxWidth: .infinity)
+                .colorScheme(.dark)
+                .background {
+                    Rectangle()
+                        .fill(Color.black)
+                        .ignoresSafeArea(.container, edges: .bottom)
+                }
             }
+            .toolbarBackground(.hidden, for: .navigationBar)
             .navigationDestination(for: Recording.self) { recording in
                 RecordingDetailView(recording: recording)
             }
-            .overlay(alignment: .top) {
-                if viewModel.showSavedConfirmation {
-                    savedConfirmationView
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                }
-            }
-            .animation(.easeInOut(duration: 0.3), value: viewModel.showSavedConfirmation)
             .sheet(isPresented: $showSettings) {
                 SettingsView()
             }
         }
-    }
-
-    private var savedConfirmationView: some View {
-        HStack {
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundColor(.green)
-            Text("Saved")
-                .font(.subheadline.weight(.medium))
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(
-            Capsule()
-                .fill(Color(uiColor: .secondarySystemBackground))
-                .shadow(radius: 4)
-        )
-        .padding(.top, 60)
     }
 }
 

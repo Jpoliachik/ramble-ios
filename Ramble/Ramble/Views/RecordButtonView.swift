@@ -1,7 +1,6 @@
 //
 //  RecordButtonView.swift
 //  Ramble
-//
 
 import SwiftUI
 
@@ -12,8 +11,8 @@ struct RecordButtonView: View {
 
     @State private var pulseScale: CGFloat = 1.0
 
-    private let buttonSize: CGFloat = 72
-    private let innerSize: CGFloat = 64
+    private let buttonSize: CGFloat = 76
+    private let innerSize: CGFloat = 66
 
     /// Maps audio level (0...1) to a fill color from dark red to bright red
     private var innerFillColor: Color {
@@ -27,16 +26,15 @@ struct RecordButtonView: View {
             ZStack {
                 // Outer ring
                 Circle()
-                    .stroke(Color.red, lineWidth: 4)
+                    .stroke(Color.red.opacity(0.8), lineWidth: 3.5)
                     .frame(width: buttonSize, height: buttonSize)
 
                 // Inner shape (circle when idle, rounded square when recording)
-                // Background fill responds to audio level
                 RoundedRectangle(cornerRadius: isRecording ? 8 : innerSize / 2)
                     .fill(innerFillColor)
                     .frame(
-                        width: isRecording ? 28 : innerSize,
-                        height: isRecording ? 28 : innerSize
+                        width: isRecording ? 24 : innerSize,
+                        height: isRecording ? 24 : innerSize
                     )
                     .scaleEffect(isRecording ? pulseScale : 1.0)
                     .animation(.easeOut(duration: 0.1), value: audioLevel)

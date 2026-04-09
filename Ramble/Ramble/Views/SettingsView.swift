@@ -33,17 +33,45 @@ struct SettingsView: View {
                     }
                 }
             }
+            .sheet(isPresented: $viewModel.showSubscriptionPaywall) {
+                SubscriptionView()
+            }
+            .sheet(isPresented: $showExportShare) {
+                if let url = exportURL {
+                    ShareSheet(activityItems: [url])
+                }
+            }
         }
     }
 
     private var transcriptionSection: some View {
         Section {
-            ForEach(TranscriptionProvider.allCases) { provider in
-                ProviderRowView(
-                    provider: provider,
-                    isSelected: viewModel.transcriptionProvider == provider,
-                    onSelect: { viewModel.transcriptionProvider = provider }
-                )
+            // Apple Speech — always available
+            ProviderRowView(
+                provider: .appleSpeech,
+                isSelected: viewModel.transcriptionProvider == .appleSpeech,
+                onSelect: { viewModel.transcriptionProvider = .appleSpeech }
+            )
+
+            // Cloud Transcription — gated behind subscription
+            ProviderRowView(
+                provider: .cloudTranscription,
+                isSelected: viewModel.transcriptionProvider == .cloudTranscription,
+                isPremiumLocked: !SubscriptionService.shared.isPremium,
+                onSelect: { viewModel.selectCloudTranscription() }
+            )
+
+            // Model picker — visible when premium + cloud selected
+            if viewModel.transcriptionProvider == .cloudTranscription
+                && SubscriptionService.shared.isPremium
+            {
+                Picker("Model", selection: $viewModel.cloudModel) {
+                    ForEach(CloudModel.allCases) { model in
+                        Text(model.displayName)
+                            .tag(model)
+                    }
+                }
+                .pickerStyle(.menu)
             }
         } header: {
             Text("Transcription")
@@ -208,11 +236,6 @@ struct SettingsView: View {
                 }
             }
         }
-        .sheet(isPresented: $showExportShare) {
-            if let url = exportURL {
-                ShareSheet(activityItems: [url])
-            }
-        }
     }
 
     private var dangerZoneSection: some View {
@@ -249,6 +272,7 @@ struct SettingsView: View {
 struct ProviderRowView: View {
     let provider: TranscriptionProvider
     let isSelected: Bool
+    var isPremiumLocked: Bool = false
     let onSelect: () -> Void
 
     var body: some View {
@@ -266,9 +290,21 @@ struct ProviderRowView: View {
                     )
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(provider.displayName)
-                        .font(.body)
-                        .foregroundStyle(.primary)
+                    HStack(spacing: 6) {
+                        Text(provider.displayName)
+                            .font(.body)
+                            .foregroundStyle(.primary)
+                        if isPremiumLocked {
+                            Text("PRO")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(
+                                    Capsule().fill(Color.blue)
+                                )
+                        }
+                    }
                     Text(provider.subtitle)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -280,6 +316,10 @@ struct ProviderRowView: View {
                     Image(systemName: "checkmark")
                         .font(.body.weight(.semibold))
                         .foregroundStyle(.tint)
+                } else if isPremiumLocked {
+                    Image(systemName: "lock.fill")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
             .contentShape(Rectangle())

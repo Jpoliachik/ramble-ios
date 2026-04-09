@@ -1,13 +1,13 @@
 //
 //  RecordingListView.swift
 //  Ramble
-//
 
 import SwiftUI
 
 struct RecordingListView: View {
     let recordingsByDay: [(date: Date, recordings: [Recording])]
     let onDelete: (Recording) -> Void
+    @Binding var scrollOffset: CGFloat
 
     var body: some View {
         if recordingsByDay.isEmpty {
@@ -30,30 +30,27 @@ struct RecordingListView: View {
                         }
                     } header: {
                         Text(DateFormatters.formatDayHeader(for: day.date))
-                            .font(.headline)
-                            .foregroundColor(.primary)
+                            .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                            .foregroundStyle(.secondary)
                             .textCase(nil)
                     }
                 }
             }
-            .listStyle(.plain)
+            .listStyle(.insetGrouped)
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                geometry.contentOffset.y + geometry.contentInsets.top
+            } action: { _, newValue in
+                scrollOffset = newValue
+            }
         }
     }
 
     private var emptyStateView: some View {
-        VStack(spacing: 16) {
-            Spacer()
-            Image(systemName: "waveform")
-                .font(.system(size: 48))
-                .foregroundColor(.secondary)
-            Text("No recordings yet")
-                .font(.title3)
-                .foregroundColor(.secondary)
-            Text("Tap the record button to start")
-                .font(.body)
-                .foregroundColor(.secondary.opacity(0.8))
-            Spacer()
-        }
+        ContentUnavailableView(
+            "No recordings yet",
+            systemImage: "waveform",
+            description: Text("Tap record to start")
+        )
     }
 }
 
@@ -68,6 +65,7 @@ struct RecordingListView: View {
                 ]
             )
         ],
-        onDelete: { _ in }
+        onDelete: { _ in },
+        scrollOffset: .constant(0)
     )
 }

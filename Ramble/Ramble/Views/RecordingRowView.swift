@@ -1,7 +1,6 @@
 //
 //  RecordingRowView.swift
 //  Ramble
-//
 
 import SwiftUI
 
@@ -9,60 +8,64 @@ struct RecordingRowView: View {
     let recording: Recording
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            // Time column
-            Text(DateFormatters.timeFormatter.string(from: recording.createdAt))
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .frame(width: 70, alignment: .leading)
-
+        HStack(spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
-                // Duration and status row
-                HStack {
+                // Top line: duration + time
+                HStack(alignment: .firstTextBaseline) {
                     Text(DateFormatters.formatDuration(recording.duration))
-                        .font(.headline)
+                        .font(.system(.headline, design: .rounded, weight: .semibold))
 
-                    Spacer()
-
-                    statusView
+                    Text(DateFormatters.timeFormatter.string(from: recording.createdAt))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
 
-                // Transcription preview (1 line only)
-                if let transcription = recording.transcription, !transcription.isEmpty {
-                    Text(transcription)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
+                // Status-aware content area
+                switch recording.status {
+                case .transcribing, .recorded:
+                    transcribingPlaceholder
+                case .completed:
+                    if let transcription = recording.transcription, !transcription.isEmpty {
+                        Text(transcription)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                case .failed:
+                    failedLabel
                 }
             }
+
+            Spacer(minLength: 4)
+
+            // Status icon — only for completed (checkmark)
+            if recording.status == .completed {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                    .font(.subheadline)
+            }
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 6)
     }
 
-    @ViewBuilder
-    private var statusView: some View {
-        switch recording.status {
-        case .recorded:
-            EmptyView()
-        case .transcribing:
+    private var transcribingPlaceholder: some View {
+        HStack(spacing: 6) {
             ProgressView()
-                .scaleEffect(0.8)
-        case .completed:
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(.green)
+                .controlSize(.mini)
+            Text(recording.status == .transcribing ? "Transcribing..." : "Waiting...")
                 .font(.caption)
-        case .failed:
-            Group {
-                if recording.isModelNotInstalled {
-                    Image(systemName: "arrow.down.circle.fill")
-                        .foregroundStyle(.orange)
-                } else {
-                    Image(systemName: "exclamationmark.circle.fill")
-                        .foregroundStyle(.red)
-                }
-            }
-            .font(.caption)
+                .foregroundStyle(.tertiary)
         }
+    }
+
+    private var failedLabel: some View {
+        HStack(spacing: 4) {
+            Image(systemName: recording.isModelNotInstalled ? "arrow.down.circle.fill" : "exclamationmark.circle.fill")
+                .foregroundStyle(recording.isModelNotInstalled ? .orange : .red)
+            Text(recording.isModelNotInstalled ? "Download required" : (recording.lastError ?? "Failed"))
+                .foregroundStyle(.secondary)
+        }
+        .font(.caption)
     }
 }
 
@@ -80,6 +83,11 @@ struct RecordingRowView: View {
         RecordingRowView(recording: Recording(
             duration: 200,
             status: .recorded
+        ))
+        RecordingRowView(recording: Recording(
+            duration: 30,
+            status: .failed,
+            lastError: "Network error"
         ))
     }
 }

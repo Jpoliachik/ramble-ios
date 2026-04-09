@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		8A290E652F2153450020317A /* watch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 8A290E5B2F2153440020317A /* watch Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		8AB9C9B12F86DE7A003C7BD8 /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8AB9C9B02F86DE7A003C7BD8 /* StoreKit.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -37,6 +38,7 @@
 /* Begin PBXFileReference section */
 		8A290E2D2F2152E10020317A /* Ramble.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ramble.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8A290E5B2F2153440020317A /* watch Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "watch Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		8AB9C9B02F86DE7A003C7BD8 /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -70,6 +72,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8AB9C9B12F86DE7A003C7BD8 /* StoreKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -88,6 +91,7 @@
 			children = (
 				8A290E2F2F2152E10020317A /* Ramble */,
 				8A290E5C2F2153440020317A /* watch Watch App */,
+				8AB9C9AF2F86DE7A003C7BD8 /* Frameworks */,
 				8A290E2E2F2152E10020317A /* Products */,
 			);
 			sourceTree = "<group>";
@@ -99,6 +103,14 @@
 				8A290E5B2F2153440020317A /* watch Watch App.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		8AB9C9AF2F86DE7A003C7BD8 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				8AB9C9B02F86DE7A003C7BD8 /* StoreKit.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -364,6 +376,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Ramble/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Ramble;
 				INFOPLIST_KEY_LSApplicationCategoryType = "";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Ramble needs microphone access to record your voice journals.";
 				INFOPLIST_KEY_NSSiriUsageDescription = "Ramble uses Siri to start and stop voice recordings hands-free.";
@@ -402,6 +415,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Ramble/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Ramble;
 				INFOPLIST_KEY_LSApplicationCategoryType = "";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Ramble needs microphone access to record your voice journals.";
 				INFOPLIST_KEY_NSSiriUsageDescription = "Ramble uses Siri to start and stop voice recordings hands-free.";

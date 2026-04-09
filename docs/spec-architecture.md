@@ -323,25 +323,7 @@ No authentication. Device ID is the identity key. The proxy trusts it for rate l
 
 ## Webhook Contract
 
-When a transcript completes and a webhook URL is configured, POST:
-
-```json
-{
-  "recording_id": "uuid",
-  "created_at": "2026-03-17T13:19:00Z",
-  "duration": 138.5,
-  "transcription": "The full transcript text...",
-  "device_id": "uuid"
-}
-```
-
-**To:** User-configured webhook URL
-**Method:** POST
-**Content-Type:** application/json
-**Retries:** 3 attempts with backoff (5s, 30s, 120s)
-**Success:** Any 2xx response
-
-The app does not read or store the webhook response. Whatever happens downstream is not the app's concern.
+See [docs/webhook-api.md](webhook-api.md) for the full webhook API reference.
 
 ---
 
