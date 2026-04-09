@@ -6,7 +6,12 @@ import {
   jwsSignatureToRaw,
 } from './crypto.js';
 
-const ALLOWED_MODELS = ['whisper-large-v3-turbo', 'whisper-large-v3'];
+const ALLOWED_MODELS = [
+  'whisper-large-v3-turbo',
+  'whisper-large-v3',
+  'deepgram-nova-3',
+  'openai-gpt-4o-transcribe',
+];
 const DEFAULT_MODEL = 'whisper-large-v3-turbo';
 const APPLE_BUNDLE_ID = 'dev.goodloop.ramble';
 const PREMIUM_PRODUCT_ID = 'dev.goodloop.ramble.premium.monthly2';
@@ -111,15 +116,23 @@ async function handleTranscribe(request, env) {
     `[transcribe] device=${deviceId} model=${requestedModel} file=${audio.name} size=${audio.size}`,
   );
 
-  // --- Forward to Groq ---
-  const text = await transcribeWithGroq(audio, requestedModel, env);
-  if (text.error) {
-    return json({ error: text.error }, text.status);
+  // --- Route to appropriate backend ---
+  let result;
+  if (requestedModel.startsWith('deepgram-')) {
+    result = await transcribeWithDeepgram(audio, env);
+  } else if (requestedModel.startsWith('openai-')) {
+    result = await transcribeWithOpenAI(audio, env);
+  } else {
+    result = await transcribeWithGroq(audio, requestedModel, env);
   }
 
-  console.log(`[transcribe] device=${deviceId} text_length=${text.result?.length || 0}`);
+  if (result.error) {
+    return json({ error: result.error }, result.status);
+  }
 
-  return json({ text: text.result });
+  console.log(`[transcribe] device=${deviceId} text_length=${result.result?.length || 0}`);
+
+  return json({ text: result.result });
 }
 
 // --- Groq Transcription ---
@@ -150,6 +163,80 @@ async function transcribeWithGroq(audio, modelName, env) {
 
   const result = await groqRes.json();
   return { result: result.text };
+}
+
+// --- Deepgram Transcription ---
+
+async function transcribeWithDeepgram(audio, env) {
+  if (!env.DEEPGRAM_API_KEY) {
+    return { error: 'Deepgram API key not configured', status: 503 };
+  }
+
+  const audioBuffer = await audio.arrayBuffer();
+
+  let res;
+  try {
+    res = await fetch('https://api.deepgram.com/v1/listen?model=nova-3&smart_format=true', {
+      method: 'POST',
+      headers: {
+        Authorization: `Token ${env.DEEPGRAM_API_KEY}`,
+        'Content-Type': audio.type || 'audio/m4a',
+      },
+      body: audioBuffer,
+    });
+  } catch (err) {
+    console.error(`[transcribe] Deepgram request failed: ${err.message}`);
+    return { error: 'Transcription service unavailable', status: 503 };
+  }
+
+  if (!res.ok) {
+    const errorBody = await res.text();
+    console.error(`[transcribe] Deepgram error ${res.status}: ${errorBody}`);
+    return { error: 'Transcription failed', status: res.status >= 500 ? 502 : 400 };
+  }
+
+  const data = await res.json();
+  const transcript = data.results?.channels?.[0]?.alternatives?.[0]?.transcript;
+
+  if (transcript === undefined || transcript === null) {
+    return { error: 'No transcript in Deepgram response', status: 502 };
+  }
+
+  return { result: transcript };
+}
+
+// --- OpenAI Transcription ---
+
+async function transcribeWithOpenAI(audio, env) {
+  if (!env.OPENAI_API_KEY) {
+    return { error: 'OpenAI API key not configured', status: 503 };
+  }
+
+  const form = new FormData();
+  form.append('file', audio, audio.name || 'recording.m4a');
+  form.append('model', 'gpt-4o-transcribe');
+  form.append('response_format', 'json');
+
+  let res;
+  try {
+    res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${env.OPENAI_API_KEY}` },
+      body: form,
+    });
+  } catch (err) {
+    console.error(`[transcribe] OpenAI request failed: ${err.message}`);
+    return { error: 'Transcription service unavailable', status: 503 };
+  }
+
+  if (!res.ok) {
+    const errorBody = await res.text();
+    console.error(`[transcribe] OpenAI error ${res.status}: ${errorBody}`);
+    return { error: 'Transcription failed', status: res.status >= 500 ? 502 : 400 };
+  }
+
+  const data = await res.json();
+  return { result: data.text };
 }
 
 // --- Apple JWS Verification ---
