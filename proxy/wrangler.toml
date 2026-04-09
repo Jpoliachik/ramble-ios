@@ -14,8 +14,8 @@ PREMIUM_PRODUCT_ID = "dev.goodloop.ramble.premium.monthly2"
 # REQUIRE_ATTEST = "true"
 
 # KV namespace for App Attest state (challenges, attested device keys).
-# Create with: wrangler kv namespace create ATTEST_KV
-# Then paste the id below.
+# SETUP REQUIRED: Run `wrangler kv namespace create ATTEST_KV` and paste
+# the returned id below. Deployment will fail until this is configured.
 [[kv_namespaces]]
 binding = "ATTEST_KV"
-id = "REPLACE_WITH_KV_NAMESPACE_ID"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"  # <-- replace before deploying
