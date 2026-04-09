@@ -3,6 +3,7 @@
 //  Ramble
 //
 
+import AVFoundation
 import Foundation
 
 struct ProxyTranscriptionRequest {
@@ -30,7 +31,107 @@ final class ProxyTranscriptionService {
         // Best-effort attestation before the first request
         try? await appAttestService.attestIfNeeded()
 
-        let audioData = try Data(contentsOf: request.audioURL)
+        // Check file size to determine if chunking is needed
+        let attributes = try FileManager.default.attributesOfItem(atPath: request.audioURL.path)
+        let fileSize = attributes[.size] as? Int ?? 0
+
+        if fileSize < Constants.Transcription.maxSingleUploadSize {
+            let audioData = try Data(contentsOf: request.audioURL)
+            return try await uploadAndTranscribe(
+                audioData: audioData, baseURL: baseURL, request: request,
+                deviceId: settings.deviceId
+            )
+        } else {
+            return try await transcribeChunked(
+                baseURL: baseURL, request: request, deviceId: settings.deviceId
+            )
+        }
+    }
+
+    // MARK: - Chunked Transcription
+
+    private func transcribeChunked(
+        baseURL: URL, request: ProxyTranscriptionRequest, deviceId: String
+    ) async throws -> String {
+        let chunkURLs = try await splitAudioIntoChunks(audioURL: request.audioURL)
+
+        defer {
+            for url in chunkURLs {
+                try? FileManager.default.removeItem(at: url)
+            }
+        }
+
+        var transcripts: [String] = []
+        for chunkURL in chunkURLs {
+            let audioData = try Data(contentsOf: chunkURL)
+            let text = try await uploadAndTranscribe(
+                audioData: audioData, baseURL: baseURL, request: request,
+                deviceId: deviceId
+            )
+            if !text.isEmpty {
+                transcripts.append(text)
+            }
+        }
+
+        return transcripts.joined(separator: " ")
+    }
+
+    private func splitAudioIntoChunks(audioURL: URL) async throws -> [URL] {
+        let asset = AVURLAsset(url: audioURL)
+        let duration = try await asset.load(.duration)
+        let totalSeconds = CMTimeGetSeconds(duration)
+
+        guard totalSeconds > 0 else {
+            throw TranscriptionError.recognitionFailed("Audio file has no duration")
+        }
+
+        let chunkDuration = Constants.Transcription.chunkDurationSeconds
+        var chunks: [URL] = []
+        var startSeconds: Double = 0
+
+        while startSeconds < totalSeconds {
+            let endSeconds = min(startSeconds + chunkDuration, totalSeconds)
+            let start = CMTime(seconds: startSeconds, preferredTimescale: 44100)
+            let end = CMTime(seconds: endSeconds, preferredTimescale: 44100)
+            let timeRange = CMTimeRange(start: start, end: end)
+
+            let tempURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("\(UUID().uuidString).m4a")
+
+            guard let exportSession = AVAssetExportSession(
+                asset: asset,
+                presetName: AVAssetExportPresetAppleM4A
+            ) else {
+                for chunk in chunks { try? FileManager.default.removeItem(at: chunk) }
+                throw TranscriptionError.recognitionFailed("Failed to create audio export session")
+            }
+
+            exportSession.outputURL = tempURL
+            exportSession.outputFileType = .m4a
+            exportSession.timeRange = timeRange
+
+            await exportSession.export()
+
+            guard exportSession.status == .completed else {
+                for chunk in chunks { try? FileManager.default.removeItem(at: chunk) }
+                try? FileManager.default.removeItem(at: tempURL)
+                let errorMsg = exportSession.error?.localizedDescription ?? "Unknown error"
+                throw TranscriptionError.recognitionFailed("Failed to split audio: \(errorMsg)")
+            }
+
+            chunks.append(tempURL)
+            startSeconds = endSeconds
+        }
+
+        return chunks
+    }
+
+    // MARK: - Upload
+
+    private func uploadAndTranscribe(
+        audioData: Data, baseURL: URL, request: ProxyTranscriptionRequest,
+        deviceId: String
+    ) async throws -> String {
         let url = baseURL.appendingPathComponent("transcribe")
         let boundary = UUID().uuidString
 
@@ -40,7 +141,7 @@ final class ProxyTranscriptionService {
             "multipart/form-data; boundary=\(boundary)",
             forHTTPHeaderField: "Content-Type"
         )
-        urlRequest.setValue(settings.deviceId, forHTTPHeaderField: "X-Device-ID")
+        urlRequest.setValue(deviceId, forHTTPHeaderField: "X-Device-ID")
 
         // Subscription JWS for server-side verification
         if let jws = request.jwsTransaction {

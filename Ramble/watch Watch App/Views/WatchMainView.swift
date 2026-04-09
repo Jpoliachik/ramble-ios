@@ -95,6 +95,15 @@ struct WatchMainView: View {
                 Text("Recording")
                     .font(.caption)
             }
+        } else if recordingManager.isRecording
+                    && recordingManager.currentDuration >= 30 * 60 {  // 30 min warning
+            HStack(spacing: 4) {
+                Image(systemName: "exclamationmark.triangle")
+                    .foregroundStyle(.orange)
+                Text("Long recording")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
         } else {
             Text("Ramble")
                 .font(.system(.headline, design: .serif))
@@ -183,8 +192,14 @@ struct WatchMainView: View {
     }
 
     private func formatDuration(_ duration: TimeInterval) -> String {
-        let minutes = Int(duration) / 60
-        let seconds = Int(duration) % 60
+        let totalSeconds = Int(duration)
+        let hours = totalSeconds / 3600
+        let minutes = (totalSeconds % 3600) / 60
+        let seconds = totalSeconds % 60
+
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, minutes, seconds)
+        }
         return String(format: "%d:%02d", minutes, seconds)
     }
 }
