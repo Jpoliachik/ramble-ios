@@ -30,6 +30,15 @@ For full brand positioning, audience, tone, and messaging guidelines, see **`doc
 - [ ] **End-to-end production testing** — verify real StoreKit subscription flow (sandbox/TestFlight), JWS verification on proxy, and cloud transcription without dev bypass
 - [ ] **Fix App Attest cert parsing bug** — proxy fails to import Apple intermediate CA public key ("P-256 curve mismatch") during attestation registration; `REQUIRE_ATTEST` is off so not blocking, but needs fixing before enabling
 
+### Post-v1 — cloud transcription enhancements
+
+These are free features from existing providers (no extra API calls or cost):
+
+- [ ] **Deepgram auto-paragraphs** — add `paragraphs=true` to Deepgram API call; instant readability improvement for longer recordings
+- [ ] **Filler word removal toggle** — settings toggle to strip "um", "uh", etc. Deepgram supports natively; client-side regex for Groq/OpenAI
+- [ ] **Speaker diarization** — opt-in toggle. Deepgram has `diarize=true`, OpenAI has `gpt-4o-transcribe-diarize` model. Labels speakers in transcript. Great for conversations/meetings.
+- [ ] **Language hint** — language picker in settings, passed to all providers. Improves accuracy for non-English users.
+
 ### Release plan
 
 - Open source the repo on GitHub

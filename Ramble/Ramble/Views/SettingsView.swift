@@ -154,10 +154,10 @@ struct SettingsView: View {
                             withAnimation { showSecretRevealed.toggle() }
                         } label: {
                             Image(systemName: showSecretRevealed ? "eye.slash" : "eye")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .font(.footnote)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
                     }
 
                     if showSecretRevealed {

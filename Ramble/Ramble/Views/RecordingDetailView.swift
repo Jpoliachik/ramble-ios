@@ -14,6 +14,7 @@ struct RecordingDetailView: View {
     @State private var isDownloadingModel = false
     @State private var showDeleteConfirmation = false
     @State private var isResendingWebhook = false
+    @State private var isTranscriptExpanded = false
 
     private let storageService = StorageService.shared
     private let transcriptionQueue = TranscriptionQueueService.shared
@@ -145,9 +146,21 @@ struct RecordingDetailView: View {
     private func transcriptSection(_ recording: Recording) -> some View {
         Section {
             if let transcription = recording.transcription, !transcription.isEmpty {
-                Text(transcription)
-                    .font(.body)
-                    .textSelection(.enabled)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(transcription)
+                        .font(.body)
+                        .lineLimit(isTranscriptExpanded ? nil : 6)
+                        .textSelection(.enabled)
+
+                    Button {
+                        withAnimation { isTranscriptExpanded.toggle() }
+                    } label: {
+                        Text(isTranscriptExpanded ? "Show less" : "Show more")
+                            .font(.footnote)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
             } else if recording.status == .transcribing {
                 HStack(spacing: 8) {
                     ProgressView().scaleEffect(0.8)
