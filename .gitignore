@@ -57,3 +57,7 @@ playground.xcworkspace
 
 # API keys
 Ramble/Ramble/Secrets.swift
+
+# Cloudflare Wrangler
+.wrangler/
+proxy/wrangler.toml

@@ -66,6 +66,15 @@ final class SettingsViewModel: ObservableObject {
         }
     }
 
+    func selectCloudModel(_ model: CloudModel) {
+        if SubscriptionService.shared.isPremium {
+            transcriptionProvider = .cloudTranscription
+            cloudModel = model
+        } else {
+            showSubscriptionPaywall = true
+        }
+    }
+
     func validateWebhookURL() {
         if webhookURL.isEmpty {
             webhookURLError = nil

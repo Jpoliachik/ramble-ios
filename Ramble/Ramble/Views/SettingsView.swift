@@ -45,7 +45,9 @@ struct SettingsView: View {
     }
 
     private var transcriptionSection: some View {
-        Section {
+        let isPremium = SubscriptionService.shared.isPremium
+
+        return Section {
             // Apple Speech — always available
             ProviderRowView(
                 provider: .appleSpeech,
@@ -53,25 +55,15 @@ struct SettingsView: View {
                 onSelect: { viewModel.transcriptionProvider = .appleSpeech }
             )
 
-            // Cloud Transcription — gated behind subscription
-            ProviderRowView(
-                provider: .cloudTranscription,
-                isSelected: viewModel.transcriptionProvider == .cloudTranscription,
-                isPremiumLocked: !SubscriptionService.shared.isPremium,
-                onSelect: { viewModel.selectCloudTranscription() }
-            )
-
-            // Model picker — visible when premium + cloud selected
-            if viewModel.transcriptionProvider == .cloudTranscription
-                && SubscriptionService.shared.isPremium
-            {
-                ForEach(CloudModel.allCases) { model in
-                    CloudModelRowView(
-                        model: model,
-                        isSelected: viewModel.cloudModel == model,
-                        onSelect: { viewModel.cloudModel = model }
-                    )
-                }
+            // Each cloud model shown individually
+            ForEach(CloudModel.allCases) { model in
+                CloudModelRowView(
+                    model: model,
+                    isSelected: viewModel.transcriptionProvider == .cloudTranscription
+                        && viewModel.cloudModel == model,
+                    isPremiumLocked: !isPremium,
+                    onSelect: { viewModel.selectCloudModel(model) }
+                )
             }
         } header: {
             Text("Transcription")
@@ -331,15 +323,37 @@ struct ProviderRowView: View {
 struct CloudModelRowView: View {
     let model: CloudModel
     let isSelected: Bool
+    var isPremiumLocked: Bool = false
     let onSelect: () -> Void
 
     var body: some View {
         Button(action: onSelect) {
-            HStack {
+            HStack(spacing: 14) {
+                Image(systemName: "cloud.fill")
+                    .font(.title3)
+                    .foregroundStyle(.blue)
+                    .frame(width: 32, height: 32)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.blue.opacity(0.12))
+                    )
+
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(model.displayName)
-                        .font(.subheadline)
-                        .foregroundStyle(.primary)
+                    HStack(spacing: 6) {
+                        Text(model.displayName)
+                            .font(.body)
+                            .foregroundStyle(.primary)
+                        if isPremiumLocked {
+                            Text("PRO")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(
+                                    Capsule().fill(Color.blue)
+                                )
+                        }
+                    }
                     Text(model.subtitle)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -351,12 +365,15 @@ struct CloudModelRowView: View {
                     Image(systemName: "checkmark")
                         .font(.body.weight(.semibold))
                         .foregroundStyle(.tint)
+                } else if isPremiumLocked {
+                    Image(systemName: "lock.fill")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .listRowInsets(EdgeInsets(top: 8, leading: 36, bottom: 8, trailing: 16))
     }
 }
 
