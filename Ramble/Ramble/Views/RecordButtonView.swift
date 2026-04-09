@@ -11,8 +11,8 @@ struct RecordButtonView: View {
 
     @State private var pulseScale: CGFloat = 1.0
 
-    private let buttonSize: CGFloat = 64
-    private let innerSize: CGFloat = 56
+    private let buttonSize: CGFloat = 76
+    private let innerSize: CGFloat = 66
 
     /// Maps audio level (0...1) to a fill color from dark red to bright red
     private var innerFillColor: Color {

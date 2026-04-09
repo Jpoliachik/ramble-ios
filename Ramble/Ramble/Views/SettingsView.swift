@@ -33,6 +33,14 @@ struct SettingsView: View {
                     }
                 }
             }
+            .sheet(isPresented: $viewModel.showSubscriptionPaywall) {
+                SubscriptionView()
+            }
+            .sheet(isPresented: $showExportShare) {
+                if let url = exportURL {
+                    ShareSheet(activityItems: [url])
+                }
+            }
         }
     }
 
@@ -67,9 +75,6 @@ struct SettingsView: View {
             }
         } header: {
             Text("Transcription")
-        }
-        .sheet(isPresented: $viewModel.showSubscriptionPaywall) {
-            SubscriptionView()
         }
     }
 
@@ -229,11 +234,6 @@ struct SettingsView: View {
                     exportURL = url
                     showExportShare = true
                 }
-            }
-        }
-        .sheet(isPresented: $showExportShare) {
-            if let url = exportURL {
-                ShareSheet(activityItems: [url])
             }
         }
     }
