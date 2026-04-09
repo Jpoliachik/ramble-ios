@@ -35,10 +35,14 @@ final class TranscriptionQueueService: ObservableObject {
         guard !queue.contains(where: { $0.recordingId == recordingId }) else { return }
         let settings = settingsService.load()
         let cloudModel: CloudModel? = settings.transcriptionProvider.isCloud ? settings.cloudModel : nil
+        let customURL: String? = settings.transcriptionProvider == .customEndpoint ? settings.customEndpointURL : nil
+        let customAuth: String? = settings.transcriptionProvider == .customEndpoint ? settings.customEndpointAuthHeader : nil
         let job = TranscriptionJob(
             recordingId: recordingId,
             provider: settings.transcriptionProvider,
-            cloudModel: cloudModel
+            cloudModel: cloudModel,
+            customEndpointURL: customURL,
+            customEndpointAuthHeader: customAuth
         )
         queue.append(job)
         saveQueue()
@@ -136,7 +140,8 @@ final class TranscriptionQueueService: ObservableObject {
 
         do {
             let text: String
-            if job.provider.isCloud {
+            switch job.provider {
+            case .cloudTranscription:
                 // Fetch fresh JWS at call time (not enqueue time) — tokens expire
                 let jws = SubscriptionService.shared.currentJWSTransaction
                 let request = ProxyTranscriptionRequest(
@@ -145,7 +150,17 @@ final class TranscriptionQueueService: ObservableObject {
                     jwsTransaction: jws
                 )
                 text = try await proxyService.transcribe(request)
-            } else {
+            case .customEndpoint:
+                guard let endpointURL = job.customEndpointURL, !endpointURL.isEmpty else {
+                    throw TranscriptionError.customEndpointNotConfigured
+                }
+                let request = CustomEndpointTranscriptionRequest(
+                    audioURL: audioURL,
+                    endpointURL: endpointURL,
+                    authHeader: job.customEndpointAuthHeader
+                )
+                text = try await proxyService.transcribeCustom(request)
+            case .appleSpeech:
                 text = try await speechAnalyzer.transcribe(audioURL: audioURL)
             }
 
@@ -154,9 +169,10 @@ final class TranscriptionQueueService: ObservableObject {
             if let i = updatedRecordings.firstIndex(where: { $0.id == job.recordingId }) {
                 updatedRecordings[i].status = .completed
                 updatedRecordings[i].transcription = text
+                updatedRecordings[i].transcriptionSource = job.sourceLabel
                 updatedRecordings[i].lastError = nil
                 updatedRecordings[i].activityLog.append(
-                    ActivityEntry("Transcription completed", httpStatus: job.provider.isCloud ? 200 : nil)
+                    ActivityEntry("Transcribed via \(job.sourceLabel)", httpStatus: job.provider.isCloud ? 200 : nil)
                 )
                 storageService.saveRecordings(updatedRecordings)
             }
@@ -205,6 +221,8 @@ final class TranscriptionQueueService: ObservableObject {
         } catch let transcriptionError as TranscriptionError {
             var httpStatus: Int?
             if case .proxyError(let code, _) = transcriptionError {
+                httpStatus = code
+            } else if case .customEndpointError(let code, _) = transcriptionError {
                 httpStatus = code
             }
             await handleTranscriptionFailure(job: job, error: transcriptionError.localizedDescription, httpStatus: httpStatus)

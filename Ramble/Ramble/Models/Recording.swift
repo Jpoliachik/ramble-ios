@@ -26,6 +26,7 @@ struct Recording: Identifiable, Codable, Hashable {
     let audioFileName: String
     var status: RecordingStatus
     var transcription: String?
+    var transcriptionSource: String?
     var webhookStatus: WebhookStatus?
     var lastError: String?
     var activityLog: [ActivityEntry]
@@ -37,6 +38,7 @@ struct Recording: Identifiable, Codable, Hashable {
         audioFileName: String? = nil,
         status: RecordingStatus = .recorded,
         transcription: String? = nil,
+        transcriptionSource: String? = nil,
         webhookStatus: WebhookStatus? = nil,
         lastError: String? = nil,
         activityLog: [ActivityEntry] = []
@@ -47,6 +49,7 @@ struct Recording: Identifiable, Codable, Hashable {
         self.audioFileName = audioFileName ?? "\(id.uuidString).m4a"
         self.status = status
         self.transcription = transcription
+        self.transcriptionSource = transcriptionSource
         self.webhookStatus = webhookStatus
         self.lastError = lastError
         self.activityLog = activityLog
@@ -60,6 +63,7 @@ struct Recording: Identifiable, Codable, Hashable {
         duration = try container.decode(TimeInterval.self, forKey: .duration)
         audioFileName = try container.decode(String.self, forKey: .audioFileName)
         transcription = try container.decodeIfPresent(String.self, forKey: .transcription)
+        transcriptionSource = try container.decodeIfPresent(String.self, forKey: .transcriptionSource)
         webhookStatus = try container.decodeIfPresent(WebhookStatus.self, forKey: .webhookStatus)
 
         // New status field, or migrate from old transcriptionStatus/status values
@@ -104,7 +108,7 @@ struct Recording: Identifiable, Codable, Hashable {
     private enum CodingKeys: String, CodingKey {
         case id, createdAt, duration, audioFileName
         case status
-        case transcription, webhookStatus, lastError, activityLog
+        case transcription, transcriptionSource, webhookStatus, lastError, activityLog
         // Legacy keys for migration
         case transcriptionStatus
         case lastTranscriptionError
@@ -118,6 +122,7 @@ struct Recording: Identifiable, Codable, Hashable {
         try container.encode(audioFileName, forKey: .audioFileName)
         try container.encode(status, forKey: .status)
         try container.encodeIfPresent(transcription, forKey: .transcription)
+        try container.encodeIfPresent(transcriptionSource, forKey: .transcriptionSource)
         try container.encodeIfPresent(webhookStatus, forKey: .webhookStatus)
         try container.encodeIfPresent(lastError, forKey: .lastError)
         if !activityLog.isEmpty {

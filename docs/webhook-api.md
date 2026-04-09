@@ -26,6 +26,7 @@ In the Ramble app, go to **Settings** and enter your webhook URL. Ramble auto-ge
   "created_at": "2026-03-17T13:19:00Z",
   "duration": 138.5,
   "transcription": "The full transcript text...",
+  "transcription_provider": "Apple Speech (on-device)",
   "device_id": "7a2b3c4d-5e6f-7890-abcd-ef1234567890"
 }
 ```
@@ -36,6 +37,7 @@ In the Ramble app, go to **Settings** and enter your webhook URL. Ramble auto-ge
 | `created_at` | `string` (ISO 8601) | When the recording was captured |
 | `duration` | `number` | Recording length in seconds |
 | `transcription` | `string` | The full transcript text. Empty string if transcription produced no output. |
+| `transcription_provider` | `string` | Which service transcribed the audio. Examples: `"Apple Speech (on-device)"`, `"Ramble Cloud (whisper-large-v3-turbo)"`, `"Custom (api.example.com)"`. Present when transcription has completed. |
 | `device_id` | `string` (UUID) | Stable per-device identifier (generated on first launch, not tied to any account) |
 
 ## Response

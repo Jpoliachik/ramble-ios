@@ -11,6 +11,12 @@ struct ProxyTranscriptionRequest {
     let jwsTransaction: String?
 }
 
+struct CustomEndpointTranscriptionRequest {
+    let audioURL: URL
+    let endpointURL: String
+    let authHeader: String?
+}
+
 final class ProxyTranscriptionService {
     private let settingsService = SettingsService.shared
 
@@ -89,6 +95,74 @@ final class ProxyTranscriptionService {
                 )
             }
             throw TranscriptionError.proxyError(
+                statusCode: httpResponse.statusCode,
+                message: errorBody
+            )
+        }
+
+        let result = try JSONDecoder().decode(TranscribeResponse.self, from: data)
+        return result.text
+    }
+
+    /// Transcribe audio using a user-configured custom endpoint.
+    /// The endpoint must accept the same multipart contract: `audio` field (m4a), returns `{"text": "..."}`.
+    func transcribeCustom(_ request: CustomEndpointTranscriptionRequest) async throws -> String {
+        guard let baseURL = URL(string: request.endpointURL) else {
+            throw TranscriptionError.customEndpointNotConfigured
+        }
+
+        guard FileManager.default.fileExists(atPath: request.audioURL.path) else {
+            throw TranscriptionError.audioFileNotFound
+        }
+
+        let audioData = try Data(contentsOf: request.audioURL)
+        let boundary = UUID().uuidString
+
+        var urlRequest = URLRequest(url: baseURL)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue(
+            "multipart/form-data; boundary=\(boundary)",
+            forHTTPHeaderField: "Content-Type"
+        )
+
+        if let authHeader = request.authHeader, !authHeader.isEmpty {
+            urlRequest.setValue(authHeader, forHTTPHeaderField: "Authorization")
+        }
+
+        // Build multipart body — same contract as /transcribe
+        var body = Data()
+
+        body.appendString("--\(boundary)\r\n")
+        body.appendString("Content-Disposition: form-data; name=\"audio\"; filename=\"recording.m4a\"\r\n")
+        body.appendString("Content-Type: audio/m4a\r\n\r\n")
+        body.append(audioData)
+        body.appendString("\r\n")
+
+        body.appendString("--\(boundary)--\r\n")
+
+        urlRequest.httpBody = body
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(for: urlRequest)
+        } catch {
+            throw TranscriptionError.networkError(error)
+        }
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw TranscriptionError.customEndpointError(statusCode: 0, message: "Invalid response")
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            if let json = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw TranscriptionError.customEndpointError(
+                    statusCode: httpResponse.statusCode,
+                    message: json.error
+                )
+            }
+            let errorBody = String(data: data, encoding: .utf8) ?? "Unknown error"
+            throw TranscriptionError.customEndpointError(
                 statusCode: httpResponse.statusCode,
                 message: errorBody
             )

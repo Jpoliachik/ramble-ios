@@ -14,8 +14,10 @@ enum TranscriptionError: Error, LocalizedError {
     case speechAnalyzerUnavailable
     case recognitionFailed(String)
     case proxyNotConfigured
+    case customEndpointNotConfigured
     case subscriptionRequired
     case proxyError(statusCode: Int, message: String)
+    case customEndpointError(statusCode: Int, message: String)
     case networkError(Error)
 
     var errorDescription: String? {
@@ -34,8 +36,12 @@ enum TranscriptionError: Error, LocalizedError {
             return "Premium subscription required for cloud transcription"
         case .proxyNotConfigured:
             return "Cloud transcription not configured — set proxy URL in Settings"
+        case .customEndpointNotConfigured:
+            return "Custom endpoint not configured — set your endpoint URL in Settings"
         case .proxyError(let code, let message):
             return "Transcription service error (\(code)): \(message)"
+        case .customEndpointError(let code, let message):
+            return "Custom endpoint error (\(code)): \(message)"
         case .networkError(let error):
             return "Network error: \(error.localizedDescription)"
         }

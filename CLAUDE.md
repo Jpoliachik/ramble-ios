@@ -74,7 +74,7 @@ If someone records a thought on their watch during a hike and the transcript isn
 
 **Upgrade: Hosted transcription service.** For users who want better accuracy, offer a paid upgrade that routes through our Cloudflare Worker proxy to a higher-quality model (e.g. Groq Whisper). The proxy is open source — users can verify no data is stored.
 
-**Custom endpoint: Bring your own.** Point Ramble at any URL that accepts audio and returns text. Same pattern: just a URL in settings.
+**Custom endpoint: Bring your own.** Point Ramble at any URL that accepts audio and returns text. Configure the URL and an optional Authorization header in Settings. The endpoint receives a multipart POST with an `audio` field (m4a) and returns `{"text": "..."}`. Full spec: `docs/custom-transcription-endpoint.md`.
 
 ### Privacy
 
@@ -117,9 +117,9 @@ Ramble/
 ### Data Flow
 
 1. **Record** — AudioRecorderService captures 16kHz mono AAC audio
-2. **Transcribe** — TranscriptionQueueService dispatches to on-device (Apple Speech) or custom endpoint
-3. **Store** — Transcript saved locally to Recording model
-4. **Webhook** — Optional POST of transcript to user-configured URL
+2. **Transcribe** — TranscriptionQueueService dispatches to Apple Speech (on-device), Ramble Cloud, or a custom endpoint
+3. **Store** — Transcript + transcription source saved locally to Recording model
+4. **Webhook** — Optional POST of transcript (including `transcription_provider`) to user-configured URL
 
 ### Key Services
 
@@ -127,8 +127,8 @@ Ramble/
 |---------|------|
 | `AudioRecorderService` | 16kHz mono AAC capture |
 | `TranscriptionQueueService` | Persistent job queue with retry |
-| `AppleSpeechTranscriptionService` | On-device transcription via SFSpeechRecognizer (default) |
-| `ProxyTranscriptionService` | HTTP client for custom transcription endpoints |
+| `AppleSpeechTranscriptionService` | On-device transcription via SpeechAnalyzer (default) |
+| `ProxyTranscriptionService` | HTTP client for Ramble Cloud and custom transcription endpoints |
 | `WebhookQueueService` | Independent queue for webhook delivery with retry |
 | `BackgroundTaskService` | UIKit + BGProcessingTask for background queue draining |
 | `RecordingManager` | Coordinates audio recording lifecycle |
@@ -137,11 +137,11 @@ Ramble/
 
 ### Models
 
-- `Recording` — Core model: id, createdAt, duration, audioFileName, status, transcription, webhookStatus, lastError
+- `Recording` — Core model: id, createdAt, duration, audioFileName, status, transcription, transcriptionSource, webhookStatus, lastError, activityLog
 - `RecordingStatus` — recorded → transcribing → completed / failed
-- `TranscriptionJob` — Single-phase job with retry backoff
+- `TranscriptionJob` — Single-phase job with retry backoff. Captures provider, cloudModel, customEndpointURL at enqueue time.
 - `WebhookJob`  — Webhook delivery job with retry
-- `Settings` — transcriptionProvider, webhookEnabled, webhookURL, webhookSecret, deviceId
+- `Settings` — transcriptionProvider, cloudModel, customEndpointURL, customEndpointAuthHeader, webhookEnabled, webhookURL, webhookSecret, deviceId
 
 ### Tech Stack
 

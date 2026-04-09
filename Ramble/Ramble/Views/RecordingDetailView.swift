@@ -66,6 +66,12 @@ struct RecordingDetailView: View {
                     Text("\(DateFormatters.dayFormatter.string(from: recording.createdAt)) at \(DateFormatters.timeFormatter.string(from: recording.createdAt))")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    if let source = recording.transcriptionSource {
+                        Label(source, systemImage: transcriptionSourceIcon(for: source))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 2)
+                    }
                 }
 
                 Spacer()
@@ -73,6 +79,12 @@ struct RecordingDetailView: View {
                 statusBadge(for: recording)
             }
         }
+    }
+
+    private func transcriptionSourceIcon(for source: String) -> String {
+        if source.hasPrefix("Apple") { return "iphone" }
+        if source.hasPrefix("Ramble") { return "cloud.fill" }
+        return "server.rack"
     }
 
     private func statusBadge(for recording: Recording) -> some View {

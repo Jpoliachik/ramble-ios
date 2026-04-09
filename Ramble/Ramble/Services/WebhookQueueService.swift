@@ -131,13 +131,16 @@ final class WebhookQueueService: ObservableObject {
         let recording = recordings[idx]
 
         // Build webhook payload
-        let payload: [String: Any] = [
+        var payload: [String: Any] = [
             "recording_id": recording.id.uuidString,
             "created_at": Self.isoFormatter.string(from: recording.createdAt),
             "duration": recording.duration,
             "transcription": recording.transcription ?? "",
             "device_id": settings.deviceId
         ]
+        if let source = recording.transcriptionSource {
+            payload["transcription_provider"] = source
+        }
 
         do {
             let jsonData = try JSONSerialization.data(withJSONObject: payload)

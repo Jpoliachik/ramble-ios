@@ -8,6 +8,7 @@ import Foundation
 enum TranscriptionProvider: String, Codable, CaseIterable, Identifiable {
     case appleSpeech = "apple_speech"
     case cloudTranscription = "cloud_transcription"
+    case customEndpoint = "custom_endpoint"
 
     var id: String { rawValue }
 
@@ -15,6 +16,7 @@ enum TranscriptionProvider: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .appleSpeech: return "Apple Speech"
         case .cloudTranscription: return "Cloud Transcription"
+        case .customEndpoint: return "Custom Endpoint"
         }
     }
 
@@ -24,6 +26,8 @@ enum TranscriptionProvider: String, Codable, CaseIterable, Identifiable {
             return "Free, private, on-device"
         case .cloudTranscription:
             return "Premium cloud-powered models"
+        case .customEndpoint:
+            return "Your own transcription server"
         }
     }
 
@@ -31,21 +35,40 @@ enum TranscriptionProvider: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .appleSpeech: return "iphone"
         case .cloudTranscription: return "cloud.fill"
+        case .customEndpoint: return "server.rack"
         }
     }
 
     var isCloud: Bool {
         switch self {
         case .appleSpeech: return false
-        case .cloudTranscription: return true
+        case .cloudTranscription, .customEndpoint: return true
         }
     }
 
-    /// The base URL for cloud transcription providers
+    /// The base URL for cloud transcription providers (custom endpoint URL is stored in Settings)
     var baseURL: String? {
         switch self {
-        case .appleSpeech: return nil
+        case .appleSpeech, .customEndpoint: return nil
         case .cloudTranscription: return "https://ramble-transcription-proxy.jpoliachik.workers.dev"
+        }
+    }
+
+    /// A short label describing the transcription source, suitable for activity logs and webhook payloads
+    func sourceLabel(customURL: String? = nil, cloudModel: CloudModel? = nil) -> String {
+        switch self {
+        case .appleSpeech:
+            return "Apple Speech (on-device)"
+        case .cloudTranscription:
+            if let model = cloudModel {
+                return "Ramble Cloud (\(model.rawValue))"
+            }
+            return "Ramble Cloud"
+        case .customEndpoint:
+            if let url = customURL, let host = URL(string: url)?.host {
+                return "Custom (\(host))"
+            }
+            return "Custom Endpoint"
         }
     }
 
@@ -58,6 +81,8 @@ enum TranscriptionProvider: String, Codable, CaseIterable, Identifiable {
             self = .appleSpeech
         case "cloud_transcription", "groq_whisper", "proxy":
             self = .cloudTranscription
+        case "custom_endpoint":
+            self = .customEndpoint
         default:
             self = .appleSpeech
         }
@@ -88,6 +113,8 @@ enum CloudModel: String, Codable, CaseIterable, Identifiable {
 struct Settings: Codable {
     var transcriptionProvider: TranscriptionProvider
     var cloudModel: CloudModel
+    var customEndpointURL: String?
+    var customEndpointAuthHeader: String?
     var webhookEnabled: Bool
     var webhookURL: String?
     var webhookSecret: String
@@ -96,6 +123,8 @@ struct Settings: Codable {
     init(
         transcriptionProvider: TranscriptionProvider = .appleSpeech,
         cloudModel: CloudModel = .whisperLargeV3Turbo,
+        customEndpointURL: String? = nil,
+        customEndpointAuthHeader: String? = nil,
         webhookEnabled: Bool = false,
         webhookURL: String? = nil,
         webhookSecret: String = Self.generateSecret(),
@@ -103,6 +132,8 @@ struct Settings: Codable {
     ) {
         self.transcriptionProvider = transcriptionProvider
         self.cloudModel = cloudModel
+        self.customEndpointURL = customEndpointURL
+        self.customEndpointAuthHeader = customEndpointAuthHeader
         self.webhookEnabled = webhookEnabled
         self.webhookURL = webhookURL
         self.webhookSecret = webhookSecret
@@ -132,6 +163,9 @@ struct Settings: Codable {
         cloudModel = try container.decodeIfPresent(CloudModel.self, forKey: .cloudModel)
             ?? .whisperLargeV3Turbo
 
+        customEndpointURL = try container.decodeIfPresent(String.self, forKey: .customEndpointURL)
+        customEndpointAuthHeader = try container.decodeIfPresent(String.self, forKey: .customEndpointAuthHeader)
+
         // Migrate provider: TranscriptionProvider.init(from:) handles old raw values
         let oldProxyURL = try container.decodeIfPresent(String.self, forKey: .proxyBaseURL)
             ?? container.decodeIfPresent(String.self, forKey: .apiBaseURL)
@@ -149,6 +183,8 @@ struct Settings: Codable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(transcriptionProvider, forKey: .transcriptionProvider)
         try container.encode(cloudModel, forKey: .cloudModel)
+        try container.encodeIfPresent(customEndpointURL, forKey: .customEndpointURL)
+        try container.encodeIfPresent(customEndpointAuthHeader, forKey: .customEndpointAuthHeader)
         try container.encode(webhookEnabled, forKey: .webhookEnabled)
         try container.encodeIfPresent(webhookURL, forKey: .webhookURL)
         // webhookSecret and deviceId are stored in Keychain, not on disk
@@ -159,6 +195,8 @@ struct Settings: Codable {
     private enum CodingKeys: String, CodingKey {
         case transcriptionProvider
         case cloudModel
+        case customEndpointURL
+        case customEndpointAuthHeader
         case webhookEnabled
         case webhookURL
         case webhookSecret

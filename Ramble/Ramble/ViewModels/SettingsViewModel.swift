@@ -10,6 +10,9 @@ import Foundation
 final class SettingsViewModel: ObservableObject {
     @Published var transcriptionProvider: TranscriptionProvider = .appleSpeech
     @Published var cloudModel: CloudModel = .whisperLargeV3Turbo
+    @Published var customEndpointURL: String = ""
+    @Published var customEndpointAuthHeader: String = ""
+    @Published var customEndpointURLError: String?
     @Published var showSubscriptionPaywall = false
     @Published var webhookEnabled: Bool = false
     @Published var webhookURL: String = ""
@@ -39,6 +42,8 @@ final class SettingsViewModel: ObservableObject {
         let settings = settingsService.load()
         transcriptionProvider = settings.transcriptionProvider
         cloudModel = settings.cloudModel
+        customEndpointURL = settings.customEndpointURL ?? ""
+        customEndpointAuthHeader = settings.customEndpointAuthHeader ?? ""
         webhookEnabled = settings.webhookEnabled
         webhookURL = settings.webhookURL ?? ""
         webhookSecret = settings.webhookSecret
@@ -50,6 +55,8 @@ final class SettingsViewModel: ObservableObject {
         let settings = Settings(
             transcriptionProvider: transcriptionProvider,
             cloudModel: cloudModel,
+            customEndpointURL: customEndpointURL.isEmpty ? nil : customEndpointURL,
+            customEndpointAuthHeader: customEndpointAuthHeader.isEmpty ? nil : customEndpointAuthHeader,
             webhookEnabled: webhookEnabled,
             webhookURL: webhookURL.isEmpty ? nil : webhookURL,
             webhookSecret: webhookSecret,
@@ -64,6 +71,26 @@ final class SettingsViewModel: ObservableObject {
         } else {
             showSubscriptionPaywall = true
         }
+    }
+
+    func validateCustomEndpointURL() {
+        if customEndpointURL.isEmpty {
+            customEndpointURLError = nil
+            return
+        }
+        guard let url = URL(string: customEndpointURL) else {
+            customEndpointURLError = "Invalid URL format"
+            return
+        }
+        guard url.scheme?.lowercased() == "https" || url.scheme?.lowercased() == "http" else {
+            customEndpointURLError = "URL must use HTTP or HTTPS"
+            return
+        }
+        guard url.host != nil, !url.host!.isEmpty else {
+            customEndpointURLError = "URL must include a hostname"
+            return
+        }
+        customEndpointURLError = nil
     }
 
     func validateWebhookURL() {

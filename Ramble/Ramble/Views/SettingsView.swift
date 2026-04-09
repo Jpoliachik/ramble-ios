@@ -12,6 +12,7 @@ struct SettingsView: View {
     @State private var showExportShare = false
     @State private var showSecretCopied = false
     @State private var showRegenerateConfirmation = false
+    @State private var showWebhookHelp = false
     @State private var exportURL: URL?
 
     var body: some View {
@@ -65,8 +66,53 @@ struct SettingsView: View {
                 }
                 .pickerStyle(.menu)
             }
+
+            // Custom Endpoint — always available
+            ProviderRowView(
+                provider: .customEndpoint,
+                isSelected: viewModel.transcriptionProvider == .customEndpoint,
+                onSelect: { viewModel.transcriptionProvider = .customEndpoint }
+            )
+
+            // Custom endpoint config — visible when custom selected
+            if viewModel.transcriptionProvider == .customEndpoint {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Endpoint URL")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    TextField("https://your-server.example.com/transcribe", text: $viewModel.customEndpointURL)
+                        .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .onChange(of: viewModel.customEndpointURL) {
+                            viewModel.validateCustomEndpointURL()
+                        }
+
+                    if let error = viewModel.customEndpointURLError {
+                        Label(error, systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Authorization Header")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    TextField("Bearer sk-your-api-key", text: $viewModel.customEndpointAuthHeader)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                    Text("Sent as the Authorization header. Leave blank if not needed.")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+            }
         } header: {
             Text("Transcription")
+        } footer: {
+            if viewModel.transcriptionProvider == .customEndpoint {
+                Text("Your endpoint receives a multipart POST with an \"audio\" field (m4a) and must return {\"text\": \"...\"}. See the docs on GitHub for the full API spec.")
+            }
         }
         .sheet(isPresented: $viewModel.showSubscriptionPaywall) {
             SubscriptionView()
@@ -75,7 +121,17 @@ struct SettingsView: View {
 
     private var webhookSection: some View {
         Section {
-            Toggle("Post-Transcription Webhook", isOn: $viewModel.webhookEnabled)
+            HStack {
+                Toggle("Post-Transcription Webhook", isOn: $viewModel.webhookEnabled)
+
+                Button {
+                    showWebhookHelp = true
+                } label: {
+                    Image(systemName: "info.circle")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
 
             if viewModel.webhookEnabled {
                 VStack(alignment: .leading, spacing: 4) {
@@ -185,6 +241,9 @@ struct SettingsView: View {
                 Text("Send your transcriptions to another service automatically. Connect Ramble to an AI agent, a cloud workflow, or any custom automation that processes your voice notes.")
             }
         }
+        .sheet(isPresented: $showWebhookHelp) {
+            WebhookHelpSheet()
+        }
     }
 
     private var statsSection: some View {
@@ -275,18 +334,24 @@ struct ProviderRowView: View {
     var isPremiumLocked: Bool = false
     let onSelect: () -> Void
 
+    private var providerColor: Color {
+        switch provider {
+        case .appleSpeech: return .green
+        case .cloudTranscription: return .blue
+        case .customEndpoint: return .orange
+        }
+    }
+
     var body: some View {
         Button(action: onSelect) {
             HStack(spacing: 14) {
                 Image(systemName: provider.iconName)
                     .font(.title3)
-                    .foregroundStyle(provider.isCloud ? .blue : .green)
+                    .foregroundStyle(providerColor)
                     .frame(width: 32, height: 32)
                     .background(
                         RoundedRectangle(cornerRadius: 8)
-                            .fill(provider.isCloud
-                                ? Color.blue.opacity(0.12)
-                                : Color.green.opacity(0.12))
+                            .fill(providerColor.opacity(0.12))
                     )
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -325,6 +390,93 @@ struct ProviderRowView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Webhook Help Sheet
+
+struct WebhookHelpSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    helpSection(
+                        title: "How It Works",
+                        icon: "paperplane.fill",
+                        content: "After each transcription completes, Ramble sends a POST request to your webhook URL with the transcript and metadata as JSON."
+                    )
+
+                    helpSection(
+                        title: "Payload",
+                        icon: "doc.text",
+                        content: """
+                        Your endpoint receives a JSON body with:
+                        - recording_id — unique ID for this recording
+                        - created_at — ISO 8601 timestamp
+                        - duration — recording length in seconds
+                        - transcription — the full transcript text
+                        - transcription_provider — which service transcribed it
+                        - device_id — stable per-device identifier
+                        """
+                    )
+
+                    helpSection(
+                        title: "Verifying Requests",
+                        icon: "lock.shield",
+                        content: "Each request includes an X-Webhook-Signature header with an HMAC-SHA256 signature of the payload body, using your signing secret as the key. Compare this against your own computed signature to verify authenticity."
+                    )
+
+                    helpSection(
+                        title: "Retries",
+                        icon: "arrow.clockwise",
+                        content: "If your endpoint returns a non-2xx status, Ramble retries up to 3 times with backoff (5s, 30s, 120s). Return any 2xx to acknowledge receipt."
+                    )
+
+                    helpSection(
+                        title: "Example Use Cases",
+                        icon: "lightbulb",
+                        content: """
+                        - Send voice notes to an AI agent for processing
+                        - Push transcripts to Notion, Obsidian, or a notes app
+                        - Trigger a Zapier or Make.com workflow
+                        - Log voice memos to a Slack channel
+                        - Feed into a custom search index
+                        """
+                    )
+
+                    Text("Full documentation available on GitHub.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 8)
+                }
+                .padding()
+            }
+            .navigationTitle("Webhook Setup")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private func helpSection(title: String, icon: String, content: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(title, systemImage: icon)
+                .font(.headline)
+            Text(content)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.quaternary.opacity(0.5))
+        .clipShape(.rect(cornerRadius: 12))
     }
 }
 
