@@ -29,6 +29,7 @@ struct Recording: Identifiable, Codable, Hashable {
     var webhookStatus: WebhookStatus?
     var lastError: String?
     var activityLog: [ActivityEntry]
+    var cloudTranscriptionCount: Int
 
     init(
         id: UUID = UUID(),
@@ -39,7 +40,8 @@ struct Recording: Identifiable, Codable, Hashable {
         transcription: String? = nil,
         webhookStatus: WebhookStatus? = nil,
         lastError: String? = nil,
-        activityLog: [ActivityEntry] = []
+        activityLog: [ActivityEntry] = [],
+        cloudTranscriptionCount: Int = 0
     ) {
         self.id = id
         self.createdAt = createdAt
@@ -50,6 +52,7 @@ struct Recording: Identifiable, Codable, Hashable {
         self.webhookStatus = webhookStatus
         self.lastError = lastError
         self.activityLog = activityLog
+        self.cloudTranscriptionCount = cloudTranscriptionCount
     }
 
     // Backward-compatible decoder: handles old status field names and values
@@ -90,6 +93,7 @@ struct Recording: Identifiable, Codable, Hashable {
             ?? container.decodeIfPresent(String.self, forKey: .lastTranscriptionError)
 
         activityLog = (try? container.decodeIfPresent([ActivityEntry].self, forKey: .activityLog)) ?? []
+        cloudTranscriptionCount = try container.decodeIfPresent(Int.self, forKey: .cloudTranscriptionCount) ?? 0
     }
 
     var audioFileURL: URL {
@@ -104,7 +108,7 @@ struct Recording: Identifiable, Codable, Hashable {
     private enum CodingKeys: String, CodingKey {
         case id, createdAt, duration, audioFileName
         case status
-        case transcription, webhookStatus, lastError, activityLog
+        case transcription, webhookStatus, lastError, activityLog, cloudTranscriptionCount
         // Legacy keys for migration
         case transcriptionStatus
         case lastTranscriptionError
@@ -122,6 +126,9 @@ struct Recording: Identifiable, Codable, Hashable {
         try container.encodeIfPresent(lastError, forKey: .lastError)
         if !activityLog.isEmpty {
             try container.encode(activityLog, forKey: .activityLog)
+        }
+        if cloudTranscriptionCount > 0 {
+            try container.encode(cloudTranscriptionCount, forKey: .cloudTranscriptionCount)
         }
     }
 }

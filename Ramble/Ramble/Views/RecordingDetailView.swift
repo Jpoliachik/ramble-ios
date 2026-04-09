@@ -240,6 +240,9 @@ struct RecordingDetailView: View {
                 }
                 .disabled(isDownloadingModel)
             } else {
+                let cloudLimitReached = SettingsService.shared.load().transcriptionProvider.isCloud
+                    && recording.cloudTranscriptionCount >= TranscriptionJob.maxCloudTranscriptions
+
                 Button {
                     HapticService.buttonTap()
                     isRetrying = true
@@ -260,7 +263,13 @@ struct RecordingDetailView: View {
                         }
                     }
                 }
-                .disabled(isRetrying || recording.status == .transcribing)
+                .disabled(isRetrying || recording.status == .transcribing || cloudLimitReached)
+
+                if cloudLimitReached {
+                    Text("Cloud transcription limit reached (\(TranscriptionJob.maxCloudTranscriptions)). Switch to on-device transcription in Settings to continue.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             if recording.webhookStatus != nil && SettingsService.shared.load().webhookEnabled {

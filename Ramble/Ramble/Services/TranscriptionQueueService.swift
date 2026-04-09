@@ -83,10 +83,18 @@ final class TranscriptionQueueService: ObservableObject {
         await speechAnalyzer.prepareModelIfNeeded()
     }
 
-    /// Manually retry a failed recording by re-enqueuing it
-    func retry(recordingId: UUID) {
+    /// Manually retry a failed recording by re-enqueuing it.
+    /// Returns false if the cloud transcription limit has been reached.
+    @discardableResult
+    func retry(recordingId: UUID) -> Bool {
         var recordings = storageService.loadRecordings()
-        guard let idx = recordings.firstIndex(where: { $0.id == recordingId }) else { return }
+        guard let idx = recordings.firstIndex(where: { $0.id == recordingId }) else { return false }
+
+        let settings = settingsService.load()
+        if settings.transcriptionProvider.isCloud
+            && recordings[idx].cloudTranscriptionCount >= TranscriptionJob.maxCloudTranscriptions {
+            return false
+        }
 
         recordings[idx].status = .recorded
         recordings[idx].lastError = nil
@@ -98,6 +106,7 @@ final class TranscriptionQueueService: ObservableObject {
         saveQueue()
 
         enqueue(recordingId: recordingId)
+        return true
     }
 
     // MARK: - Job Processing
@@ -134,6 +143,21 @@ final class TranscriptionQueueService: ObservableObject {
             return
         }
 
+        // Block if this recording has exhausted its cloud transcription limit
+        if job.provider.isCloud
+            && recordings[idx].cloudTranscriptionCount >= TranscriptionJob.maxCloudTranscriptions {
+            recordings[idx].status = .failed
+            recordings[idx].lastError = "Cloud transcription limit reached (\(TranscriptionJob.maxCloudTranscriptions))"
+            recordings[idx].activityLog.append(
+                ActivityEntry("Blocked — cloud transcription limit reached (\(TranscriptionJob.maxCloudTranscriptions) uses)")
+            )
+            storageService.saveRecordings(recordings)
+            removeJob(job)
+            isProcessing = false
+            processNextIfNeeded()
+            return
+        }
+
         do {
             let text: String
             if job.provider.isCloud {
@@ -155,6 +179,9 @@ final class TranscriptionQueueService: ObservableObject {
                 updatedRecordings[i].status = .completed
                 updatedRecordings[i].transcription = text
                 updatedRecordings[i].lastError = nil
+                if job.provider.isCloud {
+                    updatedRecordings[i].cloudTranscriptionCount += 1
+                }
                 updatedRecordings[i].activityLog.append(
                     ActivityEntry("Transcription completed", httpStatus: job.provider.isCloud ? 200 : nil)
                 )
