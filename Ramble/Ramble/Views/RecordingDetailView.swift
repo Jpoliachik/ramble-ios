@@ -7,10 +7,12 @@ import SwiftUI
 
 struct RecordingDetailView: View {
     let recordingId: UUID
+    @Environment(\.dismiss) private var dismiss
     @State private var recording: Recording?
     @State private var showCopied = false
     @State private var isRetrying = false
     @State private var isDownloadingModel = false
+    @State private var showDeleteConfirmation = false
     @State private var isResendingWebhook = false
 
     private let storageService = StorageService.shared
@@ -36,6 +38,30 @@ struct RecordingDetailView: View {
         }
         .navigationTitle("Recording")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .destructiveAction) {
+                Button(role: .destructive) {
+                    showDeleteConfirmation = true
+                } label: {
+                    Image(systemName: "trash")
+                }
+            }
+        }
+        .confirmationDialog(
+            "Delete this recording?",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete Recording", role: .destructive) {
+                if let recording = recording {
+                    storageService.deleteRecording(recording)
+                }
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will permanently delete the recording and its transcript.")
+        }
         .overlay(alignment: .top) {
             if showCopied {
                 copiedToast
