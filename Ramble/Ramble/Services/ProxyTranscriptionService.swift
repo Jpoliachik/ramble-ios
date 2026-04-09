@@ -88,8 +88,12 @@ final class ProxyTranscriptionService {
             throw TranscriptionError.proxyError(statusCode: 0, message: "Invalid response")
         }
 
-        // 403 = subscription required or expired
+        // 403 = subscription required OR attestation failed
         if httpResponse.statusCode == 403 {
+            if let errorJson = try? JSONDecoder().decode(ErrorResponse.self, from: data),
+               errorJson.error.contains("attestation") {
+                throw TranscriptionError.attestationFailed
+            }
             throw TranscriptionError.subscriptionRequired
         }
 
