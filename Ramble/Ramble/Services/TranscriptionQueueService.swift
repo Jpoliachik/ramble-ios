@@ -119,6 +119,13 @@ final class TranscriptionQueueService: ObservableObject {
         }
     }
 
+    private func providerLabel(for job: TranscriptionJob) -> String {
+        if let model = job.cloudModel {
+            return model.displayName
+        }
+        return job.provider.displayName
+    }
+
     private func processTranscription(_ job: TranscriptionJob) async {
         var recordings = storageService.loadRecordings()
         guard let idx = recordings.firstIndex(where: { $0.id == job.recordingId }) else {
@@ -149,7 +156,7 @@ final class TranscriptionQueueService: ObservableObject {
             recordings[idx].status = .failed
             recordings[idx].lastError = "Cloud transcription limit reached (\(TranscriptionJob.maxCloudTranscriptions))"
             recordings[idx].activityLog.append(
-                ActivityEntry("Blocked — cloud transcription limit reached (\(TranscriptionJob.maxCloudTranscriptions) uses)")
+                ActivityEntry("Blocked — \(providerLabel(for: job)) cloud transcription limit reached (\(TranscriptionJob.maxCloudTranscriptions) uses)")
             )
             storageService.saveRecordings(recordings)
             removeJob(job)
@@ -183,7 +190,7 @@ final class TranscriptionQueueService: ObservableObject {
                     updatedRecordings[i].cloudTranscriptionCount += 1
                 }
                 updatedRecordings[i].activityLog.append(
-                    ActivityEntry("Transcription completed", httpStatus: job.provider.isCloud ? 200 : nil)
+                    ActivityEntry("Transcription completed via \(providerLabel(for: job))", httpStatus: job.provider.isCloud ? 200 : nil)
                 )
                 storageService.saveRecordings(updatedRecordings)
             }
@@ -206,7 +213,7 @@ final class TranscriptionQueueService: ObservableObject {
                 updatedRecordings[idx].status = .failed
                 updatedRecordings[idx].lastError = TranscriptionError.subscriptionRequired.localizedDescription
                 updatedRecordings[idx].activityLog.append(
-                    ActivityEntry("Transcription failed — premium subscription required", httpStatus: 403)
+                    ActivityEntry("Transcription failed via \(providerLabel(for: job)) — premium subscription required", httpStatus: 403)
                 )
                 storageService.saveRecordings(updatedRecordings)
             }
@@ -221,7 +228,7 @@ final class TranscriptionQueueService: ObservableObject {
                 updatedRecordings[idx].status = .failed
                 updatedRecordings[idx].lastError = TranscriptionError.modelNotInstalled.localizedDescription
                 updatedRecordings[idx].activityLog.append(
-                    ActivityEntry("Transcription failed — speech model not downloaded")
+                    ActivityEntry("Transcription failed via \(providerLabel(for: job)) — speech model not downloaded")
                 )
                 storageService.saveRecordings(updatedRecordings)
             }
@@ -251,7 +258,7 @@ final class TranscriptionQueueService: ObservableObject {
             if updatedJob.retryCount >= TranscriptionJob.maxRetries {
                 recordings[idx].status = .failed
                 recordings[idx].activityLog.append(
-                    ActivityEntry("Transcription failed after \(TranscriptionJob.maxRetries) attempts — \(error)", httpStatus: httpStatus)
+                    ActivityEntry("Transcription failed via \(providerLabel(for: job)) after \(TranscriptionJob.maxRetries) attempts — \(error)", httpStatus: httpStatus)
                 )
                 storageService.saveRecordings(recordings)
                 removeJob(job)
@@ -260,7 +267,7 @@ final class TranscriptionQueueService: ObservableObject {
                 let delay = updatedJob.retryDelaySeconds
                 updatedJob.nextRetryAt = Date().addingTimeInterval(delay)
                 recordings[idx].activityLog.append(
-                    ActivityEntry("Transcription failed — \(error) (attempt \(updatedJob.retryCount)/\(TranscriptionJob.maxRetries), retry in \(Int(delay))s)", httpStatus: httpStatus)
+                    ActivityEntry("Transcription failed via \(providerLabel(for: job)) — \(error) (attempt \(updatedJob.retryCount)/\(TranscriptionJob.maxRetries), retry in \(Int(delay))s)", httpStatus: httpStatus)
                 )
                 storageService.saveRecordings(recordings)
                 updateJob(updatedJob)

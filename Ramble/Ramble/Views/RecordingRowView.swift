@@ -32,6 +32,12 @@ struct RecordingRowView: View {
                             .lineLimit(1)
                     }
                 case .failed:
+                    if let transcription = recording.transcription, !transcription.isEmpty {
+                        Text(transcription)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
                     failedLabel
                 }
             }
@@ -59,13 +65,9 @@ struct RecordingRowView: View {
     }
 
     private var failedLabel: some View {
-        HStack(spacing: 4) {
-            Image(systemName: recording.isModelNotInstalled ? "arrow.down.circle.fill" : "exclamationmark.circle.fill")
-                .foregroundStyle(recording.isModelNotInstalled ? .orange : .red)
-            Text(recording.isModelNotInstalled ? "Download required" : (recording.lastError ?? "Failed"))
-                .foregroundStyle(.secondary)
-        }
-        .font(.caption)
+        Image(systemName: recording.isModelNotInstalled ? "arrow.down.circle.fill" : "exclamationmark.circle.fill")
+            .foregroundStyle(recording.isModelNotInstalled ? .orange : .red)
+            .font(.caption)
     }
 }
 

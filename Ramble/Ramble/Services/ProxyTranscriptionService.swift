@@ -143,10 +143,18 @@ final class ProxyTranscriptionService {
         )
         urlRequest.setValue(deviceId, forHTTPHeaderField: "X-Device-ID")
 
-        // Subscription JWS for server-side verification
+        // Dev bypass token skips JWS verification (debug builds only, gitignored secret)
+        #if DEBUG
+        if let bypassToken = Secrets.devBypassToken {
+            urlRequest.setValue("DevBypass \(bypassToken)", forHTTPHeaderField: "Authorization")
+        } else if let jws = request.jwsTransaction {
+            urlRequest.setValue("Bearer \(jws)", forHTTPHeaderField: "Authorization")
+        }
+        #else
         if let jws = request.jwsTransaction {
             urlRequest.setValue("Bearer \(jws)", forHTTPHeaderField: "Authorization")
         }
+        #endif
 
         // Build multipart body
         var body = Data()

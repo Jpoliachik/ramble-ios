@@ -75,18 +75,26 @@ enum CloudModel: String, Codable, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .whisperLargeV3Turbo: return "Groq Whisper v3 Turbo"
-        case .whisperLargeV3: return "Groq Whisper v3"
+        case .whisperLargeV3: return "Groq Whisper Large v3"
         case .deepgramNova3: return "Deepgram Nova-3"
-        case .openAIGPT4oTranscribe: return "OpenAI GPT-4o Transcribe"
+        case .openAIGPT4oTranscribe: return "GPT-4o Transcribe"
         }
     }
 
     var subtitle: String {
         switch self {
-        case .whisperLargeV3Turbo: return "Fastest cloud transcription (recommended)"
-        case .whisperLargeV3: return "Groq — highest Whisper accuracy"
-        case .deepgramNova3: return "Fast, accurate, per-second billing"
-        case .openAIGPT4oTranscribe: return "OpenAI — best overall accuracy"
+        case .whisperLargeV3Turbo: return "Fast and accurate — best all-around (recommended)"
+        case .whisperLargeV3: return "Best for accents and multilingual audio"
+        case .deepgramNova3: return "Strong English accuracy, smart formatting"
+        case .openAIGPT4oTranscribe: return "Highest accuracy in noisy environments"
+        }
+    }
+
+    var iconName: String {
+        switch self {
+        case .whisperLargeV3Turbo, .whisperLargeV3: return "logo-groq"
+        case .deepgramNova3: return "logo-deepgram"
+        case .openAIGPT4oTranscribe: return "logo-openai"
         }
     }
 }

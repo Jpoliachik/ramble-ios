@@ -12,6 +12,9 @@ struct SettingsView: View {
     @State private var showExportShare = false
     @State private var showSecretCopied = false
     @State private var showRegenerateConfirmation = false
+    @State private var showSecretRevealed = false
+    @State private var showTranscriptionInfo = false
+    @State private var showWebhookInfo = false
     @State private var exportURL: URL?
 
     var body: some View {
@@ -41,6 +44,12 @@ struct SettingsView: View {
                     ShareSheet(activityItems: [url])
                 }
             }
+            .sheet(isPresented: $showTranscriptionInfo) {
+                TranscriptionInfoSheet()
+            }
+            .sheet(isPresented: $showWebhookInfo) {
+                WebhookInfoSheet()
+            }
         }
     }
 
@@ -66,7 +75,17 @@ struct SettingsView: View {
                 )
             }
         } header: {
-            Text("Transcription")
+            HStack {
+                Text("Transcription")
+                Spacer()
+                Button {
+                    showTranscriptionInfo = true
+                } label: {
+                    Image(systemName: "info.circle")
+                        .font(.subheadline)
+                        .textCase(.none)
+                }
+            }
         }
     }
 
@@ -126,15 +145,28 @@ struct SettingsView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Signing Secret")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    HStack {
+                        Text("Signing Secret")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button {
+                            withAnimation { showSecretRevealed.toggle() }
+                        } label: {
+                            Image(systemName: showSecretRevealed ? "eye.slash" : "eye")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
 
-                    Text(viewModel.webhookSecret)
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
+                    if showSecretRevealed {
+                        Text(viewModel.webhookSecret)
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
 
                     HStack(spacing: 8) {
                         Button {
@@ -145,14 +177,11 @@ struct SettingsView: View {
                                 showSecretCopied = false
                             }
                         } label: {
-                            Label {
-                                Text("Copy")
-                            } icon: {
-                                Image(systemName: showSecretCopied ? "checkmark" : "doc.on.doc")
-                            }
-                            .frame(maxWidth: .infinity)
+                            Label("Copy", systemImage: showSecretCopied ? "checkmark" : "doc.on.doc")
+                                .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.bordered)
+                        .controlSize(.small)
                         .tint(showSecretCopied ? .green : nil)
 
                         Button {
@@ -162,6 +191,7 @@ struct SettingsView: View {
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.bordered)
+                        .controlSize(.small)
                     }
                 }
                 .alert("Regenerate Secret?", isPresented: $showRegenerateConfirmation) {
@@ -173,14 +203,23 @@ struct SettingsView: View {
                     Text("Your webhook endpoint will need to be updated with the new secret to continue accepting requests.")
                 }
             }
+
+            Button {
+                showWebhookInfo = true
+            } label: {
+                HStack {
+                    Image(systemName: "info.circle")
+                        .foregroundStyle(.blue)
+                    Text("Webhook setup guide")
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .foregroundStyle(.primary)
         } header: {
             Text("Webhook")
-        } footer: {
-            if viewModel.webhookEnabled {
-                Text("Each transcription is POSTed to your HTTPS endpoint with an HMAC-SHA256 signature in the X-Webhook-Signature header. Verify the signature using your secret to confirm authenticity.")
-            } else {
-                Text("Send your transcriptions to another service automatically. Connect Ramble to an AI agent, a cloud workflow, or any custom automation that processes your voice notes.")
-            }
         }
     }
 
@@ -329,8 +368,11 @@ struct CloudModelRowView: View {
     var body: some View {
         Button(action: onSelect) {
             HStack(spacing: 14) {
-                Image(systemName: "cloud.fill")
-                    .font(.title3)
+                Image(model.iconName)
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 18, height: 18)
                     .foregroundStyle(.blue)
                     .frame(width: 32, height: 32)
                     .background(
@@ -339,21 +381,9 @@ struct CloudModelRowView: View {
                     )
 
                 VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text(model.displayName)
-                            .font(.body)
-                            .foregroundStyle(.primary)
-                        if isPremiumLocked {
-                            Text("PRO")
-                                .font(.caption2.weight(.bold))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(
-                                    Capsule().fill(Color.blue)
-                                )
-                        }
-                    }
+                    Text(model.displayName)
+                        .font(.body)
+                        .foregroundStyle(.primary)
                     Text(model.subtitle)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -374,6 +404,123 @@ struct CloudModelRowView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+struct TranscriptionInfoSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("Accurately turn your voice into text. Pick a provider.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    InfoBlock(
+                        icon: "iphone",
+                        title: "Apple Speech",
+                        text: "On-device transcription that never leaves your phone. Free, private, no network required. iOS 26 brings a significantly improved speech model with better accuracy out of the box."
+                    )
+
+                    InfoBlock(
+                        icon: "cloud",
+                        title: "Why cloud?",
+                        text: "Cloud models are more accurate — especially in noisy environments, with accents, or when speaking quickly. They also produce better punctuation, capitalization, and number formatting. Worth it if you rely on clean transcripts."
+                    )
+
+                    InfoBlock(
+                        icon: "lock.shield",
+                        title: "Cloud models are private too",
+                        text: "Cloud transcription routes through our open-source proxy. No audio or text is stored on our servers — your audio goes to the provider and the transcript comes back. That's it."
+                    )
+
+                    InfoBlock(
+                        icon: "eye",
+                        title: "Don't take our word for it",
+                        text: "Ramble is fully open source. Check the code on GitHub — no accounts, no user data stored. Your audio and transcriptions never touch our servers."
+                    )
+                }
+                .padding()
+            }
+            .navigationTitle("About Transcription")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+struct WebhookInfoSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("Automatically send your transcripts somewhere useful.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    InfoBlock(
+                        icon: "paperplane",
+                        title: "How it works",
+                        text: "Each transcription is POSTed as JSON to your URL. Requests are signed with your secret and retried automatically if your endpoint is down."
+                    )
+
+                    InfoBlock(
+                        icon: "cpu",
+                        title: "Connect to anything",
+                        text: "Pipe transcripts into an AI agent, a Zapier workflow, a Notion database, or your own backend. Any HTTPS endpoint that accepts JSON works."
+                    )
+
+                    Link(destination: URL(string: "https://github.com/Jpoliachik/ramble-ios/blob/main/docs/webhook-api.md")!) {
+                        HStack {
+                            Spacer()
+                            Label("View Full API Docs", systemImage: "doc.text")
+                            Spacer()
+                        }
+                        .padding(.vertical, 12)
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .padding()
+            }
+            .navigationTitle("Webhook Setup")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+struct InfoBlock: View {
+    let icon: String
+    let title: String
+    let text: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundStyle(.blue)
+                .frame(width: 28)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                Text(text)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 }
 

@@ -28,11 +28,23 @@ final class SettingsViewModel: ObservableObject {
         case failure(String)
     }
 
+    /// The cloud model the user tapped before being shown the paywall
+    private var pendingCloudModel: CloudModel?
+
     private let settingsService = SettingsService.shared
     private let storageService = StorageService.shared
+    private var cancellables = Set<AnyCancellable>()
 
     init() {
         load()
+        // When the paywall dismisses, apply the pending cloud model if the user subscribed
+        $showSubscriptionPaywall
+            .dropFirst()
+            .filter { !$0 }
+            .sink { [weak self] _ in
+                self?.applyPendingCloudModel()
+            }
+            .store(in: &cancellables)
     }
 
     func load() {
@@ -71,7 +83,17 @@ final class SettingsViewModel: ObservableObject {
             transcriptionProvider = .cloudTranscription
             cloudModel = model
         } else {
+            pendingCloudModel = model
             showSubscriptionPaywall = true
+        }
+    }
+
+    private func applyPendingCloudModel() {
+        guard let model = pendingCloudModel else { return }
+        pendingCloudModel = nil
+        if SubscriptionService.shared.isPremium {
+            transcriptionProvider = .cloudTranscription
+            cloudModel = model
         }
     }
 

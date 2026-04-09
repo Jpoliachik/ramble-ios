@@ -1,0 +1,99 @@
+# Ramble — Brand
+
+## What Ramble is
+
+A voice capture app that gives you accurate transcripts and lets you do something with them.
+
+Record a thought while you walk, get a clean transcript, and pipe it into your agent, workflow, or automation. No screen required — put your phone away, talk, and your words become actionable text.
+
+Open source, private by design, no accounts.
+
+## What makes Ramble different
+
+1. **Best-in-class transcription** — Choose from the latest cloud models (Groq Whisper, Deepgram Nova-3, OpenAI GPT-4o Transcribe) or use Apple's on-device speech recognition. Cloud models deliver better accuracy — especially in noisy environments, with accents, or when speaking quickly — and produce cleaner punctuation and formatting. New models get added as they ship.
+
+2. **Webhook-native** — Every transcript can automatically POST to any HTTPS endpoint. Connect Ramble to an AI agent, a Zapier workflow, a Notion database, or your own backend. Capture your thoughts, then do something with them.
+
+3. **Capture on the go** — Record from your Apple Watch or phone without looking at a screen. Walk, think, talk. Your transcript is waiting when you get back. Ramble is built for getting off your phone, not staring at it.
+
+4. **Private by architecture** — No accounts. No login. No user data on our servers. Audio and transcriptions never leave your device unless you choose to send them somewhere. Fully open source — the codebase is the proof.
+
+## Who it's for
+
+- **Transcription enthusiasts** — People who care about accuracy and want access to the best speech-to-text models as soon as they're available. They'll pay for cloud transcription because clean, reliable transcripts matter to them.
+
+- **Automation builders** — Developers, tinkerers, and agent builders who want to pipe voice into their stack. The webhook turns Ramble into a voice input device for anything — agents, workflows, databases, custom backends.
+
+Both audiences value privacy and transparency. Open source isn't a footnote — it's why they trust the app.
+
+## Positioning
+
+Ramble is voice capture that goes somewhere. Not another note-taking app. Not another AI assistant. A simple, private tool that captures your voice accurately and makes it available to whatever system you want.
+
+The pitch: get your thoughts out on the go — while you walk, while you're away from a screen — and then do something with them.
+
+## Tagline (draft — iterating)
+
+Working options:
+- "Capture your voice. Do something with it."
+- "Voice in. Text out. Anywhere."
+- "Talk. Transcribe. Automate."
+
+The tagline should convey: (1) capture on the go, (2) accurate transcripts, (3) act on them. "Tap. Talk. It's captured." works for capture but undersells the automation angle.
+
+## Tone
+
+- **Calm and direct.** Short sentences. No hype, no startup language, no "AI-powered" selling points.
+- **Honest.** Promise reliability, not transformation. Say what the app does, not what it could hypothetically become.
+- **Technical when appropriate.** The audience includes developers and tinkerers. Don't dumb things down, but don't gatekeep either.
+- **No fear-based privacy marketing.** Don't scare people about other apps. Just state what Ramble does: open source, no user data stored, verify it yourself.
+
+## Visual identity
+
+- **Palette:** Clean and warm. Sage/stone/cream tones.
+- **Typography:** SF Pro (system default).
+- **Logo:** Simple waveform mark that works at small sizes (watch complication, app icon).
+- **UI feel:** Minimal, functional, iOS-native. No custom chrome. Let SwiftUI defaults do the work.
+
+## Key messages
+
+### For transcription enthusiasts
+"The best speech-to-text models, right when they ship. Groq Whisper, Deepgram Nova-3, OpenAI GPT-4o Transcribe — pick the one that fits. Or use Apple Speech for free, on-device transcription that never leaves your phone."
+
+### For automation builders
+"Every transcript can POST to a webhook. Connect Ramble to your agent, your workflow, or your own backend. Signed requests, automatic retries, full API docs."
+
+### For the privacy-conscious
+"Open source. No accounts. No user data on our servers. Your audio and transcriptions stay on your device unless you choose to send them somewhere. Don't take our word for it — read the code."
+
+## App Store description (draft)
+
+> Your voice, accurately transcribed. Then do something with it.
+>
+> Ramble gives you the best speech-to-text models — Groq Whisper, Deepgram, OpenAI — or free on-device transcription with Apple Speech. Record from your phone or Apple Watch.
+>
+> Walk, think, talk. Your transcript is waiting. Send it to a webhook automatically — connect to AI agents, workflows, or any HTTPS endpoint.
+>
+> Open source. No accounts. No servers. Your data stays yours.
+
+## Design principles
+
+1. **Nothing ever gets lost** — Offline-first, persistent queues, clear status at all times. If someone records a thought on a hike, the transcript is there when they get home. Core promise.
+2. **Capture over organization** — Messy input beats no input. Structure comes later, somewhere else.
+3. **No user data on servers** — Privacy by architecture. Open source proves it. We may collect anonymous usage metrics but never store audio, transcriptions, or anything identifiable.
+4. **Pluggable, not opinionated** — Users choose their transcription model. Webhook for downstream. Don't lock anyone in.
+5. **Ship and iterate** — Don't overbuild. Use it, notice what's missing, add that.
+
+## What Ramble is NOT
+
+- Not a note-taking app — captures voice, gives you text. What you do with it is your business.
+- Not an AI assistant — no built-in LLM features. Webhook is the extensibility model.
+- Not a platform — no accounts, no backend, no server-side data.
+
+## What NOT to say
+
+- Don't say "AI-powered" — meaningless buzzword in this context
+- Don't say "revolutionary" or "game-changing"
+- Don't compare directly to Voice Memos or other apps
+- Don't oversell Apple Watch as the primary differentiator (it's a feature, not the identity)
+- Don't promise features that aren't shipped

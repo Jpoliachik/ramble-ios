@@ -75,20 +75,34 @@ async function handleTranscribe(request, env) {
     return json({ error: 'App attestation required' }, 403);
   }
 
-  // --- JWS Subscription Verification ---
-  const authHeader = request.headers.get('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return json({ error: 'Premium subscription required' }, 403);
+  // --- Subscription Verification ---
+  const authHeader = request.headers.get('Authorization') || '';
+  let authBypassed = false;
+
+  if (authHeader.startsWith('DevBypass ') && env.DEV_BYPASS_TOKEN) {
+    const token = authHeader.slice('DevBypass '.length);
+    if (token === env.DEV_BYPASS_TOKEN) {
+      authBypassed = true;
+      console.log(`[auth] Dev bypass accepted device=${deviceId}`);
+    } else {
+      return json({ error: 'Invalid dev bypass token' }, 403);
+    }
   }
 
-  const jws = authHeader.slice(7);
-  const verifyResult = await verifyAppleJWS(jws);
-  if (!verifyResult.valid) {
-    console.error(`[auth] JWS verification failed: ${verifyResult.reason} device=${deviceId}`);
-    return json({ error: 'Premium subscription required' }, 403);
-  }
+  if (!authBypassed) {
+    if (!authHeader.startsWith('Bearer ')) {
+      return json({ error: 'Premium subscription required' }, 403);
+    }
 
-  console.log(`[auth] JWS verified device=${deviceId} product=${verifyResult.productId}`);
+    const jws = authHeader.slice(7);
+    const verifyResult = await verifyAppleJWS(jws);
+    if (!verifyResult.valid) {
+      console.error(`[auth] JWS verification failed: ${verifyResult.reason} device=${deviceId}`);
+      return json({ error: 'Premium subscription required' }, 403);
+    }
+
+    console.log(`[auth] JWS verified device=${deviceId} product=${verifyResult.productId}`);
+  }
 
   // --- Parse form data from the buffered body ---
   let formData;
