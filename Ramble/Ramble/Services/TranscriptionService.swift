@@ -15,6 +15,7 @@ enum TranscriptionError: Error, LocalizedError {
     case recognitionFailed(String)
     case proxyNotConfigured
     case subscriptionRequired
+    case attestationFailed
     case proxyError(statusCode: Int, message: String)
     case networkError(Error)
 
@@ -32,6 +33,8 @@ enum TranscriptionError: Error, LocalizedError {
             return "Transcription failed: \(message)"
         case .subscriptionRequired:
             return "Premium subscription required for cloud transcription"
+        case .attestationFailed:
+            return "Device verification failed — please try again"
         case .proxyNotConfigured:
             return "Cloud transcription not configured — set proxy URL in Settings"
         case .proxyError(let code, let message):
