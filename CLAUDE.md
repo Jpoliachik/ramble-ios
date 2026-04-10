@@ -25,8 +25,8 @@ For full brand positioning, audience, tone, and messaging guidelines, see **`doc
 - [ ] **StoreKit 2 subscription** — $2.99/month for cloud transcription, gate cloud models behind active subscription
 - [ ] **Launch screen** — splash screen for app launch
 - [ ] **App Store assets** — screenshots (iPhone + Apple Watch), privacy policy URL, app description
-- [ ] **Marketing website** — simple landing page (separate session/repo)
-- [ ] **Documentation website** — host webhook API docs and setup guides; update in-app link in `SettingsView.swift` (currently points to GitHub raw markdown)
+- [x] **Marketing website** — landing page, privacy policy, terms of use, webhook API docs (see `website/`)
+- [ ] **Documentation website** — update in-app link in `SettingsView.swift` to point to live docs URL (currently points to GitHub raw markdown)
 - [ ] **End-to-end production testing** — verify real StoreKit subscription flow (sandbox/TestFlight), JWS verification on proxy, and cloud transcription without dev bypass
 - [ ] **Fix App Attest cert parsing bug** — proxy fails to import Apple intermediate CA public key ("P-256 curve mismatch") during attestation registration; `REQUIRE_ATTEST` is off so not blocking, but needs fixing before enabling
 
@@ -44,7 +44,7 @@ These are free features from existing providers (no extra API calls or cost):
 - Open source the repo on GitHub
 - Free app on App Store (Apple Speech on-device transcription + webhook — costs nothing to run)
 - $2.99/month subscription unlocks cloud transcription models via Cloudflare Worker proxy
-- Marketing website (simple, separate repo/session)
+- Marketing website at `goodloop.dev/ramble` (source in `website/`, static export)
 
 ## Build & Development
 
@@ -61,6 +61,19 @@ xcodebuild -project Ramble/Ramble.xcodeproj -scheme Ramble -destination 'platfor
 xcodebuild -project Ramble/Ramble.xcodeproj -scheme "watch Watch App" -destination 'platform=watchOS Simulator,name=Apple Watch Series 11 (46mm)'
 ```
 
+### Website
+
+```bash
+cd website
+npm install
+npm run build    # Static export to website/out/
+npm run dev      # Dev server at localhost:3000/ramble
+```
+
+The site is configured with `basePath: "/ramble"` and `output: "export"`. The `out/` directory contains plain HTML/CSS/JS — copy it into the goodloop.dev repo to serve at `goodloop.dev/ramble`. No server runtime needed.
+
+**Pages:** Landing (`/`), Privacy Policy (`/privacy`), Terms of Use (`/terms`), Webhook API Docs (`/docs`)
+
 ## Architecture
 
 ### Targets
@@ -72,9 +85,11 @@ xcodebuild -project Ramble/Ramble.xcodeproj -scheme "watch Watch App" -destinati
 
 ```
 Ramble/
-├── Ramble/          # Main iOS app source
-├── watch Watch App/  # watchOS companion
+├── Ramble/            # Main iOS app source
+├── watch Watch App/   # watchOS companion
 └── Ramble.xcodeproj/
+website/               # Marketing site (Next.js static export)
+proxy/                 # Cloudflare Worker transcription proxy
 ```
 
 ### Data Flow
