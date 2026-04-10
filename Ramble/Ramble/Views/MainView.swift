@@ -71,10 +71,9 @@ struct MainView: View {
                 .padding(.top, 24)
                 .padding(.bottom, 16)
                 .frame(maxWidth: .infinity)
-                .colorScheme(.dark)
                 .background {
                     Rectangle()
-                        .fill(Color.black)
+                        .fill(.background)
                         .ignoresSafeArea(.container, edges: .bottom)
                 }
             }
