@@ -5,6 +5,7 @@
 
 import Combine
 import Foundation
+import SwiftUI
 
 @MainActor
 final class SettingsViewModel: ObservableObject {
@@ -19,6 +20,12 @@ final class SettingsViewModel: ObservableObject {
     @Published var totalDuration: TimeInterval = 0
     @Published var pendingTranscriptions: Int = 0
     @Published var failedTranscriptions: Int = 0
+    @Published var appearanceMode: AppearanceMode = .system {
+        didSet {
+            // Sync to UserDefaults immediately so @AppStorage in RambleApp updates in real time
+            UserDefaults.standard.set(appearanceMode.rawValue, forKey: "appearanceMode")
+        }
+    }
     @Published var webhookURLError: String?
     @Published var testWebhookResult: TestWebhookResult?
 
@@ -55,6 +62,7 @@ final class SettingsViewModel: ObservableObject {
         webhookURL = settings.webhookURL ?? ""
         webhookSecret = settings.webhookSecret
         deviceId = settings.deviceId
+        appearanceMode = settings.appearanceMode
         loadStats()
     }
 
@@ -65,7 +73,8 @@ final class SettingsViewModel: ObservableObject {
             webhookEnabled: webhookEnabled,
             webhookURL: webhookURL.isEmpty ? nil : webhookURL,
             webhookSecret: webhookSecret,
-            deviceId: deviceId
+            deviceId: deviceId,
+            appearanceMode: appearanceMode
         )
         settingsService.save(settings)
     }

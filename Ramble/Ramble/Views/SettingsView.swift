@@ -22,6 +22,7 @@ struct SettingsView: View {
             Form {
                 transcriptionSection
                 webhookSection
+                appearanceSection
                 statsSection
                 exportSection
                 dangerZoneSection
@@ -220,6 +221,18 @@ struct SettingsView: View {
             .foregroundStyle(.primary)
         } header: {
             Text("Webhook")
+        }
+    }
+
+    private var appearanceSection: some View {
+        Section("Appearance") {
+            Picker("Theme", selection: $viewModel.appearanceMode) {
+                ForEach(AppearanceMode.allCases) { mode in
+                    Label(mode.displayName, systemImage: mode.iconName)
+                        .tag(mode)
+                }
+            }
+            .pickerStyle(.menu)
         }
     }
 

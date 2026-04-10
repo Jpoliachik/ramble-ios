@@ -4,6 +4,39 @@
 //
 
 import Foundation
+import SwiftUI
+
+enum AppearanceMode: String, Codable, CaseIterable, Identifiable {
+    case system
+    case light
+    case dark
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .system: return "System"
+        case .light: return "Light"
+        case .dark: return "Dark"
+        }
+    }
+
+    var iconName: String {
+        switch self {
+        case .system: return "circle.lefthalf.filled"
+        case .light: return "sun.max.fill"
+        case .dark: return "moon.fill"
+        }
+    }
+
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .light: return .light
+        case .dark: return .dark
+        }
+    }
+}
 
 enum TranscriptionProvider: String, Codable, CaseIterable, Identifiable {
     case appleSpeech = "apple_speech"
@@ -106,6 +139,7 @@ struct Settings: Codable {
     var webhookURL: String?
     var webhookSecret: String
     var deviceId: String
+    var appearanceMode: AppearanceMode
 
     init(
         transcriptionProvider: TranscriptionProvider = .appleSpeech,
@@ -113,7 +147,8 @@ struct Settings: Codable {
         webhookEnabled: Bool = false,
         webhookURL: String? = nil,
         webhookSecret: String = Self.generateSecret(),
-        deviceId: String = UUID().uuidString
+        deviceId: String = UUID().uuidString,
+        appearanceMode: AppearanceMode = .system
     ) {
         self.transcriptionProvider = transcriptionProvider
         self.cloudModel = cloudModel
@@ -121,6 +156,7 @@ struct Settings: Codable {
         self.webhookURL = webhookURL
         self.webhookSecret = webhookSecret
         self.deviceId = deviceId
+        self.appearanceMode = appearanceMode
     }
 
     static func generateSecret() -> String {
@@ -146,6 +182,9 @@ struct Settings: Codable {
         cloudModel = try container.decodeIfPresent(CloudModel.self, forKey: .cloudModel)
             ?? .whisperLargeV3Turbo
 
+        appearanceMode = try container.decodeIfPresent(AppearanceMode.self, forKey: .appearanceMode)
+            ?? .system
+
         // Migrate provider: TranscriptionProvider.init(from:) handles old raw values
         let oldProxyURL = try container.decodeIfPresent(String.self, forKey: .proxyBaseURL)
             ?? container.decodeIfPresent(String.self, forKey: .apiBaseURL)
@@ -165,6 +204,7 @@ struct Settings: Codable {
         try container.encode(cloudModel, forKey: .cloudModel)
         try container.encode(webhookEnabled, forKey: .webhookEnabled)
         try container.encodeIfPresent(webhookURL, forKey: .webhookURL)
+        try container.encode(appearanceMode, forKey: .appearanceMode)
         // webhookSecret and deviceId are stored in Keychain, not on disk
     }
 
@@ -177,6 +217,7 @@ struct Settings: Codable {
         case webhookURL
         case webhookSecret
         case deviceId
+        case appearanceMode
         // Legacy keys for migration
         case proxyBaseURL
         case apiBaseURL
