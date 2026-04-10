@@ -1,15 +1,20 @@
 import { Mic, Webhook, ShieldCheck } from "lucide-react";
 
+const BASE_PATH = "/ramble";
+
 export default function Home() {
   return (
     <main className="flex-1">
       {/* Hero */}
       <section className="mx-auto max-w-5xl px-6 pt-24 pb-20 sm:pt-32 sm:pb-28">
         <div className="flex flex-col items-center text-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/ramble-icon-light.png"
+            src={`${BASE_PATH}/ramble-icon-light.png`}
             alt="Ramble app icon"
-            className="h-20 w-20 rounded-2xl shadow-lg mb-8"
+            width={80}
+            height={80}
+            className="rounded-2xl shadow-lg mb-8"
           />
           <h1 className="text-4xl font-semibold tracking-tight text-stone-900 sm:text-5xl lg:text-6xl">
             Voice that goes somewhere.
