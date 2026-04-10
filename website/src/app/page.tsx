@@ -130,8 +130,8 @@ export default function Home() {
               Your voice triggers anything.
             </h2>
             <p className="mt-4 text-base leading-relaxed text-stone-500 sm:text-lg">
-              Every transcript auto-POSTs to a webhook. That means anything you say can kick off an automation, feed an
-              AI agent, or land in your system of record — hands-free.
+              Every transcript auto-POSTs to a webhook. Anything you say can kick off an automation, feed an AI agent,
+              or land in your system of record — hands-free.
             </p>
           </div>
 
@@ -144,9 +144,7 @@ export default function Home() {
             <div className="rounded-xl border border-stone-200 bg-cream p-5">
               <Zap className="h-5 w-5 text-sage-600" />
               <h3 className="mt-3 text-sm font-semibold text-stone-900">Zapier &amp; Make</h3>
-              <p className="mt-1 text-sm text-stone-500">
-                Plug into any automation platform with a single webhook.
-              </p>
+              <p className="mt-1 text-sm text-stone-500">Plug into any automation platform with a single webhook.</p>
             </div>
             <div className="rounded-xl border border-stone-200 bg-cream p-5">
               <Database className="h-5 w-5 text-sage-600" />
