@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Header from "../components/header";
 import "./globals.css";
 
 const BASE_PATH = "/ramble";
@@ -18,6 +19,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full antialiased">
       <body className="min-h-full flex flex-col bg-cream text-stone-900">
+        <Header />
         {children}
         <footer className="border-t border-stone-200 bg-stone-50">
           <div className="mx-auto max-w-5xl px-6 py-10 flex flex-col items-center gap-6 sm:flex-row sm:justify-between">

@@ -23,11 +23,15 @@
   --color-sage-800: #283a28;
   --color-sage-900: #1c291c;
 
-  --color-cream: #fdfbf7;
+  --color-cream: #f4f3ef;
   --color-cream-warm: #f9f5ed;
+
+  --color-red-500: #ff3b30;
 
   --font-sans: "SF Pro Display", "SF Pro", -apple-system, BlinkMacSystemFont,
     system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-serif: "New York", "Iowan Old Style", "Palatino Linotype",
+    "Book Antiqua", Palatino, Georgia, serif;
   --font-mono: "SF Mono", ui-monospace, SFMono-Regular, "Cascadia Code",
     Menlo, monospace;
 }
