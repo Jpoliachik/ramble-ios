@@ -65,6 +65,25 @@ That's it. No logging of audio or transcripts. No database. No user accounts.
    npm run deploy
    ```
 
+## Anonymous Usage Analytics
+
+When you use cloud transcription, the proxy records anonymous usage metrics via Cloudflare Analytics Engine. This helps us understand which models are popular and keep the service running well.
+
+**What's collected per transcription request:**
+- Model name and provider (e.g. "whisper-large-v3-turbo" via Groq)
+- Audio file size and transcript length (character count, not the text itself)
+- Processing duration
+- Success or failure status
+- SHA-256 hashed device ID — a one-way hash for counting unique devices, not reversible to your actual device ID
+
+**What's NOT collected:**
+- Audio content
+- Transcription text
+- IP addresses
+- Anything that identifies you as a person
+
+On-device transcription (Apple Speech) never contacts the proxy, so it generates zero analytics data. You can verify all of this in [`proxy/src/analytics.js`](src/analytics.js).
+
 ### Local Development
 
 ```bash

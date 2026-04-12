@@ -19,3 +19,11 @@ PREMIUM_PRODUCT_ID = "dev.goodloop.ramble.premium.monthly2"
 [[kv_namespaces]]
 binding = "ATTEST_KV"
 id = "YOUR_KV_NAMESPACE_ID"
+
+# Analytics Engine for anonymous usage metrics (model popularity, request volume).
+# SETUP REQUIRED: Run `wrangler analytics-engine create USAGE_ANALYTICS` (or create
+# via the Cloudflare dashboard under Account → Analytics Engine) and paste the
+# dataset ID below. No PII is stored — device IDs are SHA-256 hashed before writing.
+[[analytics_engine_datasets]]
+binding = "USAGE_ANALYTICS"
+dataset = "ramble_usage"
