@@ -30,6 +30,7 @@ That's it. No logging of audio or transcripts. No database. No user accounts.
 | `POST` | `/attest/challenge` | Issue a challenge for App Attest registration |
 | `POST` | `/attest` | Register a device via App Attest |
 | `GET` | `/health` | Health check |
+| `GET` | `/analytics?token=SECRET&days=7` | Anonymous usage stats (admin only) |
 
 ## Authentication
 
@@ -59,11 +60,40 @@ That's it. No logging of audio or transcripts. No database. No user accounts.
    npx wrangler secret put OPENAI_API_KEY      # optional
    ```
 
-5. Deploy:
+5. (Optional) Set up Analytics Engine for anonymous usage stats:
+   ```bash
+   # Create via Cloudflare dashboard: Account → Analytics Engine → Create dataset "ramble_usage"
+   # Then add the dataset binding to wrangler.toml (see wrangler.example.toml)
+   npx wrangler secret put ANALYTICS_TOKEN   # secret for /analytics endpoint
+   ```
+
+6. Deploy:
    ```bash
    npm install
    npm run deploy
    ```
+
+## Usage Analytics
+
+Anonymous usage tracking via Cloudflare Analytics Engine. This helps us understand which models are popular and how the service is being used, without collecting any personal information.
+
+**What's collected per transcription request:**
+- Model name and provider (e.g. "whisper-large-v3-turbo" via Groq)
+- Audio file size and transcript length
+- Processing duration
+- Success or failure
+- SHA-256 hashed device ID (for unique-user counts — not reversible)
+
+**What's NOT collected:** audio content, transcription text, IP addresses, or anything that identifies a person.
+
+**Query the data:**
+```bash
+curl "https://your-worker.workers.dev/analytics?token=YOUR_SECRET&days=30"
+```
+
+Returns: total requests, model breakdown, daily volume, unique device counts, and averages (file size, text length, duration).
+
+You can also query the raw data via the Cloudflare dashboard (Account → Analytics Engine → ramble_usage).
 
 ### Local Development
 

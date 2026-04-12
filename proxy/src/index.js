@@ -1,4 +1,5 @@
 import { handleAttestChallenge, handleAttest, verifyAssertion } from './attest.js';
+import { writeTranscriptionEvent } from './analytics.js';
 import {
   base64ToArrayBuffer,
   base64UrlDecode,
@@ -47,6 +48,10 @@ export default {
 
     if (url.pathname === '/health') {
       return json({ status: 'ok' });
+    }
+
+    if (url.pathname === '/analytics' && request.method === 'GET') {
+      return handleAnalytics(request, env);
     }
 
     return json({ error: 'Not found' }, 404);
@@ -131,6 +136,7 @@ async function handleTranscribe(request, env) {
   );
 
   // --- Route to appropriate backend ---
+  const startTime = Date.now();
   let result;
   if (requestedModel.startsWith('deepgram-')) {
     result = await transcribeWithDeepgram(audio, env);
@@ -139,12 +145,31 @@ async function handleTranscribe(request, env) {
   } else {
     result = await transcribeWithGroq(audio, requestedModel, env);
   }
+  const durationMs = Date.now() - startTime;
 
   if (result.error) {
+    writeTranscriptionEvent(env, {
+      deviceId,
+      model: requestedModel,
+      audioSize: audio.size,
+      textLength: 0,
+      durationMs,
+      error: result.error,
+    });
     return json({ error: result.error }, result.status);
   }
 
-  console.log(`[transcribe] device=${deviceId} text_length=${result.result?.length || 0}`);
+  const textLength = result.result?.length || 0;
+  console.log(`[transcribe] device=${deviceId} text_length=${textLength} duration=${durationMs}ms`);
+
+  writeTranscriptionEvent(env, {
+    deviceId,
+    model: requestedModel,
+    audioSize: audio.size,
+    textLength,
+    durationMs,
+    error: null,
+  });
 
   return json({ text: result.result });
 }
@@ -314,6 +339,81 @@ async function verifyAppleJWS(jws) {
   }
 }
 
+// --- Admin Analytics ---
+
+async function handleAnalytics(request, env) {
+  // Protected by a shared secret — set ANALYTICS_TOKEN via `wrangler secret put ANALYTICS_TOKEN`
+  const token = new URL(request.url).searchParams.get('token');
+  if (!env.ANALYTICS_TOKEN || token !== env.ANALYTICS_TOKEN) {
+    return json({ error: 'Unauthorized' }, 401);
+  }
+
+  if (!env.USAGE_ANALYTICS) {
+    return json({ error: 'Analytics Engine not configured' }, 503);
+  }
+
+  const days = Math.min(parseInt(new URL(request.url).searchParams.get('days') || '7', 10), 90);
+
+  // Run all queries in parallel
+  const [overview, byModel, daily, uniqueDevices] = await Promise.all([
+    // Overall counts and averages
+    env.USAGE_ANALYTICS.sql(`
+      SELECT
+        count() as total_requests,
+        sum(if(blob3 = 'success', 1, 0)) as successes,
+        sum(if(blob3 = 'error', 1, 0)) as errors,
+        avg(double1) as avg_audio_bytes,
+        avg(double2) as avg_text_length,
+        avg(double3) as avg_duration_ms
+      FROM ramble_usage
+      WHERE timestamp > now() - interval '${days}' day
+    `),
+
+    // Breakdown by model
+    env.USAGE_ANALYTICS.sql(`
+      SELECT
+        blob1 as model,
+        blob2 as provider,
+        count() as requests,
+        sum(if(blob3 = 'success', 1, 0)) as successes,
+        avg(double1) as avg_audio_bytes,
+        avg(double2) as avg_text_length,
+        avg(double3) as avg_duration_ms
+      FROM ramble_usage
+      WHERE timestamp > now() - interval '${days}' day
+      GROUP BY blob1, blob2
+      ORDER BY requests DESC
+    `),
+
+    // Daily volume
+    env.USAGE_ANALYTICS.sql(`
+      SELECT
+        toDate(timestamp) as date,
+        count() as requests,
+        sum(if(blob3 = 'success', 1, 0)) as successes
+      FROM ramble_usage
+      WHERE timestamp > now() - interval '${days}' day
+      GROUP BY date
+      ORDER BY date DESC
+    `),
+
+    // Unique devices
+    env.USAGE_ANALYTICS.sql(`
+      SELECT count(distinct index1) as unique_devices
+      FROM ramble_usage
+      WHERE timestamp > now() - interval '${days}' day
+    `),
+  ]);
+
+  return json({
+    period_days: days,
+    overview: overview.toArray(),
+    by_model: byModel.toArray(),
+    daily: daily.toArray(),
+    unique_devices: uniqueDevices.toArray(),
+  });
+}
+
 // --- Utilities ---
 
 function json(data, status = 200) {
@@ -326,7 +426,7 @@ function json(data, status = 200) {
 function corsHeaders() {
   return {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, X-Device-ID, Authorization, X-App-Attest, X-App-Attest-Key-Id',
   };
 }
