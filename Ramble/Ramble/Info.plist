@@ -13,5 +13,12 @@
 		<string>audio</string>
 		<string>processing</string>
 	</array>
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>LaunchBackground</string>
+		<key>UIImageName</key>
+		<string>LaunchIcon</string>
+	</dict>
 </dict>
 </plist>
