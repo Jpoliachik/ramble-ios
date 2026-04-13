@@ -226,11 +226,18 @@ async function verifyAttestation(keyId, attestationB64, challenge, env) {
 
     // 5. Verify certificate chain: leaf signed by intermediate, intermediate signed by Apple root
     const intermediateDer = x5c[1];
-    const intermediateKey = await importPublicKeyFromCert(intermediateDer.buffer);
+    // Try P-256 first; Apple's intermediate CA may use P-384
+    let intermediateKey = await importPublicKeyFromCert(intermediateDer.buffer);
+    let intermediateCurve = 'P-256';
+    if (!intermediateKey) {
+      intermediateKey = await importP384PublicKeyFromCert(intermediateDer.buffer);
+      intermediateCurve = 'P-384';
+    }
     if (!intermediateKey) {
       return { valid: false, reason: 'Could not import intermediate CA public key' };
     }
-    const leafSignatureValid = await verifyCertSignature(credCertDer, intermediateKey);
+    const leafHash = intermediateCurve === 'P-384' ? 'SHA-384' : 'SHA-256';
+    const leafSignatureValid = await verifyCertSignature(credCertDer, intermediateKey, intermediateCurve, leafHash);
     if (!leafSignatureValid) {
       return { valid: false, reason: 'Leaf certificate not signed by intermediate CA' };
     }
