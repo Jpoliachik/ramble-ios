@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 function StepHeader({ id, step, children }: { id: string; step: number; children: string }) {
   return (
     <div id={id} className="scroll-mt-8 flex items-center gap-4">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-stone-900 text-base font-semibold text-white">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-stone-900 font-serif text-base font-semibold text-white">
         {step}
       </span>
       <h2 className="font-serif text-xl font-semibold text-stone-900">{children}</h2>

@@ -90,21 +90,21 @@ export default function Home() {
           </h2>
           <div className="mt-12 grid gap-8 sm:grid-cols-3">
             <div className="text-center">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-500 text-white text-sm font-semibold">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-stone-900 font-serif text-white text-sm font-semibold">
                 1
               </div>
               <h3 className="mt-4 text-sm font-semibold text-stone-900">Ramble</h3>
               <p className="mt-1 text-sm text-stone-500">Tap and talk on your iPhone or Apple Watch.</p>
             </div>
             <div className="text-center">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-500 text-white text-sm font-semibold">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-stone-900 font-serif text-white text-sm font-semibold">
                 2
               </div>
               <h3 className="mt-4 text-sm font-semibold text-stone-900">Transcribe</h3>
               <p className="mt-1 text-sm text-stone-500">Cloud models or free on-device Apple Speech.</p>
             </div>
             <div className="text-center">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-500 text-white text-sm font-semibold">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-stone-900 font-serif text-white text-sm font-semibold">
                 3
               </div>
               <h3 className="mt-4 text-sm font-semibold text-stone-900">Send it anywhere</h3>
