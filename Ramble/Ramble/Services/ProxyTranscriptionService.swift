@@ -143,18 +143,13 @@ final class ProxyTranscriptionService {
         )
         urlRequest.setValue(deviceId, forHTTPHeaderField: "X-Device-ID")
 
-        // Dev bypass token skips JWS verification (debug builds only, gitignored secret)
-        #if DEBUG
-        if let bypassToken = Secrets.devBypassToken {
-            urlRequest.setValue("DevBypass \(bypassToken)", forHTTPHeaderField: "Authorization")
+        // Dev override key bypasses subscription check on the proxy (any build)
+        let overrideKey = UserDefaults.standard.string(forKey: SubscriptionService.devOverrideUserDefaultsKey)
+        if let overrideKey, !overrideKey.isEmpty {
+            urlRequest.setValue("DevBypass \(overrideKey)", forHTTPHeaderField: "Authorization")
         } else if let jws = request.jwsTransaction {
             urlRequest.setValue("Bearer \(jws)", forHTTPHeaderField: "Authorization")
         }
-        #else
-        if let jws = request.jwsTransaction {
-            urlRequest.setValue("Bearer \(jws)", forHTTPHeaderField: "Authorization")
-        }
-        #endif
 
         // Build multipart body
         var body = Data()

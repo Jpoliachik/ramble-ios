@@ -16,6 +16,9 @@ struct SettingsView: View {
     @State private var showTranscriptionInfo = false
     @State private var showWebhookInfo = false
     @State private var exportURL: URL?
+    @State private var versionTapCount = 0
+    @State private var showDevOverrideAlert = false
+    @State private var devOverrideKeyInput = ""
 
     var body: some View {
         NavigationView {
@@ -26,6 +29,7 @@ struct SettingsView: View {
                 statsSection
                 exportSection
                 dangerZoneSection
+                aboutSection
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
@@ -44,6 +48,20 @@ struct SettingsView: View {
                 if let url = exportURL {
                     ShareSheet(activityItems: [url])
                 }
+            }
+            .alert("Developer Override", isPresented: $showDevOverrideAlert) {
+                TextField("Override key", text: $devOverrideKeyInput)
+                Button("Save") {
+                    let key = devOverrideKeyInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                    SubscriptionService.shared.setDevOverrideKey(key.isEmpty ? nil : key)
+                }
+                Button("Clear", role: .destructive) {
+                    SubscriptionService.shared.setDevOverrideKey(nil)
+                    devOverrideKeyInput = ""
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Enter the server bypass key to unlock premium features without a subscription.")
             }
             .sheet(isPresented: $showTranscriptionInfo) {
                 TranscriptionInfoSheet()
@@ -299,6 +317,38 @@ struct SettingsView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This will permanently delete all recordings and transcriptions.")
+        }
+    }
+
+    private var aboutSection: some View {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
+        let hasOverride = SubscriptionService.shared.devOverrideKey != nil
+
+        return Section {
+            VStack(spacing: 4) {
+                Text("Ramble v\(version) (\(build))")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .onTapGesture {
+                        versionTapCount += 1
+                        if versionTapCount >= 4 {
+                            versionTapCount = 0
+                            devOverrideKeyInput = UserDefaults.standard.string(
+                                forKey: SubscriptionService.devOverrideUserDefaultsKey
+                            ) ?? ""
+                            showDevOverrideAlert = true
+                        }
+                    }
+
+                if hasOverride {
+                    Text("Developer Override Active")
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .listRowBackground(Color.clear)
         }
     }
 
