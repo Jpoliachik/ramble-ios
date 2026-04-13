@@ -236,8 +236,17 @@ async function verifyAttestation(keyId, attestationB64, challenge, env) {
     if (!intermediateKey) {
       return { valid: false, reason: 'Could not import intermediate CA public key' };
     }
-    const leafHash = intermediateCurve === 'P-384' ? 'SHA-384' : 'SHA-256';
-    const leafSignatureValid = await verifyCertSignature(credCertDer, intermediateKey, intermediateCurve, leafHash);
+    console.log(`[attest] Intermediate CA imported as ${intermediateCurve}`);
+
+    // Try the standard hash pairing first, then fall back to the other hash.
+    // Apple's intermediate may sign leaf certs with either SHA-256 or SHA-384.
+    const primaryHash = intermediateCurve === 'P-384' ? 'SHA-384' : 'SHA-256';
+    const fallbackHash = intermediateCurve === 'P-384' ? 'SHA-256' : 'SHA-384';
+    let leafSignatureValid = await verifyCertSignature(credCertDer, intermediateKey, intermediateCurve, primaryHash);
+    if (!leafSignatureValid) {
+      console.log(`[attest] Leaf sig failed with ${intermediateCurve}/${primaryHash}, trying ${fallbackHash}`);
+      leafSignatureValid = await verifyCertSignature(credCertDer, intermediateKey, intermediateCurve, fallbackHash);
+    }
     if (!leafSignatureValid) {
       return { valid: false, reason: 'Leaf certificate not signed by intermediate CA' };
     }

@@ -124,6 +124,11 @@ export async function importPublicKeyFromCert(certDer) {
       return null;
     }
 
+    // Log the curve OID that follows the ecPublicKey OID
+    const curveOidStart = oidIndex + ecPublicKeyOid.length;
+    const curveOidPreview = certBytes.slice(curveOidStart, Math.min(curveOidStart + 12, certBytes.length));
+    console.log(`[cert] EC OID at offset ${oidIndex}, curve OID bytes: ${bytesToHex(curveOidPreview)}`);
+
     let spkiStart = -1;
     for (let i = oidIndex - 1; i >= Math.max(0, oidIndex - 10); i--) {
       if (certBytes[i] === 0x30) {
@@ -145,6 +150,7 @@ export async function importPublicKeyFromCert(certDer) {
 
     const spkiEnd = spkiStart + 1 + spkiLenInfo.bytesUsed + spkiLenInfo.length;
     const spkiBytes = certBytes.slice(spkiStart, spkiEnd);
+    console.log(`[cert] SPKI: start=${spkiStart} end=${spkiEnd} len=${spkiBytes.length} first16=${bytesToHex(spkiBytes.slice(0, 16))}`);
 
     return await crypto.subtle.importKey(
       'spki',
@@ -154,7 +160,7 @@ export async function importPublicKeyFromCert(certDer) {
       ['verify'],
     );
   } catch (err) {
-    console.error(`[cert] Public key extraction failed: ${err.message}`);
+    console.error(`[cert] P-256 import failed: ${err.message}`);
     return null;
   }
 }
@@ -183,6 +189,10 @@ export async function verifyCertSignature(certDer, issuerKey, curve, hash) {
     if (!sigAlgLen) return false;
     const sigAlgEnd = sigAlgStart + 1 + sigAlgLen.bytesUsed + sigAlgLen.length;
 
+    // Log the signature algorithm OID bytes for debugging
+    const sigAlgBytes = bytes.slice(sigAlgStart, sigAlgEnd);
+    console.log(`[cert] sigAlg bytes: ${bytesToHex(sigAlgBytes)}`);
+
     if (bytes[sigAlgEnd] !== 0x03) return false;
     const sigBitLen = readAsn1Length(bytes, sigAlgEnd + 1);
     if (!sigBitLen) return false;
@@ -193,14 +203,17 @@ export async function verifyCertSignature(certDer, issuerKey, curve, hash) {
     const useCurve = curve || 'P-256';
     const useHash = hash || 'SHA-256';
     const componentSize = useCurve === 'P-384' ? 48 : 32;
+    console.log(`[cert] Verifying: curve=${useCurve} hash=${useHash} tbsLen=${tbsBytes.length} sigDerLen=${signatureDer.length} componentSize=${componentSize}`);
     const rawSig = derSignatureToRaw(signatureDer, componentSize);
 
-    return await crypto.subtle.verify(
+    const result = await crypto.subtle.verify(
       { name: 'ECDSA', hash: useHash },
       issuerKey,
       rawSig,
       tbsBytes,
     );
+    console.log(`[cert] Verify result: ${result}`);
+    return result;
   } catch (err) {
     console.error(`[cert] Signature verification failed: ${err.message}`);
     return false;
