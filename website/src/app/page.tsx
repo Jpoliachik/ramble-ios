@@ -7,15 +7,15 @@ export default function Home() {
       {/* Hero */}
       <section className="mx-auto max-w-5xl px-6 pt-32 pb-20 sm:pt-40 sm:pb-28">
         <div className="flex flex-col items-center text-center">
-          <h1 className="text-4xl font-semibold tracking-tight text-stone-900 sm:text-5xl lg:text-6xl">
-            Voice that goes somewhere.
+          <h1 className="font-serif text-4xl font-semibold tracking-tight text-stone-900 sm:text-5xl lg:text-6xl">
+            Voice that goes somewhere
           </h1>
           <p className="mt-6 text-base leading-relaxed text-stone-500 sm:text-lg lg:text-xl">
-            Your best thinking happens away from the keyboard.
+            Record your thoughts on iPhone or Apple Watch.
             <br />
-            Ramble while you walk, process while you talk —
+            Get accurate transcripts.
             <br />
-            your words become text, ready for whatever comes next.
+            Pipe them anywhere via webhook.
           </p>
           <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row">
             <a
@@ -85,7 +85,7 @@ export default function Home() {
       {/* How it works */}
       <section className="border-t border-stone-200">
         <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
-          <h2 className="text-center text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl">
+          <h2 className="font-serif text-center text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl">
             Ramble. Transcribe. Act.
           </h2>
           <div className="mt-12 grid gap-8 sm:grid-cols-3">
@@ -94,29 +94,21 @@ export default function Home() {
                 1
               </div>
               <h3 className="mt-4 text-sm font-semibold text-stone-900">Ramble</h3>
-              <p className="mt-1 text-sm text-stone-500">
-                Tap and talk on your iPhone or Apple Watch. Think out loud, unfiltered — put your phone away and just
-                go.
-              </p>
+              <p className="mt-1 text-sm text-stone-500">Tap and talk on your iPhone or Apple Watch.</p>
             </div>
             <div className="text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-500 text-white text-sm font-semibold">
                 2
               </div>
               <h3 className="mt-4 text-sm font-semibold text-stone-900">Transcribe</h3>
-              <p className="mt-1 text-sm text-stone-500">
-                Pick a cloud model for top accuracy, or use free on-device Apple Speech. Your transcript is ready when
-                you are.
-              </p>
+              <p className="mt-1 text-sm text-stone-500">Cloud models or free on-device Apple Speech.</p>
             </div>
             <div className="text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-500 text-white text-sm font-semibold">
                 3
               </div>
               <h3 className="mt-4 text-sm font-semibold text-stone-900">Send it anywhere</h3>
-              <p className="mt-1 text-sm text-stone-500">
-                Auto-POST transcripts to any webhook. Agents, workflows, databases — your voice becomes action.
-              </p>
+              <p className="mt-1 text-sm text-stone-500">Auto-POST transcripts to any webhook.</p>
             </div>
           </div>
         </div>
@@ -126,13 +118,9 @@ export default function Home() {
       <section className="border-t border-stone-200 bg-stone-50">
         <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
           <div className="max-w-2xl mx-auto text-center">
-            <h2 className="text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl">
+            <h2 className="font-serif text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl">
               Your voice triggers anything.
             </h2>
-            <p className="mt-4 text-base leading-relaxed text-stone-500 sm:text-lg">
-              Every transcript auto-POSTs to a webhook. Anything you say can kick off an automation, feed an AI agent,
-              or land in your system of record — hands-free.
-            </p>
           </div>
 
           <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -175,7 +163,7 @@ export default function Home() {
       {/* Pricing */}
       <section className="border-t border-stone-200 bg-stone-50">
         <div className="mx-auto max-w-5xl px-6 py-16 text-center">
-          <h2 className="text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl">
+          <h2 className="font-serif text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl">
             Free to use. Open source.
           </h2>
           <p className="mt-4 text-base text-stone-500">

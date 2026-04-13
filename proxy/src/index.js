@@ -66,19 +66,18 @@ async function handleTranscribe(request, env) {
   const bodyBuffer = await request.arrayBuffer();
   const attestKeyId = request.headers.get('X-App-Attest-Key-Id');
   const attestAssertionB64 = request.headers.get('X-App-Attest');
-  const requireAttest = env.REQUIRE_ATTEST === 'true';
 
-  if (attestKeyId && attestAssertionB64) {
-    const assertionResult = await verifyAssertion(attestKeyId, attestAssertionB64, bodyBuffer, env);
-    if (!assertionResult.valid) {
-      console.error(`[attest] Assertion failed: ${assertionResult.reason} device=${deviceId}`);
-      return json({ error: 'App attestation failed' }, 403);
-    }
-    console.log(`[attest] Assertion verified device=${deviceId} keyId=${attestKeyId.substring(0, 8)}...`);
-  } else if (requireAttest) {
+  if (!attestKeyId || !attestAssertionB64) {
     console.error(`[attest] Missing attestation headers device=${deviceId}`);
     return json({ error: 'App attestation required' }, 403);
   }
+
+  const assertionResult = await verifyAssertion(attestKeyId, attestAssertionB64, bodyBuffer, env);
+  if (!assertionResult.valid) {
+    console.error(`[attest] Assertion failed: ${assertionResult.reason} device=${deviceId}`);
+    return json({ error: 'App attestation failed' }, 403);
+  }
+  console.log(`[attest] Assertion verified device=${deviceId} keyId=${attestKeyId.substring(0, 8)}...`);
 
   // --- Subscription Verification ---
   const authHeader = request.headers.get('Authorization') || '';

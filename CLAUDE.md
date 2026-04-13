@@ -28,7 +28,7 @@ For full brand positioning, audience, tone, and messaging guidelines, see **`doc
 - [x] **Marketing website** — landing page, privacy policy, terms of use, webhook API docs (see `website/`)
 - [ ] **Documentation website** — update in-app link in `SettingsView.swift` to point to live docs URL (currently points to GitHub raw markdown)
 - [ ] **End-to-end production testing** — verify real StoreKit subscription flow (sandbox/TestFlight), JWS verification on proxy, and cloud transcription without dev bypass
-- [ ] **Fix App Attest cert parsing bug** — proxy fails to import Apple intermediate CA public key ("P-256 curve mismatch") during attestation registration; `REQUIRE_ATTEST` is off so not blocking, but needs fixing before enabling
+- [x] **App Attest enforcement** — `REQUIRE_ATTEST` flag removed; attestation is now always required on `/transcribe`
 - [ ] **Transcript formatting** — transcripts render as one big block of text with no line breaks. Improve formatting with paragraph breaks (Apple Speech segments, cloud provider paragraph support, or heuristic sentence grouping)
 - [ ] **Recording detail title** — show date/time instead of "Recording" in the navigation title on RecordingDetailView
 - [ ] **Recording waveform animation** — show a live audio waveform visualization while recording on iPhone. Watch should also show something but can be simpler

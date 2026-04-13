@@ -33,7 +33,7 @@ That's it. No logging of audio or transcripts. No database. No user accounts.
 
 ## Authentication
 
-**App Attest** — Apple's device attestation proves requests come from a real copy of Ramble on a real Apple device. The app attests once, then sends an assertion with each request. Controlled by the `REQUIRE_ATTEST` flag.
+**App Attest** — Apple's device attestation proves requests come from a real copy of Ramble on a real Apple device. The app attests once, then sends an assertion with each request. All `/transcribe` requests must include valid attestation headers.
 
 **Subscription verification** — Cloud transcription requires an active StoreKit 2 subscription. The proxy verifies Apple's signed JWS transaction directly — no server-side receipt validation, no App Store Server API calls.
 
