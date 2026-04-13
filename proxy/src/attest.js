@@ -101,6 +101,7 @@ export async function verifyAssertion(keyId, assertionB64, requestBody, env) {
       return { valid: false, reason: 'Unknown key — device not attested' };
     }
     const stored = JSON.parse(storedRaw);
+    console.log(`[assert] Stored key found, publicKey len=${stored.publicKey.length} counter=${stored.counter}`);
 
     // 2. Decode the CBOR assertion
     const assertionBytes = base64ToArrayBuffer(assertionB64);
@@ -112,6 +113,7 @@ export async function verifyAssertion(keyId, assertionB64, requestBody, env) {
     if (!signature || !authenticatorData) {
       return { valid: false, reason: 'Invalid assertion structure' };
     }
+    console.log(`[assert] authData len=${authenticatorData.length} sig len=${signature.length}`);
 
     // 3. Verify rpIdHash matches the value recorded during attestation
     const rpIdHash = authenticatorData.slice(0, 32);
@@ -126,6 +128,7 @@ export async function verifyAssertion(keyId, assertionB64, requestBody, env) {
     const clientDataHash = new Uint8Array(
       await crypto.subtle.digest('SHA-256', requestBody),
     );
+    console.log(`[assert] clientDataHash=${bytesToHex(clientDataHash).substring(0, 16)}... bodyLen=${requestBody.byteLength}`);
 
     // 5. Build the data that was signed: authenticatorData || clientDataHash
     const signedData = new Uint8Array(authenticatorData.length + clientDataHash.length);
@@ -134,6 +137,7 @@ export async function verifyAssertion(keyId, assertionB64, requestBody, env) {
 
     // 6. Import the stored public key (raw EC point: 0x04 || x || y)
     const publicKeyBytes = base64ToArrayBuffer(stored.publicKey);
+    console.log(`[assert] publicKey raw len=${publicKeyBytes.byteLength} first3=${bytesToHex(new Uint8Array(publicKeyBytes).slice(0, 3))}`);
     const publicKey = await crypto.subtle.importKey(
       'raw',
       publicKeyBytes,
@@ -143,7 +147,9 @@ export async function verifyAssertion(keyId, assertionB64, requestBody, env) {
     );
 
     // 7. Convert DER signature to raw r||s format for WebCrypto
-    const rawSignature = derSignatureToRaw(new Uint8Array(signature.buffer || signature));
+    const sigBytes = new Uint8Array(signature.buffer || signature);
+    console.log(`[assert] DER sig first6=${bytesToHex(sigBytes.slice(0, 6))} len=${sigBytes.length}`);
+    const rawSignature = derSignatureToRaw(sigBytes);
 
     // 8. Verify the signature (ECDSA-SHA256 over authenticatorData || clientDataHash)
     const isValid = await crypto.subtle.verify(
@@ -152,6 +158,7 @@ export async function verifyAssertion(keyId, assertionB64, requestBody, env) {
       rawSignature,
       signedData,
     );
+    console.log(`[assert] Verify result: ${isValid} signedDataLen=${signedData.length}`);
 
     if (!isValid) {
       return { valid: false, reason: 'Invalid signature' };
