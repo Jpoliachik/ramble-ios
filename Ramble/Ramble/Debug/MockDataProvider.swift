@@ -11,7 +11,7 @@ import Foundation
 
 enum MockDataProvider {
     /// Flip this to `true`, run the app, take screenshots.
-    static var enabled = true
+    static var enabled = false
 
     static func mockRecordings() -> [Recording] {
         let calendar = Calendar.current

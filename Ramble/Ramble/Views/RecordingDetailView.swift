@@ -77,6 +77,9 @@ struct RecordingDetailView: View {
     }
 
     private func refreshRecording() {
+        #if DEBUG
+        if MockDataProvider.enabled { return }
+        #endif
         let recordings = storageService.loadRecordings()
         recording = recordings.first { $0.id == recordingId }
     }
