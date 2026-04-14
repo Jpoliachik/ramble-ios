@@ -157,7 +157,7 @@ struct SubscriptionView: View {
 
             HStack(spacing: 16) {
                 Link("Terms of Use", destination: URL(string: "https://apple.com/legal/internet-services/itunes/dev/stdeula/")!)
-                Link("Privacy Policy", destination: URL(string: "https://github.com/Jpoliachik/ramble-ios")!)
+                Link("Privacy Policy", destination: URL(string: "https://goodloop.dev/ramble/privacy")!)
             }
             .font(.caption2)
         }

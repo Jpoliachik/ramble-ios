@@ -139,7 +139,7 @@ export default function TermsOfUse() {
               Ramble&apos;s source code is available under an open source
               license on{" "}
               <a
-                href="https://github.com/jpoliachik/ramble-ios"
+                href="https://github.com/Jpoliachik/ramble-ios"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="underline hover:text-stone-900"
@@ -189,7 +189,7 @@ export default function TermsOfUse() {
             <p className="mt-2">
               Questions about these terms? Open an issue on{" "}
               <a
-                href="https://github.com/jpoliachik/ramble-ios/issues"
+                href="https://github.com/Jpoliachik/ramble-ios/issues"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="underline hover:text-stone-900"

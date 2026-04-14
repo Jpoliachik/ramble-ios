@@ -38,7 +38,7 @@ export default function RootLayout({
                 App Store
               </a>
               <a
-                href="https://github.com/jpoliachik/ramble-ios"
+                href="https://github.com/Jpoliachik/ramble-ios"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-stone-900 transition-colors"

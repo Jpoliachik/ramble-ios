@@ -30,7 +30,7 @@ export default function Home() {
               Free on the App Store
             </a>
             <a
-              href="https://github.com/jpoliachik/ramble-ios"
+              href="https://github.com/Jpoliachik/ramble-ios"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 rounded-full border border-stone-300 px-6 py-3 text-sm font-medium text-stone-700 transition-colors hover:border-stone-400 hover:bg-stone-100"

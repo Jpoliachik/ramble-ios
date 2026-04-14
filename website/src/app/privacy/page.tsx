@@ -168,7 +168,7 @@ export default function PrivacyPolicy() {
               Ramble is fully open source. You can inspect exactly what data the
               app accesses and transmits by reviewing the{" "}
               <a
-                href="https://github.com/jpoliachik/ramble-ios"
+                href="https://github.com/Jpoliachik/ramble-ios"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="underline hover:text-stone-900"
@@ -195,7 +195,7 @@ export default function PrivacyPolicy() {
             <p className="mt-2">
               Questions about this policy? Open an issue on{" "}
               <a
-                href="https://github.com/jpoliachik/ramble-ios/issues"
+                href="https://github.com/Jpoliachik/ramble-ios/issues"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="underline hover:text-stone-900"

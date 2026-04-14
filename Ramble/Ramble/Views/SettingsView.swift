@@ -490,6 +490,16 @@ struct TranscriptionInfoSheet: View {
                         title: "Don't take our word for it",
                         text: "Ramble is fully open source. Check the code on GitHub — no accounts, no user data stored. Your audio and transcriptions never touch our servers."
                     )
+
+                    Link(destination: URL(string: "https://github.com/Jpoliachik/ramble-ios")!) {
+                        HStack {
+                            Spacer()
+                            Label("View Source on GitHub", systemImage: "chevron.left.forwardslash.chevron.right")
+                            Spacer()
+                        }
+                        .padding(.vertical, 12)
+                    }
+                    .buttonStyle(.bordered)
                 }
                 .padding()
             }
