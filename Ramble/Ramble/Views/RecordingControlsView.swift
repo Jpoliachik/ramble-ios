@@ -26,11 +26,11 @@ struct RecordingControlsView: View {
                     .font(.system(size: 52, weight: .bold, design: .serif))
                     .monospacedDigit()
                     .contentTransition(.numericText())
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .transition(.opacity)
             }
 
             ZStack {
-                RecordButtonView(isRecording: isRecording, audioLevel: audioLevel, action: onToggleRecording)
+                RecordButtonView(isRecording: isRecording, action: onToggleRecording)
 
                 if isRecording {
                     HStack {
@@ -49,7 +49,6 @@ struct RecordingControlsView: View {
                                 .background(.ultraThinMaterial, in: Circle())
                         }
                         .buttonStyle(.plain)
-                        .transition(.opacity)
                         .confirmationDialog(
                             "Discard recording?",
                             isPresented: $showCancelConfirmation,
@@ -65,6 +64,11 @@ struct RecordingControlsView: View {
                         Spacer()
                     }
                     .padding(.leading, 20)
+                    .transition(.move(edge: .leading).combined(with: .opacity))
+
+                    AudioWaveformView(audioLevel: audioLevel)
+                        .offset(x: 90)
+                        .transition(.opacity)
                 }
             }
 
@@ -82,7 +86,7 @@ struct RecordingControlsView: View {
                 }
             }
         }
-        .animation(.snappy(duration: 0.3), value: isRecording)
+        .animation(.snappy(duration: 0.25), value: isRecording)
     }
 }
 
