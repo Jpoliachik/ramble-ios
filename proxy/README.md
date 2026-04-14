@@ -37,6 +37,43 @@ That's it. No logging of audio or transcripts. No database. No user accounts.
 
 **Subscription verification** — Cloud transcription requires an active StoreKit 2 subscription. The proxy verifies Apple's signed JWS transaction directly — no server-side receipt validation, no App Store Server API calls.
 
+## App Attest Implementation Notes
+
+The proxy implements Apple's [App Attest](https://developer.apple.com/documentation/devicecheck/establishing-your-app-s-integrity) server-side verification entirely in hand-rolled JavaScript using only the Web Crypto API. This section documents why and the gotchas we hit along the way.
+
+### Why not use a library?
+
+Two npm libraries exist for App Attest server verification: `node-app-attest` and `appattest-checker-node`. Both depend on Node.js built-in `crypto` (`X509Certificate`, `createHash`, `createVerify`). Cloudflare Workers run on V8 (not Node.js), and while the `nodejs_compat` flag polyfills most of `crypto`, the `X509Certificate` polyfill doesn't support EC curves — it fails with `"Unrecognized or unimplemented EC curve"` when parsing Apple's certificates. So neither library works on Workers.
+
+Our implementation uses only `crypto.subtle` (Web Crypto API), which is native in Workers. Zero npm dependencies for the attest/assert flow.
+
+### Gotchas we hit
+
+**1. Apple's intermediate CA is P-384 but signs leaf certs with SHA-256**
+
+The App Attest certificate chain is: Apple Root CA (P-384) → Intermediate CA (P-384) → Credential cert (P-256). The intermediate CA uses a P-384 key but signs the leaf certificate using `ecdsa-with-SHA256`, not the standard `ecdsa-with-SHA384` pairing. Our cert chain verification tries SHA-384 first, then falls back to SHA-256.
+
+**2. Assertion signature is over a nonce hash, not raw authenticator data**
+
+Apple's assertion verification docs say: compute `nonce = SHA256(authenticatorData || clientDataHash)`, then verify the signature over the nonce. The signature is over the **nonce** (a 32-byte hash), not the raw concatenation. Since `crypto.subtle.verify` with `hash: 'SHA-256'` also hashes its input, you must pass the nonce — not the pre-hash data — to get the correct double-hash that matches what the Secure Enclave signed.
+
+```js
+// WRONG — verifies over SHA256(authData || clientDataHash)
+crypto.subtle.verify({hash: 'SHA-256'}, key, sig, authData || clientDataHash);
+
+// CORRECT — verifies over SHA256(SHA256(authData || clientDataHash))
+const nonce = SHA256(authData || clientDataHash);
+crypto.subtle.verify({hash: 'SHA-256'}, key, sig, nonce);
+```
+
+**3. Public key extraction: use the certificate, not COSE**
+
+During attestation, the credential public key is available in two places: the COSE key map in `authData` and the credential certificate's SPKI. We extract from the certificate because WebCrypto's `importKey('spki', ...)` handles it natively, avoiding hand-rolled COSE-to-raw-EC-point conversion.
+
+**4. App Attest works on local Xcode dev builds**
+
+`DCAppAttestService` works on any real Apple device, including apps built directly from Xcode. The only difference is the environment: dev builds use `appattestdevelop` as the AAGUID, while TestFlight/App Store builds use `appattest`. The proxy accepts both. App Attest does NOT work on the iOS Simulator.
+
 ## Deploy Your Own
 
 1. Copy the example config:
