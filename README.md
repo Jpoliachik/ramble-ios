@@ -13,12 +13,12 @@ iPhone + Apple Watch. Open source, private by design, no accounts.
 
 ## What's in This Repo
 
-| Directory | What it is |
-|-----------|------------|
-| `Ramble/` | iOS app (SwiftUI) |
-| `watch Watch App/` | watchOS companion |
-| `proxy/` | Cloudflare Worker transcription proxy |
-| `website/` | Marketing site (Next.js static export) |
+| dir                |                                                                                             |
+| ------------------ | ------------------------------------------------------------------------------------------- |
+| `Ramble/`          | iOS app (SwiftUI)                                                                           |
+| `watch Watch App/` | watchOS companion                                                                           |
+| `proxy/`           | Cloudflare Worker transcription proxy                                                       |
+| `website/`         | Marketing site - [goodloop.dev/ramble](https://goodloop.dev/ramble) (Next.js static export) |
 
 ## Getting Started
 
