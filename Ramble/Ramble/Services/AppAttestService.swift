@@ -79,18 +79,20 @@ final class AppAttestService {
 
     /// Generates an assertion for the given request body data.
     /// Returns nil if App Attest is unavailable or not yet attested.
-    func generateAssertion(for requestData: Data) async -> (keyId: String, assertion: Data)? {
+    func generateAssertion(for requestData: Data) async -> (keyId: String, assertion: Data, clientDataHashHex: String)? {
         guard isSupported, isAttested, let keyId = keyId else {
             return nil
         }
 
         let clientDataHash = Data(SHA256.hash(data: requestData))
+        let hashHex = clientDataHash.map { String(format: "%02x", $0) }.joined()
+        print("[AppAttest] clientDataHash=\(hashHex.prefix(16))... bodyLen=\(requestData.count)")
 
         do {
             let assertion = try await DCAppAttestService.shared.generateAssertion(
                 keyId, clientDataHash: clientDataHash
             )
-            return (keyId: keyId, assertion: assertion)
+            return (keyId: keyId, assertion: assertion, clientDataHashHex: hashHex)
         } catch {
             // Key may have been invalidated (e.g. after iOS restore).
             // Reset state so a fresh attestation happens on the next attempt.
