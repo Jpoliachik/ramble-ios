@@ -1,7 +1,6 @@
 name = "ramble-transcription-proxy"
 main = "src/index.js"
 compatibility_date = "2024-12-01"
-compatibility_flags = ["nodejs_compat"]
 # account_id is set via CLOUDFLARE_ACCOUNT_ID env var in CI
 
 [observability]

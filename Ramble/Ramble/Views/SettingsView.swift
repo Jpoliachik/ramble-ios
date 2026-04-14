@@ -17,7 +17,7 @@ struct SettingsView: View {
     @State private var showWebhookInfo = false
     @State private var exportURL: URL?
     @State private var versionTapCount = 0
-    @State private var showDevOverrideAlert = false
+    @State private var showDebugSheet = false
     @State private var devOverrideKeyInput = ""
 
     var body: some View {
@@ -49,19 +49,8 @@ struct SettingsView: View {
                     ShareSheet(activityItems: [url])
                 }
             }
-            .alert("Developer Override", isPresented: $showDevOverrideAlert) {
-                TextField("Override key", text: $devOverrideKeyInput)
-                Button("Save") {
-                    let key = devOverrideKeyInput.trimmingCharacters(in: .whitespacesAndNewlines)
-                    SubscriptionService.shared.setDevOverrideKey(key.isEmpty ? nil : key)
-                }
-                Button("Clear", role: .destructive) {
-                    SubscriptionService.shared.setDevOverrideKey(nil)
-                    devOverrideKeyInput = ""
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Enter the server bypass key to unlock premium features without a subscription.")
+            .sheet(isPresented: $showDebugSheet) {
+                DebugSheet()
             }
             .sheet(isPresented: $showTranscriptionInfo) {
                 TranscriptionInfoSheet()
@@ -334,10 +323,7 @@ struct SettingsView: View {
                         versionTapCount += 1
                         if versionTapCount >= 4 {
                             versionTapCount = 0
-                            devOverrideKeyInput = UserDefaults.standard.string(
-                                forKey: SubscriptionService.devOverrideUserDefaultsKey
-                            ) ?? ""
-                            showDevOverrideAlert = true
+                            showDebugSheet = true
                         }
                     }
 
@@ -582,6 +568,103 @@ struct InfoBlock: View {
                 Text(text)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+struct DebugSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var devOverrideKey: String = UserDefaults.standard.string(
+        forKey: SubscriptionService.devOverrideUserDefaultsKey
+    ) ?? ""
+    @State private var attestStatus = ""
+    @State private var isReattesting = false
+
+    var body: some View {
+        NavigationView {
+            Form {
+                Section("Developer Override") {
+                    TextField("Server bypass key", text: $devOverrideKey)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+
+                    HStack {
+                        Button("Save") {
+                            let key = devOverrideKey.trimmingCharacters(in: .whitespacesAndNewlines)
+                            SubscriptionService.shared.setDevOverrideKey(key.isEmpty ? nil : key)
+                        }
+                        Spacer()
+                        Button("Clear", role: .destructive) {
+                            SubscriptionService.shared.setDevOverrideKey(nil)
+                            devOverrideKey = ""
+                        }
+                    }
+                }
+
+                Section("App Attest") {
+                    HStack {
+                        Text("Supported")
+                        Spacer()
+                        Text(AppAttestService.shared.isSupported ? "Yes" : "No")
+                            .foregroundStyle(.secondary)
+                    }
+                    HStack {
+                        Text("Attested")
+                        Spacer()
+                        Text(AppAttestService.shared.isAttested ? "Yes" : "No")
+                            .foregroundStyle(.secondary)
+                    }
+                    if let keyId = AppAttestService.shared.keyId {
+                        HStack {
+                            Text("Key ID")
+                            Spacer()
+                            Text(String(keyId.prefix(12)) + "...")
+                                .font(.caption.monospaced())
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Button {
+                        isReattesting = true
+                        attestStatus = ""
+                        Task {
+                            AppAttestService.shared.resetState()
+                            do {
+                                try await AppAttestService.shared.attestIfNeeded()
+                                attestStatus = "Re-attestation succeeded"
+                            } catch {
+                                attestStatus = "Failed: \(error.localizedDescription)"
+                            }
+                            isReattesting = false
+                        }
+                    } label: {
+                        HStack {
+                            if isReattesting {
+                                ProgressView()
+                                    .controlSize(.small)
+                                Text("Re-attesting...")
+                            } else {
+                                Image(systemName: "arrow.clockwise")
+                                Text("Reset & Re-attest")
+                            }
+                        }
+                    }
+                    .disabled(isReattesting)
+
+                    if !attestStatus.isEmpty {
+                        Text(attestStatus)
+                            .font(.caption)
+                            .foregroundStyle(attestStatus.contains("succeeded") ? .green : .red)
+                    }
+                }
+            }
+            .navigationTitle("Debug")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
             }
         }
     }

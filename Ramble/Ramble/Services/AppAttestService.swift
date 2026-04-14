@@ -103,8 +103,8 @@ final class AppAttestService {
 
     /// Clears all stored attestation state so a fresh key can be generated.
     func resetState() {
-        KeychainService.setString("", forKey: Self.keyIdKey)
-        KeychainService.setString("false", forKey: Self.isAttestedKey)
+        KeychainService.delete(forKey: Self.keyIdKey)
+        KeychainService.delete(forKey: Self.isAttestedKey)
     }
 
     // MARK: - Network Helpers
