@@ -176,8 +176,6 @@ final class ProxyTranscriptionService {
                 attestResult.assertion.base64EncodedString(),
                 forHTTPHeaderField: "X-App-Attest"
             )
-            // Debug: send client-side hash so proxy can compare
-            urlRequest.setValue(attestResult.clientDataHashHex, forHTTPHeaderField: "X-Debug-Client-Hash")
         }
 
         urlRequest.httpBody = body

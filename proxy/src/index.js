@@ -1,4 +1,4 @@
-import { handleAttestChallenge, handleAttest, verifyAssertion } from './attest.js';
+import { handleAttestChallenge, handleAttest, verifyAssertionForRequest } from './attest.js';
 import { writeTranscriptionEvent } from './analytics.js';
 import {
   base64ToArrayBuffer,
@@ -72,16 +72,7 @@ async function handleTranscribe(request, env) {
     return json({ error: 'App attestation required' }, 403);
   }
 
-  // Debug: compare client-side hash with server-side hash
-  const debugClientHash = request.headers.get('X-Debug-Client-Hash');
-  if (debugClientHash) {
-    const serverHash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bodyBuffer)))
-      .map(b => b.toString(16).padStart(2, '0')).join('');
-    const match = serverHash === debugClientHash;
-    console.log(`[assert-debug] clientHash=${debugClientHash.substring(0, 16)}... serverHash=${serverHash.substring(0, 16)}... match=${match} bodyLen=${bodyBuffer.byteLength}`);
-  }
-
-  const assertionResult = await verifyAssertion(attestKeyId, attestAssertionB64, bodyBuffer, env);
+  const assertionResult = await verifyAssertionForRequest(attestKeyId, attestAssertionB64, bodyBuffer, env);
   if (!assertionResult.valid) {
     console.error(`[attest] Assertion failed: ${assertionResult.reason} device=${deviceId}`);
     return json({ error: 'App attestation failed' }, 403);
@@ -435,6 +426,6 @@ function corsHeaders() {
   return {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, X-Device-ID, Authorization, X-App-Attest, X-App-Attest-Key-Id, X-Debug-Client-Hash',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Device-ID, Authorization, X-App-Attest, X-App-Attest-Key-Id',
   };
 }

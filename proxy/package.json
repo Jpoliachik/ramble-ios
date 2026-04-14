@@ -8,5 +8,8 @@
   },
   "devDependencies": {
     "wrangler": "4.14.0"
+  },
+  "dependencies": {
+    "node-app-attest": "^1.0.1"
   }
 }
