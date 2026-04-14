@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Terms of Use — Ramble",
-  description: "Ramble terms of use.",
+  title: "Terms of Use",
+  description: "Ramble terms of use. Simple terms for a simple app.",
 };
 
 export default function TermsOfUse() {

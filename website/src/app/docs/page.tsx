@@ -5,7 +5,7 @@ import DocsSidebar from "@/components/docs-sidebar";
 import CopyLlmButton from "@/components/copy-llm-button";
 
 export const metadata: Metadata = {
-  title: "Receive Transcripts — Ramble",
+  title: "Webhook API Docs",
   description:
     "Ramble auto-POSTs every transcript to your endpoint. Set up a webhook to pipe voice notes into your agent, workflow, or backend.",
 };

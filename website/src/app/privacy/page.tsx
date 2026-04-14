@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — Ramble",
-  description: "Ramble privacy policy. Your data stays yours.",
+  title: "Privacy Policy",
+  description: "Ramble privacy policy. No accounts, no tracking. Your data stays on your device.",
 };
 
 export default function PrivacyPolicy() {

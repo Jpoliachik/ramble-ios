@@ -4,11 +4,39 @@ import Header from "../components/header";
 import "./globals.css";
 
 const BASE_PATH = "/ramble";
+const SITE_URL = "https://goodloop.dev/ramble";
 
 export const metadata: Metadata = {
-  title: "Ramble — Voice Notes",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "Ramble — Voice that goes somewhere",
+    template: "%s — Ramble",
+  },
   description:
     "Record on the go. Get accurate transcripts. Pipe them into your agent, workflow, or automation. Open source, private by design, no accounts.",
+  openGraph: {
+    type: "website",
+    siteName: "Ramble",
+    title: "Ramble — Voice that goes somewhere",
+    description:
+      "Record on the go. Get accurate transcripts. Pipe them into your agent, workflow, or automation.",
+    url: SITE_URL,
+    images: [
+      {
+        url: `${SITE_URL}/og-image.png`,
+        width: 1200,
+        height: 630,
+        alt: "Ramble — Voice that goes somewhere",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Ramble — Voice that goes somewhere",
+    description:
+      "Record on the go. Get accurate transcripts. Pipe them into your agent, workflow, or automation.",
+    images: [`${SITE_URL}/og-image.png`],
+  },
 };
 
 export default function RootLayout({
