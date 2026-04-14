@@ -6,7 +6,7 @@ import "./globals.css";
 const BASE_PATH = "/ramble";
 
 export const metadata: Metadata = {
-  title: "Ramble — Voice that goes somewhere",
+  title: "Ramble — Voice Notes",
   description:
     "Record on the go. Get accurate transcripts. Pipe them into your agent, workflow, or automation. Open source, private by design, no accounts.",
 };
@@ -25,13 +25,7 @@ export default function RootLayout({
           <div className="mx-auto max-w-5xl px-6 py-10 flex flex-col items-center gap-6 sm:flex-row sm:justify-between">
             <div className="flex items-center gap-2 text-stone-500 text-sm">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={`${BASE_PATH}/ramble-icon-light.png`}
-                alt="Ramble"
-                width={20}
-                height={20}
-                className="rounded"
-              />
+              <img src={`${BASE_PATH}/ramble-icon-light.png`} alt="Ramble" width={20} height={20} className="rounded" />
               <span>Ramble</span>
             </div>
             <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-stone-500">
@@ -51,22 +45,13 @@ export default function RootLayout({
               >
                 GitHub
               </a>
-              <Link
-                href="/docs"
-                className="hover:text-stone-900 transition-colors"
-              >
+              <Link href="/docs" className="hover:text-stone-900 transition-colors">
                 Docs
               </Link>
-              <Link
-                href="/privacy"
-                className="hover:text-stone-900 transition-colors"
-              >
+              <Link href="/privacy" className="hover:text-stone-900 transition-colors">
                 Privacy Policy
               </Link>
-              <Link
-                href="/terms"
-                className="hover:text-stone-900 transition-colors"
-              >
+              <Link href="/terms" className="hover:text-stone-900 transition-colors">
                 Terms of Use
               </Link>
             </nav>
