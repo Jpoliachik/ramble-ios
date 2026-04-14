@@ -28,6 +28,7 @@ final class SettingsViewModel: ObservableObject {
     }
     @Published var webhookURLError: String?
     @Published var testWebhookResult: TestWebhookResult?
+    @Published var devOverrideKey: String = ""
 
     enum TestWebhookResult {
         case loading
@@ -63,6 +64,7 @@ final class SettingsViewModel: ObservableObject {
         webhookSecret = settings.webhookSecret
         deviceId = settings.deviceId
         appearanceMode = settings.appearanceMode
+        devOverrideKey = UserDefaults.standard.string(forKey: SubscriptionService.devOverrideUserDefaultsKey) ?? ""
         loadStats()
     }
 
@@ -77,6 +79,9 @@ final class SettingsViewModel: ObservableObject {
             appearanceMode: appearanceMode
         )
         settingsService.save(settings)
+
+        let key = devOverrideKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        SubscriptionService.shared.setDevOverrideKey(key.isEmpty ? nil : key)
     }
 
     func selectCloudTranscription() {

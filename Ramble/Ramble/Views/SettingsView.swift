@@ -7,6 +7,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @StateObject private var viewModel = SettingsViewModel()
+    @ObservedObject private var subscriptionService = SubscriptionService.shared
     @Environment(\.dismiss) private var dismiss
     @State private var showDeleteConfirmation = false
     @State private var showExportShare = false
@@ -18,7 +19,6 @@ struct SettingsView: View {
     @State private var exportURL: URL?
     @State private var versionTapCount = 0
     @State private var showDebugSheet = false
-    @State private var devOverrideKeyInput = ""
 
     var body: some View {
         NavigationView {
@@ -50,7 +50,7 @@ struct SettingsView: View {
                 }
             }
             .sheet(isPresented: $showDebugSheet) {
-                DebugSheet()
+                DebugSheet(viewModel: viewModel)
             }
             .sheet(isPresented: $showTranscriptionInfo) {
                 TranscriptionInfoSheet()
@@ -62,9 +62,7 @@ struct SettingsView: View {
     }
 
     private var transcriptionSection: some View {
-        let isPremium = SubscriptionService.shared.isPremium
-
-        return Section {
+        Section {
             // Apple Speech — always available
             ProviderRowView(
                 provider: .appleSpeech,
@@ -78,7 +76,7 @@ struct SettingsView: View {
                     model: model,
                     isSelected: viewModel.transcriptionProvider == .cloudTranscription
                         && viewModel.cloudModel == model,
-                    isPremiumLocked: !isPremium,
+                    isPremiumLocked: !subscriptionService.isPremium,
                     onSelect: { viewModel.selectCloudModel(model) }
                 )
             }
@@ -312,29 +310,20 @@ struct SettingsView: View {
     private var aboutSection: some View {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
-        let hasOverride = SubscriptionService.shared.devOverrideKey != nil
 
         return Section {
-            VStack(spacing: 4) {
-                Text("Ramble v\(version) (\(build))")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .onTapGesture {
-                        versionTapCount += 1
-                        if versionTapCount >= 4 {
-                            versionTapCount = 0
-                            showDebugSheet = true
-                        }
+            Text("Ramble v\(version) (\(build))")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity)
+                .onTapGesture {
+                    versionTapCount += 1
+                    if versionTapCount >= 4 {
+                        versionTapCount = 0
+                        showDebugSheet = true
                     }
-
-                if hasOverride {
-                    Text("Developer Override Active")
-                        .font(.caption2)
-                        .foregroundStyle(.orange)
                 }
-            }
-            .frame(maxWidth: .infinity)
-            .listRowBackground(Color.clear)
+                .listRowBackground(Color.clear)
         }
     }
 
@@ -585,9 +574,7 @@ struct InfoBlock: View {
 
 struct DebugSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var devOverrideKey: String = UserDefaults.standard.string(
-        forKey: SubscriptionService.devOverrideUserDefaultsKey
-    ) ?? ""
+    @ObservedObject var viewModel: SettingsViewModel
     @State private var attestStatus = ""
     @State private var isReattesting = false
 
@@ -595,19 +582,18 @@ struct DebugSheet: View {
         NavigationView {
             Form {
                 Section("Developer Override") {
-                    TextField("Server bypass key", text: $devOverrideKey)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-
                     HStack {
-                        Button("Save") {
-                            let key = devOverrideKey.trimmingCharacters(in: .whitespacesAndNewlines)
-                            SubscriptionService.shared.setDevOverrideKey(key.isEmpty ? nil : key)
-                        }
-                        Spacer()
-                        Button("Clear", role: .destructive) {
-                            SubscriptionService.shared.setDevOverrideKey(nil)
-                            devOverrideKey = ""
+                        TextField("Server bypass key", text: $viewModel.devOverrideKey)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                        if !viewModel.devOverrideKey.isEmpty {
+                            Button {
+                                viewModel.devOverrideKey = ""
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
@@ -673,7 +659,10 @@ struct DebugSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+                    Button("Done") {
+                        viewModel.save()
+                        dismiss()
+                    }
                 }
             }
         }
