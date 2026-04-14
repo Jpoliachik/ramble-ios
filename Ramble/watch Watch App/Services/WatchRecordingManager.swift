@@ -50,6 +50,14 @@ final class WatchRecordingManager: ObservableObject {
             createdAt: Date(),
             duration: result.duration
         )
+
+        // Track in recording history for the list UI
+        WatchRecordingHistory.shared.addEntry(
+            id: job.id,
+            createdAt: job.createdAt,
+            duration: job.duration
+        )
+
         connectivity.transferJob(job)
     }
 }

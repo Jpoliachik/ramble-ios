@@ -64,6 +64,9 @@ final class WatchSyncQueue: ObservableObject {
         pendingCount = jobs.count
         isSyncing = !jobs.isEmpty && jobs.contains { $0.lastAttemptAt != nil }
         saveQueue()
+
+        // Update recording history with sync timestamp
+        WatchRecordingHistory.shared.markSynced(id: jobId)
     }
 
     func markFailed(jobId: UUID) {
