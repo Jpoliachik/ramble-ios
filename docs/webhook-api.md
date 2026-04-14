@@ -4,9 +4,24 @@ Ramble can POST each transcript to a URL you configure. This doc is the complete
 
 ## Setup
 
-In the Ramble app, go to **Settings → Webhook** and toggle it on. Enter your HTTPS endpoint URL and copy the auto-generated **signing secret** (base64) — you'll need it on your server to verify requests.
+In the Ramble app, go to **Settings → Webhook** and toggle it on. Enter your HTTPS endpoint URL.
 
 > The URL must use HTTPS. Localhost, private IPs, and cloud metadata endpoints are blocked.
+
+## Automation Platforms
+
+These platforms accept Ramble's webhook out of the box — create a webhook trigger, copy the URL, paste it into Ramble:
+
+- **Zapier** — Use the "Webhooks by Zapier" Catch Hook trigger. [Setup guide](https://help.zapier.com/hc/en-us/articles/8496288690317-Trigger-Zaps-from-webhooks)
+- **Make** — Use the Custom Webhook module. [Setup guide](https://www.make.com/en/help/tools/webhooks)
+- **Airtable** — Use the "When webhook received" automation trigger. [Setup guide](https://support.airtable.com/docs/when-webhook-received-trigger)
+- **n8n** — Use the Webhook node. [Setup guide](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.webhook/)
+
+Notion and IFTTT don't accept incoming webhooks directly — use Zapier or Make as a bridge.
+
+## Custom Endpoint Reference
+
+If you're building your own endpoint, the rest of this document covers the payload format, signature verification, and retry behavior.
 
 ## Request
 

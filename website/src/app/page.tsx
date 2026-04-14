@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Mic, Webhook, ShieldCheck, Zap, BrainCircuit, Database, Code } from "lucide-react";
+import AnimatedLogo from "../components/animated-logo";
 
 export default function Home() {
   return (
@@ -7,17 +8,20 @@ export default function Home() {
       {/* Hero */}
       <section className="mx-auto max-w-5xl px-6 pt-32 pb-20 sm:pt-40 sm:pb-28">
         <div className="flex flex-col items-center text-center">
-          <h1 className="font-serif text-4xl font-semibold tracking-tight text-stone-900 sm:text-5xl lg:text-6xl">
+          <div className="hero-enter-logo">
+            <AnimatedLogo />
+          </div>
+          <h1 className="hero-enter-title font-serif text-4xl font-semibold tracking-tight text-stone-900 sm:text-5xl lg:text-6xl">
             Voice that goes somewhere
           </h1>
-          <p className="mt-6 text-base leading-relaxed text-stone-500 sm:text-lg lg:text-xl">
+          <p className="hero-enter-subtitle mt-6 text-base leading-relaxed text-stone-500 sm:text-lg lg:text-xl">
             Record your thoughts on iPhone or Apple Watch.
             <br />
             Get accurate transcripts.
             <br />
             Pipe them anywhere via webhook.
           </p>
-          <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row">
+          <div className="hero-enter-buttons mt-10 flex flex-col items-center gap-4 sm:flex-row">
             <a
               href="https://apps.apple.com/app/ramble"
               target="_blank"

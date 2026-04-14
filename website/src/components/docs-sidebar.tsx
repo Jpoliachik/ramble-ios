@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 
 const sections = [
   { id: "step-1", label: "1. Enable the webhook" },
-  { id: "step-2", label: "2. Receive the POST" },
-  { id: "step-3", label: "3. Verify the signature" },
-  { id: "step-4", label: "4. Test it" },
+  { id: "step-2", label: "2. Connect a destination" },
+  { id: "platforms", label: "Automation platforms", indent: true },
+  { id: "custom", label: "Build your own endpoint", indent: true },
+  { id: "step-3", label: "3. Test it" },
 ];
 
 export default function DocsSidebar() {
@@ -42,6 +43,8 @@ export default function DocsSidebar() {
               key={section.id}
               href={`#${section.id}`}
               className={`block py-1 transition-colors ${
+                section.indent ? "pl-4 text-xs" : ""
+              } ${
                 activeId === section.id
                   ? "text-stone-900 font-medium"
                   : "text-stone-400 hover:text-stone-900"
