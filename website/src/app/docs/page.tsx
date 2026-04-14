@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CodeBlock, InlineCode } from "@/components/code-block";
 import DocsSidebar from "@/components/docs-sidebar";
+import CopyLlmButton from "@/components/copy-llm-button";
 
 export const metadata: Metadata = {
   title: "Receive Transcripts — Ramble",
@@ -51,17 +52,19 @@ export default function Docs() {
 
         {/* Main content */}
         <article className="min-w-0 max-w-3xl">
-          <Link href="/" className="text-sm text-stone-400 hover:text-stone-600 transition-colors">
-            &larr; Back to Ramble
-          </Link>
+          <div className="flex items-center justify-between">
+            <Link href="/" className="text-sm text-stone-400 hover:text-stone-600 transition-colors">
+              &larr; Back to Ramble
+            </Link>
+            <CopyLlmButton />
+          </div>
 
           <h1 className="mt-8 font-serif text-3xl font-semibold tracking-tight text-stone-900 sm:text-4xl">
             Receive your transcripts
           </h1>
           <p className="mt-4 text-lg leading-relaxed text-stone-500">
-            Every time you finish a recording, Ramble can automatically POST the
-            transcript to any HTTPS endpoint — an AI agent, a workflow, your own
-            backend. Four steps to set it up.
+            Every time you finish a recording, Ramble can automatically POST the transcript to any HTTPS endpoint — an
+            AI agent, a workflow, your own backend. Four steps to set it up.
           </p>
 
           <div className="mt-14 space-y-16 text-sm leading-relaxed text-stone-600">
@@ -70,17 +73,18 @@ export default function Docs() {
               <StepHeader id="step-1" step={1}>
                 Enable the webhook
               </StepHeader>
-              <div className="mt-6 space-y-3 pl-14">
+              <div className="mt-6 space-y-5 pl-14">
                 <p>
-                  In Ramble, go to <strong>Settings &rarr; Webhook</strong> and
-                  toggle it on. Enter your HTTPS endpoint URL and copy the
-                  auto-generated <strong>signing secret</strong> (base64) — you&apos;ll
+                  In Ramble, go to <strong>Settings &rarr; Webhook</strong> and toggle it on. Enter your endpoint URL
+                  (must be HTTPS) and copy the auto-generated <strong>signing secret</strong> (base64) — you&apos;ll
                   need it on your server to verify requests.
                 </p>
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                  The URL must use HTTPS. Localhost, private IPs, and cloud
-                  metadata endpoints are blocked.
-                </div>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/ramble/webhook-settings.png"
+                  alt="Ramble webhook settings screen showing the Post-Transcription Webhook toggle, URL field, and signing secret controls"
+                  className="mx-auto max-w-xs rounded-2xl shadow-md"
+                />
               </div>
             </section>
 
@@ -91,14 +95,11 @@ export default function Docs() {
               </StepHeader>
               <div className="mt-6 space-y-6 pl-14">
                 <p>
-                  After transcription completes, Ramble sends a{" "}
-                  <InlineCode>POST</InlineCode> with{" "}
-                  <InlineCode>Content-Type: application/json</InlineCode> to your
-                  endpoint. Return any <strong>2xx</strong> within{" "}
-                  <strong>10 seconds</strong> to acknowledge receipt. If your
-                  endpoint is down or returns an error, Ramble retries up to 3
-                  times with backoff (5s, 30s, 120s) and persists pending
-                  webhooks to disk so nothing is lost if the app is closed.
+                  After transcription completes, Ramble sends a <InlineCode>POST</InlineCode> with{" "}
+                  <InlineCode>Content-Type: application/json</InlineCode> to your endpoint. Return any{" "}
+                  <strong>2xx</strong> within <strong>10 seconds</strong> to acknowledge receipt. If your endpoint is
+                  down or returns an error, Ramble retries up to 3 times with backoff (5s, 30s, 120s) and persists
+                  pending webhooks to disk so nothing is lost if the app is closed.
                 </p>
 
                 <p>Here&apos;s the payload:</p>
@@ -124,12 +125,10 @@ export default function Docs() {
                     Recording duration in seconds.
                   </Param>
                   <Param name="transcription" type="string">
-                    Full transcript text. Empty string if transcription produced
-                    no output.
+                    Full transcript text. Empty string if transcription produced no output.
                   </Param>
                   <Param name="device_id" type="string">
-                    Stable per-device UUID. Not tied to any account — useful for
-                    distinguishing multiple devices.
+                    Stable per-device UUID. Not tied to any account — useful for distinguishing multiple devices.
                   </Param>
                 </div>
               </div>
@@ -142,12 +141,9 @@ export default function Docs() {
               </StepHeader>
               <div className="mt-6 space-y-4 pl-14">
                 <p>
-                  Every request includes an{" "}
-                  <InlineCode>X-Webhook-Signature</InlineCode> header — an
-                  HMAC-SHA256 digest of the raw request body, keyed with your
-                  signing secret. Always verify this before processing to confirm
-                  the request came from Ramble. Use constant-time comparison to
-                  prevent timing attacks.
+                  Every request includes an <InlineCode>X-Webhook-Signature</InlineCode> header — an HMAC-SHA256 digest
+                  of the raw request body, keyed with your signing secret. Always verify this before processing to
+                  confirm the request came from Ramble. Use constant-time comparison to prevent timing attacks.
                 </p>
 
                 <CodeBlock filename="verify.js">
@@ -166,8 +162,8 @@ function verifySignature(rawBody, signatureHeader, secret) {
                 </CodeBlock>
 
                 <p>
-                  If you regenerate the signing secret in Settings, update your
-                  server before the next transcription completes.
+                  If you regenerate the signing secret in Settings, update your server before the next transcription
+                  completes.
                 </p>
 
                 <details className="rounded-lg border border-stone-200">
@@ -225,13 +221,10 @@ app.listen(3000, () => console.log("Listening on :3000"));`}
               </StepHeader>
               <div className="mt-6 space-y-4 pl-14">
                 <p>
-                  Tap <strong>Settings &rarr; Send Test Webhook</strong> to fire
-                  a test payload at your endpoint. The test payload is identical
-                  to a real one, with two differences: <InlineCode>test</InlineCode>{" "}
-                  is <InlineCode>true</InlineCode>, and{" "}
-                  <InlineCode>recording_id</InlineCode> is prefixed
-                  with <InlineCode>test-</InlineCode>. Filter on either to skip
-                  test payloads in production.
+                  Tap <strong>Settings &rarr; Send Test Webhook</strong> to fire a test payload at your endpoint. The
+                  test payload is identical to a real one, with two differences: <InlineCode>test</InlineCode> is{" "}
+                  <InlineCode>true</InlineCode>, and <InlineCode>recording_id</InlineCode> is prefixed with{" "}
+                  <InlineCode>test-</InlineCode>. Filter on either to skip test payloads in production.
                 </p>
 
                 <CodeBlock language="json">
@@ -246,10 +239,9 @@ app.listen(3000, () => console.log("Listening on :3000"));`}
                 </CodeBlock>
 
                 <p>
-                  If the test succeeds, you&apos;re all set — every future
-                  transcription will POST automatically. If it fails, check
-                  that your endpoint returns a 2xx and that you&apos;re verifying
-                  the signature with the correct secret.
+                  If the test succeeds, you&apos;re all set — every future transcription will POST automatically. If it
+                  fails, check that your endpoint returns a 2xx and that you&apos;re verifying the signature with the
+                  correct secret.
                 </p>
               </div>
             </section>

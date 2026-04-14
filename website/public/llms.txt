@@ -1,0 +1,18 @@
+# Ramble
+
+> Voice capture app for iPhone and Apple Watch. Record your thoughts on the go, get accurate transcripts, and pipe them into your agent, workflow, or automation via webhook. Open source, private by design, no accounts.
+
+Ramble auto-POSTs every transcript to any HTTPS endpoint you configure. Use it to feed voice notes into AI agents, Zapier/Make workflows, Notion/Airtable databases, or your own backend.
+
+## Docs
+
+- [Webhook API — Full Reference](https://goodloop.dev/ramble/llms-full.txt): Complete webhook setup, payload format, signature verification, and code examples. Use this to build an endpoint that receives Ramble transcripts.
+
+## Links
+
+- [Website](https://goodloop.dev/ramble)
+- [Documentation](https://goodloop.dev/ramble/docs)
+- [Privacy Policy](https://goodloop.dev/ramble/privacy)
+- [Terms of Use](https://goodloop.dev/ramble/terms)
+- [GitHub](https://github.com/Jpoliachik/ramble-ios)
+- [App Store](https://apps.apple.com/app/ramble)
