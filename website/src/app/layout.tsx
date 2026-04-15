@@ -58,7 +58,7 @@ export default function RootLayout({
             </div>
             <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-stone-500">
               <a
-                href="https://apps.apple.com/app/ramble"
+                href="https://apps.apple.com/app/id6761857751"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-stone-900 transition-colors"

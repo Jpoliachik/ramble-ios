@@ -21,17 +21,10 @@ For full brand positioning, audience, tone, and messaging guidelines, see **`doc
 
 ### Remaining v1 work
 
-- [ ] **Watch recordings list** — minimal list showing timestamp, duration, and sync status for each recording. Needs a `WatchRecordingHistory` to persist completed sync jobs (id, createdAt, duration, syncedAt) since `WatchSyncQueue` removes jobs on completion. Each row shows a small indicator: pending/syncing/synced.
-- [ ] **StoreKit 2 subscription** — $2.99/month for cloud transcription, gate cloud models behind active subscription
-- [ ] **Launch screen** — splash screen for app launch
 - [ ] **App Store assets** — screenshots (iPhone + Apple Watch), privacy policy URL, app description
-- [x] **Marketing website** — landing page, privacy policy, terms of use, webhook API docs (see `website/`)
-- [ ] **Documentation website** — update in-app link in `SettingsView.swift` to point to live docs URL (currently points to GitHub raw markdown)
 - [ ] **End-to-end production testing** — verify real StoreKit subscription flow (sandbox/TestFlight), JWS verification on proxy, and cloud transcription without dev bypass
-- [x] **App Attest enforcement** — `REQUIRE_ATTEST` flag removed; attestation is now always required on `/transcribe`
 - [ ] **Transcript formatting** — transcripts render as one big block of text with no line breaks. Improve formatting with paragraph breaks (Apple Speech segments, cloud provider paragraph support, or heuristic sentence grouping)
 - [ ] **Recording detail title** — show date/time instead of "Recording" in the navigation title on RecordingDetailView
-- [ ] **Recording waveform animation** — show a live audio waveform visualization while recording on iPhone. Watch should also show something but can be simpler
 
 ### Post-v1 — cloud transcription enhancements
 
@@ -48,6 +41,7 @@ These are free features from existing providers (no extra API calls or cost):
 - Free app on App Store (Apple Speech on-device transcription + webhook — costs nothing to run)
 - $2.99/month subscription unlocks cloud transcription models via Cloudflare Worker proxy
 - Marketing website at `goodloop.dev/ramble` (source in `website/`, static export)
+- **App Store URL:** https://apps.apple.com/app/id6761857751 (Apple ID: 6761857751)
 
 ## Build & Development
 

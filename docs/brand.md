@@ -66,6 +66,10 @@ The tagline should convey: (1) capture on the go, (2) accurate transcripts, (3) 
 ### For the privacy-conscious
 "Open source. No accounts. No user data on our servers. Your audio and transcriptions stay on your device unless you choose to send them somewhere. Don't take our word for it — read the code."
 
+## App Store link
+
+https://apps.apple.com/app/id6761857751
+
 ## App Store description (draft)
 
 > Your voice, accurately transcribed. Then do something with it.

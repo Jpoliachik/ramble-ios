@@ -17,6 +17,7 @@ final class TranscriptionQueueService: ObservableObject {
     }
 
     private let speechAnalyzer = SpeechAnalyzerTranscriptionService()
+    private let legacySpeech = LegacySpeechTranscriptionService()
     private let proxyService = ProxyTranscriptionService()
     private let storageService = StorageService.shared
     private let settingsService = SettingsService.shared
@@ -176,8 +177,10 @@ final class TranscriptionQueueService: ObservableObject {
                     jwsTransaction: jws
                 )
                 text = try await proxyService.transcribe(request)
-            } else {
+            } else if #available(iOS 26.0, *) {
                 text = try await speechAnalyzer.transcribe(audioURL: audioURL)
+            } else {
+                text = try await legacySpeech.transcribe(audioURL: audioURL)
             }
 
             // Success — update recording
@@ -229,6 +232,36 @@ final class TranscriptionQueueService: ObservableObject {
                 updatedRecordings[idx].lastError = TranscriptionError.modelNotInstalled.localizedDescription
                 updatedRecordings[idx].activityLog.append(
                     ActivityEntry("Transcription failed via \(providerLabel(for: job)) — speech model not downloaded")
+                )
+                storageService.saveRecordings(updatedRecordings)
+            }
+            removeJob(job)
+            isProcessing = false
+            processNextIfNeeded()
+
+        } catch TranscriptionError.localeNotSupported {
+            // Locale not supported — fail immediately, don't retry (permanent condition)
+            var updatedRecordings = storageService.loadRecordings()
+            if let idx = updatedRecordings.firstIndex(where: { $0.id == job.recordingId }) {
+                updatedRecordings[idx].status = .failed
+                updatedRecordings[idx].lastError = TranscriptionError.localeNotSupported.localizedDescription
+                updatedRecordings[idx].activityLog.append(
+                    ActivityEntry("Transcription failed via \(providerLabel(for: job)) — \(TranscriptionError.localeNotSupported.localizedDescription)")
+                )
+                storageService.saveRecordings(updatedRecordings)
+            }
+            removeJob(job)
+            isProcessing = false
+            processNextIfNeeded()
+
+        } catch TranscriptionError.speechAnalyzerUnavailable {
+            // iOS version too old for SpeechAnalyzer — fail immediately, don't retry
+            var updatedRecordings = storageService.loadRecordings()
+            if let idx = updatedRecordings.firstIndex(where: { $0.id == job.recordingId }) {
+                updatedRecordings[idx].status = .failed
+                updatedRecordings[idx].lastError = TranscriptionError.speechAnalyzerUnavailable.localizedDescription
+                updatedRecordings[idx].activityLog.append(
+                    ActivityEntry("Transcription failed via \(providerLabel(for: job)) — \(TranscriptionError.speechAnalyzerUnavailable.localizedDescription)")
                 )
                 storageService.saveRecordings(updatedRecordings)
             }

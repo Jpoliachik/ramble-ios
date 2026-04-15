@@ -23,7 +23,7 @@ export default function Home() {
           </p>
           <div className="hero-enter-buttons mt-10 flex flex-col items-center gap-4 sm:flex-row">
             <a
-              href="https://apps.apple.com/app/ramble"
+              href="https://apps.apple.com/app/id6761857751"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 rounded-full bg-stone-900 px-6 py-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-stone-800"
@@ -173,7 +173,7 @@ export default function Home() {
           </p>
           <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
             <a
-              href="https://apps.apple.com/app/ramble"
+              href="https://apps.apple.com/app/id6761857751"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 rounded-full bg-stone-900 px-6 py-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-stone-800"

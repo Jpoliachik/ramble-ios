@@ -47,9 +47,9 @@ struct RecordingListView: View {
 
     private var emptyStateView: some View {
         ContentUnavailableView(
-            "No recordings yet",
+            "Hit record and ramble",
             systemImage: "waveform",
-            description: Text("Tap record to start")
+            description: Text("Talk first, organize later.")
         )
     }
 }

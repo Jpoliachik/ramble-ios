@@ -54,7 +54,11 @@ enum TranscriptionProvider: String, Codable, CaseIterable, Identifiable {
     var subtitle: String {
         switch self {
         case .appleSpeech:
-            return "Free, private, on-device"
+            if #available(iOS 26.0, *) {
+                return "Free, private, on-device"
+            } else {
+                return "Free, on-device — update to iOS 26 for better accuracy"
+            }
         case .cloudTranscription:
             return "Premium cloud-powered models"
         }

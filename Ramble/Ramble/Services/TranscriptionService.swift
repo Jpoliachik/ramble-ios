@@ -45,6 +45,40 @@ enum TranscriptionError: Error, LocalizedError {
     }
 }
 
+// MARK: - Legacy SFSpeechRecognizer (On-Device, iOS 18+)
+
+final class LegacySpeechTranscriptionService {
+    func transcribe(audioURL: URL) async throws -> String {
+        guard FileManager.default.fileExists(atPath: audioURL.path) else {
+            throw TranscriptionError.audioFileNotFound
+        }
+
+        guard let recognizer = SFSpeechRecognizer(), recognizer.isAvailable else {
+            throw TranscriptionError.localeNotSupported
+        }
+
+        let request = SFSpeechURLRecognitionRequest(url: audioURL)
+        request.requiresOnDeviceRecognition = true
+        request.shouldReportPartialResults = false
+
+        let result: SFSpeechRecognitionResult = try await withCheckedThrowingContinuation { continuation in
+            recognizer.recognitionTask(with: request) { result, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else if let result, result.isFinal {
+                    continuation.resume(returning: result)
+                }
+            }
+        }
+
+        let text = result.bestTranscription.formattedString
+        guard !text.isEmpty else {
+            throw TranscriptionError.recognitionFailed("No speech detected")
+        }
+        return text
+    }
+}
+
 // MARK: - SpeechAnalyzer (On-Device, iOS 26+)
 
 final class SpeechAnalyzerTranscriptionService {

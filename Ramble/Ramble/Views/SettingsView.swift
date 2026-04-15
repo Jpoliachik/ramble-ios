@@ -61,6 +61,11 @@ struct SettingsView: View {
         }
     }
 
+    private var isSpeechAnalyzerAvailable: Bool {
+        if #available(iOS 26.0, *) { return true }
+        return false
+    }
+
     private var transcriptionSection: some View {
         Section {
             // Apple Speech — always available
@@ -69,6 +74,18 @@ struct SettingsView: View {
                 isSelected: viewModel.transcriptionProvider == .appleSpeech,
                 onSelect: { viewModel.transcriptionProvider = .appleSpeech }
             )
+
+            if !isSpeechAnalyzerAvailable {
+                HStack(spacing: 10) {
+                    Image(systemName: "sparkles")
+                        .font(.subheadline)
+                        .foregroundStyle(.orange)
+                    Text("Update to iOS 26 for a significantly improved speech model with better accuracy.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 4)
+            }
 
             // Each cloud model shown individually
             ForEach(CloudModel.allCases) { model in
@@ -312,18 +329,26 @@ struct SettingsView: View {
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
 
         return Section {
-            Text("Ramble v\(version) (\(build))")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity)
-                .onTapGesture {
-                    versionTapCount += 1
-                    if versionTapCount >= 4 {
-                        versionTapCount = 0
-                        showDebugSheet = true
+            VStack(spacing: 8) {
+                Text("Ramble v\(version) (\(build))")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .onTapGesture {
+                        versionTapCount += 1
+                        if versionTapCount >= 4 {
+                            versionTapCount = 0
+                            showDebugSheet = true
+                        }
                     }
+
+                HStack(spacing: 16) {
+                    Link("Privacy Policy", destination: URL(string: "https://goodloop.dev/ramble/privacy")!)
+                    Link("Terms of Use", destination: URL(string: "https://goodloop.dev/ramble/terms")!)
                 }
-                .listRowBackground(Color.clear)
+                .font(.caption)
+            }
+            .frame(maxWidth: .infinity)
+            .listRowBackground(Color.clear)
         }
     }
 
@@ -526,7 +551,7 @@ struct WebhookInfoSheet: View {
                         text: "Pipe transcripts into an AI agent, a Zapier workflow, a Notion database, or your own backend. Any HTTPS endpoint that accepts JSON works."
                     )
 
-                    Link(destination: URL(string: "https://github.com/Jpoliachik/ramble-ios/blob/main/docs/webhook-api.md")!) {
+                    Link(destination: URL(string: "https://goodloop.dev/ramble/docs")!) {
                         HStack {
                             Spacer()
                             Label("View Full API Docs", systemImage: "doc.text")

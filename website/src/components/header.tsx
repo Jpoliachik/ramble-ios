@@ -53,7 +53,7 @@ export default function Header() {
           }`}
         >
           <a
-            href="https://apps.apple.com/app/ramble"
+            href="https://apps.apple.com/app/id6761857751"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 rounded-full bg-stone-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:bg-stone-800 hover:shadow-md active:scale-95"
