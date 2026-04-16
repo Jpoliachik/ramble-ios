@@ -29,6 +29,7 @@ struct RecordingDetailView: View {
             if let recording = recording {
                 Form {
                     headerSection(recording)
+                    audioSection(recording)
                     transcriptSection(recording)
                     actionsSection(recording)
                     if !recording.activityLog.isEmpty {
@@ -141,6 +142,20 @@ struct RecordingDetailView: View {
         case .transcribing: return .blue
         case .completed: return .green
         case .failed: return .red
+        }
+    }
+
+    // MARK: - Audio
+
+    private func audioSection(_ recording: Recording) -> some View {
+        Section {
+            if FileManager.default.fileExists(atPath: recording.audioFileURL.path) {
+                AudioPlayerView(audioURL: recording.audioFileURL)
+            } else {
+                Label("Audio file not available", systemImage: "waveform.slash")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
