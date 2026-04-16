@@ -68,13 +68,23 @@ struct MainView: View {
                         viewModel.cancelRecording()
                     }
                 )
-                .padding(.top, 24)
+                .padding(.top, 80)
                 .padding(.bottom, 16)
                 .frame(maxWidth: .infinity)
-                .background {
-                    Rectangle()
-                        .fill(.background)
-                        .ignoresSafeArea(.container, edges: .bottom)
+                .background(alignment: .top) {
+                    VStack(spacing: 0) {
+                        LinearGradient(
+                            colors: [
+                                Color(.systemBackground).opacity(0),
+                                Color(.systemBackground)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: 56)
+                        Color(.systemBackground)
+                    }
+                    .ignoresSafeArea(.container, edges: .bottom)
                 }
             }
             .toolbarBackground(.hidden, for: .navigationBar)

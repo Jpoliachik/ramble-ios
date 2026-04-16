@@ -15,6 +15,12 @@ struct RecordingDetailView: View {
     @State private var showDeleteConfirmation = false
     @State private var isResendingWebhook = false
     @State private var isTranscriptExpanded = false
+    @State private var transcriptFullHeight: CGFloat = 0
+    @State private var transcriptLimitedHeight: CGFloat = 0
+
+    private var isTranscriptTruncated: Bool {
+        transcriptFullHeight > transcriptLimitedHeight + 1
+    }
 
     private let storageService = StorageService.shared
     private let transcriptionQueue = TranscriptionQueueService.shared
@@ -149,6 +155,17 @@ struct RecordingDetailView: View {
 
     private func audioSection(_ recording: Recording) -> some View {
         Section {
+            #if DEBUG
+            if MockDataProvider.enabled {
+                MockAudioPlayerView(recording: recording)
+            } else if FileManager.default.fileExists(atPath: recording.audioFileURL.path) {
+                AudioPlayerView(audioURL: recording.audioFileURL)
+            } else {
+                Label("Audio file not available", systemImage: "waveform.slash")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            #else
             if FileManager.default.fileExists(atPath: recording.audioFileURL.path) {
                 AudioPlayerView(audioURL: recording.audioFileURL)
             } else {
@@ -156,6 +173,7 @@ struct RecordingDetailView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
+            #endif
         }
     }
 
@@ -169,15 +187,31 @@ struct RecordingDetailView: View {
                         .font(.body)
                         .lineLimit(isTranscriptExpanded ? nil : 12)
                         .textSelection(.enabled)
+                        .background {
+                            ZStack(alignment: .topLeading) {
+                                Text(transcription)
+                                    .font(.body)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .background(heightReader($transcriptFullHeight))
+                                Text(transcription)
+                                    .font(.body)
+                                    .lineLimit(12)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .background(heightReader($transcriptLimitedHeight))
+                            }
+                            .hidden()
+                        }
 
-                    Button {
-                        withAnimation { isTranscriptExpanded.toggle() }
-                    } label: {
-                        Text(isTranscriptExpanded ? "Show less" : "Show more")
-                            .font(.footnote)
+                    if isTranscriptTruncated {
+                        Button {
+                            withAnimation { isTranscriptExpanded.toggle() }
+                        } label: {
+                            Text(isTranscriptExpanded ? "Show less" : "Show more")
+                                .font(.footnote)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
                 }
             } else if recording.status == .transcribing {
                 HStack(spacing: 8) {
@@ -373,6 +407,16 @@ struct RecordingDetailView: View {
         case .transcribing: return "Transcribing..."
         case .completed: return "No transcription available."
         case .failed: return "Transcription failed."
+        }
+    }
+
+    private func heightReader(_ binding: Binding<CGFloat>) -> some View {
+        GeometryReader { proxy in
+            Color.clear
+                .onAppear { binding.wrappedValue = proxy.size.height }
+                .onChange(of: proxy.size.height) { _, newValue in
+                    binding.wrappedValue = newValue
+                }
         }
     }
 
