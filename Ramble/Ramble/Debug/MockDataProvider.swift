@@ -24,9 +24,11 @@ enum MockDataProvider {
                 createdAt: today.addingTimeInterval(9 * 3600 + 1200), // 9:20 AM
                 duration: 47,
                 status: .completed,
-                transcription: "I just had a great idea for the onboarding flow. Instead of showing a tutorial, we should drop users straight into a sample recording. Let them feel the product before we explain anything. The current three-step walkthrough feels like homework.",
+                transcription: "Follow-up note from the call with Amber at Vantage. They're interested in the enterprise plan but want to see a SOC 2 report before moving forward. Send it over today, schedule a technical deep-dive for next week, and loop in Dave from security. Mark the deal as stage two in the CRM.",
+                webhookStatus: .delivered,
                 activityLog: [
                     ActivityEntry("Transcribed via Whisper v3 Turbo", httpStatus: 200),
+                    ActivityEntry("Sent to API", httpStatus: 200),
                 ]
             ),
             Recording(
@@ -37,7 +39,7 @@ enum MockDataProvider {
                 webhookStatus: .delivered,
                 activityLog: [
                     ActivityEntry("Transcribed via Whisper v3 Turbo", httpStatus: 200),
-                    ActivityEntry("Sent to Zapier", httpStatus: 200),
+                    ActivityEntry("Sent to API", httpStatus: 200),
                 ]
             ),
 
@@ -50,18 +52,18 @@ enum MockDataProvider {
                 webhookStatus: .delivered,
                 activityLog: [
                     ActivityEntry("Transcribed via Apple Speech", httpStatus: nil),
-                    ActivityEntry("Sent to Zapier", httpStatus: 200),
+                    ActivityEntry("Sent to API", httpStatus: 200),
                 ]
             ),
             Recording(
                 createdAt: yesterday.addingTimeInterval(14 * 3600 + 900), // 2:15 PM
                 duration: 203,
                 status: .completed,
-                transcription: "Meeting recap with the design team. We agreed on the color palette — keeping it minimal with just black, white, and the accent orange. The waveform animation during recording should be subtle, not distracting. Sarah suggested a single sine wave that responds to amplitude rather than a full spectrum visualizer. I think that's right. Clean and focused. We'll prototype it this week and test on actual hardware to make sure it doesn't drop frames on older devices.",
+                transcription: "Ramble is private by design. No accounts. No user data on our servers. Your audio and transcripts stay on your device unless you choose to send them somewhere. The transcription proxy is stateless — audio comes in, text goes out, nothing is logged. The entire codebase is open source. Don't take our word for it. Read the code.",
                 webhookStatus: .delivered,
                 activityLog: [
                     ActivityEntry("Transcribed via Nova-3", httpStatus: 200),
-                    ActivityEntry("Sent to Zapier", httpStatus: 200),
+                    ActivityEntry("Sent to API", httpStatus: 200),
                 ]
             ),
             Recording(
@@ -72,7 +74,7 @@ enum MockDataProvider {
                 webhookStatus: .delivered,
                 activityLog: [
                     ActivityEntry("Transcribed via Whisper v3 Turbo", httpStatus: 200),
-                    ActivityEntry("Sent to Zapier", httpStatus: 200),
+                    ActivityEntry("Sent to API", httpStatus: 200),
                 ]
             ),
         ]
