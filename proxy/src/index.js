@@ -179,7 +179,7 @@ async function transcribeWithGroq(audio, modelName, env) {
   const groqForm = new FormData();
   groqForm.append('file', audio, audio.name || 'recording.m4a');
   groqForm.append('model', modelName);
-  groqForm.append('response_format', 'json');
+  groqForm.append('response_format', 'verbose_json');
 
   let groqRes;
   try {
@@ -199,8 +199,14 @@ async function transcribeWithGroq(audio, modelName, env) {
     return { error: 'Transcription failed', status: groqRes.status >= 500 ? 502 : 400 };
   }
 
-  const result = await groqRes.json();
-  return { result: result.text };
+  const data = await groqRes.json();
+
+  // Use segments to insert paragraph breaks on pauses (>2s gap between segments)
+  if (data.segments && data.segments.length > 0) {
+    return { result: formatSegmentsIntoParagraphs(data.segments) };
+  }
+
+  return { result: data.text };
 }
 
 // --- Deepgram Transcription ---
@@ -214,7 +220,7 @@ async function transcribeWithDeepgram(audio, env) {
 
   let res;
   try {
-    res = await fetch('https://api.deepgram.com/v1/listen?model=nova-3&smart_format=true', {
+    res = await fetch('https://api.deepgram.com/v1/listen?model=nova-3&smart_format=true&paragraphs=true', {
       method: 'POST',
       headers: {
         Authorization: `Token ${env.DEEPGRAM_API_KEY}`,
@@ -411,6 +417,34 @@ async function handleAnalytics(request, env) {
     daily: daily.toArray(),
     unique_devices: uniqueDevices.toArray(),
   });
+}
+
+// --- Transcript Formatting ---
+
+/**
+ * Group segments into paragraphs based on pauses in speech.
+ * A gap of >2 seconds between segments triggers a paragraph break.
+ */
+function formatSegmentsIntoParagraphs(segments, pauseThreshold = 2.0) {
+  if (segments.length === 0) return '';
+
+  const paragraphs = [];
+  let currentParagraph = [segments[0].text.trim()];
+
+  for (let i = 1; i < segments.length; i++) {
+    const gap = segments[i].start - segments[i - 1].end;
+    if (gap >= pauseThreshold) {
+      paragraphs.push(currentParagraph.join(' '));
+      currentParagraph = [];
+    }
+    currentParagraph.push(segments[i].text.trim());
+  }
+
+  if (currentParagraph.length > 0) {
+    paragraphs.push(currentParagraph.join(' '));
+  }
+
+  return paragraphs.join('\n\n');
 }
 
 // --- Utilities ---
