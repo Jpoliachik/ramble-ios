@@ -167,7 +167,7 @@ struct RecordingDetailView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(transcription)
                         .font(.body)
-                        .lineLimit(isTranscriptExpanded ? nil : 6)
+                        .lineLimit(isTranscriptExpanded ? nil : 12)
                         .textSelection(.enabled)
 
                     Button {
