@@ -32,11 +32,17 @@ struct MainView: View {
                 // Top bar — floats over list, slides apart and fades on scroll
                 VStack {
                     HStack(alignment: .firstTextBaseline) {
-                        Text("Ramble")
-                            .font(.system(size: 28, weight: .bold, design: .serif))
-                            .italic()
-                            .offset(x: -80 * scrollProgress)
-                            .opacity(1 - scrollProgress)
+                        HStack(spacing: 8) {
+                            Circle()
+                                .fill(Color.red)
+                                .frame(width: 12, height: 12)
+                                .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 }
+                            Text("Ramble")
+                                .font(.system(size: 22, weight: .bold, design: .serif))
+                                .italic()
+                        }
+                        .offset(x: -80 * scrollProgress)
+                        .opacity(1 - scrollProgress)
                         Spacer()
                         SettingsButtonView {
                             HapticService.buttonTap()
