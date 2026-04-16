@@ -10,7 +10,7 @@ struct AudioPlayerView: View {
     let audioURL: URL
 
     @StateObject private var player = AudioPlayerService()
-    @State private var peaks: [Float] = []
+    @State private var peaks: [Float] = Self.placeholderPeaks
     @State private var isSeeking = false
     @State private var seekProgress: Double = 0
 
@@ -24,7 +24,10 @@ struct AudioPlayerView: View {
             controls
         }
         .task {
-            peaks = await Self.extractPeaks(from: audioURL)
+            let extracted = await Self.extractPeaks(from: audioURL)
+            withAnimation(.easeInOut(duration: 0.3)) {
+                peaks = extracted
+            }
             player.load(url: audioURL)
         }
         .onDisappear {
@@ -95,7 +98,8 @@ struct AudioPlayerView: View {
             Text(DateFormatters.formatDuration(player.currentTime))
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
-                .frame(width: 44, alignment: .leading)
+                .lineLimit(1)
+                .fixedSize()
 
             Spacer()
 
@@ -114,9 +118,14 @@ struct AudioPlayerView: View {
             Text("-\(DateFormatters.formatDuration(max(0, player.duration - player.currentTime)))")
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
-                .frame(width: 44, alignment: .trailing)
+                .lineLimit(1)
+                .fixedSize()
         }
     }
+
+    // MARK: - Placeholder
+
+    private static let placeholderPeaks: [Float] = Array(repeating: 0.3, count: 70)
 
     // MARK: - Waveform Extraction
 

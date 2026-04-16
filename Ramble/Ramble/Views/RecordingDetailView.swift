@@ -29,8 +29,8 @@ struct RecordingDetailView: View {
             if let recording = recording {
                 Form {
                     headerSection(recording)
-                    audioSection(recording)
                     transcriptSection(recording)
+                    audioSection(recording)
                     actionsSection(recording)
                     if !recording.activityLog.isEmpty {
                         activitySection(recording)
