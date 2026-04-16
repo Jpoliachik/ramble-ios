@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-stone-50: #faf9f7;
+  --color-stone-100: #f5f3f0;
+  --color-stone-200: #e7e4df;
+  --color-stone-300: #d5d0c8;
+  --color-stone-400: #a8a197;
+  --color-stone-500: #7c7568;
+  --color-stone-600: #57524a;
+  --color-stone-700: #3d3a34;
+  --color-stone-800: #2a2825;
+  --color-stone-900: #1a1917;
+
+  --color-sage-50: #f4f7f4;
+  --color-sage-100: #e8efe8;
+  --color-sage-200: #c9d9c9;
+  --color-sage-300: #a3bfa3;
+  --color-sage-400: #7a9e7a;
+  --color-sage-500: #5a7d5a;
+  --color-sage-600: #456345;
+  --color-sage-700: #354d35;
+  --color-sage-800: #283a28;
+  --color-sage-900: #1c291c;
+
+  --color-cream: #f4f3ef;
+  --color-cream-warm: #f9f5ed;
+
+  --color-red-500: #ff3b30;
+
+  --font-sans: "SF Pro Display", "SF Pro", -apple-system, BlinkMacSystemFont,
+    system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-serif: "New York", "Iowan Old Style", "Palatino Linotype",
+    "Book Antiqua", Palatino, Georgia, serif;
+  --font-mono: "SF Mono", ui-monospace, SFMono-Regular, "Cascadia Code",
+    Menlo, monospace;
+}
+
+body {
+  font-family: var(--font-sans);
+}
+
+/* Hero entry animations */
+@keyframes hero-fade-in-scale {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes hero-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes hero-fade-up-sm {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hero-enter-logo {
+  animation: hero-fade-in-scale 0.4s ease-out both;
+}
+
+.hero-enter-title {
+  animation: hero-fade-up 0.5s ease-out 0.2s both;
+}
+
+.hero-enter-subtitle {
+  animation: hero-fade-up-sm 0.5s ease-out 0.35s both;
+}
+
+.hero-enter-buttons {
+  animation: hero-fade-up-sm 0.5s ease-out 0.5s both;
+}

@@ -7,21 +7,29 @@ import SwiftUI
 
 struct SettingsView: View {
     @StateObject private var viewModel = SettingsViewModel()
+    @ObservedObject private var subscriptionService = SubscriptionService.shared
     @Environment(\.dismiss) private var dismiss
     @State private var showDeleteConfirmation = false
     @State private var showExportShare = false
     @State private var showSecretCopied = false
     @State private var showRegenerateConfirmation = false
+    @State private var showSecretRevealed = false
+    @State private var showTranscriptionInfo = false
+    @State private var showWebhookInfo = false
     @State private var exportURL: URL?
+    @State private var versionTapCount = 0
+    @State private var showDebugSheet = false
 
     var body: some View {
         NavigationView {
             Form {
                 transcriptionSection
                 webhookSection
+                appearanceSection
                 statsSection
                 exportSection
                 dangerZoneSection
+                aboutSection
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
@@ -33,7 +41,29 @@ struct SettingsView: View {
                     }
                 }
             }
+            .sheet(isPresented: $viewModel.showSubscriptionPaywall) {
+                SubscriptionView()
+            }
+            .sheet(isPresented: $showExportShare) {
+                if let url = exportURL {
+                    ShareSheet(activityItems: [url])
+                }
+            }
+            .sheet(isPresented: $showDebugSheet) {
+                DebugSheet(viewModel: viewModel)
+            }
+            .sheet(isPresented: $showTranscriptionInfo) {
+                TranscriptionInfoSheet()
+            }
+            .sheet(isPresented: $showWebhookInfo) {
+                WebhookInfoSheet()
+            }
         }
+    }
+
+    private var isSpeechAnalyzerAvailable: Bool {
+        if #available(iOS 26.0, *) { return true }
+        return false
     }
 
     private var transcriptionSection: some View {
@@ -45,31 +75,40 @@ struct SettingsView: View {
                 onSelect: { viewModel.transcriptionProvider = .appleSpeech }
             )
 
-            // Cloud Transcription — gated behind subscription
-            ProviderRowView(
-                provider: .cloudTranscription,
-                isSelected: viewModel.transcriptionProvider == .cloudTranscription,
-                isPremiumLocked: !SubscriptionService.shared.isPremium,
-                onSelect: { viewModel.selectCloudTranscription() }
-            )
-
-            // Model picker — visible when premium + cloud selected
-            if viewModel.transcriptionProvider == .cloudTranscription
-                && SubscriptionService.shared.isPremium
-            {
-                Picker("Model", selection: $viewModel.cloudModel) {
-                    ForEach(CloudModel.allCases) { model in
-                        Text(model.displayName)
-                            .tag(model)
-                    }
+            if !isSpeechAnalyzerAvailable {
+                HStack(spacing: 10) {
+                    Image(systemName: "sparkles")
+                        .font(.subheadline)
+                        .foregroundStyle(.orange)
+                    Text("Update to iOS 26 for a significantly improved speech model with better accuracy.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-                .pickerStyle(.menu)
+                .padding(.vertical, 4)
+            }
+
+            // Each cloud model shown individually
+            ForEach(CloudModel.allCases) { model in
+                CloudModelRowView(
+                    model: model,
+                    isSelected: viewModel.transcriptionProvider == .cloudTranscription
+                        && viewModel.cloudModel == model,
+                    isPremiumLocked: !subscriptionService.isPremium,
+                    onSelect: { viewModel.selectCloudModel(model) }
+                )
             }
         } header: {
-            Text("Transcription")
-        }
-        .sheet(isPresented: $viewModel.showSubscriptionPaywall) {
-            SubscriptionView()
+            HStack {
+                Text("Transcription")
+                Spacer()
+                Button {
+                    showTranscriptionInfo = true
+                } label: {
+                    Image(systemName: "info.circle")
+                        .font(.subheadline)
+                        .textCase(.none)
+                }
+            }
         }
     }
 
@@ -129,15 +168,28 @@ struct SettingsView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Signing Secret")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    HStack {
+                        Text("Signing Secret")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button {
+                            withAnimation { showSecretRevealed.toggle() }
+                        } label: {
+                            Image(systemName: showSecretRevealed ? "eye.slash" : "eye")
+                                .font(.footnote)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
 
-                    Text(viewModel.webhookSecret)
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
+                    if showSecretRevealed {
+                        Text(viewModel.webhookSecret)
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
 
                     HStack(spacing: 8) {
                         Button {
@@ -148,14 +200,11 @@ struct SettingsView: View {
                                 showSecretCopied = false
                             }
                         } label: {
-                            Label {
-                                Text("Copy")
-                            } icon: {
-                                Image(systemName: showSecretCopied ? "checkmark" : "doc.on.doc")
-                            }
-                            .frame(maxWidth: .infinity)
+                            Label("Copy", systemImage: showSecretCopied ? "checkmark" : "doc.on.doc")
+                                .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.bordered)
+                        .controlSize(.small)
                         .tint(showSecretCopied ? .green : nil)
 
                         Button {
@@ -165,6 +214,7 @@ struct SettingsView: View {
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.bordered)
+                        .controlSize(.small)
                     }
                 }
                 .alert("Regenerate Secret?", isPresented: $showRegenerateConfirmation) {
@@ -176,14 +226,35 @@ struct SettingsView: View {
                     Text("Your webhook endpoint will need to be updated with the new secret to continue accepting requests.")
                 }
             }
+
+            Button {
+                showWebhookInfo = true
+            } label: {
+                HStack {
+                    Image(systemName: "info.circle")
+                        .foregroundStyle(.blue)
+                    Text("Webhook setup guide")
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .foregroundStyle(.primary)
         } header: {
             Text("Webhook")
-        } footer: {
-            if viewModel.webhookEnabled {
-                Text("Each transcription is POSTed to your HTTPS endpoint with an HMAC-SHA256 signature in the X-Webhook-Signature header. Verify the signature using your secret to confirm authenticity.")
-            } else {
-                Text("Send your transcriptions to another service automatically. Connect Ramble to an AI agent, a cloud workflow, or any custom automation that processes your voice notes.")
+        }
+    }
+
+    private var appearanceSection: some View {
+        Section("Appearance") {
+            Picker("Theme", selection: $viewModel.appearanceMode) {
+                ForEach(AppearanceMode.allCases) { mode in
+                    Label(mode.displayName, systemImage: mode.iconName)
+                        .tag(mode)
+                }
             }
+            .pickerStyle(.menu)
         }
     }
 
@@ -231,11 +302,6 @@ struct SettingsView: View {
                 }
             }
         }
-        .sheet(isPresented: $showExportShare) {
-            if let url = exportURL {
-                ShareSheet(activityItems: [url])
-            }
-        }
     }
 
     private var dangerZoneSection: some View {
@@ -255,6 +321,34 @@ struct SettingsView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This will permanently delete all recordings and transcriptions.")
+        }
+    }
+
+    private var aboutSection: some View {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
+
+        return Section {
+            VStack(spacing: 8) {
+                Text("Ramble v\(version) (\(build))")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .onTapGesture {
+                        versionTapCount += 1
+                        if versionTapCount >= 4 {
+                            versionTapCount = 0
+                            showDebugSheet = true
+                        }
+                    }
+
+                HStack(spacing: 16) {
+                    Link("Privacy Policy", destination: URL(string: "https://goodloop.dev/ramble/privacy")!)
+                    Link("Terms of Use", destination: URL(string: "https://goodloop.dev/ramble/terms")!)
+                }
+                .font(.caption)
+            }
+            .frame(maxWidth: .infinity)
+            .listRowBackground(Color.clear)
         }
     }
 
@@ -325,6 +419,278 @@ struct ProviderRowView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+struct CloudModelRowView: View {
+    let model: CloudModel
+    let isSelected: Bool
+    var isPremiumLocked: Bool = false
+    let onSelect: () -> Void
+
+    var body: some View {
+        Button(action: onSelect) {
+            HStack(spacing: 14) {
+                Image(model.iconName)
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 18, height: 18)
+                    .foregroundStyle(.blue)
+                    .frame(width: 32, height: 32)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.blue.opacity(0.12))
+                    )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(model.displayName)
+                        .font(.body)
+                        .foregroundStyle(.primary)
+                    Text(model.subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.tint)
+                } else if isPremiumLocked {
+                    Image(systemName: "lock.fill")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+struct TranscriptionInfoSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("Accurately turn your voice into text. Pick a provider.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    InfoBlock(
+                        icon: "iphone",
+                        title: "Apple Speech",
+                        text: "On-device transcription that never leaves your phone. Free, private, no network required. iOS 26 brings a significantly improved speech model with better accuracy out of the box."
+                    )
+
+                    InfoBlock(
+                        icon: "cloud",
+                        title: "Why cloud?",
+                        text: "Cloud models are more accurate — especially in noisy environments, with accents, or when speaking quickly. They also produce better punctuation, capitalization, and number formatting. Worth it if you rely on clean transcripts."
+                    )
+
+                    InfoBlock(
+                        icon: "lock.shield",
+                        title: "Cloud models are private too",
+                        text: "Cloud transcription routes through our open-source proxy. No audio or text is stored on our servers — your audio goes to the provider and the transcript comes back. That's it."
+                    )
+
+                    InfoBlock(
+                        icon: "eye",
+                        title: "Don't take our word for it",
+                        text: "Ramble is fully open source. Check the code on GitHub — no accounts, no user data stored. Your audio and transcriptions never touch our servers."
+                    )
+
+                    Link(destination: URL(string: "https://github.com/Jpoliachik/ramble-ios")!) {
+                        HStack {
+                            Spacer()
+                            Label("View Source on GitHub", systemImage: "chevron.left.forwardslash.chevron.right")
+                            Spacer()
+                        }
+                        .padding(.vertical, 12)
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .padding()
+            }
+            .navigationTitle("About Transcription")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+struct WebhookInfoSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("Automatically send your transcripts somewhere useful.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    InfoBlock(
+                        icon: "paperplane",
+                        title: "How it works",
+                        text: "Each transcription is POSTed as JSON to your URL. Requests are signed with your secret and retried automatically if your endpoint is down."
+                    )
+
+                    InfoBlock(
+                        icon: "cpu",
+                        title: "Connect to anything",
+                        text: "Pipe transcripts into an AI agent, a Zapier workflow, a Notion database, or your own backend. Any HTTPS endpoint that accepts JSON works."
+                    )
+
+                    Link(destination: URL(string: "https://goodloop.dev/ramble/docs")!) {
+                        HStack {
+                            Spacer()
+                            Label("View Full API Docs", systemImage: "doc.text")
+                            Spacer()
+                        }
+                        .padding(.vertical, 12)
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .padding()
+            }
+            .navigationTitle("Webhook Setup")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+struct InfoBlock: View {
+    let icon: String
+    let title: String
+    let text: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundStyle(.blue)
+                .frame(width: 28)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                Text(text)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+struct DebugSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject var viewModel: SettingsViewModel
+    @State private var attestStatus = ""
+    @State private var isReattesting = false
+
+    var body: some View {
+        NavigationView {
+            Form {
+                Section("Developer Override") {
+                    HStack {
+                        TextField("Server bypass key", text: $viewModel.devOverrideKey)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                        if !viewModel.devOverrideKey.isEmpty {
+                            Button {
+                                viewModel.devOverrideKey = ""
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                Section("App Attest") {
+                    HStack {
+                        Text("Supported")
+                        Spacer()
+                        Text(AppAttestService.shared.isSupported ? "Yes" : "No")
+                            .foregroundStyle(.secondary)
+                    }
+                    HStack {
+                        Text("Attested")
+                        Spacer()
+                        Text(AppAttestService.shared.isAttested ? "Yes" : "No")
+                            .foregroundStyle(.secondary)
+                    }
+                    if let keyId = AppAttestService.shared.keyId {
+                        HStack {
+                            Text("Key ID")
+                            Spacer()
+                            Text(String(keyId.prefix(12)) + "...")
+                                .font(.caption.monospaced())
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Button {
+                        isReattesting = true
+                        attestStatus = ""
+                        Task {
+                            AppAttestService.shared.resetState()
+                            do {
+                                try await AppAttestService.shared.attestIfNeeded()
+                                attestStatus = "Re-attestation succeeded"
+                            } catch {
+                                attestStatus = "Failed: \(error.localizedDescription)"
+                            }
+                            isReattesting = false
+                        }
+                    } label: {
+                        HStack {
+                            if isReattesting {
+                                ProgressView()
+                                    .controlSize(.small)
+                                Text("Re-attesting...")
+                            } else {
+                                Image(systemName: "arrow.clockwise")
+                                Text("Reset & Re-attest")
+                            }
+                        }
+                    }
+                    .disabled(isReattesting)
+
+                    if !attestStatus.isEmpty {
+                        Text(attestStatus)
+                            .font(.caption)
+                            .foregroundStyle(attestStatus.contains("succeeded") ? .green : .red)
+                    }
+                }
+            }
+            .navigationTitle("Debug")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        viewModel.save()
+                        dismiss()
+                    }
+                }
+            }
+        }
     }
 }
 

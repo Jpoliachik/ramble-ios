@@ -17,6 +17,7 @@ final class TranscriptionQueueService: ObservableObject {
     }
 
     private let speechAnalyzer = SpeechAnalyzerTranscriptionService()
+    private let legacySpeech = LegacySpeechTranscriptionService()
     private let proxyService = ProxyTranscriptionService()
     private let storageService = StorageService.shared
     private let settingsService = SettingsService.shared
@@ -83,10 +84,18 @@ final class TranscriptionQueueService: ObservableObject {
         await speechAnalyzer.prepareModelIfNeeded()
     }
 
-    /// Manually retry a failed recording by re-enqueuing it
-    func retry(recordingId: UUID) {
+    /// Manually retry a failed recording by re-enqueuing it.
+    /// Returns false if the cloud transcription limit has been reached.
+    @discardableResult
+    func retry(recordingId: UUID) -> Bool {
         var recordings = storageService.loadRecordings()
-        guard let idx = recordings.firstIndex(where: { $0.id == recordingId }) else { return }
+        guard let idx = recordings.firstIndex(where: { $0.id == recordingId }) else { return false }
+
+        let settings = settingsService.load()
+        if settings.transcriptionProvider.isCloud
+            && recordings[idx].cloudTranscriptionCount >= TranscriptionJob.maxCloudTranscriptions {
+            return false
+        }
 
         recordings[idx].status = .recorded
         recordings[idx].lastError = nil
@@ -98,6 +107,7 @@ final class TranscriptionQueueService: ObservableObject {
         saveQueue()
 
         enqueue(recordingId: recordingId)
+        return true
     }
 
     // MARK: - Job Processing
@@ -108,6 +118,13 @@ final class TranscriptionQueueService: ObservableObject {
         Task {
             await processTranscription(job)
         }
+    }
+
+    private func providerLabel(for job: TranscriptionJob) -> String {
+        if let model = job.cloudModel {
+            return model.displayName
+        }
+        return job.provider.displayName
     }
 
     private func processTranscription(_ job: TranscriptionJob) async {
@@ -134,6 +151,21 @@ final class TranscriptionQueueService: ObservableObject {
             return
         }
 
+        // Block if this recording has exhausted its cloud transcription limit
+        if job.provider.isCloud
+            && recordings[idx].cloudTranscriptionCount >= TranscriptionJob.maxCloudTranscriptions {
+            recordings[idx].status = .failed
+            recordings[idx].lastError = "Cloud transcription limit reached (\(TranscriptionJob.maxCloudTranscriptions))"
+            recordings[idx].activityLog.append(
+                ActivityEntry("Blocked — \(providerLabel(for: job)) cloud transcription limit reached (\(TranscriptionJob.maxCloudTranscriptions) uses)")
+            )
+            storageService.saveRecordings(recordings)
+            removeJob(job)
+            isProcessing = false
+            processNextIfNeeded()
+            return
+        }
+
         do {
             let text: String
             if job.provider.isCloud {
@@ -145,8 +177,10 @@ final class TranscriptionQueueService: ObservableObject {
                     jwsTransaction: jws
                 )
                 text = try await proxyService.transcribe(request)
-            } else {
+            } else if #available(iOS 26.0, *) {
                 text = try await speechAnalyzer.transcribe(audioURL: audioURL)
+            } else {
+                text = try await legacySpeech.transcribe(audioURL: audioURL)
             }
 
             // Success — update recording
@@ -155,8 +189,11 @@ final class TranscriptionQueueService: ObservableObject {
                 updatedRecordings[i].status = .completed
                 updatedRecordings[i].transcription = text
                 updatedRecordings[i].lastError = nil
+                if job.provider.isCloud {
+                    updatedRecordings[i].cloudTranscriptionCount += 1
+                }
                 updatedRecordings[i].activityLog.append(
-                    ActivityEntry("Transcription completed", httpStatus: job.provider.isCloud ? 200 : nil)
+                    ActivityEntry("Transcription completed via \(providerLabel(for: job))", httpStatus: job.provider.isCloud ? 200 : nil)
                 )
                 storageService.saveRecordings(updatedRecordings)
             }
@@ -179,7 +216,7 @@ final class TranscriptionQueueService: ObservableObject {
                 updatedRecordings[idx].status = .failed
                 updatedRecordings[idx].lastError = TranscriptionError.subscriptionRequired.localizedDescription
                 updatedRecordings[idx].activityLog.append(
-                    ActivityEntry("Transcription failed — premium subscription required", httpStatus: 403)
+                    ActivityEntry("Transcription failed via \(providerLabel(for: job)) — premium subscription required", httpStatus: 403)
                 )
                 storageService.saveRecordings(updatedRecordings)
             }
@@ -194,7 +231,37 @@ final class TranscriptionQueueService: ObservableObject {
                 updatedRecordings[idx].status = .failed
                 updatedRecordings[idx].lastError = TranscriptionError.modelNotInstalled.localizedDescription
                 updatedRecordings[idx].activityLog.append(
-                    ActivityEntry("Transcription failed — speech model not downloaded")
+                    ActivityEntry("Transcription failed via \(providerLabel(for: job)) — speech model not downloaded")
+                )
+                storageService.saveRecordings(updatedRecordings)
+            }
+            removeJob(job)
+            isProcessing = false
+            processNextIfNeeded()
+
+        } catch TranscriptionError.localeNotSupported {
+            // Locale not supported — fail immediately, don't retry (permanent condition)
+            var updatedRecordings = storageService.loadRecordings()
+            if let idx = updatedRecordings.firstIndex(where: { $0.id == job.recordingId }) {
+                updatedRecordings[idx].status = .failed
+                updatedRecordings[idx].lastError = TranscriptionError.localeNotSupported.localizedDescription
+                updatedRecordings[idx].activityLog.append(
+                    ActivityEntry("Transcription failed via \(providerLabel(for: job)) — \(TranscriptionError.localeNotSupported.localizedDescription)")
+                )
+                storageService.saveRecordings(updatedRecordings)
+            }
+            removeJob(job)
+            isProcessing = false
+            processNextIfNeeded()
+
+        } catch TranscriptionError.speechAnalyzerUnavailable {
+            // iOS version too old for SpeechAnalyzer — fail immediately, don't retry
+            var updatedRecordings = storageService.loadRecordings()
+            if let idx = updatedRecordings.firstIndex(where: { $0.id == job.recordingId }) {
+                updatedRecordings[idx].status = .failed
+                updatedRecordings[idx].lastError = TranscriptionError.speechAnalyzerUnavailable.localizedDescription
+                updatedRecordings[idx].activityLog.append(
+                    ActivityEntry("Transcription failed via \(providerLabel(for: job)) — \(TranscriptionError.speechAnalyzerUnavailable.localizedDescription)")
                 )
                 storageService.saveRecordings(updatedRecordings)
             }
@@ -224,7 +291,7 @@ final class TranscriptionQueueService: ObservableObject {
             if updatedJob.retryCount >= TranscriptionJob.maxRetries {
                 recordings[idx].status = .failed
                 recordings[idx].activityLog.append(
-                    ActivityEntry("Transcription failed after \(TranscriptionJob.maxRetries) attempts — \(error)", httpStatus: httpStatus)
+                    ActivityEntry("Transcription failed via \(providerLabel(for: job)) after \(TranscriptionJob.maxRetries) attempts — \(error)", httpStatus: httpStatus)
                 )
                 storageService.saveRecordings(recordings)
                 removeJob(job)
@@ -233,7 +300,7 @@ final class TranscriptionQueueService: ObservableObject {
                 let delay = updatedJob.retryDelaySeconds
                 updatedJob.nextRetryAt = Date().addingTimeInterval(delay)
                 recordings[idx].activityLog.append(
-                    ActivityEntry("Transcription failed — \(error) (attempt \(updatedJob.retryCount)/\(TranscriptionJob.maxRetries), retry in \(Int(delay))s)", httpStatus: httpStatus)
+                    ActivityEntry("Transcription failed via \(providerLabel(for: job)) — \(error) (attempt \(updatedJob.retryCount)/\(TranscriptionJob.maxRetries), retry in \(Int(delay))s)", httpStatus: httpStatus)
                 )
                 storageService.saveRecordings(recordings)
                 updateJob(updatedJob)

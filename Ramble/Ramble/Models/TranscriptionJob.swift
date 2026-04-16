@@ -26,6 +26,10 @@ struct TranscriptionJob: Identifiable, Codable {
 
     static let maxRetries = 5
 
+    /// Max successful cloud transcriptions per recording.
+    /// Failed attempts don't count — only completions that cost an API call.
+    static let maxCloudTranscriptions = 5
+
     /// Backoff: 5s, 15s, 45s, 90s, 180s
     var retryDelaySeconds: TimeInterval {
         let baseDelay: TimeInterval = 5

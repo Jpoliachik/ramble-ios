@@ -7,6 +7,7 @@ import SwiftUI
 struct RecordingListView: View {
     let recordingsByDay: [(date: Date, recordings: [Recording])]
     let onDelete: (Recording) -> Void
+    @Binding var scrollOffset: CGFloat
 
     var body: some View {
         if recordingsByDay.isEmpty {
@@ -36,14 +37,19 @@ struct RecordingListView: View {
                 }
             }
             .listStyle(.insetGrouped)
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                geometry.contentOffset.y + geometry.contentInsets.top
+            } action: { _, newValue in
+                scrollOffset = newValue
+            }
         }
     }
 
     private var emptyStateView: some View {
         ContentUnavailableView(
-            "No recordings yet",
+            "Hit record and ramble",
             systemImage: "waveform",
-            description: Text("Tap record to start")
+            description: Text("Talk first, organize later.")
         )
     }
 }
@@ -59,6 +65,7 @@ struct RecordingListView: View {
                 ]
             )
         ],
-        onDelete: { _ in }
+        onDelete: { _ in },
+        scrollOffset: .constant(0)
     )
 }

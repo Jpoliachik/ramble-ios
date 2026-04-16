@@ -10,69 +10,55 @@ struct WatchRecordButtonView: View {
     var audioLevel: Float = 0
     let action: () -> Void
 
-    @State private var pulseScale: CGFloat = 1.0
-
     private let buttonSize: CGFloat = 80
 
-    private var glowScale: CGFloat {
-        guard isRecording else { return 1.0 }
-        return 1.0 + CGFloat(audioLevel) * 0.4
-    }
+    // Bar configuration
+    private let barWidth: CGFloat = 10
+    private let barSpacing: CGFloat = 6
+    private let barCornerRadius: CGFloat = 5
+    private let minBarHeight: CGFloat = 10
+    private let maxBarHeight: CGFloat = 36
+    private let barScales: [CGFloat] = [0.7, 1.0, 0.8]
 
-    private var glowOpacity: Double {
-        guard isRecording else { return 0 }
-        return Double(audioLevel) * 0.5
+    private func barHeight(for index: Int) -> CGFloat {
+        let level = CGFloat(audioLevel)
+        return minBarHeight + (maxBarHeight - minBarHeight) * level * barScales[index]
     }
 
     var body: some View {
         Button(action: action) {
             ZStack {
-                // Audio level glow
-                Circle()
-                    .fill(Color.red)
-                    .frame(width: buttonSize, height: buttonSize)
-                    .scaleEffect(glowScale)
-                    .opacity(glowOpacity)
-                    .blur(radius: 6)
-                    .animation(.easeOut(duration: 0.1), value: audioLevel)
-
+                // Border ring
                 Circle()
                     .stroke(Color.red, lineWidth: 4)
                     .frame(width: buttonSize, height: buttonSize)
 
-                RoundedRectangle(cornerRadius: isRecording ? 8 : buttonSize / 2)
-                    .fill(Color.red)
-                    .frame(
-                        width: isRecording ? 24 : buttonSize - 16,
-                        height: isRecording ? 24 : buttonSize - 16
-                    )
-                    .scaleEffect(isRecording ? pulseScale : 1.0)
+                if isRecording {
+                    // Animated audio level bars
+                    HStack(spacing: barSpacing) {
+                        ForEach(0..<3, id: \.self) { index in
+                            RoundedRectangle(cornerRadius: barCornerRadius)
+                                .fill(Color.red)
+                                .frame(width: barWidth, height: barHeight(for: index))
+                        }
+                    }
+                    .animation(.spring(response: 0.15, dampingFraction: 0.6), value: audioLevel)
+                } else {
+                    // Filled circle
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: buttonSize - 16, height: buttonSize - 16)
+                }
             }
         }
         .buttonStyle(.plain)
-        .animation(.easeInOut(duration: 0.2), value: isRecording)
-        .onChange(of: isRecording) { _, newValue in
-            if newValue {
-                startPulseAnimation()
-            } else {
-                pulseScale = 1.0
-            }
-        }
-    }
-
-    private func startPulseAnimation() {
-        withAnimation(
-            .easeInOut(duration: 0.8)
-            .repeatForever(autoreverses: true)
-        ) {
-            pulseScale = 1.2
-        }
+        .animation(.easeInOut(duration: 0.3), value: isRecording)
     }
 }
 
 #Preview {
     VStack {
         WatchRecordButtonView(isRecording: false) {}
-        WatchRecordButtonView(isRecording: true) {}
+        WatchRecordButtonView(isRecording: true, audioLevel: 0.5) {}
     }
 }

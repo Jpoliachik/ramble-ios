@@ -12,10 +12,12 @@ struct SettingsButtonView: View {
             Image(systemName: "gearshape")
                 .font(.body.weight(.medium))
                 .foregroundStyle(.secondary)
-                .frame(width: 34, height: 34)
+                .frame(width: 40, height: 40)
                 .background(.ultraThinMaterial, in: Circle())
+                .shadow(color: .black.opacity(0.15), radius: 6, y: 3)
         }
         .buttonStyle(.plain)
+        .contentShape(Circle().scale(1.5))
     }
 }
 

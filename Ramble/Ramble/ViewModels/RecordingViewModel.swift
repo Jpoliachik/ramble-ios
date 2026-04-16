@@ -82,6 +82,12 @@ final class RecordingViewModel: ObservableObject {
 
     func loadRecordings() {
         withAnimation(.smooth) {
+            #if DEBUG
+            if MockDataProvider.enabled {
+                recordings = MockDataProvider.mockRecordings()
+                return
+            }
+            #endif
             recordings = storageService.loadRecordings()
         }
     }

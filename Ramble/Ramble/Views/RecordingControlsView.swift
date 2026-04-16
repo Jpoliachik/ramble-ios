@@ -12,6 +12,13 @@ struct RecordingControlsView: View {
     let onToggleRecording: () -> Void
     var onCancel: (() -> Void)? = nil
 
+    @State private var showCancelConfirmation = false
+
+    private var durationWarning: String? {
+        guard isRecording, duration >= Constants.Recording.longWarningDuration else { return nil }
+        return "Long recording"
+    }
+
     var body: some View {
         VStack(spacing: 8) {
             if isRecording {
@@ -19,38 +26,67 @@ struct RecordingControlsView: View {
                     .font(.system(size: 52, weight: .bold, design: .serif))
                     .monospacedDigit()
                     .contentTransition(.numericText())
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .transition(.opacity)
             }
 
             ZStack {
-                RecordButtonView(isRecording: isRecording, audioLevel: audioLevel, action: onToggleRecording)
+                RecordButtonView(isRecording: isRecording, action: onToggleRecording)
 
                 if isRecording {
                     HStack {
                         Button {
-                            onCancel?()
+                            HapticService.buttonTap()
+                            if duration > 30 {
+                                showCancelConfirmation = true
+                            } else {
+                                onCancel?()
+                            }
                         } label: {
-                            Text("Cancel")
-                                .font(.caption2)
+                            Image(systemName: "xmark")
+                                .font(.caption2.weight(.semibold))
                                 .foregroundStyle(.secondary)
+                                .frame(width: 26, height: 26)
+                                .background(.ultraThinMaterial, in: Circle())
                         }
                         .buttonStyle(.plain)
-                        .transition(.opacity)
+                        .confirmationDialog(
+                            "Discard recording?",
+                            isPresented: $showCancelConfirmation,
+                            titleVisibility: .visible
+                        ) {
+                            Button("Discard", role: .destructive) {
+                                onCancel?()
+                            }
+                        } message: {
+                            Text("This will delete \(DateFormatters.formatDuration(duration)) of audio.")
+                        }
 
                         Spacer()
                     }
                     .padding(.leading, 20)
+                    .transition(.move(edge: .leading).combined(with: .opacity))
+
+                    AudioWaveformView(audioLevel: audioLevel)
+                        .offset(x: 90)
+                        .transition(.opacity)
                 }
             }
 
-            if isRecording, let source = inputSourceName {
-                Text("via \(source)")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .transition(.opacity)
+            if isRecording {
+                if let warning = durationWarning {
+                    Text(warning)
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                        .transition(.opacity)
+                } else if let source = inputSourceName {
+                    Text("via \(source)")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .transition(.opacity)
+                }
             }
         }
-        .animation(.snappy(duration: 0.3), value: isRecording)
+        .animation(.snappy(duration: 0.25), value: isRecording)
     }
 }
 

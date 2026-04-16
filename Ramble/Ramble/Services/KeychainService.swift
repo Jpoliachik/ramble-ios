@@ -29,6 +29,15 @@ enum KeychainService {
         return string
     }
 
+    static func delete(forKey key: String) {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: key
+        ]
+        SecItemDelete(query as CFDictionary)
+    }
+
     static func setString(_ value: String, forKey key: String) {
         let data = Data(value.utf8)
 

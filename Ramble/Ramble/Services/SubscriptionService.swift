@@ -20,6 +20,20 @@ final class SubscriptionService: ObservableObject {
 
     private var transactionListener: Task<Void, Never>?
 
+    static let devOverrideUserDefaultsKey = "devOverrideKey"
+
+    /// Developer override key — bypasses subscription check on both client and proxy.
+    /// Stored in UserDefaults, entered via hidden Settings easter egg.
+    nonisolated var devOverrideKey: String? {
+        let key = UserDefaults.standard.string(forKey: Self.devOverrideUserDefaultsKey)
+        return (key != nil && !key!.isEmpty) ? key : nil
+    }
+
+    func setDevOverrideKey(_ key: String?) {
+        UserDefaults.standard.set(key, forKey: Self.devOverrideUserDefaultsKey)
+        Task { await refreshStatus() }
+    }
+
     private init() {
         transactionListener = listenForTransactionUpdates()
         Task { await refreshStatus() }
@@ -85,7 +99,8 @@ final class SubscriptionService: ObservableObject {
             }
         }
 
-        isPremium = foundPremium
+        // Dev override key grants premium access without a subscription
+        isPremium = foundPremium || devOverrideKey != nil
         if !foundPremium {
             expirationDate = nil
             currentJWSTransaction = nil

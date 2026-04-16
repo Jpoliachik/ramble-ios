@@ -1,0 +1,26 @@
+name = "ramble-transcription-proxy"
+main = "src/index.js"
+compatibility_date = "2024-12-01"
+account_id = "YOUR_CLOUDFLARE_ACCOUNT_ID"
+
+[observability]
+enabled = true
+
+[vars]
+APPLE_BUNDLE_ID = "dev.goodloop.ramble"
+PREMIUM_PRODUCT_ID = "dev.goodloop.ramble.premium.monthly2"
+
+# KV namespace for App Attest state (challenges, attested device keys).
+# SETUP REQUIRED: Run `wrangler kv namespace create ATTEST_KV` and paste
+# the returned id below. Deployment will fail until this is configured.
+[[kv_namespaces]]
+binding = "ATTEST_KV"
+id = "YOUR_KV_NAMESPACE_ID"
+
+# Analytics Engine for anonymous usage metrics (model popularity, request volume).
+# SETUP REQUIRED: Run `wrangler analytics-engine create USAGE_ANALYTICS` (or create
+# via the Cloudflare dashboard under Account → Analytics Engine) and paste the
+# dataset ID below. No PII is stored — device IDs are SHA-256 hashed before writing.
+[[analytics_engine_datasets]]
+binding = "USAGE_ANALYTICS"
+dataset = "ramble_usage"

@@ -10,37 +10,108 @@ struct WatchMainView: View {
     @StateObject private var recordingManager = WatchRecordingManager.shared
     @StateObject private var connectivity = WatchConnectivityService.shared
     @StateObject private var syncQueue = WatchSyncQueue.shared
+    @StateObject private var history = WatchRecordingHistory.shared
 
     @State private var showSaved = false
     @State private var phoneRecordingDuration: TimeInterval = 0
     @State private var durationTimer: Timer?
     @State private var stopRequestCancellable: AnyCancellable?
 
+    private var isRecording: Bool {
+        recordingManager.isRecording || connectivity.phoneIsRecording
+    }
+
+    private var currentDuration: TimeInterval {
+        if recordingManager.isRecording {
+            return recordingManager.currentDuration
+        } else if connectivity.phoneIsRecording {
+            return phoneRecordingDuration
+        }
+        return 0
+    }
+
     var body: some View {
-        VStack(spacing: 12) {
-            Spacer()
+        NavigationStack {
+            VStack(spacing: 8) {
+                Spacer()
 
-            // Status indicator
-            statusView
+                // Status area above the button
+                if showSaved {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                        Text("Saved")
+                            .font(.caption)
+                    }
+                    .transition(.opacity)
+                } else if isRecording {
+                    VStack(spacing: 4) {
+                        // Phone recording indicator
+                        if connectivity.phoneIsRecording {
+                            HStack(spacing: 4) {
+                                Image(systemName: "iphone")
+                                    .font(.caption2)
+                                    .foregroundStyle(.red)
+                                Text("iPhone")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
 
-            // Timer
-            timerView
+                        // Timer
+                        Text(formatDuration(currentDuration))
+                            .font(.system(size: 32, weight: .bold, design: .serif))
+                            .monospacedDigit()
+                            .foregroundStyle(.red)
+                            .contentTransition(.numericText())
 
-            Spacer()
+                        // Long recording warning
+                        if recordingManager.isRecording
+                            && recordingManager.currentDuration >= 30 * 60
+                        {
+                            HStack(spacing: 4) {
+                                Image(systemName: "exclamationmark.triangle")
+                                    .foregroundStyle(.orange)
+                                Text("Long recording")
+                                    .font(.caption2)
+                                    .foregroundStyle(.orange)
+                            }
+                        }
+                    }
+                    .transition(.opacity)
+                }
 
-            // Record button
-            WatchRecordButtonView(
-                isRecording: recordingManager.isRecording || connectivity.phoneIsRecording,
-                audioLevel: recordingManager.audioLevel
-            ) {
-                Task {
-                    await toggleRecording()
+                // Record button
+                WatchRecordButtonView(
+                    isRecording: isRecording,
+                    audioLevel: recordingManager.audioLevel
+                ) {
+                    Task {
+                        await toggleRecording()
+                    }
+                }
+
+                Spacer()
+            }
+            .animation(.easeInOut(duration: 0.3), value: isRecording)
+            .animation(.easeInOut(duration: 0.2), value: showSaved)
+            .padding()
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    NavigationLink(destination: WatchRecordingsListView()) {
+                        ZStack(alignment: .topTrailing) {
+                            Image(systemName: "list.bullet")
+                            if syncQueue.pendingCount > 0 {
+                                Circle()
+                                    .fill(.orange)
+                                    .frame(width: 8, height: 8)
+                                    .offset(x: 4, y: -4)
+                            }
+                        }
+                    }
                 }
             }
-
-            Spacer()
         }
-        .padding()
         .onAppear {
             subscribeToStopRequests()
             connectivity.queryPhoneState()
@@ -58,69 +129,6 @@ struct WatchMainView: View {
             } else {
                 stopPhoneDurationTimer()
             }
-        }
-    }
-
-    @ViewBuilder
-    private var statusView: some View {
-        if showSaved {
-            HStack {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
-                Text("Saved")
-                    .font(.caption)
-            }
-            .transition(.opacity)
-        } else if connectivity.isTransferring {
-            HStack {
-                ProgressView()
-                    .scaleEffect(0.7)
-                Text("Syncing...")
-                    .font(.caption)
-            }
-        } else if syncQueue.pendingCount > 0 && !connectivity.isTransferring {
-            HStack {
-                Image(systemName: "exclamationmark.arrow.trianglehead.counterclockwise.rotate.90")
-                    .foregroundStyle(.orange)
-                Text("\(syncQueue.pendingCount) unsent")
-                    .font(.caption)
-            }
-            .onTapGesture {
-                connectivity.retryPendingTransfers()
-            }
-        } else if connectivity.phoneIsRecording {
-            HStack {
-                Image(systemName: "iphone")
-                    .foregroundStyle(.red)
-                Text("Recording")
-                    .font(.caption)
-            }
-        } else {
-            Text("Ramble")
-                .font(.system(.headline, design: .serif))
-                .italic()
-        }
-    }
-
-    @ViewBuilder
-    private var timerView: some View {
-        if recordingManager.isRecording {
-            Text(formatDuration(recordingManager.currentDuration))
-                .font(.system(size: 32, weight: .bold, design: .serif))
-                .monospacedDigit()
-                .foregroundStyle(.red)
-                .contentTransition(.numericText())
-        } else if connectivity.phoneIsRecording {
-            Text(formatDuration(phoneRecordingDuration))
-                .font(.system(size: 32, weight: .bold, design: .serif))
-                .monospacedDigit()
-                .foregroundStyle(.red)
-                .contentTransition(.numericText())
-        } else {
-            Text(formatDuration(0))
-                .font(.system(size: 32, weight: .bold, design: .serif))
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
         }
     }
 
@@ -183,8 +191,14 @@ struct WatchMainView: View {
     }
 
     private func formatDuration(_ duration: TimeInterval) -> String {
-        let minutes = Int(duration) / 60
-        let seconds = Int(duration) % 60
+        let totalSeconds = Int(duration)
+        let hours = totalSeconds / 3600
+        let minutes = (totalSeconds % 3600) / 60
+        let seconds = totalSeconds % 60
+
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, minutes, seconds)
+        }
         return String(format: "%d:%02d", minutes, seconds)
     }
 }

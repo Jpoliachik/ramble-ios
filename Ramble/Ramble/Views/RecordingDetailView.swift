@@ -7,11 +7,14 @@ import SwiftUI
 
 struct RecordingDetailView: View {
     let recordingId: UUID
+    @Environment(\.dismiss) private var dismiss
     @State private var recording: Recording?
     @State private var showCopied = false
     @State private var isRetrying = false
     @State private var isDownloadingModel = false
+    @State private var showDeleteConfirmation = false
     @State private var isResendingWebhook = false
+    @State private var isTranscriptExpanded = false
 
     private let storageService = StorageService.shared
     private let transcriptionQueue = TranscriptionQueueService.shared
@@ -37,6 +40,30 @@ struct RecordingDetailView: View {
         }
         .navigationTitle("Recording")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .destructiveAction) {
+                Button(role: .destructive) {
+                    showDeleteConfirmation = true
+                } label: {
+                    Image(systemName: "trash")
+                }
+            }
+        }
+        .confirmationDialog(
+            "Delete this recording?",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete Recording", role: .destructive) {
+                if let recording = recording {
+                    storageService.deleteRecording(recording)
+                }
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will permanently delete the recording and its transcript.")
+        }
         .overlay(alignment: .top) {
             if showCopied {
                 copiedToast
@@ -51,6 +78,9 @@ struct RecordingDetailView: View {
     }
 
     private func refreshRecording() {
+        #if DEBUG
+        if MockDataProvider.enabled { return }
+        #endif
         let recordings = storageService.loadRecordings()
         recording = recordings.first { $0.id == recordingId }
     }
@@ -134,9 +164,21 @@ struct RecordingDetailView: View {
     private func transcriptSection(_ recording: Recording) -> some View {
         Section {
             if let transcription = recording.transcription, !transcription.isEmpty {
-                Text(transcription)
-                    .font(.body)
-                    .textSelection(.enabled)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(transcription)
+                        .font(.body)
+                        .lineLimit(isTranscriptExpanded ? nil : 6)
+                        .textSelection(.enabled)
+
+                    Button {
+                        withAnimation { isTranscriptExpanded.toggle() }
+                    } label: {
+                        Text(isTranscriptExpanded ? "Show less" : "Show more")
+                            .font(.footnote)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
             } else if recording.status == .transcribing {
                 HStack(spacing: 8) {
                     ProgressView().scaleEffect(0.8)
@@ -229,6 +271,9 @@ struct RecordingDetailView: View {
                 }
                 .disabled(isDownloadingModel)
             } else {
+                let cloudLimitReached = SettingsService.shared.load().transcriptionProvider.isCloud
+                    && recording.cloudTranscriptionCount >= TranscriptionJob.maxCloudTranscriptions
+
                 Button {
                     HapticService.buttonTap()
                     isRetrying = true
@@ -249,7 +294,13 @@ struct RecordingDetailView: View {
                         }
                     }
                 }
-                .disabled(isRetrying || recording.status == .transcribing)
+                .disabled(isRetrying || recording.status == .transcribing || cloudLimitReached)
+
+                if cloudLimitReached {
+                    Text("Cloud transcription limit reached (\(TranscriptionJob.maxCloudTranscriptions)). Switch to on-device transcription in Settings to continue.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             if recording.webhookStatus != nil && SettingsService.shared.load().webhookEnabled {

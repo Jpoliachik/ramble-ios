@@ -9,6 +9,8 @@ import SwiftUI
 
 @main
 struct RambleApp: App {
+    @AppStorage("appearanceMode") private var appearanceMode: String = AppearanceMode.system.rawValue
+
     init() {
         BackgroundTaskService.shared.registerBackgroundTasks()
         _ = PhoneConnectivityService.shared
@@ -28,6 +30,9 @@ struct RambleApp: App {
     var body: some Scene {
         WindowGroup {
             MainView()
+                .preferredColorScheme(
+                    AppearanceMode(rawValue: appearanceMode)?.colorScheme
+                )
                 .onReceive(
                     NotificationCenter.default.publisher(
                         for: UIApplication.didEnterBackgroundNotification

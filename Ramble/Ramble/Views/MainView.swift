@@ -7,33 +7,50 @@ import SwiftUI
 struct MainView: View {
     @StateObject private var viewModel = RecordingViewModel()
     @State private var showSettings = false
+    @State private var scrollOffset: CGFloat = 0
+
+    /// How far the user scrolls before the header is fully collapsed (in points)
+    private let scrollThreshold: CGFloat = 60
+
+    /// 0 = at top (fully expanded), 1 = scrolled past threshold (fully collapsed)
+    private var scrollProgress: CGFloat {
+        min(max(scrollOffset / scrollThreshold, 0), 1)
+    }
 
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottom) {
-                VStack(spacing: 0) {
-                    // Top bar
+                // Recording list — full height, scrolls under header and controls
+                RecordingListView(
+                    recordingsByDay: viewModel.recordingsByDay,
+                    onDelete: viewModel.deleteRecording,
+                    scrollOffset: $scrollOffset
+                )
+                .contentMargins(.top, 48, for: .scrollContent)
+                .contentMargins(.bottom, 120, for: .scrollContent)
+
+                // Top bar — floats over list, slides apart and fades on scroll
+                VStack {
                     HStack(alignment: .firstTextBaseline) {
                         Text("Ramble")
                             .font(.system(size: 28, weight: .bold, design: .serif))
                             .italic()
+                            .offset(x: -80 * scrollProgress)
+                            .opacity(1 - scrollProgress)
                         Spacer()
                         SettingsButtonView {
                             HapticService.buttonTap()
                             showSettings = true
                         }
+                        .offset(x: 80 * scrollProgress)
+                        .opacity(1 - scrollProgress)
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
                     .padding(.bottom, 4)
-
-                    // Recording list — full height, scrolls under the controls
-                    RecordingListView(
-                        recordingsByDay: viewModel.recordingsByDay,
-                        onDelete: viewModel.deleteRecording
-                    )
-                    .contentMargins(.top, 8, for: .scrollContent)
-                    .contentMargins(.bottom, 120, for: .scrollContent)
+                    .allowsHitTesting(scrollProgress < 0.5)
+                    .animation(.easeOut(duration: 0.15), value: scrollProgress)
+                    Spacer()
                 }
 
                 // Floating bottom controls
@@ -51,16 +68,16 @@ struct MainView: View {
                         viewModel.cancelRecording()
                     }
                 )
-                .padding(.top, 16)
+                .padding(.top, 24)
                 .padding(.bottom, 16)
                 .frame(maxWidth: .infinity)
-                .colorScheme(.dark)
                 .background {
                     Rectangle()
-                        .fill(Color.black)
+                        .fill(.background)
                         .ignoresSafeArea(.container, edges: .bottom)
                 }
             }
+            .toolbarBackground(.hidden, for: .navigationBar)
             .navigationDestination(for: Recording.self) { recording in
                 RecordingDetailView(recording: recording)
             }
