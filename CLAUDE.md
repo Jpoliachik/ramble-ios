@@ -35,6 +35,10 @@ These are free features from existing providers (no extra API calls or cost):
 - [ ] **Speaker diarization** — opt-in toggle. Deepgram has `diarize=true`, OpenAI has `gpt-4o-transcribe-diarize` model. Labels speakers in transcript. Great for conversations/meetings.
 - [ ] **Language hint** — language picker in settings, passed to all providers. Improves accuracy for non-English users.
 
+### Future
+
+- [ ] **Localization** — translate the app UI into additional languages
+
 ### Release plan
 
 - Open source the repo on GitHub
