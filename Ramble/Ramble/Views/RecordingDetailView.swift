@@ -128,12 +128,9 @@ struct RecordingDetailView: View {
                 Text("Transcribing")
             case .completed:
                 switch recording.webhookStatus {
-                case .sending:
+                case .pending, .sending:
                     ProgressView().scaleEffect(0.7)
                     Text("Sending webhook")
-                case .pending:
-                    Image(systemName: "paperplane")
-                    Text("Webhook queued")
                 case .failed:
                     Image(systemName: "exclamationmark.triangle.fill")
                     Text("Webhook failed")

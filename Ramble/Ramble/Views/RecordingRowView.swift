@@ -57,10 +57,9 @@ struct RecordingRowView: View {
         switch recording.status {
         case .completed:
             switch recording.webhookStatus {
-            case .sending, .pending:
-                Image(systemName: "paperplane")
-                    .foregroundStyle(.blue)
-                    .font(.subheadline)
+            case .pending, .sending:
+                ProgressView()
+                    .controlSize(.mini)
             case .failed:
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)
