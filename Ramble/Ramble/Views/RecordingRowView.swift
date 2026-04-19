@@ -56,9 +56,19 @@ struct RecordingRowView: View {
     private var statusIcon: some View {
         switch recording.status {
         case .completed:
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(.green)
-                .font(.subheadline)
+            switch recording.webhookStatus {
+            case .pending, .sending:
+                ProgressView()
+                    .controlSize(.mini)
+            case .failed:
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                    .font(.subheadline)
+            case .delivered, .none:
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                    .font(.subheadline)
+            }
         case .failed:
             Image(systemName: recording.isModelNotInstalled ? "arrow.down.circle.fill" : "exclamationmark.circle.fill")
                 .foregroundStyle(recording.isModelNotInstalled ? .orange : .red)

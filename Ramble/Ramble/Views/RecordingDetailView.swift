@@ -127,8 +127,17 @@ struct RecordingDetailView: View {
                 ProgressView().scaleEffect(0.7)
                 Text("Transcribing")
             case .completed:
-                Image(systemName: "checkmark.circle.fill")
-                Text("Completed")
+                switch recording.webhookStatus {
+                case .pending, .sending:
+                    ProgressView().scaleEffect(0.7)
+                    Text("Sending webhook")
+                case .failed:
+                    Image(systemName: "exclamationmark.triangle.fill")
+                    Text("Webhook failed")
+                case .delivered, .none:
+                    Image(systemName: "checkmark.circle.fill")
+                    Text("Completed")
+                }
             case .failed:
                 Image(systemName: "exclamationmark.circle.fill")
                 Text("Failed")
@@ -146,7 +155,12 @@ struct RecordingDetailView: View {
         switch recording.status {
         case .recorded: return recording.lastError != nil ? .orange : .secondary
         case .transcribing: return .blue
-        case .completed: return .green
+        case .completed:
+            switch recording.webhookStatus {
+            case .sending, .pending: return .blue
+            case .failed: return .orange
+            case .delivered, .none: return .green
+            }
         case .failed: return .red
         }
     }
@@ -338,27 +352,35 @@ struct RecordingDetailView: View {
             }
 
             if recording.webhookStatus != nil && SettingsService.shared.load().webhookEnabled {
-                Button {
-                    HapticService.buttonTap()
-                    isResendingWebhook = true
-                    WebhookQueueService.shared.enqueue(recordingId: recording.id)
-                    Task {
-                        try? await Task.sleep(nanoseconds: 500_000_000)
-                        refreshRecording()
-                        isResendingWebhook = false
-                    }
-                } label: {
-                    Label {
-                        Text(isResendingWebhook ? "Sending..." : "Resend Webhook")
-                    } icon: {
-                        if isResendingWebhook {
-                            ProgressView().scaleEffect(0.8)
-                        } else {
-                            Image(systemName: "paperplane")
-                        }
-                    }
+                webhookActionRow(for: recording)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func webhookActionRow(for recording: Recording) -> some View {
+        let inFlight = isResendingWebhook || recording.webhookStatus == .sending
+
+        if inFlight {
+            HStack(spacing: 10) {
+                ProgressView().controlSize(.small)
+                Text("Sending webhook…")
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+            .accessibilityElement(children: .combine)
+        } else {
+            Button {
+                HapticService.buttonTap()
+                isResendingWebhook = true
+                WebhookQueueService.shared.resend(recordingId: recording.id)
+                Task {
+                    try? await Task.sleep(nanoseconds: 500_000_000)
+                    refreshRecording()
+                    isResendingWebhook = false
                 }
-                .disabled(isResendingWebhook || recording.webhookStatus == .sending)
+            } label: {
+                Label("Resend Webhook", systemImage: "paperplane")
             }
         }
     }

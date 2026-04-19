@@ -51,6 +51,29 @@ final class WebhookQueueService: ObservableObject {
         processNextIfNeeded()
     }
 
+    /// User-initiated webhook send. Logs the request, resets retry state, and
+    /// enqueues (or replaces) a job. Works even if a job is already queued or
+    /// waiting in backoff.
+    func resend(recordingId: UUID) {
+        let settings = settingsService.load()
+        guard settings.webhookEnabled,
+              let webhookURL = settings.webhookURL,
+              !webhookURL.isEmpty else { return }
+
+        var recordings = storageService.loadRecordings()
+        if let idx = recordings.firstIndex(where: { $0.id == recordingId }) {
+            recordings[idx].webhookStatus = .pending
+            recordings[idx].activityLog.append(ActivityEntry("Manual webhook resend requested"))
+            storageService.saveRecordings(recordings)
+        }
+
+        // Remove any existing job so the new attempt starts fresh (retry count 0)
+        queue.removeAll { $0.recordingId == recordingId }
+        queue.append(WebhookJob(recordingId: recordingId))
+        saveQueue()
+        processNextIfNeeded()
+    }
+
     func processNextIfNeeded() {
         guard !isProcessing, let job = queue.first else { return }
         processJob(job)
@@ -124,8 +147,14 @@ final class WebhookQueueService: ObservableObject {
             return
         }
 
-        // Update webhook status to sending
+        // Update webhook status to sending and log the attempt so users can see
+        // each reach-out, including ones that time out before a response.
         recordings[idx].webhookStatus = .sending
+        let attemptNumber = job.retryCount + 1
+        let attemptLabel = attemptNumber == 1
+            ? "Sending webhook…"
+            : "Sending webhook… (attempt \(attemptNumber)/\(WebhookJob.maxRetries))"
+        recordings[idx].activityLog.append(ActivityEntry(attemptLabel))
         storageService.saveRecordings(recordings)
 
         let recording = recordings[idx]
