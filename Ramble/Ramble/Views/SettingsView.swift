@@ -27,6 +27,7 @@ struct SettingsView: View {
                 webhookSection
                 appearanceSection
                 statsSection
+                helpSection
                 exportSection
                 dangerZoneSection
                 aboutSection
@@ -288,6 +289,23 @@ struct SettingsView: View {
                     Spacer()
                     Text("\(viewModel.failedTranscriptions)")
                         .foregroundStyle(.red)
+                }
+            }
+        }
+    }
+
+    private var helpSection: some View {
+        Section("Help") {
+            Button {
+                HapticService.buttonTap()
+                UserDefaults.standard.set(false, forKey: "hasCompletedOnboarding")
+                dismiss()
+            } label: {
+                HStack {
+                    Image(systemName: "sparkles")
+                        .foregroundStyle(.red)
+                    Text("Replay intro")
+                        .foregroundStyle(.primary)
                 }
             }
         }
