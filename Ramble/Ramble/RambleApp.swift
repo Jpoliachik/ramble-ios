@@ -10,6 +10,7 @@ import SwiftUI
 @main
 struct RambleApp: App {
     @AppStorage("appearanceMode") private var appearanceMode: String = AppearanceMode.system.rawValue
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
 
     init() {
         BackgroundTaskService.shared.registerBackgroundTasks()
@@ -25,11 +26,29 @@ struct RambleApp: App {
         Task {
             await SubscriptionService.shared.start()
         }
+
+        // Returning users (existing recordings or configured webhook) skip onboarding
+        if !UserDefaults.standard.bool(forKey: "hasCompletedOnboarding") {
+            let hasRecordings = !StorageService.shared.loadRecordings().isEmpty
+            let hasWebhook = SettingsService.shared.load().webhookURL?.isEmpty == false
+            if hasRecordings || hasWebhook {
+                UserDefaults.standard.set(true, forKey: "hasCompletedOnboarding")
+            }
+        }
     }
 
     var body: some Scene {
         WindowGroup {
-            MainView()
+            Group {
+                if hasCompletedOnboarding {
+                    MainView()
+                        .transition(.opacity)
+                } else {
+                    OnboardingView()
+                        .transition(.opacity)
+                }
+            }
+                .animation(.easeInOut(duration: 0.35), value: hasCompletedOnboarding)
                 .preferredColorScheme(
                     AppearanceMode(rawValue: appearanceMode)?.colorScheme
                 )
