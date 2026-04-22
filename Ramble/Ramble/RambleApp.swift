@@ -13,6 +13,7 @@ struct RambleApp: App {
 
     init() {
         BackgroundTaskService.shared.registerBackgroundTasks()
+        AppAttestService.shared.migrateKeychainAccessibilityIfNeeded()
         _ = PhoneConnectivityService.shared
         HapticService.prepare()
 
