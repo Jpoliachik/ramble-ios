@@ -10,6 +10,7 @@ import SwiftUI
 @main
 struct RambleApp: App {
     @AppStorage("appearanceMode") private var appearanceMode: String = AppearanceMode.system.rawValue
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
 
     init() {
         BackgroundTaskService.shared.registerBackgroundTasks()
@@ -29,7 +30,15 @@ struct RambleApp: App {
 
     var body: some Scene {
         WindowGroup {
-            MainView()
+            Group {
+                if hasCompletedOnboarding {
+                    MainView()
+                        .transition(.opacity)
+                } else {
+                    OnboardingView()
+                        .transition(.opacity)
+                }
+            }
                 .preferredColorScheme(
                     AppearanceMode(rawValue: appearanceMode)?.colorScheme
                 )

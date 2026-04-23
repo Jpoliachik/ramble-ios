@@ -32,4 +32,19 @@ enum HapticService {
         lightGenerator.impactOccurred()
         lightGenerator.prepare()
     }
+
+    static func success() {
+        notificationGenerator.notificationOccurred(.success)
+        notificationGenerator.prepare()
+    }
+
+    static func warning() {
+        notificationGenerator.notificationOccurred(.warning)
+        notificationGenerator.prepare()
+    }
+
+    static func selection() {
+        lightGenerator.impactOccurred(intensity: 0.7)
+        lightGenerator.prepare()
+    }
 }
