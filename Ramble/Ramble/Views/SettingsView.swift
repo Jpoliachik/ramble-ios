@@ -181,6 +181,7 @@ struct SettingsView: View {
                 .buttonStyle(.plain)
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                .listRowSeparator(.hidden)
             } else {
                 Button {
                     showDestinationEdit = true
@@ -209,7 +210,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 14) {
                 SettingsGroupTitle(
                     title: "Send via Webhook",
-                    subtitle: "Pipe transcripts to a URL you control. Optional."
+                    subtitle: "Pipe transcripts to a URL you control."
                 )
                 if viewModel.webhookURL.isEmpty {
                     SendVisual()
@@ -226,7 +227,7 @@ struct SettingsView: View {
             }
             .textCase(.none)
         } footer: {
-            Text("Your notes, an automation, an AI agent — anywhere that accepts an HTTPS POST.")
+            Text("Create automations, send to an AI agent — anywhere that accepts an HTTPS POST.")
         }
     }
 
@@ -736,6 +737,8 @@ struct WebhookDestinationEditSheet: View {
                     removeSection
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(Color.obBg)
             .navigationTitle(isEditing ? "Edit destination" : "Add destination")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -792,6 +795,7 @@ struct WebhookDestinationEditSheet: View {
         } footer: {
             Text("This is yours — your server, your workflow, your data. Transcripts go only here, never anywhere else.")
         }
+        .listRowBackground(Color.obSurface)
     }
 
     private var secretSection: some View {
@@ -838,6 +842,7 @@ struct WebhookDestinationEditSheet: View {
         } footer: {
             Text("Use this to verify requests on your endpoint.")
         }
+        .listRowBackground(Color.obSurface)
     }
 
     private var docsSection: some View {
@@ -853,6 +858,7 @@ struct WebhookDestinationEditSheet: View {
             }
             .foregroundStyle(.primary)
         }
+        .listRowBackground(Color.obSurface)
     }
 
     private var testSection: some View {
@@ -884,6 +890,7 @@ struct WebhookDestinationEditSheet: View {
             }
             .disabled(isTestLoading)
         }
+        .listRowBackground(Color.obSurface)
     }
 
     private var removeSection: some View {
@@ -894,6 +901,7 @@ struct WebhookDestinationEditSheet: View {
                 Label("Remove destination", systemImage: "trash")
             }
         }
+        .listRowBackground(Color.obSurface)
     }
 
     private func validateURL() {
