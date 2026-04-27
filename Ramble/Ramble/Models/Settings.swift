@@ -139,16 +139,20 @@ enum CloudModel: String, Codable, CaseIterable, Identifiable {
 struct Settings: Codable {
     var transcriptionProvider: TranscriptionProvider
     var cloudModel: CloudModel
-    var webhookEnabled: Bool
     var webhookURL: String?
     var webhookSecret: String
     var deviceId: String
     var appearanceMode: AppearanceMode
 
+    /// Whether webhook delivery is configured. Any non-empty URL means "send it."
+    var isWebhookConfigured: Bool {
+        guard let url = webhookURL else { return false }
+        return !url.isEmpty
+    }
+
     init(
         transcriptionProvider: TranscriptionProvider = .appleSpeech,
         cloudModel: CloudModel = .whisperLargeV3Turbo,
-        webhookEnabled: Bool = false,
         webhookURL: String? = nil,
         webhookSecret: String = Self.generateSecret(),
         deviceId: String = UUID().uuidString,
@@ -156,7 +160,6 @@ struct Settings: Codable {
     ) {
         self.transcriptionProvider = transcriptionProvider
         self.cloudModel = cloudModel
-        self.webhookEnabled = webhookEnabled
         self.webhookURL = webhookURL
         self.webhookSecret = webhookSecret
         self.deviceId = deviceId
@@ -173,9 +176,6 @@ struct Settings: Codable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
         webhookURL = try container.decodeIfPresent(String.self, forKey: .webhookURL)
-
-        webhookEnabled = try container.decodeIfPresent(Bool.self, forKey: .webhookEnabled)
-            ?? (webhookURL != nil && !webhookURL!.isEmpty)
 
         webhookSecret = try container.decodeIfPresent(String.self, forKey: .webhookSecret)
             ?? Self.generateSecret()
@@ -206,7 +206,6 @@ struct Settings: Codable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(transcriptionProvider, forKey: .transcriptionProvider)
         try container.encode(cloudModel, forKey: .cloudModel)
-        try container.encode(webhookEnabled, forKey: .webhookEnabled)
         try container.encodeIfPresent(webhookURL, forKey: .webhookURL)
         try container.encode(appearanceMode, forKey: .appearanceMode)
         // webhookSecret and deviceId are stored in Keychain, not on disk
@@ -217,12 +216,12 @@ struct Settings: Codable {
     private enum CodingKeys: String, CodingKey {
         case transcriptionProvider
         case cloudModel
-        case webhookEnabled
         case webhookURL
         case webhookSecret
         case deviceId
         case appearanceMode
         // Legacy keys for migration
+        case webhookEnabled
         case proxyBaseURL
         case apiBaseURL
         case apiToken

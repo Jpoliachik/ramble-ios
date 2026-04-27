@@ -11,11 +11,9 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showDeleteConfirmation = false
     @State private var showExportShare = false
-    @State private var showSecretCopied = false
-    @State private var showRegenerateConfirmation = false
-    @State private var showSecretRevealed = false
     @State private var showTranscriptionInfo = false
     @State private var showWebhookInfo = false
+    @State private var showDestinationEdit = false
     @State private var exportURL: URL?
     @State private var versionTapCount = 0
     @State private var showDebugSheet = false
@@ -58,6 +56,9 @@ struct SettingsView: View {
             .sheet(isPresented: $showWebhookInfo) {
                 WebhookInfoSheet()
             }
+            .sheet(isPresented: $showDestinationEdit) {
+                WebhookDestinationEditSheet(viewModel: viewModel)
+            }
         }
     }
 
@@ -66,14 +67,20 @@ struct SettingsView: View {
         return false
     }
 
+    private var appleSpeechSubtitle: String {
+        isSpeechAnalyzerAvailable ? "Built into iOS · works offline" : "Free, on-device"
+    }
+
     private var transcriptionSection: some View {
         Section {
-            // Apple Speech — always available
-            ProviderRowView(
-                provider: .appleSpeech,
+            TranscriptionModelRow(
+                title: TranscriptionProvider.appleSpeech.displayName,
+                subtitle: appleSpeechSubtitle,
+                logo: .system(TranscriptionProvider.appleSpeech.iconName),
                 isSelected: viewModel.transcriptionProvider == .appleSpeech,
-                onSelect: { viewModel.transcriptionProvider = .appleSpeech }
+                onTap: { viewModel.transcriptionProvider = .appleSpeech }
             )
+            .listRowInsets(EdgeInsets())
 
             if !isSpeechAnalyzerAvailable {
                 HStack(spacing: 10) {
@@ -87,15 +94,18 @@ struct SettingsView: View {
                 .padding(.vertical, 4)
             }
 
-            // Each cloud model shown individually
             ForEach(CloudModel.allCases) { model in
-                CloudModelRowView(
-                    model: model,
+                TranscriptionModelRow(
+                    title: model.displayName,
+                    subtitle: model.subtitle,
+                    logo: .asset(model.iconName),
                     isSelected: viewModel.transcriptionProvider == .cloudTranscription
                         && viewModel.cloudModel == model,
-                    isPremiumLocked: !subscriptionService.isPremium,
-                    onSelect: { viewModel.selectCloudModel(model) }
+                    isLocked: !subscriptionService.isPremium,
+                    showsRecommended: model == .whisperLargeV3Turbo,
+                    onTap: { viewModel.selectCloudModel(model) }
                 )
+                .listRowInsets(EdgeInsets())
             }
         } header: {
             HStack {
@@ -114,117 +124,45 @@ struct SettingsView: View {
 
     private var webhookSection: some View {
         Section {
-            Toggle("Post-Transcription Webhook", isOn: $viewModel.webhookEnabled)
-
-            if viewModel.webhookEnabled {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Webhook URL")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    TextField("https://your-webhook.example.com", text: $viewModel.webhookURL)
-                        .keyboardType(.URL)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .onChange(of: viewModel.webhookURL) {
-                            viewModel.validateWebhookURL()
-                        }
-
-                    if let error = viewModel.webhookURLError {
-                        Label(error, systemImage: "exclamationmark.triangle.fill")
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                    }
-                }
-
-                // Test webhook button
-                if !viewModel.webhookURL.isEmpty && viewModel.webhookURLError == nil {
-                    Button {
-                        viewModel.sendTestWebhook()
-                    } label: {
-                        HStack {
-                            switch viewModel.testWebhookResult {
-                            case .loading:
-                                ProgressView()
-                                    .controlSize(.small)
-                                Text("Sending...")
-                            case .success:
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(.green)
-                                Text("Test delivered")
-                            case .failure(let error):
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundStyle(.red)
-                                Text("Failed — \(error)")
-                            case nil:
-                                Image(systemName: "paperplane")
-                                Text("Send Test Webhook")
-                            }
-                        }
-                    }
-                    .disabled(viewModel.testWebhookResult != nil && {
-                        if case .loading = viewModel.testWebhookResult { return true }
-                        return false
-                    }())
-                }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("Signing Secret")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+            if viewModel.webhookURL.isEmpty {
+                Button {
+                    showDestinationEdit = true
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(.blue)
+                        Text("Add destination")
                         Spacer()
-                        Button {
-                            withAnimation { showSecretRevealed.toggle() }
-                        } label: {
-                            Image(systemName: showSecretRevealed ? "eye.slash" : "eye")
-                                .font(.footnote)
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                    }
-
-                    if showSecretRevealed {
-                        Text(viewModel.webhookSecret)
-                            .font(.system(.caption, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                    }
-
-                    HStack(spacing: 8) {
-                        Button {
-                            UIPasteboard.general.string = viewModel.webhookSecret
-                            showSecretCopied = true
-                            Task {
-                                try? await Task.sleep(nanoseconds: 1_500_000_000)
-                                showSecretCopied = false
-                            }
-                        } label: {
-                            Label("Copy", systemImage: showSecretCopied ? "checkmark" : "doc.on.doc")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .tint(showSecretCopied ? .green : nil)
-
-                        Button {
-                            showRegenerateConfirmation = true
-                        } label: {
-                            Label("Regenerate", systemImage: "arrow.clockwise")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
                     }
                 }
-                .alert("Regenerate Secret?", isPresented: $showRegenerateConfirmation) {
-                    Button("Regenerate", role: .destructive) {
-                        viewModel.regenerateWebhookSecret()
+                .foregroundStyle(.primary)
+            } else {
+                Button {
+                    showDestinationEdit = true
+                } label: {
+                    HStack(spacing: 12) {
+                        Circle()
+                            .fill(Color.green)
+                            .frame(width: 8, height: 8)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(destinationHost)
+                                .font(.body)
+                                .foregroundStyle(.primary)
+                            Text("Transcripts are sent automatically")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
                     }
-                    Button("Cancel", role: .cancel) {}
-                } message: {
-                    Text("Your webhook endpoint will need to be updated with the new secret to continue accepting requests.")
                 }
+                .foregroundStyle(.primary)
             }
 
             Button {
@@ -244,6 +182,10 @@ struct SettingsView: View {
         } header: {
             Text("Webhook")
         }
+    }
+
+    private var destinationHost: String {
+        URL(string: viewModel.webhookURL)?.host ?? viewModel.webhookURL
     }
 
     private var appearanceSection: some View {
@@ -363,113 +305,6 @@ struct SettingsView: View {
     }
 }
 
-struct ProviderRowView: View {
-    let provider: TranscriptionProvider
-    let isSelected: Bool
-    var isPremiumLocked: Bool = false
-    let onSelect: () -> Void
-
-    var body: some View {
-        Button(action: onSelect) {
-            HStack(spacing: 14) {
-                Image(systemName: provider.iconName)
-                    .font(.title3)
-                    .foregroundStyle(provider.isCloud ? .blue : .green)
-                    .frame(width: 32, height: 32)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(provider.isCloud
-                                ? Color.blue.opacity(0.12)
-                                : Color.green.opacity(0.12))
-                    )
-
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text(provider.displayName)
-                            .font(.body)
-                            .foregroundStyle(.primary)
-                        if isPremiumLocked {
-                            Text("PRO")
-                                .font(.caption2.weight(.bold))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(
-                                    Capsule().fill(Color.blue)
-                                )
-                        }
-                    }
-                    Text(provider.subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                if isSelected {
-                    Image(systemName: "checkmark")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(.tint)
-                } else if isPremiumLocked {
-                    Image(systemName: "lock.fill")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-struct CloudModelRowView: View {
-    let model: CloudModel
-    let isSelected: Bool
-    var isPremiumLocked: Bool = false
-    let onSelect: () -> Void
-
-    var body: some View {
-        Button(action: onSelect) {
-            HStack(spacing: 14) {
-                Image(model.iconName)
-                    .renderingMode(.template)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 18, height: 18)
-                    .foregroundStyle(.blue)
-                    .frame(width: 32, height: 32)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Color.blue.opacity(0.12))
-                    )
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(model.displayName)
-                        .font(.body)
-                        .foregroundStyle(.primary)
-                    Text(model.subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                if isSelected {
-                    Image(systemName: "checkmark")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(.tint)
-                } else if isPremiumLocked {
-                    Image(systemName: "lock.fill")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-}
-
 struct TranscriptionInfoSheet: View {
     @Environment(\.dismiss) private var dismiss
 
@@ -518,6 +353,70 @@ struct TranscriptionInfoSheet: View {
                 .padding()
             }
             .navigationTitle("About Transcription")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+struct PrivacyInfoSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("Your audio belongs to you. Here's exactly where it goes — and where it doesn't.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    InfoBlock(
+                        icon: "iphone",
+                        title: "Recorded on your device",
+                        text: "Recordings are saved locally to your phone. They aren't uploaded anywhere automatically."
+                    )
+
+                    InfoBlock(
+                        icon: "lock.shield",
+                        title: "On-device transcription stays put",
+                        text: "Apple Speech transcribes audio entirely on your iPhone — nothing leaves the device. It's the default."
+                    )
+
+                    InfoBlock(
+                        icon: "cloud",
+                        title: "Cloud transcription is opt-in",
+                        text: "If you choose a cloud model, audio is sent through our open-source proxy to the provider, transcribed, and the text comes back. We don't store the audio or the transcript."
+                    )
+
+                    InfoBlock(
+                        icon: "paperplane",
+                        title: "Webhooks go where you point them",
+                        text: "If you configure a webhook, transcripts are POSTed to a URL you control. That's the only place transcripts ever leave your device — and only when you set it up."
+                    )
+
+                    InfoBlock(
+                        icon: "chevron.left.forwardslash.chevron.right",
+                        title: "Open source",
+                        text: "Ramble is open source. Read the code, audit the proxy, run your own. No accounts, no analytics."
+                    )
+
+                    Link(destination: URL(string: "https://goodloop.dev/ramble/privacy")!) {
+                        HStack {
+                            Spacer()
+                            Label("Read the full privacy policy", systemImage: "doc.text")
+                            Spacer()
+                        }
+                        .padding(.vertical, 12)
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .padding()
+            }
+            .navigationTitle("How privacy works")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -691,6 +590,228 @@ struct DebugSheet: View {
                 }
             }
         }
+    }
+}
+
+struct WebhookDestinationEditSheet: View {
+    @ObservedObject var viewModel: SettingsViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var draftURL: String
+    @State private var draftSecret: String
+    @State private var draftURLError: String?
+    @State private var showRegenerateConfirmation = false
+    @State private var showRemoveConfirmation = false
+    @State private var showSecretRevealed = false
+    @State private var showSecretCopied = false
+
+    init(viewModel: SettingsViewModel) {
+        self.viewModel = viewModel
+        _draftURL = State(initialValue: viewModel.webhookURL)
+        let secret = viewModel.webhookSecret.isEmpty ? Settings.generateSecret() : viewModel.webhookSecret
+        _draftSecret = State(initialValue: secret)
+    }
+
+    private var isEditing: Bool {
+        !viewModel.webhookURL.isEmpty
+    }
+
+    private var trimmedURL: String {
+        draftURL.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var canSave: Bool {
+        !trimmedURL.isEmpty && draftURLError == nil
+    }
+
+    private var isTestLoading: Bool {
+        if case .loading = viewModel.testWebhookResult { return true }
+        return false
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                urlSection
+                secretSection
+                if canSave {
+                    testSection
+                }
+                if isEditing {
+                    removeSection
+                }
+            }
+            .navigationTitle(isEditing ? "Edit destination" : "Add destination")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { save() }
+                        .disabled(!canSave)
+                }
+            }
+            .confirmationDialog(
+                "Regenerate secret?",
+                isPresented: $showRegenerateConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Regenerate", role: .destructive) {
+                    draftSecret = Settings.generateSecret()
+                    HapticService.warning()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Your endpoint will need the new secret to accept requests.")
+            }
+            .confirmationDialog(
+                "Remove destination?",
+                isPresented: $showRemoveConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Remove", role: .destructive) {
+                    remove()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Transcripts will no longer be sent anywhere.")
+            }
+        }
+    }
+
+    private var urlSection: some View {
+        Section {
+            TextField("https://your-webhook.example.com", text: $draftURL)
+                .keyboardType(.URL)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .onChange(of: draftURL) { validateURL() }
+            if let error = draftURLError {
+                Label(error, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+        } header: {
+            Text("URL")
+        } footer: {
+            Text("Ramble will POST each transcript as JSON to this URL.")
+        }
+    }
+
+    private var secretSection: some View {
+        Section {
+            HStack {
+                Text(showSecretRevealed ? draftSecret : String(repeating: "•", count: 24))
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer()
+                Button {
+                    withAnimation { showSecretRevealed.toggle() }
+                } label: {
+                    Image(systemName: showSecretRevealed ? "eye.slash" : "eye")
+                }
+                .buttonStyle(.borderless)
+            }
+
+            Button {
+                UIPasteboard.general.string = draftSecret
+                HapticService.success()
+                showSecretCopied = true
+                Task {
+                    try? await Task.sleep(nanoseconds: 1_500_000_000)
+                    showSecretCopied = false
+                }
+            } label: {
+                Label(
+                    showSecretCopied ? "Copied" : "Copy secret",
+                    systemImage: showSecretCopied ? "checkmark" : "doc.on.doc"
+                )
+                .foregroundStyle(showSecretCopied ? .green : .primary)
+            }
+
+            Button {
+                showRegenerateConfirmation = true
+            } label: {
+                Label("Regenerate", systemImage: "arrow.clockwise")
+                    .foregroundStyle(.primary)
+            }
+        } header: {
+            Text("Signing secret")
+        } footer: {
+            Text("Use this to verify requests on your endpoint.")
+        }
+    }
+
+    private var testSection: some View {
+        Section {
+            Button {
+                persistDraft()
+                viewModel.sendTestWebhook()
+            } label: {
+                HStack {
+                    switch viewModel.testWebhookResult {
+                    case .loading:
+                        ProgressView().controlSize(.small)
+                        Text("Sending…")
+                    case .success:
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                        Text("Test delivered")
+                    case .failure(let error):
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.red)
+                        Text("Failed — \(error)")
+                            .lineLimit(2)
+                    case nil:
+                        Image(systemName: "paperplane")
+                        Text("Send test webhook")
+                    }
+                }
+                .foregroundStyle(.primary)
+            }
+            .disabled(isTestLoading)
+        }
+    }
+
+    private var removeSection: some View {
+        Section {
+            Button(role: .destructive) {
+                showRemoveConfirmation = true
+            } label: {
+                Label("Remove destination", systemImage: "trash")
+            }
+        }
+    }
+
+    private func validateURL() {
+        if trimmedURL.isEmpty {
+            draftURLError = nil
+            return
+        }
+        draftURLError = WebhookQueueService.validateWebhookURL(trimmedURL)
+    }
+
+    // Pushes draft values into the view model and persists. Used by Save and Test.
+    private func persistDraft() {
+        viewModel.webhookURL = trimmedURL
+        viewModel.webhookSecret = draftSecret
+        viewModel.save()
+    }
+
+    private func save() {
+        persistDraft()
+        HapticService.success()
+        dismiss()
+    }
+
+    private func remove() {
+        viewModel.webhookURL = ""
+        viewModel.save()
+        HapticService.success()
+        dismiss()
     }
 }
 

@@ -3,93 +3,126 @@
 //  Ramble
 //
 
+import Combine
 import SwiftUI
 
 struct OnboardingSendStep: View {
-    let namespace: Namespace.ID
     let onFinish: () -> Void
 
     @StateObject private var viewModel = OnboardingSendViewModel()
 
     var body: some View {
-        VStack(spacing: 0) {
-            Spacer().frame(height: 16)
+        OnboardingPage {
+            VStack(spacing: 0) {
+                Spacer().frame(height: 8)
 
-            SendIllustration()
-                .frame(height: 96)
-                .onboardingAppear(delay: 0.05)
+                OnboardingIllustration(name: "illustration-automate")
+                    .onboardingAppear(delay: 0.05)
 
-            Spacer().frame(height: 16)
+                Spacer().frame(height: 14)
 
-            OnboardingStepHeader(
-                eyebrow: "Step 3 · Send",
-                title: "Where it lands",
-                subtitle: "Ramble can auto-deliver every transcript to a URL you control — perfect for your notes app, automations, or an AI agent. Totally optional."
-            )
+                VStack(spacing: 16) {
+                    OnboardingHeadline(size: 34) {
+                        Text("Make it ") + Text("do something.").italic()
+                    }
 
-            Spacer()
+                    OnboardingBody(text: "Pipe every transcript into a URL you control — your notes, an automation, an AI agent. Optional.")
+                }
+                .padding(.horizontal, 24)
+                .onboardingAppear(delay: 0.2)
 
-            Group {
+                Spacer().frame(height: 24)
+
+                SendVisual()
+                    .padding(.horizontal, 16)
+                    .onboardingAppear(delay: 0.3)
+
+                Spacer().frame(height: 20)
+
                 if viewModel.hasDestination {
                     destinationRow
+                        .padding(.horizontal, 16)
+                        .onboardingAppear(delay: 0.4)
                 } else {
-                    addDestinationButton
+                    addDestinationCard
+                        .padding(.horizontal, 16)
+                        .onboardingAppear(delay: 0.4)
                 }
+
+                Spacer(minLength: 24)
             }
-            .padding(.horizontal, 24)
-            .onboardingAppear(delay: 0.3)
-
-            Spacer()
-
-            VStack(spacing: 4) {
-                OnboardingPrimaryButton(title: viewModel.hasDestination ? "All set" : "Maybe later") {
+        } bottomBar: {
+            VStack(spacing: 8) {
+                OnboardingSurfaceButton(
+                    title: viewModel.hasDestination ? "Continue" : "Maybe later"
+                ) {
                     viewModel.commit()
                     HapticService.success()
                     onFinish()
                 }
+
                 if !viewModel.hasDestination {
                     Text("You can always add one in Settings.")
-                        .font(.footnote)
-                        .foregroundStyle(.tertiary)
-                        .padding(.top, 2)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.obInkFaint)
                 }
             }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 32)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 24)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .sheet(isPresented: $viewModel.showEditSheet) {
             DestinationEditSheet(viewModel: viewModel)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
+                .presentationDetents([.large])
+                .presentationBackgroundInteraction(.disabled)
+                .presentationContentInteraction(.scrolls)
+                .interactiveDismissDisabled(false)
         }
     }
 
-    private var addDestinationButton: some View {
+    // MARK: - Add destination (dashed card)
+
+    private var addDestinationCard: some View {
         Button {
             HapticService.buttonTap()
             viewModel.beginAdd()
         } label: {
-            HStack(spacing: 10) {
-                Image(systemName: "plus.circle.fill")
-                    .font(.title3)
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(Color.obInk)
+                        .frame(width: 28, height: 28)
+
+                    Image(systemName: "plus")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Color.obBg)
+                }
+
                 Text("Add a destination")
-                    .font(.headline)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Color.obInk)
+
                 Spacer()
+
                 Image(systemName: "chevron.right")
-                    .font(.footnote)
-                    .foregroundStyle(.tertiary)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.obInkFaint)
             }
-            .foregroundStyle(.primary)
-            .padding(.vertical, 16)
-            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity)
             .background(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color.secondary.opacity(0.3), style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.obSurface)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.obInk.opacity(0.08), lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
     }
+
+    // MARK: - Destination row (set state)
 
     private var destinationRow: some View {
         Button {
@@ -98,36 +131,145 @@ struct OnboardingSendStep: View {
         } label: {
             HStack(spacing: 12) {
                 Circle()
-                    .fill(Color.green)
+                    .fill(Color.obRed)
                     .frame(width: 10, height: 10)
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 1) {
                     Text(viewModel.destinationLabel)
-                        .font(.body.weight(.medium))
-                        .foregroundStyle(.primary)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(Color.obInk)
                     Text("Tap to edit")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.obInkFaint)
                 }
 
                 Spacer()
 
                 Image(systemName: "pencil")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color.obInkFaint)
             }
             .padding(.vertical, 14)
-            .padding(.horizontal, 18)
+            .padding(.horizontal, 16)
             .background(
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(Color(.secondarySystemGroupedBackground))
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.obSurface)
             )
         }
         .buttonStyle(.plain)
-        .transition(.asymmetric(
-            insertion: .scale(scale: 0.9).combined(with: .opacity),
-            removal: .opacity
-        ))
+    }
+}
+
+// MARK: - Send visual (voice → endpoint pill)
+
+private struct SendVisual: View {
+    private let cycleDuration: Double = 2.4
+
+    var body: some View {
+        HStack(spacing: 10) {
+            voiceChip
+
+            connector
+                .frame(width: 56, height: 20)
+
+            endpointChip
+        }
+        .padding(.vertical, 18)
+        .padding(.horizontal, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color.obSurface)
+        )
+    }
+
+    private var voiceChip: some View {
+        HStack(alignment: .center, spacing: 8) {
+            Image(systemName: "waveform")
+                .font(.system(size: 12))
+                .foregroundStyle(Color.obRed)
+
+            Text("So I was thinking we should ship Tuesday morning.")
+                .font(.system(size: 11, design: .serif).italic())
+                .foregroundStyle(Color.obInkSoft)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, minHeight: 30, alignment: .leading)
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.obBg)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.obHair, lineWidth: 0.5)
+                )
+        )
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var connector: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { context in
+            let elapsed = context.date.timeIntervalSinceReferenceDate
+            let progress = elapsed.truncatingRemainder(dividingBy: cycleDuration) / cycleDuration
+
+            ZStack(alignment: .leading) {
+                Rectangle()
+                    .fill(Color.obHair)
+                    .frame(height: 2)
+                    .padding(.trailing, 6)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Color.obInkFaint)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+
+                GeometryReader { geo in
+                    let travel = max(0, geo.size.width - 14)
+                    Circle()
+                        .fill(Color.obRed)
+                        .frame(width: 9, height: 9)
+                        .offset(
+                            x: travel * CGFloat(progress),
+                            y: (geo.size.height - 9) / 2
+                        )
+                        .opacity(travelOpacity(for: progress))
+                }
+            }
+        }
+    }
+
+    private func travelOpacity(for progress: Double) -> Double {
+        switch progress {
+        case ..<0.15: return progress / 0.15
+        case 0.85...: return max(0, (1 - progress) / 0.15)
+        default: return 1
+        }
+    }
+
+    private var endpointChip: some View {
+        HStack(alignment: .center, spacing: 8) {
+            Image(systemName: "paperplane.fill")
+                .font(.system(size: 11))
+                .foregroundStyle(Color.obRed)
+
+            Text("my.api.com")
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(Color.obInkSoft)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, minHeight: 30, alignment: .leading)
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.obBg)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.obHair, lineWidth: 0.5)
+                )
+        )
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -208,16 +350,13 @@ final class OnboardingSendViewModel: ObservableObject {
         showEditSheet = false
     }
 
-    /// Persists to settings. Enables webhook when a URL is present.
     func commit() {
         var current = settingsService.load()
         if destinationURL.isEmpty {
             current.webhookURL = nil
-            current.webhookEnabled = false
         } else {
             current.webhookURL = destinationURL
             current.webhookSecret = destinationSecret
-            current.webhookEnabled = true
         }
         settingsService.save(current)
     }
@@ -227,6 +366,8 @@ final class OnboardingSendViewModel: ObservableObject {
 
 private struct DestinationEditSheet: View {
     @ObservedObject var viewModel: OnboardingSendViewModel
+    @State private var showSecretRevealed = false
+    @State private var showSecretCopied = false
 
     var body: some View {
         NavigationStack {
@@ -245,27 +386,58 @@ private struct DestinationEditSheet: View {
                             .foregroundStyle(.red)
                     }
                 } header: {
-                    Text("URL")
+                    Text("Your URL")
                 } footer: {
-                    Text("Ramble will POST each transcript as JSON to this URL.")
+                    Text("This is yours — your server, your workflow, your data. Transcripts go only here, never anywhere else.")
                 }
 
                 Section {
-                    Text(viewModel.draftSecret)
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
+                    HStack {
+                        Text(showSecretRevealed ? viewModel.draftSecret : String(repeating: "•", count: 24))
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Spacer()
+                        Button {
+                            withAnimation { showSecretRevealed.toggle() }
+                        } label: {
+                            Image(systemName: showSecretRevealed ? "eye.slash" : "eye")
+                        }
+                        .buttonStyle(.borderless)
+                    }
                     Button {
                         UIPasteboard.general.string = viewModel.draftSecret
                         HapticService.success()
+                        showSecretCopied = true
+                        Task {
+                            try? await Task.sleep(nanoseconds: 1_500_000_000)
+                            showSecretCopied = false
+                        }
                     } label: {
-                        Label("Copy secret", systemImage: "doc.on.doc")
+                        Label(
+                            showSecretCopied ? "Copied" : "Copy secret",
+                            systemImage: showSecretCopied ? "checkmark" : "doc.on.doc"
+                        )
+                        .foregroundStyle(showSecretCopied ? .green : .primary)
                     }
                 } header: {
                     Text("Signing secret")
                 } footer: {
                     Text("Use this to verify requests on your endpoint.")
+                }
+
+                Section {
+                    Link(destination: URL(string: "https://goodloop.dev/ramble/docs")!) {
+                        HStack {
+                            Label("API setup docs", systemImage: "doc.text")
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .foregroundStyle(.primary)
                 }
             }
             .navigationTitle(viewModel.isEditing ? "Edit destination" : "Add destination")
@@ -282,33 +454,6 @@ private struct DestinationEditSheet: View {
                     }
                     .disabled(!viewModel.canSaveDraft)
                 }
-            }
-        }
-    }
-}
-
-// MARK: - Illustration
-
-private struct SendIllustration: View {
-    @State private var pulse = false
-
-    var body: some View {
-        ZStack {
-            // Soft halo
-            Circle()
-                .fill(Color.red.opacity(0.08))
-                .frame(width: 92, height: 92)
-
-            Image(systemName: "paperplane.fill")
-                .font(.system(size: 38, weight: .regular))
-                .foregroundStyle(.red)
-                .rotationEffect(.degrees(-20))
-                .offset(x: pulse ? 6 : -6, y: pulse ? -4 : 4)
-                .shadow(color: .red.opacity(0.25), radius: 8, y: 4)
-        }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 1.6).repeatForever(autoreverses: true)) {
-                pulse = true
             }
         }
     }

@@ -7,84 +7,89 @@ import SwiftUI
 
 struct OnboardingView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
+    @AppStorage("shouldShowOnboardingToast") private var shouldShowOnboardingToast: Bool = false
 
     @State private var step: OnboardingStep = .welcome
-    @Namespace private var namespace
+    @State private var direction: TransitionDirection = .forward
 
     var body: some View {
         ZStack {
-            // Subtle warm radial backdrop — barely perceptible, but premium.
-            OnboardingBackdrop()
+            Color.obBg
                 .ignoresSafeArea()
 
-            OnboardingStepContainer(step: step, namespace: namespace) {
+            VStack(spacing: 0) {
+                // Persistent nav row — fades in/out when moving between Welcome and the body
+                // steps, but is the *same* view instance across body steps so only the active
+                // dot animates between transitions.
+                if let activeStep = step.progressIndex {
+                    OnboardingNavRow(activeStep: activeStep) {
+                        if let previous = step.previous {
+                            advance(to: previous)
+                        }
+                    }
+                    .transition(.opacity)
+                }
+
                 Group {
                     switch step {
                     case .welcome:
-                        OnboardingWelcomeStep(namespace: namespace) {
-                            advance(to: .record)
-                        }
+                        OnboardingWelcomeStep(
+                            onContinue: { advance(to: .record) }
+                        )
                     case .record:
-                        OnboardingRecordStep(namespace: namespace) {
-                            advance(to: .transcribe)
-                        }
+                        OnboardingRecordStep(
+                            onPermissionGranted: { advance(to: .transcribe) }
+                        )
                     case .transcribe:
-                        OnboardingTranscribeStep(namespace: namespace) {
-                            advance(to: .send)
-                        }
+                        OnboardingTranscribeStep(
+                            onContinue: { advance(to: .send) }
+                        )
                     case .send:
-                        OnboardingSendStep(namespace: namespace) {
-                            finish()
-                        }
+                        OnboardingSendStep(
+                            onFinish: finish
+                        )
                     }
                 }
-                .transition(
-                    .asymmetric(
-                        insertion: .move(edge: .trailing).combined(with: .opacity),
-                        removal: .move(edge: .leading).combined(with: .opacity)
-                    )
-                )
+                .transition(slideTransition)
                 .id(step)
             }
+        }
+        .preferredColorScheme(nil)
+    }
+
+    private var slideTransition: AnyTransition {
+        switch direction {
+        case .forward:
+            return .asymmetric(
+                insertion: .move(edge: .trailing).combined(with: .opacity),
+                removal: .move(edge: .leading).combined(with: .opacity)
+            )
+        case .backward:
+            return .asymmetric(
+                insertion: .move(edge: .leading).combined(with: .opacity),
+                removal: .move(edge: .trailing).combined(with: .opacity)
+            )
         }
     }
 
     private func advance(to next: OnboardingStep) {
-        withAnimation(.spring(response: 0.55, dampingFraction: 0.82)) {
+        direction = next.rawValue > step.rawValue ? .forward : .backward
+        withAnimation(.smooth(duration: 0.3)) {
             step = next
         }
     }
 
     private func finish() {
-        withAnimation(.easeInOut(duration: 0.45)) {
+        shouldShowOnboardingToast = true
+        withAnimation(.easeInOut(duration: 0.4)) {
             hasCompletedOnboarding = true
         }
     }
 }
 
-/// Slow warm→cool radial gradient that drifts imperceptibly behind the whole flow.
-private struct OnboardingBackdrop: View {
-    @State private var phase: CGFloat = 0
-
-    var body: some View {
-        GeometryReader { geo in
-            RadialGradient(
-                colors: [
-                    Color.red.opacity(0.08),
-                    Color.red.opacity(0.0),
-                    Color(.systemBackground)
-                ],
-                center: UnitPoint(x: 0.5 + 0.1 * phase, y: 0.15 - 0.05 * phase),
-                startRadius: 60,
-                endRadius: max(geo.size.width, geo.size.height)
-            )
-            .onAppear {
-                withAnimation(.easeInOut(duration: 10).repeatForever(autoreverses: true)) {
-                    phase = 1
-                }
-            }
-        }
-    }
+private enum TransitionDirection {
+    case forward
+    case backward
 }
 
 #Preview {

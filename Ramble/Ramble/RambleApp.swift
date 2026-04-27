@@ -30,18 +30,19 @@ struct RambleApp: App {
 
     var body: some Scene {
         WindowGroup {
-            Group {
-                if hasCompletedOnboarding {
-                    MainView()
-                        .transition(.opacity)
-                } else {
-                    OnboardingView()
-                        .transition(.opacity)
-                }
-            }
+            MainView()
                 .preferredColorScheme(
                     AppearanceMode(rawValue: appearanceMode)?.colorScheme
                 )
+                .sheet(isPresented: Binding(
+                    get: { !hasCompletedOnboarding },
+                    set: { isPresented in
+                        if !isPresented { hasCompletedOnboarding = true }
+                    }
+                )) {
+                    OnboardingView()
+                        .interactiveDismissDisabled()
+                }
                 .onReceive(
                     NotificationCenter.default.publisher(
                         for: UIApplication.didEnterBackgroundNotification

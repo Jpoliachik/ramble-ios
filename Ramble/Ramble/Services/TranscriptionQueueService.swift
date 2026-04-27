@@ -201,9 +201,8 @@ final class TranscriptionQueueService: ObservableObject {
             removeJob(job)
             isProcessing = false
 
-            // Enqueue webhook if enabled and configured
-            let settings = settingsService.load()
-            if settings.webhookEnabled, let webhookURL = settings.webhookURL, !webhookURL.isEmpty {
+            // Enqueue webhook if a destination is configured
+            if settingsService.load().isWebhookConfigured {
                 WebhookQueueService.shared.enqueue(recordingId: job.recordingId)
             }
 

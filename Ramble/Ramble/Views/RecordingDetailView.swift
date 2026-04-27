@@ -351,7 +351,7 @@ struct RecordingDetailView: View {
                 }
             }
 
-            if recording.webhookStatus != nil && SettingsService.shared.load().webhookEnabled {
+            if recording.webhookStatus != nil && SettingsService.shared.load().isWebhookConfigured {
                 webhookActionRow(for: recording)
             }
         }

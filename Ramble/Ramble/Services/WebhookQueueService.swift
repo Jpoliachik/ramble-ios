@@ -34,8 +34,7 @@ final class WebhookQueueService: ObservableObject {
         guard !queue.contains(where: { $0.recordingId == recordingId }) else { return }
 
         let settings = settingsService.load()
-        guard settings.webhookEnabled,
-              let webhookURL = settings.webhookURL,
+        guard let webhookURL = settings.webhookURL,
               !webhookURL.isEmpty else { return }
 
         // Update recording webhook status
@@ -56,8 +55,7 @@ final class WebhookQueueService: ObservableObject {
     /// waiting in backoff.
     func resend(recordingId: UUID) {
         let settings = settingsService.load()
-        guard settings.webhookEnabled,
-              let webhookURL = settings.webhookURL,
+        guard let webhookURL = settings.webhookURL,
               !webhookURL.isEmpty else { return }
 
         var recordings = storageService.loadRecordings()

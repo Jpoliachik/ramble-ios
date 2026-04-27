@@ -14,52 +14,48 @@ enum MicPermissionState {
 }
 
 struct OnboardingRecordStep: View {
-    let namespace: Namespace.ID
     let onPermissionGranted: () -> Void
 
     @State private var permissionState: MicPermissionState = Self.currentPermissionState()
     @State private var isRequesting = false
-    @State private var buttonShake: CGFloat = 0
-    @State private var iconsAppeared = false
+    @State private var hasAdvanced = false
+    @State private var showPrivacyInfo = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            Spacer().frame(height: 16)
+        OnboardingPage {
+            VStack(spacing: 0) {
+                Spacer().frame(height: 8)
 
-            // Paired mic + watch sketches
-            HStack(spacing: 24) {
-                MicSketchIcon(active: permissionState == .granted)
-                    .opacity(iconsAppeared ? 1 : 0)
-                    .scaleEffect(iconsAppeared ? 1 : 0.6)
+                OnboardingIllustration(name: "illustration-record")
+                    .onboardingAppear(delay: 0.05)
 
-                Image(systemName: "applewatch.radiowaves.left.and.right")
-                    .font(.system(size: 44, weight: .regular))
-                    .foregroundStyle(.secondary)
-                    .opacity(iconsAppeared ? 0.85 : 0)
-                    .scaleEffect(iconsAppeared ? 1 : 0.6)
-            }
-            .frame(height: 96)
+                Spacer().frame(height: 18)
 
-            Spacer().frame(height: 24)
+                VStack(spacing: 12) {
+                    OnboardingHeadline(size: 34) {
+                        Text("First, ") + Text("let it hear you.").italic()
+                    }
 
-            OnboardingStepHeader(
-                eyebrow: "Step 1 · Record",
-                title: "Just talk",
-                subtitle: "Ramble captures your voice notes so you don't have to think. Best on the go — phone in your pocket, or straight from your Apple Watch."
-            )
-
-            Spacer()
-
-            ctaSection
+                    OnboardingBody(text: "Ramble records from your iPhone or Apple Watch. Audio stays on your device unless you choose to send it.")
+                }
                 .padding(.horizontal, 24)
-                .padding(.bottom, 40)
-                .onboardingAppear(delay: 0.4)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear {
-            withAnimation(.spring(response: 0.55, dampingFraction: 0.65).delay(0.15)) {
-                iconsAppeared = true
+                .onboardingAppear(delay: 0.2)
+
+                Spacer().frame(height: 28)
+
+                permissionRow
+                    .padding(.horizontal, 16)
+                    .onboardingAppear(delay: 0.35)
+
+                Spacer(minLength: 24)
             }
+        } bottomBar: {
+            ctaSection
+                .padding(.horizontal, 16)
+                .padding(.bottom, 24)
+                .onboardingAppear(delay: 0.45)
+        }
+        .onAppear {
             refreshPermissionState()
         }
         .onReceive(
@@ -69,51 +65,102 @@ struct OnboardingRecordStep: View {
         ) { _ in
             refreshPermissionState()
         }
+        .sheet(isPresented: $showPrivacyInfo) {
+            PrivacyInfoSheet()
+        }
     }
+
+    // MARK: - Permission row card
+
+    private var permissionRow: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.obRed)
+                    .frame(width: 32, height: 32)
+
+                Image(systemName: "mic.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Microphone")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Color.obInk)
+
+                HStack(spacing: 0) {
+                    OnboardingItalicTag(text: tagLabel)
+                    Text(" · \(tagSuffix)")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.obInkFaint)
+                }
+            }
+
+            Spacer()
+        }
+        .padding(.vertical, 14)
+        .padding(.horizontal, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.obSurface)
+        )
+    }
+
+    private var tagLabel: String {
+        switch permissionState {
+        case .undetermined: return "Required"
+        case .granted: return "Enabled"
+        case .denied: return "Blocked"
+        }
+    }
+
+    private var tagSuffix: String {
+        switch permissionState {
+        case .undetermined: return "only used while recording"
+        case .granted: return "ready to record"
+        case .denied: return "enable in Settings to continue"
+        }
+    }
+
+    // MARK: - CTA
 
     @ViewBuilder
     private var ctaSection: some View {
-        switch permissionState {
-        case .undetermined:
-            OnboardingPrimaryButton(title: isRequesting ? "Requesting…" : "Enable Microphone", isDisabled: isRequesting) {
-                requestPermission()
-            }
-            .offset(x: buttonShake)
-        case .denied:
-            VStack(spacing: 10) {
+        VStack(spacing: 0) {
+            switch permissionState {
+            case .undetermined:
+                OnboardingPrimaryButton(
+                    title: isRequesting ? "Requesting…" : "Enable Microphone",
+                    isDisabled: isRequesting
+                ) {
+                    requestPermission()
+                }
+                OnboardingSecondaryLink(title: "How privacy works") {
+                    showPrivacyInfo = true
+                }
+            case .granted:
+                OnboardingPrimaryButton(title: "Continue") {
+                    advance()
+                }
+                OnboardingSecondaryLink(title: "How privacy works") {
+                    showPrivacyInfo = true
+                }
+            case .denied:
                 OnboardingPrimaryButton(title: "Open Settings") {
                     openAppSettings()
                 }
-                Text("Ramble needs microphone access to record. Enable it in Settings to continue.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 12)
+                OnboardingSecondaryLink(title: "How privacy works") {
+                    showPrivacyInfo = true
+                }
             }
-        case .granted:
-            // Transient success state before auto-advance.
-            HStack(spacing: 10) {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
-                    .font(.title3)
-                Text("Microphone ready")
-                    .font(.headline)
-                    .foregroundStyle(.primary)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
         }
     }
 
     // MARK: - Permission handling
 
     private func refreshPermissionState() {
-        let previous = permissionState
-        let new = Self.currentPermissionState()
-        permissionState = new
-        if new == .granted && previous != .granted {
-            advanceAfterGrant()
-        }
+        permissionState = Self.currentPermissionState()
     }
 
     private static func currentPermissionState() -> MicPermissionState {
@@ -133,57 +180,24 @@ struct OnboardingRecordStep: View {
                 if granted {
                     permissionState = .granted
                     HapticService.success()
-                    advanceAfterGrant()
+                    advance()
                 } else {
                     permissionState = .denied
                     HapticService.warning()
-                    triggerShake()
                 }
             }
         }
     }
 
-    private func advanceAfterGrant() {
-        Task {
-            try? await Task.sleep(nanoseconds: 650_000_000)
-            await MainActor.run { onPermissionGranted() }
-        }
-    }
-
-    private func triggerShake() {
-        let values: [CGFloat] = [-10, 10, -8, 8, -4, 4, 0]
-        for (i, v) in values.enumerated() {
-            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.05) {
-                withAnimation(.easeInOut(duration: 0.05)) {
-                    buttonShake = v
-                }
-            }
-        }
+    private func advance() {
+        guard !hasAdvanced else { return }
+        hasAdvanced = true
+        onPermissionGranted()
     }
 
     private func openAppSettings() {
         guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
         UIApplication.shared.open(url)
-    }
-}
-
-/// Hand-drawn-ish microphone icon that gains a red rim glow when active.
-private struct MicSketchIcon: View {
-    let active: Bool
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .fill(Color.red.opacity(active ? 0.18 : 0.0))
-                .frame(width: 72, height: 72)
-                .blur(radius: active ? 8 : 0)
-
-            Image(systemName: "mic.fill")
-                .font(.system(size: 44, weight: .regular))
-                .foregroundStyle(active ? Color.red : Color.primary)
-                .symbolEffect(.pulse, options: active ? .repeating : .nonRepeating)
-        }
-        .animation(.easeInOut(duration: 0.4), value: active)
     }
 }
 

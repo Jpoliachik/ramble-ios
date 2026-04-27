@@ -5,140 +5,354 @@
 
 import SwiftUI
 
+// MARK: - Step state
+
 enum OnboardingStep: Int, CaseIterable {
     case welcome
     case record
     case transcribe
     case send
 
-    var showsProgress: Bool {
-        self != .welcome
-    }
-
-    /// Progress index (0-based) among the three post-welcome steps.
+    /// 1-based position in the 3-step body. Welcome returns nil (no dots shown).
     var progressIndex: Int? {
         switch self {
         case .welcome: return nil
-        case .record: return 0
-        case .transcribe: return 1
-        case .send: return 2
+        case .record: return 1
+        case .transcribe: return 2
+        case .send: return 3
         }
     }
 
-    static var progressCount: Int { 3 }
+    var previous: OnboardingStep? {
+        switch self {
+        case .welcome: return nil
+        case .record: return .welcome
+        case .transcribe: return .record
+        case .send: return .transcribe
+        }
+    }
+
+    static let bodyStepCount = 3
 }
 
-/// Three-dot progress indicator with a single traveling filled dot.
-struct OnboardingProgressDots: View {
-    let activeIndex: Int
-    let namespace: Namespace.ID
+// MARK: - Design tokens
 
-    private let dotSize: CGFloat = 7
-    private let spacing: CGFloat = 10
-
-    var body: some View {
-        HStack(spacing: spacing) {
-            ForEach(0..<OnboardingStep.progressCount, id: \.self) { index in
-                ZStack {
-                    Circle()
-                        .fill(Color.secondary.opacity(0.25))
-                        .frame(width: dotSize, height: dotSize)
-
-                    if index == activeIndex {
-                        Circle()
-                            .fill(Color.red)
-                            .frame(width: dotSize, height: dotSize)
-                            .matchedGeometryEffect(id: "onboarding.progress.active", in: namespace)
-                    }
-                }
-            }
-        }
-        .animation(.spring(response: 0.45, dampingFraction: 0.75), value: activeIndex)
-    }
+extension Color {
+    static let obBg = Color("onboarding-bg")
+    static let obSurface = Color("onboarding-surface")
+    static let obInk = Color("onboarding-ink")
+    static let obInkSoft = Color("onboarding-ink-soft")
+    static let obInkFaint = Color("onboarding-ink-faint")
+    static let obHair = Color("onboarding-hair")
+    static let obRed = Color("onboarding-red")
+    static let obRedSoft = Color("onboarding-red-soft")
 }
 
-/// The persistent red circle that travels between screens as the CTA.
-/// Uses matchedGeometryEffect so it morphs across step transitions.
-struct OnboardingRedCircleButton: View {
-    let systemImage: String
-    let namespace: Namespace.ID
-    let action: () -> Void
-
-    @State private var pulse = false
-    @State private var idleNudge = false
-
-    private let size: CGFloat = 72
-
-    var body: some View {
-        Button(action: {
-            HapticService.buttonTap()
-            action()
-        }) {
-            ZStack {
-                Circle()
-                    .fill(Color.red.opacity(0.25))
-                    .frame(width: size + 24, height: size + 24)
-                    .scaleEffect(pulse ? 1.08 : 0.92)
-                    .opacity(pulse ? 0.0 : 0.7)
-
-                Circle()
-                    .fill(Color.red)
-                    .frame(width: size, height: size)
-                    .matchedGeometryEffect(id: "onboarding.redDot", in: namespace)
-
-                Image(systemName: systemImage)
-                    .font(.system(size: 28, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .offset(x: idleNudge ? 4 : 0)
-            }
-            .frame(width: size + 32, height: size + 32)
-        }
-        .buttonStyle(.plain)
-        .onAppear {
-            withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: false)) {
-                pulse = true
-            }
-        }
-        .task {
-            try? await Task.sleep(nanoseconds: 3_500_000_000)
-            if !Task.isCancelled {
-                startIdleNudge()
-            }
-        }
+enum OnboardingFont {
+    /// New York serif headline — used at 34pt for steps 2-4 and 48pt for the welcome screen.
+    static func serifHeadline(size: CGFloat) -> Font {
+        .system(size: size, design: .serif).weight(.medium)
     }
 
-    private func startIdleNudge() {
-        withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
-            idleNudge = true
-        }
-    }
+    static let body: Font = .system(size: 16)
+    static let bodyLarge: Font = .system(size: 17)
+    static let sectionHeader: Font = .system(size: 12, weight: .medium)
 }
 
-/// Shared container providing consistent vertical layout + top progress bar.
-struct OnboardingStepContainer<Content: View>: View {
-    let step: OnboardingStep
-    let namespace: Namespace.ID
+// MARK: - Page chrome
+
+/// Scrollable body container for an onboarding step with an optional pinned
+/// bottom bar (typically the primary CTA). The body fills the area above the
+/// bottom bar; if its content overflows the body scrolls. The persistent nav
+/// row lives in `OnboardingView` so it doesn't get re-mounted between steps.
+struct OnboardingPage<Content: View, BottomBar: View>: View {
     @ViewBuilder let content: () -> Content
+    @ViewBuilder let bottomBar: () -> BottomBar
 
     var body: some View {
         VStack(spacing: 0) {
-            if step.showsProgress, let activeIndex = step.progressIndex {
-                OnboardingProgressDots(activeIndex: activeIndex, namespace: namespace)
-                    .padding(.top, 16)
-                    .padding(.bottom, 24)
-                    .transition(.opacity)
-            } else {
-                Color.clear.frame(height: 40)
+            GeometryReader { geo in
+                ScrollView {
+                    VStack(spacing: 0) {
+                        content()
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(minHeight: geo.size.height, alignment: .top)
+                }
+                .scrollBounceBehavior(.basedOnSize)
             }
 
-            content()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            bottomBar()
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
-/// Fades + slides content up on appear, with a staggered delay.
+extension OnboardingPage where BottomBar == EmptyView {
+    init(@ViewBuilder content: @escaping () -> Content) {
+        self.init(content: content, bottomBar: { EmptyView() })
+    }
+}
+
+/// Persistent nav row: back chevron + segmented progress bar. Owned by
+/// `OnboardingView` so the row stays mounted across step transitions and
+/// only the active progress dot animates.
+struct OnboardingNavRow: View {
+    let activeStep: Int
+    let onBack: () -> Void
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Button {
+                HapticService.buttonTap()
+                onBack()
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(Color.obRed)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Back")
+
+            Spacer()
+
+            OnboardingProgressBar(activeStep: activeStep)
+
+            Spacer()
+
+            // Mirrors the back button width so the dots stay centered.
+            Color.clear.frame(width: 44, height: 1)
+        }
+        .frame(height: 40)
+        .padding(.horizontal, 16)
+        .padding(.top, 16)
+    }
+}
+
+// MARK: - Progress bar (segmented pill)
+
+struct OnboardingProgressBar: View {
+    /// 1-based: 1, 2, or 3.
+    let activeStep: Int
+
+    private let dotSize: CGFloat = 6
+    private let activeWidth: CGFloat = 20
+    private let spacing: CGFloat = 6
+
+    var body: some View {
+        HStack(spacing: spacing) {
+            ForEach(1...OnboardingStep.bodyStepCount, id: \.self) { index in
+                Capsule()
+                    .fill(index <= activeStep ? Color.obRed : Color.obHair)
+                    .frame(width: index == activeStep ? activeWidth : dotSize, height: dotSize)
+            }
+        }
+        .animation(.smooth(duration: 0.3), value: activeStep)
+    }
+}
+
+// MARK: - Typographic primitives
+
+/// Renders a serif headline. Pass a Text composition to mix italic accents:
+///   `OnboardingHeadline(size: 34) { Text("First, ") + Text("let it hear you.").italic() }`
+struct OnboardingHeadline: View {
+    let size: CGFloat
+    let alignment: TextAlignment
+    let content: () -> Text
+
+    init(size: CGFloat = 34, alignment: TextAlignment = .center, @ViewBuilder content: @escaping () -> Text) {
+        self.size = size
+        self.alignment = alignment
+        self.content = content
+    }
+
+    var body: some View {
+        content()
+            .font(OnboardingFont.serifHeadline(size: size))
+            .foregroundStyle(Color.obInk)
+            .tracking(size >= 44 ? -1.0 : -0.6)
+            .lineSpacing(0)
+            .multilineTextAlignment(alignment)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+struct OnboardingBody: View {
+    let text: String
+    var maxWidth: CGFloat? = 320
+    var alignment: TextAlignment = .center
+
+    var body: some View {
+        Text(text)
+            .font(OnboardingFont.body)
+            .foregroundStyle(Color.obInkSoft)
+            .lineSpacing(2)
+            .multilineTextAlignment(alignment)
+            .frame(maxWidth: maxWidth)
+    }
+}
+
+// MARK: - Wordmark (red dot + italic serif)
+
+struct OnboardingWordmark: View {
+    let size: CGFloat
+
+    init(size: CGFloat = 48) {
+        self.size = size
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: size * 0.3) {
+            Circle()
+                .fill(Color.obRed)
+                .frame(width: size * 0.42, height: size * 0.42)
+
+            Text("Ramble")
+                .font(.system(size: size, design: .serif).italic())
+                .fontWeight(.bold)
+                .foregroundStyle(Color.obInk)
+                .tracking(-0.5)
+        }
+    }
+}
+
+// MARK: - Illustration disc
+
+/// 96pt soft-red disc for the step header illustration. The illustrations
+/// already include the disc as part of the SVG, so this is just a sizer.
+struct OnboardingIllustration: View {
+    let name: String
+    private let size: CGFloat = 96
+
+    var body: some View {
+        Image(name)
+            .resizable()
+            .scaledToFit()
+            .frame(width: size, height: size)
+            .accessibilityHidden(true)
+    }
+}
+
+// MARK: - Buttons
+
+struct OnboardingPrimaryButton: View {
+    let title: String
+    let isDisabled: Bool
+    let action: () -> Void
+
+    init(title: String, isDisabled: Bool = false, action: @escaping () -> Void) {
+        self.title = title
+        self.isDisabled = isDisabled
+        self.action = action
+    }
+
+    var body: some View {
+        Button {
+            HapticService.buttonTap()
+            action()
+        } label: {
+            Text(title)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 56)
+                .background(
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(Color.obRed)
+                )
+                .opacity(isDisabled ? 0.4 : 1)
+        }
+        .buttonStyle(.plain)
+        .disabled(isDisabled)
+    }
+}
+
+/// Full-width text button — surface fill, ink text, used as a "Maybe later" style action.
+struct OnboardingSurfaceButton: View {
+    let title: String
+    let action: () -> Void
+
+    var body: some View {
+        Button {
+            HapticService.buttonTap()
+            action()
+        } label: {
+            Text(title)
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(Color.obInk)
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.obSurface)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// Centered red text link, full width.
+struct OnboardingSecondaryLink: View {
+    let title: String
+    let action: () -> Void
+
+    var body: some View {
+        Button {
+            HapticService.buttonTap()
+            action()
+        } label: {
+            Text(title)
+                .font(.system(size: 15))
+                .foregroundStyle(Color.obRed)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Section header (uppercase tracked label)
+
+struct OnboardingSectionHeader: View {
+    let title: String
+    var trailing: String? = nil
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(title)
+                .font(OnboardingFont.sectionHeader)
+                .tracking(1.0)
+                .textCase(.uppercase)
+                .foregroundStyle(Color.obInkFaint)
+
+            Spacer()
+
+            if let trailing {
+                Text(trailing)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.obInkFaint)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 6)
+    }
+}
+
+// MARK: - Italic-red inline tag (e.g. "Required", "Recommended")
+
+struct OnboardingItalicTag: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 13, design: .serif).italic().weight(.medium))
+            .foregroundStyle(Color.obRed)
+    }
+}
+
+// MARK: - Appear-in animation
+
 struct OnboardingAppearModifier: ViewModifier {
     let delay: Double
     @State private var visible = false
@@ -160,69 +374,3 @@ extension View {
         modifier(OnboardingAppearModifier(delay: delay))
     }
 }
-
-/// Large title + subtitle header shared across steps 2–4.
-struct OnboardingStepHeader: View {
-    let eyebrow: String?
-    let title: String
-    let subtitle: String
-
-    var body: some View {
-        VStack(spacing: 10) {
-            if let eyebrow {
-                Text(eyebrow)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.red)
-                    .tracking(1.2)
-                    .textCase(.uppercase)
-                    .onboardingAppear(delay: 0.05)
-            }
-
-            Text(title)
-                .font(.system(size: 34, weight: .bold, design: .serif))
-                .italic()
-                .foregroundStyle(.primary)
-                .onboardingAppear(delay: 0.15)
-
-            Text(subtitle)
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
-                .onboardingAppear(delay: 0.25)
-        }
-    }
-}
-
-/// Shared bottom continue button — mirrors the red dot's visual language but rectangular.
-struct OnboardingPrimaryButton: View {
-    let title: String
-    let isDisabled: Bool
-    let action: () -> Void
-
-    init(title: String, isDisabled: Bool = false, action: @escaping () -> Void) {
-        self.title = title
-        self.isDisabled = isDisabled
-        self.action = action
-    }
-
-    var body: some View {
-        Button {
-            HapticService.buttonTap()
-            action()
-        } label: {
-            Text(title)
-                .font(.headline)
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(isDisabled ? Color.red.opacity(0.4) : Color.red)
-                )
-        }
-        .buttonStyle(.plain)
-        .disabled(isDisabled)
-    }
-}
-

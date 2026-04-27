@@ -12,7 +12,6 @@ final class SettingsViewModel: ObservableObject {
     @Published var transcriptionProvider: TranscriptionProvider = .appleSpeech
     @Published var cloudModel: CloudModel = .whisperLargeV3Turbo
     @Published var showSubscriptionPaywall = false
-    @Published var webhookEnabled: Bool = false
     @Published var webhookURL: String = ""
     @Published var webhookSecret: String = ""
     @Published var deviceId: String = ""
@@ -59,7 +58,6 @@ final class SettingsViewModel: ObservableObject {
         let settings = settingsService.load()
         transcriptionProvider = settings.transcriptionProvider
         cloudModel = settings.cloudModel
-        webhookEnabled = settings.webhookEnabled
         webhookURL = settings.webhookURL ?? ""
         webhookSecret = settings.webhookSecret
         deviceId = settings.deviceId
@@ -72,7 +70,6 @@ final class SettingsViewModel: ObservableObject {
         let settings = Settings(
             transcriptionProvider: transcriptionProvider,
             cloudModel: cloudModel,
-            webhookEnabled: webhookEnabled,
             webhookURL: webhookURL.isEmpty ? nil : webhookURL,
             webhookSecret: webhookSecret,
             deviceId: deviceId,
