@@ -131,7 +131,7 @@ struct OnboardingSendStep: View {
         } label: {
             HStack(spacing: 12) {
                 Circle()
-                    .fill(Color.obRed)
+                    .fill(Color.brandRed)
                     .frame(width: 10, height: 10)
 
                 VStack(alignment: .leading, spacing: 1) {
@@ -157,119 +157,6 @@ struct OnboardingSendStep: View {
             )
         }
         .buttonStyle(.plain)
-    }
-}
-
-// MARK: - Send visual (voice → endpoint pill)
-
-private struct SendVisual: View {
-    private let cycleDuration: Double = 2.4
-
-    var body: some View {
-        HStack(spacing: 10) {
-            voiceChip
-
-            connector
-                .frame(width: 56, height: 20)
-
-            endpointChip
-        }
-        .padding(.vertical, 18)
-        .padding(.horizontal, 16)
-        .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color.obSurface)
-        )
-    }
-
-    private var voiceChip: some View {
-        HStack(alignment: .center, spacing: 8) {
-            Image(systemName: "waveform")
-                .font(.system(size: 12))
-                .foregroundStyle(Color.obRed)
-
-            Text("So I was thinking we should ship Tuesday morning.")
-                .font(.system(size: 11, design: .serif).italic())
-                .foregroundStyle(Color.obInkSoft)
-                .lineLimit(2)
-                .multilineTextAlignment(.leading)
-                .frame(maxWidth: .infinity, minHeight: 30, alignment: .leading)
-        }
-        .padding(.vertical, 10)
-        .padding(.horizontal, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.obBg)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.obHair, lineWidth: 0.5)
-                )
-        )
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var connector: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { context in
-            let elapsed = context.date.timeIntervalSinceReferenceDate
-            let progress = elapsed.truncatingRemainder(dividingBy: cycleDuration) / cycleDuration
-
-            ZStack(alignment: .leading) {
-                Rectangle()
-                    .fill(Color.obHair)
-                    .frame(height: 2)
-                    .padding(.trailing, 6)
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(Color.obInkFaint)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-
-                GeometryReader { geo in
-                    let travel = max(0, geo.size.width - 14)
-                    Circle()
-                        .fill(Color.obRed)
-                        .frame(width: 9, height: 9)
-                        .offset(
-                            x: travel * CGFloat(progress),
-                            y: (geo.size.height - 9) / 2
-                        )
-                        .opacity(travelOpacity(for: progress))
-                }
-            }
-        }
-    }
-
-    private func travelOpacity(for progress: Double) -> Double {
-        switch progress {
-        case ..<0.15: return progress / 0.15
-        case 0.85...: return max(0, (1 - progress) / 0.15)
-        default: return 1
-        }
-    }
-
-    private var endpointChip: some View {
-        HStack(alignment: .center, spacing: 8) {
-            Image(systemName: "paperplane.fill")
-                .font(.system(size: 11))
-                .foregroundStyle(Color.obRed)
-
-            Text("my.api.com")
-                .font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(Color.obInkSoft)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, minHeight: 30, alignment: .leading)
-        }
-        .padding(.vertical, 10)
-        .padding(.horizontal, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.obBg)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.obHair, lineWidth: 0.5)
-                )
-        )
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

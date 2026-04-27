@@ -20,7 +20,6 @@ struct TranscriptionModelRow: View {
     let logo: TranscriptionModelLogo
     var isSelected: Bool = false
     var isLocked: Bool = false
-    var showsRecommended: Bool = false
     let onTap: () -> Void
 
     private let trailingSlotWidth: CGFloat = 24
@@ -32,17 +31,9 @@ struct TranscriptionModelRow: View {
                     .frame(width: 22, height: 22)
 
                 VStack(alignment: .leading, spacing: 1) {
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text(title)
-                            .font(.system(size: 17))
-                            .foregroundStyle(Color.obInk)
-
-                        if showsRecommended {
-                            Text("· recommended")
-                                .font(.system(size: 11, design: .serif).italic().weight(.medium))
-                                .foregroundStyle(Color.obRed)
-                        }
-                    }
+                    Text(title)
+                        .font(.system(size: 17))
+                        .foregroundStyle(Color.obInk)
 
                     Text(subtitle)
                         .font(.system(size: 13))
@@ -83,7 +74,7 @@ struct TranscriptionModelRow: View {
         if isSelected {
             Image(systemName: "checkmark")
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Color.obRed)
+                .foregroundStyle(Color.brandRed)
         } else if isLocked {
             Image(systemName: "lock.fill")
                 .font(.system(size: 13))

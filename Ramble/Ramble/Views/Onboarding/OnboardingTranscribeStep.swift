@@ -39,7 +39,7 @@ struct OnboardingTranscribeStep: View {
                     appleRow
                         .padding(.bottom, 24)
 
-                    OnboardingSectionHeader(title: "Cloud · premium", trailing: "$2.99 / month")
+                    OnboardingSectionHeader(title: "Cloud · premium", trailing: "$3.99 / month")
                     cloudRows
 
                     Text("Cloud transcription routes through our open-source proxy. No audio or text is stored on our servers.")
@@ -80,7 +80,7 @@ struct OnboardingTranscribeStep: View {
     // MARK: - Free row
 
     private var appleRow: some View {
-        VStack(spacing: 0) {
+        BrandCard {
             TranscriptionModelRow(
                 title: TranscriptionProvider.appleSpeech.displayName,
                 subtitle: appleSubtitle,
@@ -89,17 +89,13 @@ struct OnboardingTranscribeStep: View {
                 onTap: viewModel.selectApple
             )
         }
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.obSurface)
-        )
         .padding(.horizontal, 16)
     }
 
     // MARK: - Cloud rows
 
     private var cloudRows: some View {
-        VStack(spacing: 0) {
+        BrandCard {
             ForEach(Array(CloudModel.allCases.enumerated()), id: \.element.id) { index, model in
                 TranscriptionModelRow(
                     title: model.displayName,
@@ -107,22 +103,14 @@ struct OnboardingTranscribeStep: View {
                     logo: .asset(model.iconName),
                     isSelected: viewModel.isSelected(cloudModel: model),
                     isLocked: !subscriptionService.isPremium,
-                    showsRecommended: model == .whisperLargeV3Turbo,
                     onTap: { viewModel.tapCloud(model) }
                 )
 
                 if index < CloudModel.allCases.count - 1 {
-                    Rectangle()
-                        .fill(Color.obHair)
-                        .frame(height: 0.5)
-                        .padding(.leading, 50)
+                    BrandRowDivider()
                 }
             }
         }
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.obSurface)
-        )
         .padding(.horizontal, 16)
     }
 

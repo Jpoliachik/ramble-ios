@@ -21,7 +21,8 @@ struct SettingsView: View {
     var body: some View {
         NavigationView {
             Form {
-                transcriptionSection
+                freeTranscriptionSection
+                cloudTranscriptionSection
                 webhookSection
                 appearanceSection
                 statsSection
@@ -29,7 +30,9 @@ struct SettingsView: View {
                 dangerZoneSection
                 aboutSection
             }
-            .navigationTitle("Settings")
+            .scrollContentBackground(.hidden)
+            .background(Color.obBg)
+            .listSectionSpacing(28)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -71,7 +74,7 @@ struct SettingsView: View {
         isSpeechAnalyzerAvailable ? "Built into iOS · works offline" : "Free, on-device"
     }
 
-    private var transcriptionSection: some View {
+    private var freeTranscriptionSection: some View {
         Section {
             TranscriptionModelRow(
                 title: TranscriptionProvider.appleSpeech.displayName,
@@ -81,6 +84,7 @@ struct SettingsView: View {
                 onTap: { viewModel.transcriptionProvider = .appleSpeech }
             )
             .listRowInsets(EdgeInsets())
+            .listRowBackground(Color.obSurface)
 
             if !isSpeechAnalyzerAvailable {
                 HStack(spacing: 10) {
@@ -92,8 +96,29 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
                 .padding(.vertical, 4)
+                .listRowBackground(Color.obSurface)
             }
+        } header: {
+            VStack(alignment: .leading, spacing: 14) {
+                SettingsGroupTitle(
+                    title: "Transcribe",
+                    subtitle: "How your voice becomes text."
+                )
+                SettingsSubsectionLabel(title: "Free · on-device") {
+                    Button {
+                        showTranscriptionInfo = true
+                    } label: {
+                        Image(systemName: "info.circle")
+                            .font(.subheadline)
+                    }
+                }
+            }
+            .textCase(.none)
+        }
+    }
 
+    private var cloudTranscriptionSection: some View {
+        Section {
             ForEach(CloudModel.allCases) { model in
                 TranscriptionModelRow(
                     title: model.displayName,
@@ -102,23 +127,19 @@ struct SettingsView: View {
                     isSelected: viewModel.transcriptionProvider == .cloudTranscription
                         && viewModel.cloudModel == model,
                     isLocked: !subscriptionService.isPremium,
-                    showsRecommended: model == .whisperLargeV3Turbo,
                     onTap: { viewModel.selectCloudModel(model) }
                 )
                 .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.obSurface)
             }
         } header: {
-            HStack {
-                Text("Transcription")
-                Spacer()
-                Button {
-                    showTranscriptionInfo = true
-                } label: {
-                    Image(systemName: "info.circle")
-                        .font(.subheadline)
-                        .textCase(.none)
-                }
+            SettingsSubsectionLabel(title: "Cloud · premium") {
+                Text("$3.99 / month")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.obInkFaint)
             }
+        } footer: {
+            Text("Cloud transcription routes through our open-source proxy. No audio or text is stored on our servers.")
         }
     }
 
@@ -129,58 +150,83 @@ struct SettingsView: View {
                     showDestinationEdit = true
                 } label: {
                     HStack(spacing: 12) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.title3)
-                            .foregroundStyle(.blue)
-                        Text("Add destination")
+                        ZStack {
+                            Circle()
+                                .fill(Color.obInk)
+                                .frame(width: 28, height: 28)
+                            Image(systemName: "plus")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(Color.obBg)
+                        }
+                        Text("Add a destination")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(Color.obInk)
                         Spacer()
                         Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Color.obInkFaint)
                     }
+                    .padding(.vertical, 14)
+                    .padding(.horizontal, 16)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.obSurface)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.obInk.opacity(0.08), lineWidth: 1)
+                    )
                 }
-                .foregroundStyle(.primary)
+                .buttonStyle(.plain)
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
             } else {
                 Button {
                     showDestinationEdit = true
                 } label: {
                     HStack(spacing: 12) {
                         Circle()
-                            .fill(Color.green)
-                            .frame(width: 8, height: 8)
+                            .fill(Color.brandRed)
+                            .frame(width: 10, height: 10)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(destinationHost)
                                 .font(.body)
-                                .foregroundStyle(.primary)
-                            Text("Transcripts are sent automatically")
+                                .foregroundStyle(Color.obInk)
+                            Text("Tap to edit")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color.obInkFaint)
                         }
                         Spacer()
                         Image(systemName: "chevron.right")
                             .font(.caption)
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(Color.obInkFaint)
                     }
                 }
-                .foregroundStyle(.primary)
+                .listRowBackground(Color.obSurface)
             }
-
-            Button {
-                showWebhookInfo = true
-            } label: {
-                HStack {
-                    Image(systemName: "info.circle")
-                        .foregroundStyle(.blue)
-                    Text("Webhook setup guide")
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
+        } header: {
+            VStack(alignment: .leading, spacing: 14) {
+                SettingsGroupTitle(
+                    title: "Send via Webhook",
+                    subtitle: "Pipe transcripts to a URL you control. Optional."
+                )
+                if viewModel.webhookURL.isEmpty {
+                    SendVisual()
+                        .padding(.bottom, 4)
+                }
+                SettingsSubsectionLabel(title: "Destination") {
+                    Button {
+                        showWebhookInfo = true
+                    } label: {
+                        Image(systemName: "info.circle")
+                            .font(.subheadline)
+                    }
                 }
             }
-            .foregroundStyle(.primary)
-        } header: {
-            Text("Webhook")
+            .textCase(.none)
+        } footer: {
+            Text("Your notes, an automation, an AI agent — anywhere that accepts an HTTPS POST.")
         }
     }
 
@@ -189,7 +235,7 @@ struct SettingsView: View {
     }
 
     private var appearanceSection: some View {
-        Section("Appearance") {
+        Section {
             Picker("Theme", selection: $viewModel.appearanceMode) {
                 ForEach(AppearanceMode.allCases) { mode in
                     Label(mode.displayName, systemImage: mode.iconName)
@@ -197,23 +243,28 @@ struct SettingsView: View {
                 }
             }
             .pickerStyle(.menu)
+            .listRowBackground(Color.obSurface)
+        } header: {
+            SettingsGroupTitle(title: "Appearance")
         }
     }
 
     private var statsSection: some View {
-        Section("Statistics") {
+        Section {
             HStack {
                 Text("Total Recordings")
                 Spacer()
                 Text("\(viewModel.totalRecordings)")
                     .foregroundStyle(.secondary)
             }
+            .listRowBackground(Color.obSurface)
             HStack {
                 Text("Total Duration")
                 Spacer()
                 Text(formatTotalDuration(viewModel.totalDuration))
                     .foregroundStyle(.secondary)
             }
+            .listRowBackground(Color.obSurface)
 
             if viewModel.pendingTranscriptions > 0 {
                 HStack {
@@ -222,6 +273,7 @@ struct SettingsView: View {
                     Text("\(viewModel.pendingTranscriptions)")
                         .foregroundStyle(.secondary)
                 }
+                .listRowBackground(Color.obSurface)
             }
 
             if viewModel.failedTranscriptions > 0 {
@@ -231,26 +283,58 @@ struct SettingsView: View {
                     Text("\(viewModel.failedTranscriptions)")
                         .foregroundStyle(.red)
                 }
+                .listRowBackground(Color.obSurface)
             }
+        } header: {
+            SettingsGroupTitle(title: "Statistics")
         }
     }
 
     private var exportSection: some View {
-        Section("Data") {
-            Button("Export All Recordings (JSON)") {
+        Section {
+            Button {
                 if let url = viewModel.exportJSON() {
                     exportURL = url
                     showExportShare = true
                 }
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 16))
+                        .foregroundStyle(Color.obInk)
+                        .frame(width: 22)
+                    Text("Export all recordings (JSON)")
+                        .foregroundStyle(Color.obInk)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.obInkFaint)
+                }
             }
+            .listRowBackground(Color.obSurface)
+        } header: {
+            SettingsGroupTitle(title: "Data")
         }
     }
 
     private var dangerZoneSection: some View {
-        Section("Danger Zone") {
-            Button("Delete All Data", role: .destructive) {
+        Section {
+            Button(role: .destructive) {
                 showDeleteConfirmation = true
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 16))
+                        .foregroundStyle(Color.brandRed)
+                        .frame(width: 22)
+                    Text("Delete all data")
+                        .foregroundStyle(Color.brandRed)
+                    Spacer()
+                }
             }
+            .listRowBackground(Color.obSurface)
+        } header: {
+            SettingsGroupTitle(title: "Danger zone")
         }
         .confirmationDialog(
             "Delete all recordings?",
@@ -311,10 +395,15 @@ struct TranscriptionInfoSheet: View {
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    Text("Accurately turn your voice into text. Pick a provider.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 24) {
+                    VStack(spacing: 16) {
+                        OnboardingIllustration(name: "illustration-transcribe")
+                        OnboardingHeadline(size: 28) {
+                            Text("Voice in, ") + Text("text out.").italic()
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 8)
 
                     InfoBlock(
                         icon: "iphone",
@@ -433,10 +522,15 @@ struct WebhookInfoSheet: View {
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    Text("Automatically send your transcripts somewhere useful.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 24) {
+                    VStack(spacing: 16) {
+                        OnboardingIllustration(name: "illustration-automate")
+                        OnboardingHeadline(size: 28) {
+                            Text("Send it ") + Text("anywhere you point.").italic()
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 8)
 
                     InfoBlock(
                         icon: "paperplane",
@@ -482,7 +576,7 @@ struct InfoBlock: View {
         HStack(alignment: .top, spacing: 14) {
             Image(systemName: icon)
                 .font(.title3)
-                .foregroundStyle(.blue)
+                .foregroundStyle(Color.brandRed)
                 .frame(width: 28)
 
             VStack(alignment: .leading, spacing: 4) {
@@ -634,6 +728,7 @@ struct WebhookDestinationEditSheet: View {
             Form {
                 urlSection
                 secretSection
+                docsSection
                 if canSave {
                     testSection
                 }
@@ -693,9 +788,9 @@ struct WebhookDestinationEditSheet: View {
                     .foregroundStyle(.red)
             }
         } header: {
-            Text("URL")
+            Text("Your URL")
         } footer: {
-            Text("Ramble will POST each transcript as JSON to this URL.")
+            Text("This is yours — your server, your workflow, your data. Transcripts go only here, never anywhere else.")
         }
     }
 
@@ -742,6 +837,21 @@ struct WebhookDestinationEditSheet: View {
             Text("Signing secret")
         } footer: {
             Text("Use this to verify requests on your endpoint.")
+        }
+    }
+
+    private var docsSection: some View {
+        Section {
+            Link(destination: URL(string: "https://goodloop.dev/ramble/docs")!) {
+                HStack {
+                    Label("API setup docs", systemImage: "doc.text")
+                    Spacer()
+                    Image(systemName: "arrow.up.right")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .foregroundStyle(.primary)
         }
     }
 
@@ -812,6 +922,59 @@ struct WebhookDestinationEditSheet: View {
         viewModel.save()
         HapticService.success()
         dismiss()
+    }
+}
+
+// MARK: - Settings header components
+
+/// Serif group title — top-level grouping label (Transcribe, Send via Webhook).
+/// Mirrors the onboarding headline aesthetic at a smaller size, with an
+/// optional friendly subtitle below.
+private struct SettingsGroupTitle: View {
+    let title: String
+    var subtitle: String? = nil
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.system(size: 24, design: .serif).weight(.medium))
+                .tracking(-0.3)
+                .foregroundStyle(Color.obInk)
+            if let subtitle {
+                Text(subtitle)
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color.obInkSoft)
+            }
+        }
+        .textCase(.none)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, 8)
+    }
+}
+
+/// Uppercase tracked subsection label — matches `OnboardingSectionHeader` style.
+/// Optional trailing slot for prices, info buttons, etc.
+private struct SettingsSubsectionLabel<Trailing: View>: View {
+    let title: String
+    @ViewBuilder let trailing: () -> Trailing
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(title)
+                .font(.system(size: 12, weight: .medium))
+                .tracking(1.0)
+                .textCase(.uppercase)
+                .foregroundStyle(Color.obInkFaint)
+            Spacer()
+            trailing()
+        }
+        .textCase(.none)
+    }
+}
+
+extension SettingsSubsectionLabel where Trailing == EmptyView {
+    init(_ title: String) {
+        self.init(title: title, trailing: { EmptyView() })
     }
 }
 

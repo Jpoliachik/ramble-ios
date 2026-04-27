@@ -120,7 +120,7 @@ enum CloudModel: String, Codable, CaseIterable, Identifiable {
 
     var subtitle: String {
         switch self {
-        case .whisperLargeV3Turbo: return "Fast and accurate — best all-around (recommended)"
+        case .whisperLargeV3Turbo: return "Fast and accurate — best all-around"
         case .whisperLargeV3: return "Best for accents and multilingual audio"
         case .deepgramNova3: return "Strong English accuracy, smart formatting"
         case .openAIGPT4oTranscribe: return "Highest accuracy in noisy environments"

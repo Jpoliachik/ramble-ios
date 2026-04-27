@@ -18,12 +18,12 @@ struct RecordButtonView: View {
             ZStack {
                 // Outer ring — always visible
                 Circle()
-                    .stroke(Color.red.opacity(0.8), lineWidth: 4)
+                    .stroke(Color.brandRed.opacity(0.8), lineWidth: 4)
                     .frame(width: buttonSize, height: buttonSize)
 
                 // Inner shape — filled circle when idle, rounded square when recording
                 RoundedRectangle(cornerRadius: isRecording ? 8 : innerSize / 2)
-                    .fill(Color.red)
+                    .fill(Color.brandRed)
                     .frame(
                         width: isRecording ? 24 : innerSize,
                         height: isRecording ? 24 : innerSize
@@ -95,7 +95,7 @@ private struct WaveformBar: View {
 
     var body: some View {
         Capsule()
-            .fill(Color.red)
+            .fill(Color.brandRed)
             .frame(width: barWidth, height: barHeight)
             .onChange(of: audioLevel) { _, newLevel in
                 DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
