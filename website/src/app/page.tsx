@@ -169,7 +169,7 @@ export default function Home() {
           <p className="mt-4 text-base text-stone-500">
             On-device transcription and webhooks are completely free.
             <br className="hidden sm:block" /> Cloud transcription models available for{" "}
-            <span className="font-medium text-stone-700">$2.99/month</span>.
+            <span className="font-medium text-stone-700">$3.99/month</span>.
           </p>
           <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
             <a

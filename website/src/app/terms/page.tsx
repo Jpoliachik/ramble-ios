@@ -63,7 +63,7 @@ export default function TermsOfUse() {
               Subscription
             </h2>
             <p className="mt-2">
-              Cloud transcription requires a paid subscription at $2.99/month,
+              Cloud transcription requires a paid subscription at $3.99/month,
               billed through Apple&apos;s App Store. The subscription
               auto-renews unless cancelled at least 24 hours before the end of
               the current billing period. You can manage or cancel your

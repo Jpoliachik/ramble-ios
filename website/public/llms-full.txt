@@ -158,7 +158,7 @@ Webhooks fire after transcription completes — not after recording. Transcripti
 ## About Ramble
 
 - Free app on the App Store (on-device transcription via Apple Speech + webhook are free)
-- $2.99/month subscription unlocks cloud transcription models (Whisper, Deepgram Nova, GPT-4o Transcribe)
+- $3.99/month subscription unlocks cloud transcription models (Whisper, Deepgram Nova, GPT-4o Transcribe)
 - Open source: https://github.com/Jpoliachik/ramble-ios
 - Privacy: no accounts, no tracking, recordings stay on device
 - Website: https://goodloop.dev/ramble

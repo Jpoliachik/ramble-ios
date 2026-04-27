@@ -97,7 +97,7 @@ struct SubscriptionView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             } else {
-                Text("$2.99")
+                Text("$3.99")
                     .font(.system(size: 36, weight: .bold, design: .rounded))
                 Text("per month")
                     .font(.subheadline)

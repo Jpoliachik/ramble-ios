@@ -16,7 +16,7 @@ For full brand positioning, audience, tone, and messaging guidelines, see **`doc
 
 - iOS: record → transcribe → browse/copy transcripts, settings for proxy + webhook
 - Watch: record, sync to phone, minimal recordings list (timestamp, duration, sync status)
-- StoreKit 2 subscription for cloud transcription ($2.99/month)
+- StoreKit 2 subscription for cloud transcription ($3.99/month)
 - NOT in v1: CarPlay, widgets, Siri, full-text search, tags/folders, watch complication
 
 ### Remaining v1 work
@@ -43,7 +43,7 @@ These are free features from existing providers (no extra API calls or cost):
 
 - Open source the repo on GitHub
 - Free app on App Store (Apple Speech on-device transcription + webhook — costs nothing to run)
-- $2.99/month subscription unlocks cloud transcription models via Cloudflare Worker proxy
+- $3.99/month subscription unlocks cloud transcription models via Cloudflare Worker proxy
 - Marketing website at `goodloop.dev/ramble` (source in `website/`, static export)
 - **App Store URL:** https://apps.apple.com/app/id6761857751 (Apple ID: 6761857751)
 
@@ -153,5 +153,5 @@ Apple App Attest implemented. Client-side attestation via `DCAppAttestService` p
 
 - **Transcript browsing UX for v1:** Just scroll the list. No search, no tags, no folders.
 - **Watch complication:** Not in v1.
-- **Pricing:** Free app + $2.99/month subscription for cloud transcription. On-device Apple Speech and webhook are free.
+- **Pricing:** Free app + $3.99/month subscription for cloud transcription. On-device Apple Speech and webhook are free.
 - **Platform:** Apple only (iPhone + Apple Watch). No Android, no web.
