@@ -140,10 +140,14 @@ struct SettingsView: View {
             .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
             .listRowSeparator(.hidden)
         } header: {
-            SettingsSubsectionLabel(title: "Cloud · premium") {
-                Text("$3.99 / month")
-                    .font(.system(size: 13))
-                    .foregroundStyle(Color.obInkFaint)
+            if subscriptionService.isPremium {
+                SettingsSubsectionLabel("Cloud · premium")
+            } else {
+                SettingsSubsectionLabel(title: "Cloud · premium") {
+                    Text("$3.99 / month")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.obInkFaint)
+                }
             }
         } footer: {
             Text("Cloud transcription routes through our open-source proxy. No audio or text is stored on our servers.")
@@ -165,16 +169,12 @@ struct SettingsView: View {
                 } label: {
                     HStack(spacing: 12) {
                         Circle()
-                            .fill(Color.brandRed)
+                            .fill(viewModel.webhookHealth.color)
                             .frame(width: 10, height: 10)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(destinationHost)
-                                .font(.body)
-                                .foregroundStyle(Color.obInk)
-                            Text("Tap to edit")
-                                .font(.caption)
-                                .foregroundStyle(Color.obInkFaint)
-                        }
+                            .accessibilityLabel(viewModel.webhookHealth.accessibilityLabel)
+                        Text(destinationHost)
+                            .font(.body)
+                            .foregroundStyle(Color.obInk)
                         Spacer()
                         Image(systemName: "chevron.right")
                             .font(.caption)
@@ -186,7 +186,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 14) {
                 SettingsGroupTitle(
                     title: "Send via Webhook",
-                    subtitle: "Pipe transcripts to a URL you control."
+                    subtitle: "Pipe transcripts to any URL."
                 ) {
                     Button {
                         showWebhookInfo = true
@@ -195,13 +195,13 @@ struct SettingsView: View {
                             .font(.title3)
                     }
                 }
-                SendVisual()
+                SendVisual(endpointText: SendVisual.endpointText(for: viewModel.webhookURL))
                     .padding(.bottom, 4)
                 SettingsSubsectionLabel("Destination")
             }
             .textCase(.none)
         } footer: {
-            Text("Create automations, send to an AI agent — anywhere that accepts an HTTPS POST.")
+            Text("Create automations, send to an AI agent — anywhere that accepts an HTTPS POST. Make sure this is a trusted URL.")
         }
     }
 

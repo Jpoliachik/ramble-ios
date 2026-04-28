@@ -19,6 +19,7 @@ final class SettingsViewModel: ObservableObject {
     @Published var totalDuration: TimeInterval = 0
     @Published var pendingTranscriptions: Int = 0
     @Published var failedTranscriptions: Int = 0
+    @Published var webhookHealth: WebhookHealth = .untested
     @Published var appearanceMode: AppearanceMode = .system {
         didSet {
             // Sync to UserDefaults immediately so @AppStorage in RambleApp updates in real time
@@ -43,6 +44,14 @@ final class SettingsViewModel: ObservableObject {
             .filter { !$0 }
             .sink { [weak self] _ in
                 self?.applyPendingCloudModel()
+            }
+            .store(in: &cancellables)
+
+        NotificationCenter.default
+            .publisher(for: StorageService.recordingsDidChangeNotification)
+            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.loadStats()
             }
             .store(in: &cancellables)
     }
@@ -119,6 +128,7 @@ final class SettingsViewModel: ObservableObject {
         totalDuration = recordings.reduce(0) { $0 + $1.duration }
         pendingTranscriptions = recordings.filter { [.recorded, .transcribing].contains($0.status) }.count
         failedTranscriptions = recordings.filter { $0.status == .failed }.count
+        webhookHealth = WebhookHealth.compute(from: recordings)
     }
 
     func exportJSON() -> URL? {

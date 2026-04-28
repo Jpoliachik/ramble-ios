@@ -316,6 +316,22 @@ struct SendVisual: View {
     var voiceText: String = "I was thinking..."
     var endpointText: String = "my.api.com"
 
+    /// Formats a configured webhook URL for compact display (strips scheme +
+    /// trailing slash). Returns the placeholder when the URL is empty.
+    static func endpointText(for url: String) -> String {
+        let trimmed = url.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "my.api.com" }
+        var stripped = trimmed
+        for scheme in ["https://", "http://"] where stripped.lowercased().hasPrefix(scheme) {
+            stripped = String(stripped.dropFirst(scheme.count))
+            break
+        }
+        if stripped.hasSuffix("/") {
+            stripped.removeLast()
+        }
+        return stripped
+    }
+
     private let cycleDuration: Double = 2.0
 
     var body: some View {

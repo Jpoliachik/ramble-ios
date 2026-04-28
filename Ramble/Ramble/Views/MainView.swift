@@ -27,6 +27,7 @@ struct MainView: View {
                 RecordingListView(
                     recordingsByDay: viewModel.recordingsByDay,
                     onDelete: viewModel.deleteRecording,
+                    isRecording: viewModel.isRecording,
                     scrollOffset: $scrollOffset
                 )
                 .contentMargins(.top, 48, for: .scrollContent)

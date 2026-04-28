@@ -39,7 +39,10 @@ struct OnboardingTranscribeStep: View {
                     appleRow
                         .padding(.bottom, 24)
 
-                    OnboardingSectionHeader(title: "Cloud · premium", trailing: "$3.99 / month")
+                    OnboardingSectionHeader(
+                        title: "Cloud · premium",
+                        trailing: subscriptionService.isPremium ? nil : "$3.99 / month"
+                    )
                     cloudRows
 
                     Text("Cloud transcription routes through our open-source proxy. No audio or text is stored on our servers.")

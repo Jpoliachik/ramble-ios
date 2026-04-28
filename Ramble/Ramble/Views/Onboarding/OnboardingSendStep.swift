@@ -33,7 +33,7 @@ struct OnboardingSendStep: View {
 
                 Spacer().frame(height: 24)
 
-                SendVisual()
+                SendVisual(endpointText: SendVisual.endpointText(for: viewModel.destinationURL))
                     .padding(.horizontal, 16)
                     .onboardingAppear(delay: 0.3)
 
@@ -94,22 +94,18 @@ struct OnboardingSendStep: View {
         } label: {
             HStack(spacing: 12) {
                 Circle()
-                    .fill(Color.brandRed)
+                    .fill(viewModel.webhookHealth.color)
                     .frame(width: 10, height: 10)
+                    .accessibilityLabel(viewModel.webhookHealth.accessibilityLabel)
 
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(viewModel.destinationLabel)
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(Color.obInk)
-                    Text("Tap to edit")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color.obInkFaint)
-                }
+                Text(viewModel.destinationLabel)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Color.obInk)
 
                 Spacer()
 
-                Image(systemName: "pencil")
-                    .font(.system(size: 14))
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Color.obInkFaint)
             }
             .padding(.vertical, 14)
@@ -130,6 +126,7 @@ final class OnboardingSendViewModel: ObservableObject {
     @Published var destinationURL: String = ""
     @Published var destinationSecret: String = ""
     @Published var showEditSheet = false
+    @Published var webhookHealth: WebhookHealth = .untested
 
     /// Sheet-local draft values so cancelling doesn't trash saved state.
     @Published var draftURL: String = ""
@@ -137,11 +134,13 @@ final class OnboardingSendViewModel: ObservableObject {
     @Published var draftURLError: String?
 
     private let settingsService = SettingsService.shared
+    private let storageService = StorageService.shared
 
     init() {
         let loaded = settingsService.load()
         destinationURL = loaded.webhookURL ?? ""
         destinationSecret = loaded.webhookSecret
+        webhookHealth = WebhookHealth.compute(from: storageService.loadRecordings())
     }
 
     var hasDestination: Bool {
