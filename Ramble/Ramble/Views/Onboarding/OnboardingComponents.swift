@@ -245,7 +245,7 @@ struct BrandCard<Content: View>: View {
         }
         .background(
             RoundedRectangle(cornerRadius: cornerRadius)
-                .fill(Color(.secondarySystemBackground))
+                .fill(Color(.secondarySystemGroupedBackground))
         )
     }
 }
@@ -298,7 +298,7 @@ struct BrandPlusActionCard: View {
             .frame(maxWidth: .infinity)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(.secondarySystemBackground))
+                    .fill(Color(.secondarySystemGroupedBackground))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12)

@@ -77,11 +77,15 @@ struct SettingsView: View {
 
     private var freeTranscriptionSection: some View {
         Section {
-            AppleSpeechRow(
-                isSelected: viewModel.transcriptionProvider == .appleSpeech,
-                onTap: { viewModel.transcriptionProvider = .appleSpeech }
-            )
-            .listRowInsets(EdgeInsets())
+            BrandCard {
+                AppleSpeechRow(
+                    isSelected: viewModel.transcriptionProvider == .appleSpeech,
+                    onTap: { viewModel.transcriptionProvider = .appleSpeech }
+                )
+            }
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+            .listRowSeparator(.hidden)
 
             if !isSpeechAnalyzerAvailable {
                 HStack(spacing: 10) {
@@ -93,21 +97,23 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
                 .padding(.vertical, 4)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
             }
         } header: {
             VStack(alignment: .leading, spacing: 14) {
                 SettingsGroupTitle(
                     title: "Transcribe",
                     subtitle: "How your voice becomes text."
-                )
-                SettingsSubsectionLabel(title: "Free · on-device") {
+                ) {
                     Button {
                         showTranscriptionInfo = true
                     } label: {
                         Image(systemName: "info.circle")
-                            .font(.subheadline)
+                            .font(.title3)
                     }
                 }
+                SettingsSubsectionLabel("Free · on-device")
             }
             .textCase(.none)
         }
@@ -115,16 +121,24 @@ struct SettingsView: View {
 
     private var cloudTranscriptionSection: some View {
         Section {
-            ForEach(CloudModel.allCases) { model in
-                CloudModelRow(
-                    model: model,
-                    isSelected: viewModel.transcriptionProvider == .cloudTranscription
-                        && viewModel.cloudModel == model,
-                    isLocked: !subscriptionService.isPremium,
-                    onTap: { viewModel.selectCloudModel(model) }
-                )
-                .listRowInsets(EdgeInsets())
+            BrandCard {
+                ForEach(Array(CloudModel.allCases.enumerated()), id: \.element.id) { index, model in
+                    CloudModelRow(
+                        model: model,
+                        isSelected: viewModel.transcriptionProvider == .cloudTranscription
+                            && viewModel.cloudModel == model,
+                        isLocked: !subscriptionService.isPremium,
+                        onTap: { viewModel.selectCloudModel(model) }
+                    )
+
+                    if index < CloudModel.allCases.count - 1 {
+                        BrandRowDivider()
+                    }
+                }
             }
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+            .listRowSeparator(.hidden)
         } header: {
             SettingsSubsectionLabel(title: "Cloud · premium") {
                 Text("$3.99 / month")
@@ -173,19 +187,19 @@ struct SettingsView: View {
                 SettingsGroupTitle(
                     title: "Send via Webhook",
                     subtitle: "Pipe transcripts to a URL you control."
-                )
-                if viewModel.webhookURL.isEmpty {
-                    SendVisual()
-                        .padding(.bottom, 4)
-                }
-                SettingsSubsectionLabel(title: "Destination") {
+                ) {
                     Button {
                         showWebhookInfo = true
                     } label: {
                         Image(systemName: "info.circle")
-                            .font(.subheadline)
+                            .font(.title3)
                     }
                 }
+                if viewModel.webhookURL.isEmpty {
+                    SendVisual()
+                        .padding(.bottom, 4)
+                }
+                SettingsSubsectionLabel("Destination")
             }
             .textCase(.none)
         } footer: {
@@ -706,16 +720,21 @@ struct WebhookDestinationEditSheet: View {
 /// Serif group title — top-level grouping label (Transcribe, Send via Webhook).
 /// Mirrors the onboarding headline aesthetic at a smaller size, with an
 /// optional friendly subtitle below.
-private struct SettingsGroupTitle: View {
+private struct SettingsGroupTitle<Trailing: View>: View {
     let title: String
     var subtitle: String? = nil
+    @ViewBuilder let trailing: () -> Trailing
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.system(size: 24, design: .serif).weight(.medium))
-                .tracking(-0.3)
-                .foregroundStyle(Color.obInk)
+            HStack(spacing: 12) {
+                Text(title)
+                    .font(.system(size: 24, design: .serif).weight(.medium))
+                    .tracking(-0.3)
+                    .foregroundStyle(Color.obInk)
+                Spacer(minLength: 0)
+                trailing()
+            }
             if let subtitle {
                 Text(subtitle)
                     .font(.system(size: 14))
@@ -725,6 +744,12 @@ private struct SettingsGroupTitle: View {
         .textCase(.none)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, 8)
+    }
+}
+
+extension SettingsGroupTitle where Trailing == EmptyView {
+    init(title: String, subtitle: String? = nil) {
+        self.init(title: title, subtitle: subtitle, trailing: { EmptyView() })
     }
 }
 

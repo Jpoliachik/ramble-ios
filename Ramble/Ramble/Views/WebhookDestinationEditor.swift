@@ -46,11 +46,11 @@ struct WebhookDestinationEditor: View {
         NavigationStack {
             Form {
                 urlSection
-                secretSection
-                docsSection
                 if canSave {
                     testSection
                 }
+                secretSection
+                docsSection
                 if isEditing {
                     removeSection
                 }
@@ -105,9 +105,9 @@ struct WebhookDestinationEditor: View {
                     .foregroundStyle(.red)
             }
         } header: {
-            Text("Your URL")
+            Text("URL")
         } footer: {
-            Text("This is yours — your server, your workflow, your data. Transcripts go only here, never anywhere else.")
+            Text("Make sure this is a valid URL that can receive POST requests.")
         }
     }
 
@@ -153,7 +153,7 @@ struct WebhookDestinationEditor: View {
         } header: {
             Text("Signing secret")
         } footer: {
-            Text("Use this to verify requests on your endpoint.")
+            Text("For added security. Use this to optionally verify requests on your endpoint.")
         }
     }
 
@@ -161,7 +161,7 @@ struct WebhookDestinationEditor: View {
         Section {
             Link(destination: URL(string: "https://goodloop.dev/ramble/docs")!) {
                 HStack {
-                    Label("API setup docs", systemImage: "doc.text")
+                    Label("Webhook setup docs", systemImage: "doc.text")
                     Spacer()
                     Image(systemName: "arrow.up.right")
                         .font(.caption)
