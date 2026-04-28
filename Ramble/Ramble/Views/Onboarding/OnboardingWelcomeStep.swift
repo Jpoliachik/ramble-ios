@@ -11,6 +11,11 @@ struct OnboardingWelcomeStep: View {
     var body: some View {
         OnboardingPage {
             VStack(alignment: .leading, spacing: 0) {
+                RambleBarsMark(size: 96, tint: Color.obHair)
+                    .padding(.top, 24)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .onboardingAppear(delay: 0)
+
                 Spacer()
 
                 OnboardingWordmark(size: 32)
@@ -24,12 +29,6 @@ struct OnboardingWelcomeStep: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .onboardingAppear(delay: 0.2)
-
-                Text("Three quick steps. About thirty seconds.")
-                    .font(.system(size: 15))
-                    .foregroundStyle(Color.obInkSoft)
-                    .padding(.top, 14)
-                    .onboardingAppear(delay: 0.35)
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 28)

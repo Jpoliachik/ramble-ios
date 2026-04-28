@@ -82,3 +82,43 @@ struct TranscriptionModelRow: View {
         }
     }
 }
+
+// MARK: - Model-aware row presets
+
+/// Apple Speech row that always reads its label/subtitle/icon from the
+/// `TranscriptionProvider.appleSpeech` model. Use anywhere the picker is shown
+/// so onboarding and Settings render identically.
+struct AppleSpeechRow: View {
+    let isSelected: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        TranscriptionModelRow(
+            title: TranscriptionProvider.appleSpeech.displayName,
+            subtitle: TranscriptionProvider.appleSpeech.subtitle,
+            logo: .system(TranscriptionProvider.appleSpeech.iconName),
+            isSelected: isSelected,
+            onTap: onTap
+        )
+    }
+}
+
+/// Cloud model row driven entirely by `CloudModel`. Adding a new case to the
+/// enum surfaces it in every picker automatically.
+struct CloudModelRow: View {
+    let model: CloudModel
+    let isSelected: Bool
+    let isLocked: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        TranscriptionModelRow(
+            title: model.displayName,
+            subtitle: model.subtitle,
+            logo: .asset(model.iconName),
+            isSelected: isSelected,
+            isLocked: isLocked,
+            onTap: onTap
+        )
+    }
+}

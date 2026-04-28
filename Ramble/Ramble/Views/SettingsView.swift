@@ -5,6 +5,13 @@
 
 import SwiftUI
 
+private enum SettingsLinks {
+    static let privacy = URL(string: "https://goodloop.dev/ramble/privacy")!
+    static let terms = URL(string: "https://goodloop.dev/ramble/terms")!
+    static let docs = URL(string: "https://goodloop.dev/ramble/docs")!
+    static let github = URL(string: "https://github.com/Jpoliachik/ramble-ios")!
+}
+
 struct SettingsView: View {
     @StateObject private var viewModel = SettingsViewModel()
     @ObservedObject private var subscriptionService = SubscriptionService.shared
@@ -70,16 +77,9 @@ struct SettingsView: View {
         return false
     }
 
-    private var appleSpeechSubtitle: String {
-        isSpeechAnalyzerAvailable ? "Built into iOS · works offline" : "Free, on-device"
-    }
-
     private var freeTranscriptionSection: some View {
         Section {
-            TranscriptionModelRow(
-                title: TranscriptionProvider.appleSpeech.displayName,
-                subtitle: appleSpeechSubtitle,
-                logo: .system(TranscriptionProvider.appleSpeech.iconName),
+            AppleSpeechRow(
                 isSelected: viewModel.transcriptionProvider == .appleSpeech,
                 onTap: { viewModel.transcriptionProvider = .appleSpeech }
             )
@@ -120,10 +120,8 @@ struct SettingsView: View {
     private var cloudTranscriptionSection: some View {
         Section {
             ForEach(CloudModel.allCases) { model in
-                TranscriptionModelRow(
-                    title: model.displayName,
-                    subtitle: model.subtitle,
-                    logo: .asset(model.iconName),
+                CloudModelRow(
+                    model: model,
                     isSelected: viewModel.transcriptionProvider == .cloudTranscription
                         && viewModel.cloudModel == model,
                     isLocked: !subscriptionService.isPremium,
@@ -146,39 +144,9 @@ struct SettingsView: View {
     private var webhookSection: some View {
         Section {
             if viewModel.webhookURL.isEmpty {
-                Button {
+                BrandPlusActionCard(title: "Add a destination") {
                     showDestinationEdit = true
-                } label: {
-                    HStack(spacing: 12) {
-                        ZStack {
-                            Circle()
-                                .fill(Color.obInk)
-                                .frame(width: 28, height: 28)
-                            Image(systemName: "plus")
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(Color.obBg)
-                        }
-                        Text("Add a destination")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundStyle(Color.obInk)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(Color.obInkFaint)
-                    }
-                    .padding(.vertical, 14)
-                    .padding(.horizontal, 16)
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.obSurface)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.obInk.opacity(0.08), lineWidth: 1)
-                    )
                 }
-                .buttonStyle(.plain)
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
                 .listRowSeparator(.hidden)
@@ -369,8 +337,8 @@ struct SettingsView: View {
                     }
 
                 HStack(spacing: 16) {
-                    Link("Privacy Policy", destination: URL(string: "https://goodloop.dev/ramble/privacy")!)
-                    Link("Terms of Use", destination: URL(string: "https://goodloop.dev/ramble/terms")!)
+                    Link("Privacy Policy", destination: SettingsLinks.privacy)
+                    Link("Terms of Use", destination: SettingsLinks.terms)
                 }
                 .font(.caption)
             }
@@ -430,7 +398,7 @@ struct TranscriptionInfoSheet: View {
                         text: "Ramble is fully open source. Check the code on GitHub — no accounts, no user data stored. Your audio and transcriptions never touch our servers."
                     )
 
-                    Link(destination: URL(string: "https://github.com/Jpoliachik/ramble-ios")!) {
+                    Link(destination: SettingsLinks.github) {
                         HStack {
                             Spacer()
                             Label("View Source on GitHub", systemImage: "chevron.left.forwardslash.chevron.right")
@@ -494,7 +462,7 @@ struct PrivacyInfoSheet: View {
                         text: "Ramble is open source. Read the code, audit the proxy, run your own. No accounts, no analytics."
                     )
 
-                    Link(destination: URL(string: "https://goodloop.dev/ramble/privacy")!) {
+                    Link(destination: SettingsLinks.privacy) {
                         HStack {
                             Spacer()
                             Label("Read the full privacy policy", systemImage: "doc.text")
@@ -545,7 +513,7 @@ struct WebhookInfoSheet: View {
                         text: "Pipe transcripts into an AI agent, a Zapier workflow, a Notion database, or your own backend. Any HTTPS endpoint that accepts JSON works."
                     )
 
-                    Link(destination: URL(string: "https://goodloop.dev/ramble/docs")!) {
+                    Link(destination: SettingsLinks.docs) {
                         HStack {
                             Spacer()
                             Label("View Full API Docs", systemImage: "doc.text")
@@ -847,7 +815,7 @@ struct WebhookDestinationEditSheet: View {
 
     private var docsSection: some View {
         Section {
-            Link(destination: URL(string: "https://goodloop.dev/ramble/docs")!) {
+            Link(destination: SettingsLinks.docs) {
                 HStack {
                     Label("API setup docs", systemImage: "doc.text")
                     Spacer()
@@ -912,7 +880,6 @@ struct WebhookDestinationEditSheet: View {
         draftURLError = WebhookQueueService.validateWebhookURL(trimmedURL)
     }
 
-    // Pushes draft values into the view model and persists. Used by Save and Test.
     private func persistDraft() {
         viewModel.webhookURL = trimmedURL
         viewModel.webhookSecret = draftSecret

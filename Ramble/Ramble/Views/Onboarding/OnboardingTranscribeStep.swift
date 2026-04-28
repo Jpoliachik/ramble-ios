@@ -27,7 +27,7 @@ struct OnboardingTranscribeStep: View {
                         Text("Voice ") + Text("in").italic() + Text(", words ") + Text("back").italic() + Text(".")
                     }
 
-                    OnboardingBody(text: "Apple Speech is free and on-device. Cloud models are sharper — pick one if accuracy matters.")
+                    OnboardingBody(text: "Apple Speech is free and on-device. Cloud models are sharper - if accuracy matters to you.")
                 }
                 .padding(.horizontal, 24)
                 .onboardingAppear(delay: 0.2)
@@ -77,14 +77,9 @@ struct OnboardingTranscribeStep: View {
         return cloudSelectedButLocked ? "Subscribe & Continue" : "Continue"
     }
 
-    // MARK: - Free row
-
     private var appleRow: some View {
         BrandCard {
-            TranscriptionModelRow(
-                title: TranscriptionProvider.appleSpeech.displayName,
-                subtitle: appleSubtitle,
-                logo: .system("iphone"),
+            AppleSpeechRow(
                 isSelected: viewModel.isAppleSelected,
                 onTap: viewModel.selectApple
             )
@@ -92,15 +87,11 @@ struct OnboardingTranscribeStep: View {
         .padding(.horizontal, 16)
     }
 
-    // MARK: - Cloud rows
-
     private var cloudRows: some View {
         BrandCard {
             ForEach(Array(CloudModel.allCases.enumerated()), id: \.element.id) { index, model in
-                TranscriptionModelRow(
-                    title: model.displayName,
-                    subtitle: shortSubtitle(for: model),
-                    logo: .asset(model.iconName),
+                CloudModelRow(
+                    model: model,
                     isSelected: viewModel.isSelected(cloudModel: model),
                     isLocked: !subscriptionService.isPremium,
                     onTap: { viewModel.tapCloud(model) }
@@ -112,23 +103,6 @@ struct OnboardingTranscribeStep: View {
             }
         }
         .padding(.horizontal, 16)
-    }
-
-    private var appleSubtitle: String {
-        if #available(iOS 26.0, *) {
-            return "Built into iOS · works offline"
-        } else {
-            return "Update to iOS 26 for better accuracy"
-        }
-    }
-
-    private func shortSubtitle(for model: CloudModel) -> String {
-        switch model {
-        case .whisperLargeV3Turbo: return "Fast and accurate — all-around"
-        case .whisperLargeV3: return "Best for accents and multilingual"
-        case .deepgramNova3: return "Smart formatting, strong English"
-        case .openAIGPT4oTranscribe: return "Highest accuracy in noise"
-        }
     }
 }
 

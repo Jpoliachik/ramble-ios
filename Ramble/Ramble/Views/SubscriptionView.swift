@@ -6,6 +6,12 @@
 import StoreKit
 import SwiftUI
 
+private enum SubscriptionLinks {
+    static let appleEULA = URL(string: "https://apple.com/legal/internet-services/itunes/dev/stdeula/")!
+    static let privacy = URL(string: "https://goodloop.dev/ramble/privacy")!
+    static let manage = URL(string: "https://apps.apple.com/account/subscriptions")!
+}
+
 struct SubscriptionView: View {
     @ObservedObject private var subscriptionService = SubscriptionService.shared
     @Environment(\.dismiss) private var dismiss
@@ -107,7 +113,13 @@ struct SubscriptionView: View {
             }
         } else {
             VStack(spacing: 14) {
-                primaryButton
+                OnboardingPrimaryButton(
+                    title: "Subscribe",
+                    isDisabled: subscriptionService.product == nil,
+                    isLoading: isPurchasing
+                ) {
+                    purchasePremium()
+                }
 
                 Button("Restore purchases") {
                     Task { await subscriptionService.restore() }
@@ -125,33 +137,6 @@ struct SubscriptionView: View {
         }
     }
 
-    private var primaryButton: some View {
-        Button {
-            purchasePremium()
-        } label: {
-            Group {
-                if isPurchasing {
-                    ProgressView()
-                        .progressViewStyle(.circular)
-                        .tint(.white)
-                } else {
-                    Text("Subscribe")
-                        .font(.system(size: 17, weight: .semibold))
-                }
-            }
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .frame(height: 56)
-            .background(
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(Color.brandRed)
-            )
-            .opacity(primaryButtonDisabled ? 0.4 : 1)
-        }
-        .buttonStyle(.plain)
-        .disabled(primaryButtonDisabled)
-    }
-
     private var footerSection: some View {
         VStack(spacing: 10) {
             Text("Payment is charged to your Apple ID. Renews monthly unless cancelled at least 24 hours before the period ends.")
@@ -161,8 +146,8 @@ struct SubscriptionView: View {
                 .lineSpacing(2)
 
             HStack(spacing: 16) {
-                Link("Terms of Use", destination: URL(string: "https://apple.com/legal/internet-services/itunes/dev/stdeula/")!)
-                Link("Privacy Policy", destination: URL(string: "https://goodloop.dev/ramble/privacy")!)
+                Link("Terms of Use", destination: SubscriptionLinks.appleEULA)
+                Link("Privacy Policy", destination: SubscriptionLinks.privacy)
             }
             .font(.system(size: 12))
             .foregroundStyle(Color.brandRed)
@@ -173,10 +158,6 @@ struct SubscriptionView: View {
 
     private var displayPrice: String {
         subscriptionService.product?.displayPrice ?? "$3.99"
-    }
-
-    private var primaryButtonDisabled: Bool {
-        isPurchasing || subscriptionService.product == nil
     }
 
     // MARK: - Actions
@@ -196,9 +177,7 @@ struct SubscriptionView: View {
     }
 
     private func openSubscriptionManagement() {
-        if let url = URL(string: "https://apps.apple.com/account/subscriptions") {
-            UIApplication.shared.open(url)
-        }
+        UIApplication.shared.open(SubscriptionLinks.manage)
     }
 }
 

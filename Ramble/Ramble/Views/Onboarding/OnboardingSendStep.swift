@@ -79,47 +79,10 @@ struct OnboardingSendStep: View {
         }
     }
 
-    // MARK: - Add destination (dashed card)
-
     private var addDestinationCard: some View {
-        Button {
-            HapticService.buttonTap()
+        BrandPlusActionCard(title: "Add a destination") {
             viewModel.beginAdd()
-        } label: {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(Color.obInk)
-                        .frame(width: 28, height: 28)
-
-                    Image(systemName: "plus")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Color.obBg)
-                }
-
-                Text("Add a destination")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(Color.obInk)
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Color.obInkFaint)
-            }
-            .padding(.vertical, 14)
-            .padding(.horizontal, 16)
-            .frame(maxWidth: .infinity)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.obSurface)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.obInk.opacity(0.08), lineWidth: 1)
-            )
         }
-        .buttonStyle(.plain)
     }
 
     // MARK: - Destination row (set state)
@@ -183,10 +146,6 @@ final class OnboardingSendViewModel: ObservableObject {
 
     var hasDestination: Bool {
         !destinationURL.isEmpty
-    }
-
-    var isEditing: Bool {
-        hasDestination
     }
 
     var destinationLabel: String {
@@ -327,7 +286,7 @@ private struct DestinationEditSheet: View {
                     .foregroundStyle(.primary)
                 }
             }
-            .navigationTitle(viewModel.isEditing ? "Edit destination" : "Add destination")
+            .navigationTitle(viewModel.hasDestination ? "Edit destination" : "Add destination")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -336,7 +295,7 @@ private struct DestinationEditSheet: View {
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(viewModel.isEditing ? "Save" : "Add") {
+                    Button(viewModel.hasDestination ? "Save" : "Add") {
                         viewModel.saveDraft()
                     }
                     .disabled(!viewModel.canSaveDraft)
