@@ -195,10 +195,8 @@ struct SettingsView: View {
                             .font(.title3)
                     }
                 }
-                if viewModel.webhookURL.isEmpty {
-                    SendVisual()
-                        .padding(.bottom, 4)
-                }
+                SendVisual()
+                    .padding(.bottom, 4)
                 SettingsSubsectionLabel("Destination")
             }
             .textCase(.none)

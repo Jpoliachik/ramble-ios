@@ -66,10 +66,9 @@ struct WebhookDestinationEditor: View {
                         .disabled(!canSave)
                 }
             }
-            .confirmationDialog(
+            .alert(
                 "Regenerate secret?",
-                isPresented: $showRegenerateConfirmation,
-                titleVisibility: .visible
+                isPresented: $showRegenerateConfirmation
             ) {
                 Button("Regenerate", role: .destructive) {
                     onRegenerate()
@@ -79,10 +78,9 @@ struct WebhookDestinationEditor: View {
             } message: {
                 Text("Your endpoint will need the new secret to accept requests.")
             }
-            .confirmationDialog(
+            .alert(
                 "Remove destination?",
-                isPresented: $showRemoveConfirmation,
-                titleVisibility: .visible
+                isPresented: $showRemoveConfirmation
             ) {
                 Button("Remove", role: .destructive, action: onRemove)
                 Button("Cancel", role: .cancel) {}

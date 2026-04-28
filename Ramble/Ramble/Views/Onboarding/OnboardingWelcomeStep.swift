@@ -13,9 +13,9 @@ struct OnboardingWelcomeStep: View {
             VStack(alignment: .leading, spacing: 0) {
                 Spacer()
 
-                RambleBarsMark(size: 96, tint: Color.obHair)
+                RambleBarsMark(size: 120, appearDelay: 0.5)
                     .frame(maxWidth: .infinity, alignment: .center)
-                    .onboardingAppear(delay: 0)
+                    .onboardingAppear(delay: 0.5)
 
                 Spacer()
 

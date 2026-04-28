@@ -68,7 +68,7 @@ struct AudioPlayerView: View {
 
             let barFraction = Double(index) / Double(barCount)
             let color: Color = barFraction < displayProgress
-                ? .accentColor
+                ? .brandRed
                 : .secondary.opacity(0.25)
 
             context.fill(

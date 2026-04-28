@@ -46,7 +46,7 @@ struct SubscriptionView: View {
 
     private var headerSection: some View {
         VStack(spacing: 16) {
-            OnboardingIllustration(name: "illustration-transcribe")
+            OnboardingIllustration(name: "illustration-upgrade")
 
             if subscriptionService.isPremium {
                 OnboardingHeadline(size: 28) {

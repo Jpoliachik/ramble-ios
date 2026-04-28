@@ -11,9 +11,18 @@ enum TranscriptionModelLogo {
 }
 
 /// Shared row for picking a transcription model. Used in both the onboarding
-/// Transcribe step and the Settings transcription section so both surfaces look
-/// identical. The trailing slot has a fixed width so the row doesn't shift width
-/// when a row toggles between selected (checkmark) and locked (lock).
+/// Transcribe step and the Settings transcription section so both surfaces
+/// look identical. The trailing slot has a fixed width so the row doesn't
+/// shift width when toggling between selected (checkmark) and locked (lock).
+///
+/// Selection is communicated by:
+///   • a soft brand-red tint behind the row (clipped by the surrounding card)
+///   • a brand-red checkmark on the trailing edge
+///   • a brand-red title color
+///
+/// We intentionally don't draw a stroked border for selection — Form/List
+/// cells render their own shape geometry that overlay borders can't reliably
+/// trace, so a tinted fill is the iOS-native pattern that "just works."
 struct TranscriptionModelRow: View {
     let title: String
     let subtitle: String
@@ -32,8 +41,8 @@ struct TranscriptionModelRow: View {
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title)
-                        .font(.system(size: 17))
-                        .foregroundStyle(Color.obInk)
+                        .font(.system(size: 17, weight: isSelected ? .semibold : .regular))
+                        .foregroundStyle(isSelected ? Color.brandRed : Color.obInk)
 
                     Text(subtitle)
                         .font(.system(size: 13))
@@ -48,12 +57,8 @@ struct TranscriptionModelRow: View {
             }
             .padding(.vertical, 12)
             .padding(.horizontal, 16)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(Color.brandRed, lineWidth: 2)
-                    .opacity(isSelected ? 1 : 0)
-                    .animation(.easeInOut(duration: 0.2), value: isSelected)
-            )
+            .background(isSelected ? Color.brandRedSoft : Color.clear)
+            .animation(.easeInOut(duration: 0.2), value: isSelected)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -65,13 +70,13 @@ struct TranscriptionModelRow: View {
         case .system(let name):
             Image(systemName: name)
                 .font(.system(size: 18, weight: .regular))
-                .foregroundStyle(Color.obInk)
+                .foregroundStyle(isSelected ? Color.brandRed : Color.obInk)
         case .asset(let name):
             Image(name)
                 .renderingMode(.template)
                 .resizable()
                 .scaledToFit()
-                .foregroundStyle(Color.obInk)
+                .foregroundStyle(isSelected ? Color.brandRed : Color.obInk)
         }
     }
 

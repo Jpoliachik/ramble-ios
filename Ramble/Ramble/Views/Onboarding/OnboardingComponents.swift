@@ -103,7 +103,7 @@ struct OnboardingNavRow: View {
                 onBack()
             } label: {
                 Image(systemName: "chevron.left")
-                    .font(.system(size: 17, weight: .medium))
+                    .font(.system(size: 20, weight: .medium))
                     .foregroundStyle(Color.brandRed)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
@@ -120,7 +120,7 @@ struct OnboardingNavRow: View {
             // Mirrors the back button width so the dots stay centered.
             Color.clear.frame(width: 44, height: 1)
         }
-        .frame(height: 40)
+        .frame(height: 44)
         .padding(.horizontal, 16)
         .padding(.top, 16)
     }
@@ -236,7 +236,7 @@ struct OnboardingIllustration: View {
 /// outside of Form (e.g. onboarding steps). Inside Form, the system already
 /// renders this surface as the row background — no explicit card needed.
 struct BrandCard<Content: View>: View {
-    var cornerRadius: CGFloat = 12
+    var cornerRadius: CGFloat = 16
     @ViewBuilder let content: () -> Content
 
     var body: some View {
@@ -247,6 +247,9 @@ struct BrandCard<Content: View>: View {
             RoundedRectangle(cornerRadius: cornerRadius)
                 .fill(Color(.secondarySystemGroupedBackground))
         )
+        // Clip children so a row's selected-state fill (which paints to the
+        // row's rectangular bounds) is bounded by the card's rounded corners.
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
     }
 }
 
@@ -265,7 +268,7 @@ struct BrandRowDivider: View {
 
 // MARK: - Plus action card
 
-/// Bordered surface card with a circular plus icon — used for "Add a destination"
+/// Surface card with a circular plus icon — used for "Add a destination"
 /// style entry points. Reused in onboarding and Settings.
 struct BrandPlusActionCard: View {
     let title: String
@@ -297,12 +300,8 @@ struct BrandPlusActionCard: View {
             .padding(.horizontal, 16)
             .frame(maxWidth: .infinity)
             .background(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: 22)
                     .fill(Color(.secondarySystemGroupedBackground))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.obInk.opacity(0.08), lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
@@ -314,7 +313,7 @@ struct BrandPlusActionCard: View {
 /// Illustrated explainer showing a spoken thought traveling to a webhook URL.
 /// Reused in onboarding and Settings to anchor the webhook concept.
 struct SendVisual: View {
-    var voiceText: String = "So I was thinking we should do that thing."
+    var voiceText: String = "I was thinking..."
     var endpointText: String = "my.api.com"
 
     private let cycleDuration: Double = 2.0
@@ -328,18 +327,12 @@ struct SendVisual: View {
 
             endpointChip
         }
-        .padding(.vertical, 16)
-        .padding(.horizontal, 18)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color.brandRedSoft)
-        )
     }
 
     private var voiceChip: some View {
         HStack(alignment: .center, spacing: 8) {
             Image(systemName: "waveform")
-                .font(.system(size: 12))
+                .font(.system(size: 14))
                 .foregroundStyle(Color.brandRed)
 
             Text(voiceText)
@@ -349,8 +342,8 @@ struct SendVisual: View {
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, minHeight: 30, alignment: .leading)
         }
-        .padding(.vertical, 10)
-        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .padding(.horizontal, 10)
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color(.systemBackground))
@@ -406,18 +399,17 @@ struct SendVisual: View {
     private var endpointChip: some View {
         HStack(alignment: .center, spacing: 8) {
             Image(systemName: "paperplane.fill")
-                .font(.system(size: 11))
+                .font(.system(size: 13))
                 .foregroundStyle(Color.brandRed)
 
             Text(endpointText)
-                .font(.system(size: 11, design: .monospaced))
+                .font(.system(size: 10, design: .monospaced))
                 .foregroundStyle(Color.obInkSoft)
                 .lineLimit(1)
-                .truncationMode(.middle)
                 .frame(maxWidth: .infinity, minHeight: 30, alignment: .leading)
         }
-        .padding(.vertical, 10)
-        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .padding(.horizontal, 10)
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color(.systemBackground))
@@ -479,7 +471,9 @@ struct OnboardingPrimaryButton: View {
     }
 }
 
-/// Full-width text button — surface fill, ink text, used as a "Maybe later" style action.
+/// Full-width neutral secondary button — surface fill with a hairline outline,
+/// ink text. Mirrors the primary button's geometry so the two read as a clear
+/// pair when stacked. Used for "Maybe later" / dismiss-style actions.
 struct OnboardingSurfaceButton: View {
     let title: String
     let action: () -> Void
@@ -490,13 +484,17 @@ struct OnboardingSurfaceButton: View {
             action()
         } label: {
             Text(title)
-                .font(.system(size: 17, weight: .medium))
+                .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(Color.obInk)
                 .frame(maxWidth: .infinity)
-                .frame(height: 50)
+                .frame(height: 56)
                 .background(
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: 14)
                         .fill(Color(.secondarySystemBackground))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .strokeBorder(Color.obInk.opacity(0.12), lineWidth: 1)
                 )
         }
         .buttonStyle(.plain)
