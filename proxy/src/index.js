@@ -240,7 +240,8 @@ async function transcribeWithDeepgram(audio, env) {
   }
 
   const data = await res.json();
-  const transcript = data.results?.channels?.[0]?.alternatives?.[0]?.transcript;
+  const alternative = data.results?.channels?.[0]?.alternatives?.[0];
+  const transcript = alternative?.paragraphs?.transcript ?? alternative?.transcript;
 
   if (transcript === undefined || transcript === null) {
     return { error: 'No transcript in Deepgram response', status: 502 };
