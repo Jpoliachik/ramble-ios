@@ -48,6 +48,12 @@ struct TranscriptionModelRow: View {
             }
             .padding(.vertical, 12)
             .padding(.horizontal, 16)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(Color.brandRed, lineWidth: 2)
+                    .opacity(isSelected ? 1 : 0)
+                    .animation(.easeInOut(duration: 0.2), value: isSelected)
+            )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

@@ -32,8 +32,6 @@ struct SubscriptionView: View {
                 .padding(.top, 8)
                 .padding(.bottom, 32)
             }
-            .scrollContentBackground(.hidden)
-            .background(Color.obBg)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -64,8 +62,6 @@ struct SubscriptionView: View {
                 OnboardingHeadline(size: 28) {
                     Text("Best-in-class ") + Text("transcription models.").italic()
                 }
-
-                OnboardingBody(text: "Higher accuracy in noise, with accents, and across any language.")
             }
         }
     }
@@ -75,7 +71,7 @@ struct SubscriptionView: View {
             BrandFeatureRow(
                 icon: "bolt.fill",
                 title: "Top-tier accuracy",
-                subtitle: "Whisper, Nova-3, GPT-4o transcribe"
+                subtitle: "The best models available. Updated as new ones are released."
             )
             BrandRowDivider()
             BrandFeatureRow(

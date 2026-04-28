@@ -11,21 +11,22 @@ struct OnboardingWelcomeStep: View {
     var body: some View {
         OnboardingPage {
             VStack(alignment: .leading, spacing: 0) {
+                Spacer()
+
                 RambleBarsMark(size: 96, tint: Color.obHair)
-                    .padding(.top, 24)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .onboardingAppear(delay: 0)
 
                 Spacer()
 
-                OnboardingWordmark(size: 32)
+                OnboardingWordmark(size: 24)
                     .padding(.bottom, 18)
                     .onboardingAppear(delay: 0.05)
 
-                OnboardingHeadline(size: 40, alignment: .leading) {
+                OnboardingHeadline(size: 32, alignment: .leading) {
                     Text("Voice notes ")
                     + Text("that").italic().foregroundColor(Color.obInkSoft)
-                    + Text(" go somewhere.")
+                    + Text(" go somewhere.").italic().foregroundColor(Color.obInkSoft)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .onboardingAppear(delay: 0.2)

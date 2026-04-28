@@ -38,8 +38,6 @@ enum OnboardingStep: Int, CaseIterable {
 // MARK: - Design tokens
 
 extension Color {
-    static let obBg = Color("onboarding-bg")
-    static let obSurface = Color("onboarding-surface")
     static let obInk = Color("onboarding-ink")
     static let obInkSoft = Color("onboarding-ink-soft")
     static let obInkFaint = Color("onboarding-ink-faint")
@@ -232,12 +230,11 @@ struct OnboardingIllustration: View {
     }
 }
 
-// MARK: - Brand surface card
+// MARK: - Surface card
 
-/// Wraps content in the brand surface card — rounded `obSurface` fill.
-/// Used to group rows in the onboarding flow. In Settings forms the equivalent
-/// is `.listRowBackground(Color.obSurface)` on each row, which produces the
-/// same visual but works inside Form's row chrome.
+/// Rounded card filled with `secondarySystemBackground`. Used to group rows
+/// outside of Form (e.g. onboarding steps). Inside Form, the system already
+/// renders this surface as the row background — no explicit card needed.
 struct BrandCard<Content: View>: View {
     var cornerRadius: CGFloat = 12
     @ViewBuilder let content: () -> Content
@@ -248,7 +245,7 @@ struct BrandCard<Content: View>: View {
         }
         .background(
             RoundedRectangle(cornerRadius: cornerRadius)
-                .fill(Color.obSurface)
+                .fill(Color(.secondarySystemBackground))
         )
     }
 }
@@ -286,7 +283,7 @@ struct BrandPlusActionCard: View {
                         .frame(width: 28, height: 28)
                     Image(systemName: "plus")
                         .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Color.obBg)
+                        .foregroundStyle(Color(.systemBackground))
                 }
                 Text(title)
                     .font(.system(size: 16, weight: .medium))
@@ -301,7 +298,7 @@ struct BrandPlusActionCard: View {
             .frame(maxWidth: .infinity)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.obSurface)
+                    .fill(Color(.secondarySystemBackground))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
@@ -331,11 +328,11 @@ struct SendVisual: View {
 
             endpointChip
         }
-        .padding(.vertical, 18)
-        .padding(.horizontal, 16)
+        .padding(.vertical, 16)
+        .padding(.horizontal, 18)
         .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color.obSurface)
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.brandRedSoft)
         )
     }
 
@@ -346,9 +343,9 @@ struct SendVisual: View {
                 .foregroundStyle(Color.brandRed)
 
             Text(voiceText)
-                .font(.system(size: 11, design: .serif).italic())
+                .font(.system(size: 10, design: .serif).italic())
                 .foregroundStyle(Color.obInkSoft)
-                .lineLimit(2)
+                .lineLimit(1)
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, minHeight: 30, alignment: .leading)
         }
@@ -356,20 +353,19 @@ struct SendVisual: View {
         .padding(.horizontal, 12)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color.obBg)
+                .fill(Color(.systemBackground))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.obHair, lineWidth: 0.5)
+                        .stroke(Color.obInk, lineWidth: 1.5)
                 )
         )
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var connector: some View {
-        // Connector frame is fixed at connectorWidth × connectorHeight by the
-        // parent, so the dot's travel and vertical centering are constants.
-        let dotTravel = Self.connectorWidth - Self.dotSize - 5
-        let dotY = (Self.connectorHeight - Self.dotSize) / 2
+        // The ZStack already vertically centers its children, so the dot only
+        // needs an x offset for travel — no y math required.
+        let dotTravel = Self.connectorWidth - Self.dotSize - 6
 
         return TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { context in
             let elapsed = context.date.timeIntervalSinceReferenceDate
@@ -377,27 +373,27 @@ struct SendVisual: View {
 
             ZStack(alignment: .leading) {
                 Rectangle()
-                    .fill(Color.obHair)
-                    .frame(height: 2)
-                    .padding(.trailing, 6)
+                    .fill(Color.obInk)
+                    .frame(height: 3)
+                    .padding(.trailing, 8)
 
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(Color.obInkFaint)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Color.obInk)
                     .frame(maxWidth: .infinity, alignment: .trailing)
 
                 Circle()
                     .fill(Color.brandRed)
                     .frame(width: Self.dotSize, height: Self.dotSize)
-                    .offset(x: dotTravel * CGFloat(progress), y: dotY)
+                    .offset(x: dotTravel * CGFloat(progress))
                     .opacity(travelOpacity(for: progress))
             }
         }
     }
 
-    private static let connectorWidth: CGFloat = 56
-    private static let connectorHeight: CGFloat = 20
-    private static let dotSize: CGFloat = 9
+    private static let connectorWidth: CGFloat = 64
+    private static let connectorHeight: CGFloat = 24
+    private static let dotSize: CGFloat = 14
 
     private func travelOpacity(for progress: Double) -> Double {
         switch progress {
@@ -424,10 +420,10 @@ struct SendVisual: View {
         .padding(.horizontal, 12)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color.obBg)
+                .fill(Color(.systemBackground))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.obHair, lineWidth: 0.5)
+                        .stroke(Color.obInk, lineWidth: 1.5)
                 )
         )
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -500,7 +496,7 @@ struct OnboardingSurfaceButton: View {
                 .frame(height: 50)
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.obSurface)
+                        .fill(Color(.secondarySystemBackground))
                 )
         }
         .buttonStyle(.plain)

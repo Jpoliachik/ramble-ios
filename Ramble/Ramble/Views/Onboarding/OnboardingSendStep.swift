@@ -22,11 +22,11 @@ struct OnboardingSendStep: View {
                 Spacer().frame(height: 14)
 
                 VStack(spacing: 16) {
-                    OnboardingHeadline(size: 34) {
-                        Text("Make it ") + Text("do something.").italic()
+                    OnboardingHeadline(size: 32) {
+                        Text("Now, make it ") + Text("do something.").italic()
                     }
 
-                    OnboardingBody(text: "Pipe every transcript into a URL you control — your notes, an automation, an AI agent. Optional.")
+                    OnboardingBody(text: "Pipe every transcript straight to your API. Connect to your notes system, an automation platform, AI agent - anywhere.")
                 }
                 .padding(.horizontal, 24)
                 .onboardingAppear(delay: 0.2)
@@ -116,7 +116,7 @@ struct OnboardingSendStep: View {
             .padding(.horizontal, 16)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.obSurface)
+                    .fill(Color(.secondarySystemBackground))
             )
         }
         .buttonStyle(.plain)
@@ -196,6 +196,17 @@ final class OnboardingSendViewModel: ObservableObject {
         showEditSheet = false
     }
 
+    func regenerateDraftSecret() {
+        draftSecret = Settings.generateSecret()
+    }
+
+    func removeDestination() {
+        destinationURL = ""
+        destinationSecret = Settings.generateSecret()
+        HapticService.success()
+        showEditSheet = false
+    }
+
     func commit() {
         var current = settingsService.load()
         if destinationURL.isEmpty {
@@ -212,96 +223,20 @@ final class OnboardingSendViewModel: ObservableObject {
 
 private struct DestinationEditSheet: View {
     @ObservedObject var viewModel: OnboardingSendViewModel
-    @State private var showSecretRevealed = false
-    @State private var showSecretCopied = false
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    TextField("https://your-webhook.example.com", text: $viewModel.draftURL)
-                        .keyboardType(.URL)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .onChange(of: viewModel.draftURL) {
-                            viewModel.validateDraftURL()
-                        }
-                    if let error = viewModel.draftURLError {
-                        Label(error, systemImage: "exclamationmark.triangle.fill")
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                    }
-                } header: {
-                    Text("Your URL")
-                } footer: {
-                    Text("This is yours — your server, your workflow, your data. Transcripts go only here, never anywhere else.")
-                }
-
-                Section {
-                    HStack {
-                        Text(showSecretRevealed ? viewModel.draftSecret : String(repeating: "•", count: 24))
-                            .font(.system(.caption, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                        Spacer()
-                        Button {
-                            withAnimation { showSecretRevealed.toggle() }
-                        } label: {
-                            Image(systemName: showSecretRevealed ? "eye.slash" : "eye")
-                        }
-                        .buttonStyle(.borderless)
-                    }
-                    Button {
-                        UIPasteboard.general.string = viewModel.draftSecret
-                        HapticService.success()
-                        showSecretCopied = true
-                        Task {
-                            try? await Task.sleep(nanoseconds: 1_500_000_000)
-                            showSecretCopied = false
-                        }
-                    } label: {
-                        Label(
-                            showSecretCopied ? "Copied" : "Copy secret",
-                            systemImage: showSecretCopied ? "checkmark" : "doc.on.doc"
-                        )
-                        .foregroundStyle(showSecretCopied ? .green : .primary)
-                    }
-                } header: {
-                    Text("Signing secret")
-                } footer: {
-                    Text("Use this to verify requests on your endpoint.")
-                }
-
-                Section {
-                    Link(destination: URL(string: "https://goodloop.dev/ramble/docs")!) {
-                        HStack {
-                            Label("API setup docs", systemImage: "doc.text")
-                            Spacer()
-                            Image(systemName: "arrow.up.right")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .foregroundStyle(.primary)
-                }
-            }
-            .navigationTitle(viewModel.hasDestination ? "Edit destination" : "Add destination")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        viewModel.cancelDraft()
-                    }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(viewModel.hasDestination ? "Save" : "Add") {
-                        viewModel.saveDraft()
-                    }
-                    .disabled(!viewModel.canSaveDraft)
-                }
-            }
-        }
+        WebhookDestinationEditor(
+            draftURL: $viewModel.draftURL,
+            draftSecret: $viewModel.draftSecret,
+            draftURLError: $viewModel.draftURLError,
+            isEditing: viewModel.hasDestination,
+            canSave: viewModel.canSaveDraft,
+            onSave: viewModel.saveDraft,
+            onCancel: viewModel.cancelDraft,
+            onValidateURL: viewModel.validateDraftURL,
+            onRegenerate: viewModel.regenerateDraftSecret,
+            onRemove: viewModel.removeDestination
+        )
     }
 }
 

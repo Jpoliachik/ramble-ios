@@ -23,11 +23,11 @@ struct OnboardingTranscribeStep: View {
                 Spacer().frame(height: 14)
 
                 VStack(spacing: 12) {
-                    OnboardingHeadline(size: 34) {
+                    OnboardingHeadline(size: 32) {
                         Text("Voice ") + Text("in").italic() + Text(", words ") + Text("back").italic() + Text(".")
                     }
 
-                    OnboardingBody(text: "Apple Speech is free and on-device. Cloud models are sharper - if accuracy matters to you.")
+                    OnboardingBody(text: "Choose your model. Apple Speech is free and on-device. Cloud models are sharper - if accuracy is important.")
                 }
                 .padding(.horizontal, 24)
                 .onboardingAppear(delay: 0.2)

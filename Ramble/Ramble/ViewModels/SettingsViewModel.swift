@@ -26,14 +26,7 @@ final class SettingsViewModel: ObservableObject {
         }
     }
     @Published var webhookURLError: String?
-    @Published var testWebhookResult: TestWebhookResult?
     @Published var devOverrideKey: String = ""
-
-    enum TestWebhookResult {
-        case loading
-        case success
-        case failure(String)
-    }
 
     /// The cloud model the user tapped before being shown the paywall
     private var pendingCloudModel: CloudModel?
@@ -118,32 +111,6 @@ final class SettingsViewModel: ObservableObject {
 
     func regenerateWebhookSecret() {
         webhookSecret = Settings.generateSecret()
-    }
-
-    func sendTestWebhook() {
-        // Validate first
-        validateWebhookURL()
-        guard webhookURLError == nil, !webhookURL.isEmpty else { return }
-
-        // Save current settings so the test uses latest values
-        save()
-
-        testWebhookResult = .loading
-        Task {
-            let error = await WebhookQueueService.shared.sendTestWebhook()
-            if let error {
-                testWebhookResult = .failure(error)
-            } else {
-                testWebhookResult = .success
-            }
-            // Auto-dismiss success after a delay
-            if case .success = testWebhookResult {
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
-                if case .success = testWebhookResult {
-                    testWebhookResult = nil
-                }
-            }
-        }
     }
 
     private func loadStats() {

@@ -32,7 +32,7 @@ struct OnboardingRecordStep: View {
                 Spacer().frame(height: 18)
 
                 VStack(spacing: 12) {
-                    OnboardingHeadline(size: 34) {
+                    OnboardingHeadline(size: 32) {
                         Text("First, ") + Text("let it hear you.").italic()
                     }
 
@@ -103,7 +103,7 @@ struct OnboardingRecordStep: View {
         .padding(.horizontal, 16)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color.obSurface)
+                .fill(Color(.secondarySystemBackground))
         )
     }
 

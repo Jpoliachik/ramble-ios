@@ -16,6 +16,11 @@ import SwiftUI
 struct RambleBarsMark: View {
     let size: CGFloat
     var tint: Color = .obInkSoft
+    /// Delay before the entrance grow animation starts. Useful when the parent
+    /// wants to stagger this mark behind other elements.
+    var appearDelay: Double = 0
+
+    @State private var appearScale: CGFloat = 0
 
     private static let baseHeights: [CGFloat] = [0.55, 0.85, 0.45]
     private static let phaseOffsets: [Double] = [0, 0.55, 1.1]
@@ -40,6 +45,12 @@ struct RambleBarsMark: View {
             }
             .frame(width: size, height: size)
         }
+        .scaleEffect(x: 1, y: appearScale, anchor: .center)
         .accessibilityHidden(true)
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.7).delay(appearDelay)) {
+                appearScale = 1
+            }
+        }
     }
 }

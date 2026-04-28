@@ -37,8 +37,6 @@ struct SettingsView: View {
                 dangerZoneSection
                 aboutSection
             }
-            .scrollContentBackground(.hidden)
-            .background(Color.obBg)
             .listSectionSpacing(28)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -84,7 +82,6 @@ struct SettingsView: View {
                 onTap: { viewModel.transcriptionProvider = .appleSpeech }
             )
             .listRowInsets(EdgeInsets())
-            .listRowBackground(Color.obSurface)
 
             if !isSpeechAnalyzerAvailable {
                 HStack(spacing: 10) {
@@ -96,7 +93,6 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
                 .padding(.vertical, 4)
-                .listRowBackground(Color.obSurface)
             }
         } header: {
             VStack(alignment: .leading, spacing: 14) {
@@ -128,7 +124,6 @@ struct SettingsView: View {
                     onTap: { viewModel.selectCloudModel(model) }
                 )
                 .listRowInsets(EdgeInsets())
-                .listRowBackground(Color.obSurface)
             }
         } header: {
             SettingsSubsectionLabel(title: "Cloud · premium") {
@@ -172,7 +167,6 @@ struct SettingsView: View {
                             .foregroundStyle(Color.obInkFaint)
                     }
                 }
-                .listRowBackground(Color.obSurface)
             }
         } header: {
             VStack(alignment: .leading, spacing: 14) {
@@ -212,7 +206,6 @@ struct SettingsView: View {
                 }
             }
             .pickerStyle(.menu)
-            .listRowBackground(Color.obSurface)
         } header: {
             SettingsGroupTitle(title: "Appearance")
         }
@@ -226,14 +219,12 @@ struct SettingsView: View {
                 Text("\(viewModel.totalRecordings)")
                     .foregroundStyle(.secondary)
             }
-            .listRowBackground(Color.obSurface)
             HStack {
                 Text("Total Duration")
                 Spacer()
                 Text(formatTotalDuration(viewModel.totalDuration))
                     .foregroundStyle(.secondary)
             }
-            .listRowBackground(Color.obSurface)
 
             if viewModel.pendingTranscriptions > 0 {
                 HStack {
@@ -242,7 +233,6 @@ struct SettingsView: View {
                     Text("\(viewModel.pendingTranscriptions)")
                         .foregroundStyle(.secondary)
                 }
-                .listRowBackground(Color.obSurface)
             }
 
             if viewModel.failedTranscriptions > 0 {
@@ -252,7 +242,6 @@ struct SettingsView: View {
                     Text("\(viewModel.failedTranscriptions)")
                         .foregroundStyle(.red)
                 }
-                .listRowBackground(Color.obSurface)
             }
         } header: {
             SettingsGroupTitle(title: "Statistics")
@@ -280,7 +269,6 @@ struct SettingsView: View {
                         .foregroundStyle(Color.obInkFaint)
                 }
             }
-            .listRowBackground(Color.obSurface)
         } header: {
             SettingsGroupTitle(title: "Data")
         }
@@ -301,7 +289,6 @@ struct SettingsView: View {
                     Spacer()
                 }
             }
-            .listRowBackground(Color.obSurface)
         } header: {
             SettingsGroupTitle(title: "Danger zone")
         }
@@ -663,10 +650,6 @@ struct WebhookDestinationEditSheet: View {
     @State private var draftURL: String
     @State private var draftSecret: String
     @State private var draftURLError: String?
-    @State private var showRegenerateConfirmation = false
-    @State private var showRemoveConfirmation = false
-    @State private var showSecretRevealed = false
-    @State private var showSecretCopied = false
 
     init(viewModel: SettingsViewModel) {
         self.viewModel = viewModel
@@ -675,201 +658,23 @@ struct WebhookDestinationEditSheet: View {
         _draftSecret = State(initialValue: secret)
     }
 
-    private var isEditing: Bool {
-        !viewModel.webhookURL.isEmpty
-    }
-
     private var trimmedURL: String {
         draftURL.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private var canSave: Bool {
-        !trimmedURL.isEmpty && draftURLError == nil
-    }
-
-    private var isTestLoading: Bool {
-        if case .loading = viewModel.testWebhookResult { return true }
-        return false
-    }
-
     var body: some View {
-        NavigationStack {
-            Form {
-                urlSection
-                secretSection
-                docsSection
-                if canSave {
-                    testSection
-                }
-                if isEditing {
-                    removeSection
-                }
-            }
-            .scrollContentBackground(.hidden)
-            .background(Color.obBg)
-            .navigationTitle(isEditing ? "Edit destination" : "Add destination")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { save() }
-                        .disabled(!canSave)
-                }
-            }
-            .confirmationDialog(
-                "Regenerate secret?",
-                isPresented: $showRegenerateConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button("Regenerate", role: .destructive) {
-                    draftSecret = Settings.generateSecret()
-                    HapticService.warning()
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Your endpoint will need the new secret to accept requests.")
-            }
-            .confirmationDialog(
-                "Remove destination?",
-                isPresented: $showRemoveConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button("Remove", role: .destructive) {
-                    remove()
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Transcripts will no longer be sent anywhere.")
-            }
-        }
-    }
-
-    private var urlSection: some View {
-        Section {
-            TextField("https://your-webhook.example.com", text: $draftURL)
-                .keyboardType(.URL)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .onChange(of: draftURL) { validateURL() }
-            if let error = draftURLError {
-                Label(error, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.red)
-            }
-        } header: {
-            Text("Your URL")
-        } footer: {
-            Text("This is yours — your server, your workflow, your data. Transcripts go only here, never anywhere else.")
-        }
-        .listRowBackground(Color.obSurface)
-    }
-
-    private var secretSection: some View {
-        Section {
-            HStack {
-                Text(showSecretRevealed ? draftSecret : String(repeating: "•", count: 24))
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Spacer()
-                Button {
-                    withAnimation { showSecretRevealed.toggle() }
-                } label: {
-                    Image(systemName: showSecretRevealed ? "eye.slash" : "eye")
-                }
-                .buttonStyle(.borderless)
-            }
-
-            Button {
-                UIPasteboard.general.string = draftSecret
-                HapticService.success()
-                showSecretCopied = true
-                Task {
-                    try? await Task.sleep(nanoseconds: 1_500_000_000)
-                    showSecretCopied = false
-                }
-            } label: {
-                Label(
-                    showSecretCopied ? "Copied" : "Copy secret",
-                    systemImage: showSecretCopied ? "checkmark" : "doc.on.doc"
-                )
-                .foregroundStyle(showSecretCopied ? .green : .primary)
-            }
-
-            Button {
-                showRegenerateConfirmation = true
-            } label: {
-                Label("Regenerate", systemImage: "arrow.clockwise")
-                    .foregroundStyle(.primary)
-            }
-        } header: {
-            Text("Signing secret")
-        } footer: {
-            Text("Use this to verify requests on your endpoint.")
-        }
-        .listRowBackground(Color.obSurface)
-    }
-
-    private var docsSection: some View {
-        Section {
-            Link(destination: SettingsLinks.docs) {
-                HStack {
-                    Label("API setup docs", systemImage: "doc.text")
-                    Spacer()
-                    Image(systemName: "arrow.up.right")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .foregroundStyle(.primary)
-        }
-        .listRowBackground(Color.obSurface)
-    }
-
-    private var testSection: some View {
-        Section {
-            Button {
-                persistDraft()
-                viewModel.sendTestWebhook()
-            } label: {
-                HStack {
-                    switch viewModel.testWebhookResult {
-                    case .loading:
-                        ProgressView().controlSize(.small)
-                        Text("Sending…")
-                    case .success:
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                        Text("Test delivered")
-                    case .failure(let error):
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.red)
-                        Text("Failed — \(error)")
-                            .lineLimit(2)
-                    case nil:
-                        Image(systemName: "paperplane")
-                        Text("Send test webhook")
-                    }
-                }
-                .foregroundStyle(.primary)
-            }
-            .disabled(isTestLoading)
-        }
-        .listRowBackground(Color.obSurface)
-    }
-
-    private var removeSection: some View {
-        Section {
-            Button(role: .destructive) {
-                showRemoveConfirmation = true
-            } label: {
-                Label("Remove destination", systemImage: "trash")
-            }
-        }
-        .listRowBackground(Color.obSurface)
+        WebhookDestinationEditor(
+            draftURL: $draftURL,
+            draftSecret: $draftSecret,
+            draftURLError: $draftURLError,
+            isEditing: !viewModel.webhookURL.isEmpty,
+            canSave: !trimmedURL.isEmpty && draftURLError == nil,
+            onSave: save,
+            onCancel: { dismiss() },
+            onValidateURL: validateURL,
+            onRegenerate: { draftSecret = Settings.generateSecret() },
+            onRemove: remove
+        )
     }
 
     private func validateURL() {
@@ -880,14 +685,10 @@ struct WebhookDestinationEditSheet: View {
         draftURLError = WebhookQueueService.validateWebhookURL(trimmedURL)
     }
 
-    private func persistDraft() {
+    private func save() {
         viewModel.webhookURL = trimmedURL
         viewModel.webhookSecret = draftSecret
         viewModel.save()
-    }
-
-    private func save() {
-        persistDraft()
         HapticService.success()
         dismiss()
     }
