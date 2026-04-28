@@ -8,24 +8,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 For full brand positioning, audience, tone, and messaging guidelines, see **`docs/brand.md`**.
 
-## Current Phase
-
-**v1 push to App Store** — Local-first architecture is in place. Focus is reliability (queues, retry, status transparency), watch sync, and UX polish. Then ship.
-
-### v1 scope
-
-- iOS: record → transcribe → browse/copy transcripts, settings for proxy + webhook
-- Watch: record, sync to phone, minimal recordings list (timestamp, duration, sync status)
-- StoreKit 2 subscription for cloud transcription ($3.99/month)
-- NOT in v1: CarPlay, widgets, Siri, full-text search, tags/folders, watch complication
-
-### Remaining v1 work
-
-- [ ] **App Store assets** — screenshots (iPhone + Apple Watch), privacy policy URL, app description
-- [ ] **End-to-end production testing** — verify real StoreKit subscription flow (sandbox/TestFlight), JWS verification on proxy, and cloud transcription without dev bypass
-- [ ] **Transcript formatting** — transcripts render as one big block of text with no line breaks. Improve formatting with paragraph breaks (Apple Speech segments, cloud provider paragraph support, or heuristic sentence grouping)
-- [ ] **Recording detail title** — show date/time instead of "Recording" in the navigation title on RecordingDetailView
-
 ### Post-v1 — cloud transcription enhancements
 
 These are free features from existing providers (no extra API calls or cost):
@@ -102,17 +84,17 @@ proxy/                 # Cloudflare Worker transcription proxy
 
 ### Key Services
 
-| Service | Role |
-|---------|------|
-| `AudioRecorderService` | 16kHz mono AAC capture |
-| `TranscriptionQueueService` | Persistent job queue with retry |
+| Service                           | Role                                                     |
+| --------------------------------- | -------------------------------------------------------- |
+| `AudioRecorderService`            | 16kHz mono AAC capture                                   |
+| `TranscriptionQueueService`       | Persistent job queue with retry                          |
 | `AppleSpeechTranscriptionService` | On-device transcription via SFSpeechRecognizer (default) |
-| `ProxyTranscriptionService` | HTTP client for cloud/custom transcription endpoints |
-| `WebhookQueueService` | Independent queue for webhook delivery with retry |
-| `BackgroundTaskService` | UIKit + BGProcessingTask for background queue draining |
-| `RecordingManager` | Coordinates audio recording lifecycle |
-| `StorageService` | JSON file persistence for recordings |
-| `PhoneConnectivityService` | WatchConnectivity bridge for watch recordings |
+| `ProxyTranscriptionService`       | HTTP client for cloud/custom transcription endpoints     |
+| `WebhookQueueService`             | Independent queue for webhook delivery with retry        |
+| `BackgroundTaskService`           | UIKit + BGProcessingTask for background queue draining   |
+| `RecordingManager`                | Coordinates audio recording lifecycle                    |
+| `StorageService`                  | JSON file persistence for recordings                     |
+| `PhoneConnectivityService`        | WatchConnectivity bridge for watch recordings            |
 
 ### Models
 
@@ -136,12 +118,12 @@ Thin stateless Cloudflare Worker. Receives audio, forwards to transcription prov
 
 ### Cloud Transcription Models
 
-| Model | Provider | Strength |
-|-------|----------|----------|
-| Whisper v3 Turbo | Groq | Fast and accurate — best all-around (default) |
-| Whisper Large v3 | Groq | Best for accents and multilingual audio |
-| Nova-3 | Deepgram | Strong English accuracy, smart formatting |
-| GPT-4o Transcribe | OpenAI | Highest accuracy in noisy environments |
+| Model             | Provider | Strength                                      |
+| ----------------- | -------- | --------------------------------------------- |
+| Whisper v3 Turbo  | Groq     | Fast and accurate — best all-around (default) |
+| Whisper Large v3  | Groq     | Best for accents and multilingual audio       |
+| Nova-3            | Deepgram | Strong English accuracy, smart formatting     |
+| GPT-4o Transcribe | OpenAI   | Highest accuracy in noisy environments        |
 
 ## Pre-Launch Checklist
 
