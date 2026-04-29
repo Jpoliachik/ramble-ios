@@ -53,15 +53,19 @@ struct OnboardingSendStep: View {
             }
         } bottomBar: {
             VStack(spacing: 8) {
-                OnboardingSurfaceButton(
-                    title: viewModel.hasDestination ? "Continue" : "Maybe later"
-                ) {
-                    viewModel.commit()
-                    HapticService.success()
-                    onFinish()
-                }
+                if viewModel.hasDestination {
+                    OnboardingPrimaryButton(title: "Continue") {
+                        viewModel.commit()
+                        HapticService.success()
+                        onFinish()
+                    }
+                } else {
+                    OnboardingSurfaceButton(title: "Maybe later") {
+                        viewModel.commit()
+                        HapticService.success()
+                        onFinish()
+                    }
 
-                if !viewModel.hasDestination {
                     Text("You can always add one in Settings.")
                         .font(.system(size: 13))
                         .foregroundStyle(Color.obInkFaint)
@@ -110,9 +114,10 @@ struct OnboardingSendStep: View {
             }
             .padding(.vertical, 14)
             .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity)
             .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(.secondarySystemBackground))
+                RoundedRectangle(cornerRadius: 22)
+                    .fill(Color(.secondarySystemGroupedBackground))
             )
         }
         .buttonStyle(.plain)
