@@ -167,7 +167,7 @@ final class TranscriptionQueueService: ObservableObject {
         }
 
         do {
-            let text: String
+            let rawText: String
             if job.provider.isCloud {
                 // Fetch fresh JWS at call time (not enqueue time) — tokens expire
                 let jws = SubscriptionService.shared.currentJWSTransaction
@@ -176,12 +176,13 @@ final class TranscriptionQueueService: ObservableObject {
                     model: job.cloudModel ?? .whisperLargeV3Turbo,
                     jwsTransaction: jws
                 )
-                text = try await proxyService.transcribe(request)
+                rawText = try await proxyService.transcribe(request)
             } else if #available(iOS 26.0, *) {
-                text = try await speechAnalyzer.transcribe(audioURL: audioURL)
+                rawText = try await speechAnalyzer.transcribe(audioURL: audioURL)
             } else {
-                text = try await legacySpeech.transcribe(audioURL: audioURL)
+                rawText = try await legacySpeech.transcribe(audioURL: audioURL)
             }
+            let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
 
             // Success — update recording
             var updatedRecordings = storageService.loadRecordings()
