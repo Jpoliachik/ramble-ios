@@ -1,45 +1,110 @@
 import Link from "next/link";
-import { Mic, Webhook, ShieldCheck, Zap, BrainCircuit, Database, Code } from "lucide-react";
-import AnimatedLogo from "../components/animated-logo";
+import { Mic, Webhook, ShieldCheck } from "lucide-react";
+import HeroFlow from "../components/hero-flow";
+
+const BASE_PATH = "/ramble";
 
 export default function Home() {
   return (
     <main className="flex-1">
       {/* Hero */}
-      <section className="mx-auto max-w-5xl px-6 pt-32 pb-20 sm:pt-40 sm:pb-28">
-        <div className="flex flex-col items-center text-center">
-          <div className="hero-enter-logo">
-            <AnimatedLogo />
+      <section className="mx-auto max-w-6xl px-6 pt-32 pb-20 sm:pt-40 sm:pb-28">
+        <div className="grid items-center gap-16 lg:grid-cols-[minmax(0,1fr)_auto] lg:gap-12">
+          <div className="flex flex-col items-center text-center lg:items-start lg:text-left">
+            <div className="hero-enter-logo">
+              <HeroFlow />
+            </div>
+            <h1 className="hero-enter-title font-serif text-4xl font-semibold tracking-tight text-stone-900 sm:text-5xl lg:text-6xl">
+              Voice in.
+              <br />
+              <span className="italic text-red-500">Webhooks out.</span>
+            </h1>
+            <p className="hero-enter-subtitle mt-6 text-base leading-relaxed text-stone-500 sm:text-lg lg:text-xl">
+              Record your thoughts on iPhone or Apple Watch.
+              <br />
+              Get accurate transcripts.
+              <br />
+              Pipe them anywhere via webhook.
+            </p>
+            <div className="hero-enter-buttons mt-10 flex flex-col items-center gap-4 sm:flex-row lg:items-start">
+              <a
+                href="https://apps.apple.com/app/id6761857751"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-full bg-stone-900 px-6 py-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-stone-800"
+              >
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
+                </svg>
+                Download on the App Store
+              </a>
+              <Link
+                href="/docs"
+                className="inline-flex items-center gap-2 rounded-full border border-stone-300 px-6 py-3 text-sm font-medium text-stone-700 transition-colors hover:border-stone-400 hover:bg-stone-100"
+              >
+                Read the docs
+                <span aria-hidden="true">&rarr;</span>
+              </Link>
+            </div>
           </div>
-          <h1 className="hero-enter-title font-serif text-4xl font-semibold tracking-tight text-stone-900 sm:text-5xl lg:text-6xl">
-            Voice that goes somewhere
-          </h1>
-          <p className="hero-enter-subtitle mt-6 text-base leading-relaxed text-stone-500 sm:text-lg lg:text-xl">
-            Record your thoughts on iPhone or Apple Watch.
-            <br />
-            Get accurate transcripts.
-            <br />
-            Pipe them anywhere via webhook.
-          </p>
-          <div className="hero-enter-buttons mt-10 flex flex-col items-center gap-4 sm:flex-row">
-            <a
-              href="https://apps.apple.com/app/id6761857751"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-full bg-stone-900 px-6 py-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-stone-800"
-            >
-              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
-              </svg>
-              Download on the App Store
-            </a>
-            <Link
-              href="/docs"
-              className="inline-flex items-center gap-2 rounded-full border border-stone-300 px-6 py-3 text-sm font-medium text-stone-700 transition-colors hover:border-stone-400 hover:bg-stone-100"
-            >
-              Automate your voice notes
-              <span aria-hidden="true">&rarr;</span>
-            </Link>
+
+          {/* Device showcase */}
+          <div className="hero-enter-devices relative mx-auto pl-12 sm:pl-16 lg:mx-0 lg:pl-12">
+            <div className="relative w-[220px] sm:w-[260px] lg:w-[280px]">
+              {/* iPhone 17 Pro frame */}
+              <div className="relative">
+                {/* Side buttons (Action button left, Camera Control right) */}
+                <span
+                  aria-hidden="true"
+                  className="absolute -left-[3px] top-[18%] h-12 w-[4px] rounded-l-sm bg-stone-700"
+                />
+                <span
+                  aria-hidden="true"
+                  className="absolute -right-[3px] top-[14%] h-8 w-[4px] rounded-r-sm bg-stone-700"
+                />
+                <span
+                  aria-hidden="true"
+                  className="absolute -right-[3px] top-[26%] h-16 w-[4px] rounded-r-sm bg-stone-700"
+                />
+                <div className="rounded-[3rem] bg-stone-900 p-[10px] shadow-[0_30px_60px_-15px_rgba(26,25,23,0.35)] ring-1 ring-black/5">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`${BASE_PATH}/screenshot-home-light.png`}
+                    alt="Ramble app on iPhone showing the recordings list and an in-progress recording"
+                    className="block w-full rounded-[2.4rem]"
+                  />
+                </div>
+              </div>
+
+              {/* Apple Watch Ultra frame, overlapping bottom-left */}
+              <div className="absolute -left-10 sm:-left-14 -bottom-6 w-[110px] sm:w-[130px]">
+                <div className="relative">
+                  {/* Action button (left) */}
+                  <span
+                    aria-hidden="true"
+                    className="absolute -left-[4px] top-[36%] h-6 w-[5px] rounded-l-sm bg-red-500/80"
+                  />
+                  {/* Digital crown (right) */}
+                  <span
+                    aria-hidden="true"
+                    className="absolute -right-[5px] top-[22%] h-5 w-[6px] rounded-r-md bg-stone-700"
+                  />
+                  {/* Side button (right) */}
+                  <span
+                    aria-hidden="true"
+                    className="absolute -right-[4px] top-[44%] h-7 w-[5px] rounded-r-sm bg-stone-700"
+                  />
+                  <div className="rounded-[2.25rem] bg-stone-900 p-[6px] shadow-[0_20px_40px_-10px_rgba(26,25,23,0.4)] ring-1 ring-black/5">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={`${BASE_PATH}/screenshot-watch-recording2.png`}
+                      alt="Ramble recording on Apple Watch Ultra"
+                      className="block w-full rounded-[1.85rem]"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -111,51 +176,122 @@ export default function Home() {
               <p className="mt-1 text-sm text-stone-500">Auto-POST transcripts to any webhook.</p>
             </div>
           </div>
-        </div>
-      </section>
 
-      {/* Webhook / Automations */}
-      <section className="border-t border-stone-200 bg-stone-50">
-        <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
-          <div className="max-w-2xl mx-auto text-center">
-            <h2 className="font-serif text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl">
-              Your voice triggers anything.
-            </h2>
-          </div>
-
-          <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-xl border border-stone-200 bg-cream p-5">
-              <BrainCircuit className="h-5 w-5 text-sage-600" />
-              <h3 className="mt-3 text-sm font-semibold text-stone-900">AI agents</h3>
-              <p className="mt-1 text-sm text-stone-500">Ramble your thoughts, let AI sort them out.</p>
-            </div>
-            <div className="rounded-xl border border-stone-200 bg-cream p-5">
-              <Zap className="h-5 w-5 text-sage-600" />
-              <h3 className="mt-3 text-sm font-semibold text-stone-900">Zapier &amp; Make</h3>
-              <p className="mt-1 text-sm text-stone-500">Plug into any automation platform with a single webhook.</p>
-            </div>
-            <div className="rounded-xl border border-stone-200 bg-cream p-5">
-              <Database className="h-5 w-5 text-sage-600" />
-              <h3 className="mt-3 text-sm font-semibold text-stone-900">Notion &amp; Airtable</h3>
-              <p className="mt-1 text-sm text-stone-500">
-                Ramble a thought, it shows up in your database. Journaling, meeting notes, field logs.
-              </p>
-            </div>
-            <div className="rounded-xl border border-stone-200 bg-cream p-5">
-              <Code className="h-5 w-5 text-sage-600" />
-              <h3 className="mt-3 text-sm font-semibold text-stone-900">Your own backend</h3>
-              <p className="mt-1 text-sm text-stone-500">Any HTTPS endpoint. Signed requests, automatic retries.</p>
-            </div>
-          </div>
-
-          <div className="mt-10 text-center">
+          <div className="mt-14 text-center">
             <Link
               href="/docs"
               className="inline-flex items-center gap-2 rounded-full border border-stone-300 px-6 py-3 text-sm font-medium text-stone-700 transition-colors hover:border-stone-400 hover:bg-stone-100"
             >
-              Build your first automation
+              Build your automation
               <span aria-hidden="true">&rarr;</span>
             </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section className="border-t border-stone-200">
+        <div className="mx-auto max-w-3xl px-6 py-12 sm:py-16">
+          <div className="divide-y divide-stone-200 border-t border-b border-stone-200">
+            <details className="group">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-5 text-sm font-medium text-stone-900 transition-colors hover:text-stone-700 sm:text-base">
+                Is Ramble free?
+                <span aria-hidden="true" className="text-stone-400 transition-transform group-open:rotate-45">
+                  +
+                </span>
+              </summary>
+              <div className="pb-5 text-sm leading-relaxed text-stone-500">
+                Yes — on-device transcription via Apple Speech and webhook delivery are completely free. Cloud
+                transcription models (Groq Whisper, Deepgram Nova-3, OpenAI GPT-4o) are an optional{" "}
+                <span className="text-stone-700">$3.99/month</span> subscription.
+              </div>
+            </details>
+            <details className="group">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-5 text-sm font-medium text-stone-900 transition-colors hover:text-stone-700 sm:text-base">
+                What data do you collect?
+                <span aria-hidden="true" className="text-stone-400 transition-transform group-open:rotate-45">
+                  +
+                </span>
+              </summary>
+              <div className="pb-5 text-sm leading-relaxed text-stone-500">
+                None. There are no accounts and no logins. Audio and transcripts live on your device. Cloud
+                transcription requests are forwarded to the provider you select and not retained on our end. It&apos;s
+                all open source — verify it yourself.
+              </div>
+            </details>
+            <details className="group">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-5 text-sm font-medium text-stone-900 transition-colors hover:text-stone-700 sm:text-base">
+                Where can the webhook send transcripts?
+                <span aria-hidden="true" className="text-stone-400 transition-transform group-open:rotate-45">
+                  +
+                </span>
+              </summary>
+              <div className="pb-5 text-sm leading-relaxed text-stone-500">
+                Any HTTPS endpoint. Plug into Zapier, Make, n8n, Notion, Airtable, your AI agent, or your own backend.
+                Requests are signed with a shared secret and retried on failure.{" "}
+                <Link href="/docs" className="text-red-500 underline-offset-2 hover:underline">
+                  Read the docs
+                </Link>
+                .
+              </div>
+            </details>
+            <details className="group">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-5 text-sm font-medium text-stone-900 transition-colors hover:text-stone-700 sm:text-base">
+                On-device vs. cloud transcription — what&apos;s the difference?
+                <span aria-hidden="true" className="text-stone-400 transition-transform group-open:rotate-45">
+                  +
+                </span>
+              </summary>
+              <div className="pb-5 text-sm leading-relaxed text-stone-500">
+                On-device uses Apple Speech — free, works offline, accuracy varies by device. Cloud routes audio through
+                the model you pick (Whisper, Nova-3, GPT-4o) for sharper transcripts on accents, technical terms, and
+                noisy environments.
+              </div>
+            </details>
+            <details className="group">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-5 text-sm font-medium text-stone-900 transition-colors hover:text-stone-700 sm:text-base">
+                Does the Apple Watch app work without my iPhone?
+                <span aria-hidden="true" className="text-stone-400 transition-transform group-open:rotate-45">
+                  +
+                </span>
+              </summary>
+              <div className="pb-5 text-sm leading-relaxed text-stone-500">
+                Yes. The watch records standalone. Recordings sync to your iPhone the next time it&apos;s in range,
+                where transcription and webhook delivery happen.
+              </div>
+            </details>
+            <details className="group">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-5 text-sm font-medium text-stone-900 transition-colors hover:text-stone-700 sm:text-base">
+                Is Ramble open source?
+                <span aria-hidden="true" className="text-stone-400 transition-transform group-open:rotate-45">
+                  +
+                </span>
+              </summary>
+              <div className="pb-5 text-sm leading-relaxed text-stone-500">
+                Yes — MIT licensed, hosted on{" "}
+                <a
+                  href="https://github.com/Jpoliachik/ramble-ios"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-red-500 underline-offset-2 hover:underline"
+                >
+                  GitHub
+                </a>
+                . Audit the code, build it yourself, or fork it.
+              </div>
+            </details>
+            <details className="group">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-5 text-sm font-medium text-stone-900 transition-colors hover:text-stone-700 sm:text-base">
+                How do I cancel my subscription?
+                <span aria-hidden="true" className="text-stone-400 transition-transform group-open:rotate-45">
+                  +
+                </span>
+              </summary>
+              <div className="pb-5 text-sm leading-relaxed text-stone-500">
+                Like any iOS subscription — Settings → Apple ID → Subscriptions → Ramble → Cancel. On-device
+                transcription and webhooks keep working after cancellation.
+              </div>
+            </details>
           </div>
         </div>
       </section>

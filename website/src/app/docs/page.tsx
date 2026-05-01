@@ -63,26 +63,28 @@ export default function Docs() {
             Receive your transcripts
           </h1>
           <p className="mt-4 text-lg leading-relaxed text-stone-500">
-            Every time you finish a recording, Ramble can automatically POST the transcript to any HTTPS endpoint — an
-            automation platform, an AI agent, or your own backend. Three steps to set it up.
+            Every time you finish a recording, Ramble POSTs the transcript to each destination you&apos;ve added — an
+            automation platform, an AI agent, your own backend, or all of them at once. Three steps to set it up.
           </p>
 
           <div className="mt-14 space-y-16 text-sm leading-relaxed text-stone-600">
             {/* Step 1 */}
             <section>
               <StepHeader id="step-1" step={1}>
-                Enable the webhook
+                Add a destination
               </StepHeader>
               <div className="mt-6 space-y-5 pl-14">
                 <p>
-                  In Ramble, go to <strong>Settings &rarr; Webhook</strong>{" "}and toggle it on. You&apos;ll need an
-                  endpoint URL to paste in — grab one from your automation platform (step 2) or use your own server URL.
+                  In Ramble, go to <strong>Settings &rarr; Send via Webhook</strong>{" "}and tap{" "}
+                  <strong>Add a destination</strong>. Paste in any HTTPS URL — grab one from your automation platform
+                  (step 2) or use your own server. Add as many destinations as you want; every transcript fires to
+                  all of them.
                 </p>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="/ramble/webhook-settings.png"
-                  alt="Ramble webhook settings screen showing the Post-Transcription Webhook toggle, URL field, and signing secret controls"
-                  className="mx-auto max-w-xs rounded-2xl shadow-md"
+                  alt="Ramble Send via Webhook settings screen with an Add a destination button"
+                  className="mx-auto max-w-sm rounded-2xl shadow-md"
                 />
               </div>
             </section>
@@ -191,8 +193,9 @@ export default function Docs() {
                   <h4 className="mt-8 text-sm font-semibold text-stone-700">Verify the signature</h4>
                   <p className="mt-3">
                     Every request includes an <InlineCode>X-Webhook-Signature</InlineCode>{" "}header — an HMAC-SHA256
-                    digest of the raw request body, keyed with your signing secret. Copy the secret from <strong>Settings &rarr; Webhook</strong>{" "}in Ramble. Always verify before processing to confirm the
-                    request came from Ramble.
+                    digest of the raw request body, keyed with the destination&apos;s signing secret. Copy the secret
+                    from the destination&apos;s detail screen in <strong>Settings &rarr; Send via Webhook</strong>.
+                    Always verify before processing to confirm the request came from Ramble.
                   </p>
 
                   <div className="mt-4">
@@ -273,8 +276,9 @@ app.listen(3000, () => console.log("Listening on :3000"));`}
               </StepHeader>
               <div className="mt-6 space-y-4 pl-14">
                 <p>
-                  Tap <strong>Settings &rarr; Send Test Webhook</strong>{" "}to fire a test payload at your endpoint. The
-                  test payload is identical to a real one, with two differences: <InlineCode>test</InlineCode>{" "}is{" "}
+                  Open the destination from <strong>Settings &rarr; Send via Webhook</strong>{" "}and tap{" "}
+                  <strong>Send Test Webhook</strong>{" "}to fire a test payload at that endpoint. The test payload is
+                  identical to a real one, with two differences: <InlineCode>test</InlineCode>{" "}is{" "}
                   <InlineCode>true</InlineCode>, and <InlineCode>recording_id</InlineCode>{" "}is prefixed with{" "}
                   <InlineCode>test-</InlineCode>.
                 </p>

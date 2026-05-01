@@ -89,3 +89,7 @@ body {
 .hero-enter-buttons {
   animation: hero-fade-up-sm 0.5s ease-out 0.5s both;
 }
+
+.hero-enter-devices {
+  animation: hero-fade-up 0.7s ease-out 0.7s both;
+}

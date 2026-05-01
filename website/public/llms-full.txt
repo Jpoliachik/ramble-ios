@@ -1,12 +1,12 @@
 # Ramble Webhook API — Complete Reference
 
-Ramble is a voice capture app for iPhone and Apple Watch. It auto-POSTs every transcript to any HTTPS endpoint you configure. This document contains everything you need to build an endpoint that receives Ramble transcripts.
+Ramble is a voice capture app for iPhone and Apple Watch. It auto-POSTs every transcript to each HTTPS destination you configure — one or many. This document contains everything you need to build an endpoint that receives Ramble transcripts.
 
 ## Quick Start
 
-1. In Ramble, go to **Settings → Webhook** and toggle it on.
-2. Enter your HTTPS endpoint URL (from an automation platform or your own server).
-3. Tap **Send Test Webhook** to verify it works.
+1. In Ramble, go to **Settings → Send via Webhook** and tap **Add a destination**.
+2. Enter an HTTPS endpoint URL (from an automation platform or your own server). Add as many destinations as you want — every transcript fires to all of them.
+3. Open the destination and tap **Send Test Webhook** to verify it works.
 
 The URL must use HTTPS. Localhost, private IPs, and cloud metadata endpoints are blocked.
 
@@ -71,7 +71,7 @@ After 3 failed retries, the webhook is marked as failed. The user can manually r
 
 ## Signature Verification
 
-Every request includes an `X-Webhook-Signature` header — an HMAC-SHA256 digest of the raw request body, keyed with your signing secret. Always verify this before processing. Use constant-time comparison to prevent timing attacks.
+Every request includes an `X-Webhook-Signature` header — an HMAC-SHA256 digest of the raw request body, keyed with the destination's signing secret (each destination has its own). Copy the secret from the destination's detail screen in **Settings → Send via Webhook**. Always verify this before processing. Use constant-time comparison to prevent timing attacks.
 
 ### Verification Function (Node.js)
 
@@ -133,7 +133,7 @@ app.listen(3000, () => console.log("Listening on :3000"));
 
 ## Test Webhooks
 
-Tap **Settings → Send Test Webhook** to fire a test payload. The test payload is identical to a real one, with two differences:
+Open a destination from **Settings → Send via Webhook** and tap **Send Test Webhook** to fire a test payload at that destination. The test payload is identical to a real one, with two differences:
 
 - `test` is `true`
 - `recording_id` is prefixed with `test-`
