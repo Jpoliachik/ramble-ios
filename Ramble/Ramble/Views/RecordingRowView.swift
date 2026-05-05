@@ -25,8 +25,8 @@ struct RecordingRowView: View {
                 case .transcribing, .recorded:
                     transcribingPlaceholder
                 case .completed, .failed:
-                    if let transcription = recording.transcription, !transcription.isEmpty {
-                        Text(transcription)
+                    if let preview = transcriptionPreview {
+                        Text(preview)
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
@@ -40,6 +40,14 @@ struct RecordingRowView: View {
             statusIcon
         }
         .padding(.vertical, 6)
+    }
+
+    private var transcriptionPreview: String? {
+        guard let transcription = recording.transcription else { return nil }
+        let collapsed = transcription
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+        return collapsed.isEmpty ? nil : collapsed
     }
 
     private var transcribingPlaceholder: some View {
