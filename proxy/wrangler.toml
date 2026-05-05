@@ -7,7 +7,7 @@ compatibility_date = "2024-12-01"
 enabled = true
 
 [vars]
-APPLE_BUNDLE_ID = "dev.goodloop.ramble"
+APPLE_BUNDLE_ID = "dev.goodloop.Ramble"
 PREMIUM_PRODUCT_ID = "dev.goodloop.ramble.premium.monthly2"
 
 # KV namespace for App Attest state (challenges, attested device keys).

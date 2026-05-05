@@ -14,7 +14,7 @@ const ALLOWED_MODELS = [
   'openai-gpt-4o-transcribe',
 ];
 const DEFAULT_MODEL = 'whisper-large-v3-turbo';
-const APPLE_BUNDLE_ID = 'dev.goodloop.ramble';
+const APPLE_BUNDLE_ID = 'dev.goodloop.Ramble';
 const PREMIUM_PRODUCT_ID = 'dev.goodloop.ramble.premium.monthly2';
 
 // Apple Root CA - G3 (public key SHA-256 fingerprint for chain validation)
