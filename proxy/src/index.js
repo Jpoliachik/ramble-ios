@@ -14,6 +14,26 @@ const ALLOWED_MODELS = [
   'openai-gpt-4o-transcribe',
 ];
 const DEFAULT_MODEL = 'whisper-large-v3-turbo';
+
+// OpenAI's `gpt-4o-transcribe` retires around June 2026; `gpt-4o-transcribe-diarize`
+// is the GA successor (retires 2027-04-16). We ignore diarization metadata and
+// extract only the plain transcript.
+const OPENAI_MODEL = 'gpt-4o-transcribe-diarize';
+
+// Languages Deepgram Nova-3 supports as a `language=` hint. Mirror of
+// `CloudModel.deepgramNova3Languages` in Ramble/Models/Settings.swift —
+// keep in sync. Anything outside this set falls back to English.
+const DEEPGRAM_NOVA3_LANGUAGES = new Set([
+  'ar','bg','bn','ca','cs','da','de','el','en','es','et','fa','fi','fr','he',
+  'hi','hr','hu','id','it','ja','ko','lt','lv','ms','nl','no','pl','pt','ro',
+  'ru','sk','sv','ta','te','th','tl','tr','uk','ur','vi','zh',
+]);
+
+// Filler words stripped from Whisper/OpenAI output when remove_filler_words=true.
+// Deepgram already excludes fillers by default. Conservative list — only the
+// disfluencies most users want gone, not slang ("like", "you know") which is
+// often meaningful.
+const FILLER_REGEX = /\b(?:um+|uh+|er+|ah+|hmm+|mhm+|uhm+|erm+)\b[\s,.;:!?]*/gi;
 const APPLE_BUNDLE_ID = 'dev.goodloop.Ramble';
 const PREMIUM_PRODUCT_ID = 'dev.goodloop.ramble.premium.monthly2';
 
@@ -130,21 +150,34 @@ async function handleTranscribe(request, env) {
     return json({ error: `Invalid model. Allowed: ${ALLOWED_MODELS.join(', ')}` }, 400);
   }
 
+  // --- Optional transcription tuning ---
+  const language = (formData.get('language') || '').trim().toLowerCase() || null;
+  const vocabulary = (formData.get('vocabulary') || '').trim();
+  const removeFillerWords = formData.get('remove_filler_words') === 'true';
+
+  const options = { language, vocabulary };
+
   console.log(
-    `[transcribe] device=${deviceId} model=${requestedModel} file=${audio.name} size=${audio.size}`,
+    `[transcribe] device=${deviceId} model=${requestedModel} lang=${language || 'auto'} vocab=${vocabulary ? 'yes' : 'no'} fillers=${removeFillerWords ? 'strip' : 'keep'} file=${audio.name} size=${audio.size}`,
   );
 
   // --- Route to appropriate backend ---
   const startTime = Date.now();
   let result;
   if (requestedModel.startsWith('deepgram-')) {
-    result = await transcribeWithDeepgram(audio, env);
+    result = await transcribeWithDeepgram(audio, options, env);
   } else if (requestedModel.startsWith('openai-')) {
-    result = await transcribeWithOpenAI(audio, env);
+    result = await transcribeWithOpenAI(audio, options, env);
   } else {
-    result = await transcribeWithGroq(audio, requestedModel, env);
+    result = await transcribeWithGroq(audio, requestedModel, options, env);
   }
   const durationMs = Date.now() - startTime;
+
+  // Post-process: strip fillers from Whisper/OpenAI output.
+  // Deepgram's default excludes fillers, so we skip it there.
+  if (!result.error && removeFillerWords && !requestedModel.startsWith('deepgram-')) {
+    result.result = stripFillerWords(result.result);
+  }
 
   if (result.error) {
     writeTranscriptionEvent(env, {
@@ -175,11 +208,18 @@ async function handleTranscribe(request, env) {
 
 // --- Groq Transcription ---
 
-async function transcribeWithGroq(audio, modelName, env) {
+async function transcribeWithGroq(audio, modelName, options, env) {
   const groqForm = new FormData();
   groqForm.append('file', audio, audio.name || 'recording.m4a');
   groqForm.append('model', modelName);
   groqForm.append('response_format', 'verbose_json');
+  if (options.language) {
+    groqForm.append('language', options.language);
+  }
+  if (options.vocabulary) {
+    // Whisper `prompt` accepts up to ~224 tokens of context — names, jargon, etc.
+    groqForm.append('prompt', options.vocabulary);
+  }
 
   let groqRes;
   try {
@@ -211,16 +251,38 @@ async function transcribeWithGroq(audio, modelName, env) {
 
 // --- Deepgram Transcription ---
 
-async function transcribeWithDeepgram(audio, env) {
+async function transcribeWithDeepgram(audio, options, env) {
   if (!env.DEEPGRAM_API_KEY) {
     return { error: 'Deepgram API key not configured', status: 503 };
   }
 
   const audioBuffer = await audio.arrayBuffer();
 
+  const params = new URLSearchParams({
+    model: 'nova-3',
+    smart_format: 'true',
+    paragraphs: 'true',
+    // Auto-detect: use `multi` to handle codeswitching across the 10-language
+    // set. Explicit user choices are passed through verbatim — respecting the
+    // user's pick is more accurate than overriding with `multi` on the chance
+    // they might also speak another language.
+    language: resolveDeepgramLanguage(options.language),
+  });
+  if (options.vocabulary) {
+    // Deepgram supports `keyterm` repeated; a single comma-separated list is
+    // accepted as one term but multiple terms work better — split on commas/newlines.
+    const terms = options.vocabulary
+      .split(/[,\n]+/)
+      .map((t) => t.trim())
+      .filter(Boolean);
+    for (const term of terms) {
+      params.append('keyterm', term);
+    }
+  }
+
   let res;
   try {
-    res = await fetch('https://api.deepgram.com/v1/listen?model=nova-3&smart_format=true&paragraphs=true', {
+    res = await fetch(`https://api.deepgram.com/v1/listen?${params.toString()}`, {
       method: 'POST',
       headers: {
         Authorization: `Token ${env.DEEPGRAM_API_KEY}`,
@@ -252,15 +314,25 @@ async function transcribeWithDeepgram(audio, env) {
 
 // --- OpenAI Transcription ---
 
-async function transcribeWithOpenAI(audio, env) {
+async function transcribeWithOpenAI(audio, options, env) {
   if (!env.OPENAI_API_KEY) {
     return { error: 'OpenAI API key not configured', status: 503 };
   }
 
   const form = new FormData();
   form.append('file', audio, audio.name || 'recording.m4a');
-  form.append('model', 'gpt-4o-transcribe');
-  form.append('response_format', 'json');
+  form.append('model', OPENAI_MODEL);
+  // diarize model returns `diarized_json`; we ignore speaker labels and
+  // concatenate segment text. `chunking_strategy=auto` is required for audio
+  // longer than 30s.
+  form.append('response_format', 'diarized_json');
+  form.append('chunking_strategy', 'auto');
+  if (options.language) {
+    form.append('language', options.language);
+  }
+  if (options.vocabulary) {
+    form.append('prompt', options.vocabulary);
+  }
 
   let res;
   try {
@@ -281,7 +353,21 @@ async function transcribeWithOpenAI(audio, env) {
   }
 
   const data = await res.json();
-  return { result: data.text };
+
+  // diarized_json: { segments: [{ speaker, text, start, end }, ...] }
+  // plain json: { text: "..." }
+  if (Array.isArray(data.segments) && data.segments.length > 0) {
+    const hasTimings = data.segments.every((s) => typeof s.start === 'number' && typeof s.end === 'number');
+    return {
+      result: hasTimings
+        ? formatSegmentsIntoParagraphs(data.segments)
+        : data.segments.map((s) => (s.text || '').trim()).filter(Boolean).join(' '),
+    };
+  }
+  if (typeof data.text === 'string') {
+    return { result: data.text };
+  }
+  return { error: 'No transcript in OpenAI response', status: 502 };
 }
 
 // --- Apple JWS Verification ---
@@ -446,6 +532,28 @@ function formatSegmentsIntoParagraphs(segments, pauseThreshold = 2.0) {
   }
 
   return paragraphs.join('\n\n');
+}
+
+/**
+ * Remove disfluencies ("um", "uh", "er", "hmm", etc.) from a transcript and
+ * collapse the resulting whitespace.
+ */
+function resolveDeepgramLanguage(code) {
+  if (!code) return 'multi';
+  if (DEEPGRAM_NOVA3_LANGUAGES.has(code)) return code;
+  return 'en';
+}
+
+function stripFillerWords(text) {
+  if (!text) return text;
+  const stripped = text.replace(FILLER_REGEX, '');
+  // Collapse multiple spaces but preserve paragraph breaks.
+  return stripped
+    .split('\n')
+    .map((line) => line.replace(/[ \t]+/g, ' ').replace(/\s+([,.!?;:])/g, '$1').trim())
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 // --- Utilities ---

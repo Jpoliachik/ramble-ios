@@ -81,6 +81,12 @@ struct SubscriptionView: View {
             )
             BrandRowDivider()
             BrandFeatureRow(
+                icon: "character.book.closed",
+                title: "Tune the output",
+                subtitle: "Pick a language, teach it your jargon, strip filler words."
+            )
+            BrandRowDivider()
+            BrandFeatureRow(
                 icon: "lock.shield",
                 title: "Still private",
                 subtitle: "Audio routes through our open-source proxy. Nothing stored."

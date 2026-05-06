@@ -30,6 +30,7 @@ struct SettingsView: View {
             Form {
                 freeTranscriptionSection
                 cloudTranscriptionSection
+                cloudTuningSection
                 webhookSection
                 appearanceSection
                 statsSection
@@ -152,6 +153,53 @@ struct SettingsView: View {
         } footer: {
             Text("Cloud transcription routes through our open-source proxy. No audio or text is stored on our servers.")
         }
+    }
+
+    private var cloudTuningSection: some View {
+        // Shown always — when on Apple Speech the section renders as a locked
+        // teaser so the user can see what cloud unlocks.
+        let isCloud = viewModel.transcriptionProvider.isCloud
+        return Section {
+            NavigationLink {
+                LanguagePickerView(
+                    selection: $viewModel.transcriptionLanguage,
+                    supported: viewModel.cloudModel.supportedLanguages
+                )
+            } label: {
+                HStack {
+                    Text("Language")
+                    Spacer()
+                    Text(viewModel.transcriptionLanguage.displayName)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                TextField(
+                    "e.g. Goodloop, Ramble, Cloudflare Workers",
+                    text: $viewModel.customVocabulary,
+                    axis: .vertical
+                )
+                .lineLimit(2...5)
+                .textInputAutocapitalization(.words)
+                .autocorrectionDisabled()
+                Text("Names, jargon, and phrases the model might miss. Comma-separated.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Toggle("Remove filler words", isOn: $viewModel.removeFillerWords)
+        } header: {
+            SettingsSubsectionLabel(title: "Cloud · tuning") {
+                if !isCloud {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Color.obInkFaint)
+                }
+            }
+        }
+        .disabled(!isCloud)
+        .opacity(isCloud ? 1 : 0.5)
     }
 
     private var webhookSection: some View {
@@ -774,6 +822,45 @@ private struct SettingsSubsectionLabel<Trailing: View>: View {
 extension SettingsSubsectionLabel where Trailing == EmptyView {
     init(_ title: String) {
         self.init(title: title, trailing: { EmptyView() })
+    }
+}
+
+/// Language picker — only shows the languages supported by the currently
+/// selected transcription path (provider + model). The caller is responsible
+/// for resetting `selection` to `.auto` if the user switches to a path that
+/// doesn't support their previously chosen language.
+struct LanguagePickerView: View {
+    @Binding var selection: TranscriptionLanguage
+    let supported: Set<TranscriptionLanguage>
+    @Environment(\.dismiss) private var dismiss
+
+    private var visibleLanguages: [TranscriptionLanguage] {
+        let rest = TranscriptionLanguage.sortedCases
+            .filter { $0 != .auto && supported.contains($0) }
+        return [.auto] + rest
+    }
+
+    var body: some View {
+        List {
+            ForEach(visibleLanguages) { language in
+                Button {
+                    selection = language
+                    dismiss()
+                } label: {
+                    HStack {
+                        Text(language.displayName)
+                            .foregroundStyle(Color.obInk)
+                        Spacer()
+                        if selection == language {
+                            Image(systemName: "checkmark")
+                                .foregroundStyle(Color.brandRed)
+                        }
+                    }
+                }
+            }
+        }
+        .navigationTitle("Language")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

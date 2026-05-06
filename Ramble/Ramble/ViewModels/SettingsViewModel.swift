@@ -9,8 +9,27 @@ import SwiftUI
 
 @MainActor
 final class SettingsViewModel: ObservableObject {
-    @Published var transcriptionProvider: TranscriptionProvider = .appleSpeech
-    @Published var cloudModel: CloudModel = .whisperLargeV3Turbo
+    /// Hard cap on the custom-vocabulary field. Whisper's `prompt` accepts up
+    /// to ~224 tokens (~900 chars); beyond that the provider silently
+    /// truncates. We clamp on input so the user sees the limit instead of
+    /// getting silently lossy hints.
+    static let maxVocabularyLength = 900
+
+    @Published var transcriptionProvider: TranscriptionProvider = .appleSpeech {
+        didSet { resetLanguageIfUnsupported() }
+    }
+    @Published var cloudModel: CloudModel = .whisperLargeV3Turbo {
+        didSet { resetLanguageIfUnsupported() }
+    }
+    @Published var transcriptionLanguage: TranscriptionLanguage = .auto
+    @Published var customVocabulary: String = "" {
+        didSet {
+            if customVocabulary.count > Self.maxVocabularyLength {
+                customVocabulary = String(customVocabulary.prefix(Self.maxVocabularyLength))
+            }
+        }
+    }
+    @Published var removeFillerWords: Bool = false
     @Published var showSubscriptionPaywall = false
     @Published var webhookURL: String = ""
     @Published var webhookSecret: String = ""
@@ -60,6 +79,9 @@ final class SettingsViewModel: ObservableObject {
         let settings = settingsService.load()
         transcriptionProvider = settings.transcriptionProvider
         cloudModel = settings.cloudModel
+        transcriptionLanguage = settings.transcriptionLanguage
+        customVocabulary = settings.customVocabulary
+        removeFillerWords = settings.removeFillerWords
         webhookURL = settings.webhookURL ?? ""
         webhookSecret = settings.webhookSecret
         deviceId = settings.deviceId
@@ -72,6 +94,9 @@ final class SettingsViewModel: ObservableObject {
         let settings = Settings(
             transcriptionProvider: transcriptionProvider,
             cloudModel: cloudModel,
+            transcriptionLanguage: transcriptionLanguage,
+            customVocabulary: customVocabulary,
+            removeFillerWords: removeFillerWords,
             webhookURL: webhookURL.isEmpty ? nil : webhookURL,
             webhookSecret: webhookSecret,
             deviceId: deviceId,
@@ -98,6 +123,17 @@ final class SettingsViewModel: ObservableObject {
         } else {
             pendingCloudModel = model
             showSubscriptionPaywall = true
+        }
+    }
+
+    /// When the cloud model changes to one that doesn't support the user's
+    /// previously chosen language (e.g. Welsh on Whisper → Nova-3), demote
+    /// the picker back to `.auto` so we never silently send an unsupported hint.
+    private func resetLanguageIfUnsupported() {
+        guard transcriptionLanguage != .auto else { return }
+        guard transcriptionProvider.isCloud else { return }
+        if !cloudModel.supports(transcriptionLanguage) {
+            transcriptionLanguage = .auto
         }
     }
 

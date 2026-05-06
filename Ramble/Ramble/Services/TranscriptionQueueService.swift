@@ -171,9 +171,13 @@ final class TranscriptionQueueService: ObservableObject {
             if job.provider.isCloud {
                 // Fetch fresh JWS at call time (not enqueue time) — tokens expire
                 let jws = SubscriptionService.shared.currentJWSTransaction
+                let currentSettings = settingsService.load()
                 let request = ProxyTranscriptionRequest(
                     audioURL: audioURL,
                     model: job.cloudModel ?? .whisperLargeV3Turbo,
+                    language: currentSettings.transcriptionLanguage,
+                    customVocabulary: currentSettings.customVocabulary,
+                    removeFillerWords: currentSettings.removeFillerWords,
                     jwsTransaction: jws
                 )
                 rawText = try await proxyService.transcribe(request)

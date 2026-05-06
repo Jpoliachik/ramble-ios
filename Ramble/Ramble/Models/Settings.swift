@@ -101,6 +101,83 @@ enum TranscriptionProvider: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// Language hint sent to cloud transcription providers.
+/// `.auto` lets each provider auto-detect (mapped to `multi` for Deepgram).
+/// Other cases pass an ISO-639-1 code directly to all providers.
+/// Picker UI shows all cases; rows are disabled when the selected `CloudModel`
+/// doesn't support the language.
+enum TranscriptionLanguage: String, Codable, CaseIterable, Identifiable {
+    case auto
+    case af, ar, bg, bn, ca, cs, cy, da, de, el, en, es, et, fa, fi, fr, he, hi, hr,
+         hu, id, it, ja, ko, lt, lv, ms, nl, no, pl, pt, ro, ru, sk, sv, sw, ta, te,
+         th, tl, tr, uk, ur, vi, zh
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .auto: return "Auto-detect"
+        case .af: return "Afrikaans"
+        case .ar: return "Arabic"
+        case .bg: return "Bulgarian"
+        case .bn: return "Bengali"
+        case .ca: return "Catalan"
+        case .cs: return "Czech"
+        case .cy: return "Welsh"
+        case .da: return "Danish"
+        case .de: return "German"
+        case .el: return "Greek"
+        case .en: return "English"
+        case .es: return "Spanish"
+        case .et: return "Estonian"
+        case .fa: return "Persian"
+        case .fi: return "Finnish"
+        case .fr: return "French"
+        case .he: return "Hebrew"
+        case .hi: return "Hindi"
+        case .hr: return "Croatian"
+        case .hu: return "Hungarian"
+        case .id: return "Indonesian"
+        case .it: return "Italian"
+        case .ja: return "Japanese"
+        case .ko: return "Korean"
+        case .lt: return "Lithuanian"
+        case .lv: return "Latvian"
+        case .ms: return "Malay"
+        case .nl: return "Dutch"
+        case .no: return "Norwegian"
+        case .pl: return "Polish"
+        case .pt: return "Portuguese"
+        case .ro: return "Romanian"
+        case .ru: return "Russian"
+        case .sk: return "Slovak"
+        case .sv: return "Swedish"
+        case .sw: return "Swahili"
+        case .ta: return "Tamil"
+        case .te: return "Telugu"
+        case .th: return "Thai"
+        case .tl: return "Tagalog"
+        case .tr: return "Turkish"
+        case .uk: return "Ukrainian"
+        case .ur: return "Urdu"
+        case .vi: return "Vietnamese"
+        case .zh: return "Chinese"
+        }
+    }
+
+    /// ISO-639-1 code to send to providers, or nil for auto-detect.
+    var code: String? {
+        self == .auto ? nil : rawValue
+    }
+
+    /// Alphabetized by display name, with `.auto` pinned first. Computed once.
+    static let sortedCases: [TranscriptionLanguage] = {
+        let rest = allCases.filter { $0 != .auto }
+            .sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
+        return [.auto] + rest
+    }()
+}
+
 enum CloudModel: String, Codable, CaseIterable, Identifiable {
     case whisperLargeV3Turbo = "whisper-large-v3-turbo"
     case whisperLargeV3 = "whisper-large-v3"
@@ -134,11 +211,40 @@ enum CloudModel: String, Codable, CaseIterable, Identifiable {
         case .openAIGPT4oTranscribe: return "logo-openai"
         }
     }
+
+    /// Languages this model accepts as a hint (excluding `.auto`, which is
+    /// always allowed). Used by the picker to show only relevant rows.
+    /// Whisper-based models cover the full enum; Nova-3 has a fixed subset.
+    var supportedLanguages: Set<TranscriptionLanguage> {
+        switch self {
+        case .whisperLargeV3Turbo, .whisperLargeV3, .openAIGPT4oTranscribe:
+            return Self.whisperLanguages
+        case .deepgramNova3:
+            return Self.deepgramNova3Languages
+        }
+    }
+
+    func supports(_ language: TranscriptionLanguage) -> Bool {
+        language == .auto || supportedLanguages.contains(language)
+    }
+
+    private static let whisperLanguages: Set<TranscriptionLanguage> =
+        Set(TranscriptionLanguage.allCases.filter { $0 != .auto })
+
+    /// Mirror of `DEEPGRAM_NOVA3_LANGUAGES` in proxy/src/index.js — keep in sync.
+    private static let deepgramNova3Languages: Set<TranscriptionLanguage> = [
+        .ar, .bg, .bn, .ca, .cs, .da, .de, .el, .en, .es, .et, .fa, .fi, .fr, .he,
+        .hi, .hr, .hu, .id, .it, .ja, .ko, .lt, .lv, .ms, .nl, .no, .pl, .pt, .ro,
+        .ru, .sk, .sv, .ta, .te, .th, .tl, .tr, .uk, .ur, .vi, .zh,
+    ]
 }
 
 struct Settings: Codable {
     var transcriptionProvider: TranscriptionProvider
     var cloudModel: CloudModel
+    var transcriptionLanguage: TranscriptionLanguage
+    var customVocabulary: String
+    var removeFillerWords: Bool
     var webhookURL: String?
     var webhookSecret: String
     var deviceId: String
@@ -153,6 +259,9 @@ struct Settings: Codable {
     init(
         transcriptionProvider: TranscriptionProvider = .appleSpeech,
         cloudModel: CloudModel = .whisperLargeV3Turbo,
+        transcriptionLanguage: TranscriptionLanguage = .auto,
+        customVocabulary: String = "",
+        removeFillerWords: Bool = false,
         webhookURL: String? = nil,
         webhookSecret: String = Self.generateSecret(),
         deviceId: String = UUID().uuidString,
@@ -160,6 +269,9 @@ struct Settings: Codable {
     ) {
         self.transcriptionProvider = transcriptionProvider
         self.cloudModel = cloudModel
+        self.transcriptionLanguage = transcriptionLanguage
+        self.customVocabulary = customVocabulary
+        self.removeFillerWords = removeFillerWords
         self.webhookURL = webhookURL
         self.webhookSecret = webhookSecret
         self.deviceId = deviceId
@@ -186,6 +298,13 @@ struct Settings: Codable {
         cloudModel = try container.decodeIfPresent(CloudModel.self, forKey: .cloudModel)
             ?? .whisperLargeV3Turbo
 
+        transcriptionLanguage = try container.decodeIfPresent(TranscriptionLanguage.self, forKey: .transcriptionLanguage)
+            ?? .auto
+
+        customVocabulary = try container.decodeIfPresent(String.self, forKey: .customVocabulary) ?? ""
+
+        removeFillerWords = try container.decodeIfPresent(Bool.self, forKey: .removeFillerWords) ?? false
+
         appearanceMode = try container.decodeIfPresent(AppearanceMode.self, forKey: .appearanceMode)
             ?? .system
 
@@ -206,6 +325,9 @@ struct Settings: Codable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(transcriptionProvider, forKey: .transcriptionProvider)
         try container.encode(cloudModel, forKey: .cloudModel)
+        try container.encode(transcriptionLanguage, forKey: .transcriptionLanguage)
+        try container.encode(customVocabulary, forKey: .customVocabulary)
+        try container.encode(removeFillerWords, forKey: .removeFillerWords)
         try container.encodeIfPresent(webhookURL, forKey: .webhookURL)
         try container.encode(appearanceMode, forKey: .appearanceMode)
         // webhookSecret and deviceId are stored in Keychain, not on disk
@@ -216,6 +338,9 @@ struct Settings: Codable {
     private enum CodingKeys: String, CodingKey {
         case transcriptionProvider
         case cloudModel
+        case transcriptionLanguage
+        case customVocabulary
+        case removeFillerWords
         case webhookURL
         case webhookSecret
         case deviceId
