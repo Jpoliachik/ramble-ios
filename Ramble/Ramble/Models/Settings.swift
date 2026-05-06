@@ -228,10 +228,18 @@ enum CloudModel: String, Codable, CaseIterable, Identifiable {
         language == .auto || supportedLanguages.contains(language)
     }
 
+    /// Whisper supports ~99 languages — the full enum is a subset of that.
+    /// Authoritative list (OpenAI / Groq both use the same Whisper model):
+    ///   https://platform.openai.com/docs/guides/speech-to-text/supported-languages
+    ///   https://github.com/openai/whisper#available-models-and-languages
+    ///   https://console.groq.com/docs/speech-to-text
     private static let whisperLanguages: Set<TranscriptionLanguage> =
         Set(TranscriptionLanguage.allCases.filter { $0 != .auto })
 
-    /// Mirror of `DEEPGRAM_NOVA3_LANGUAGES` in proxy/src/index.js — keep in sync.
+    /// Deepgram Nova-3 monolingual language codes. Mirror of
+    /// `DEEPGRAM_NOVA3_LANGUAGES` in proxy/src/index.js — keep in sync.
+    /// Authoritative list (check periodically, Deepgram adds languages):
+    ///   https://developers.deepgram.com/docs/models-languages-overview
     private static let deepgramNova3Languages: Set<TranscriptionLanguage> = [
         .ar, .bg, .bn, .ca, .cs, .da, .de, .el, .en, .es, .et, .fa, .fi, .fr, .he,
         .hi, .hr, .hu, .id, .it, .ja, .ko, .lt, .lv, .ms, .nl, .no, .pl, .pt, .ro,

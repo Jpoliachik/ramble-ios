@@ -23,6 +23,9 @@ const OPENAI_MODEL = 'gpt-4o-transcribe-diarize';
 // Languages Deepgram Nova-3 supports as a `language=` hint. Mirror of
 // `CloudModel.deepgramNova3Languages` in Ramble/Models/Settings.swift —
 // keep in sync. Anything outside this set falls back to English.
+// Authoritative list (Deepgram adds languages periodically — check before
+// expanding the iOS enum):
+//   https://developers.deepgram.com/docs/models-languages-overview
 const DEEPGRAM_NOVA3_LANGUAGES = new Set([
   'ar','bg','bn','ca','cs','da','de','el','en','es','et','fa','fi','fr','he',
   'hi','hr','hu','id','it','ja','ko','lt','lv','ms','nl','no','pl','pt','ro',
