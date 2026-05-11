@@ -176,6 +176,13 @@ async function handleTranscribe(request, env) {
   }
   const durationMs = Date.now() - startTime;
 
+  // Post-process: Whisper occasionally echoes the `prompt` (vocabulary hint)
+  // at the tail of the transcript. Deepgram uses `keyterm` instead, so only
+  // strip for Whisper-based providers.
+  if (!result.error && vocabulary && !requestedModel.startsWith('deepgram-')) {
+    result.result = stripPromptEcho(result.result, vocabulary);
+  }
+
   // Post-process: strip fillers from Whisper/OpenAI output.
   // Deepgram's default excludes fillers, so we skip it there.
   if (!result.error && removeFillerWords && !requestedModel.startsWith('deepgram-')) {
@@ -221,7 +228,7 @@ async function transcribeWithGroq(audio, modelName, options, env) {
   }
   if (options.vocabulary) {
     // Whisper `prompt` accepts up to ~224 tokens of context — names, jargon, etc.
-    groqForm.append('prompt', options.vocabulary);
+    groqForm.append('prompt', buildWhisperPrompt(options.vocabulary));
   }
 
   let groqRes;
@@ -334,7 +341,7 @@ async function transcribeWithOpenAI(audio, options, env) {
     form.append('language', options.language);
   }
   if (options.vocabulary) {
-    form.append('prompt', options.vocabulary);
+    form.append('prompt', buildWhisperPrompt(options.vocabulary));
   }
 
   let res;
@@ -545,6 +552,37 @@ function resolveDeepgramLanguage(code) {
   if (!code) return 'multi';
   if (DEEPGRAM_NOVA3_LANGUAGES.has(code)) return code;
   return 'en';
+}
+
+// Phrase the Whisper `prompt` as a complete sentence. Whisper biases toward
+// outputs that continue the prompt, so a bare comma list often gets echoed
+// into the transcript; framing it as already-complete prose reduces that.
+function buildWhisperPrompt(vocabulary) {
+  return `Names and terms that may come up: ${vocabulary}.`;
+}
+
+// Backstop for the above — if Whisper still echoes the prompt at the tail,
+// strip it. Matches either the sentence form or the bare list, requires a
+// word boundary before the match so we don't eat legitimate content.
+function stripPromptEcho(text, vocabulary) {
+  if (!text || !vocabulary) return text;
+  const trimTrailing = (s) => s.replace(/[\s.,;:!?]+$/, '');
+  const candidates = [buildWhisperPrompt(vocabulary), vocabulary]
+    .map(trimTrailing)
+    .filter(Boolean)
+    .map((c) => c.toLowerCase())
+    .sort((a, b) => b.length - a.length);
+
+  const haystackTrimmed = trimTrailing(text);
+  const haystackLower = haystackTrimmed.toLowerCase();
+
+  for (const candidate of candidates) {
+    if (!haystackLower.endsWith(candidate)) continue;
+    const cutPos = haystackTrimmed.length - candidate.length;
+    if (cutPos !== 0 && !/[\s.,;:!?]/.test(haystackTrimmed[cutPos - 1])) continue;
+    return haystackTrimmed.slice(0, cutPos).replace(/[\s,;:]+$/, '');
+  }
+  return text;
 }
 
 function stripFillerWords(text) {
