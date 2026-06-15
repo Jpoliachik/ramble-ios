@@ -20,11 +20,11 @@ export default function Home() {
               <span className="italic text-red-500">Webhooks out.</span>
             </h1>
             <p className="hero-enter-subtitle mt-6 text-base leading-relaxed text-stone-500 sm:text-lg lg:text-xl">
-              Record your thoughts on iPhone or Apple Watch.
+              Record on iPhone or Apple Watch.
               <br />
-              Get accurate transcripts.
+              Get an accurate transcript.
               <br />
-              Pipe them anywhere via webhook.
+              POST it to your agent, n8n, or any webhook.
             </p>
             <div className="hero-enter-buttons mt-10 flex flex-col items-center gap-4 sm:flex-row lg:items-start">
               <a
@@ -129,8 +129,8 @@ export default function Home() {
               </div>
               <h3 className="mt-4 text-base font-semibold text-stone-900">Webhook-native</h3>
               <p className="mt-2 text-sm leading-relaxed text-stone-500">
-                Every transcript can automatically POST to any HTTPS endpoint. Connect to an AI agent, a Zapier
-                workflow, a Notion database, or your own backend.
+                Every transcript can automatically POST to any HTTPS endpoint. Send it to your own server, n8n,
+                Home Assistant, an AI agent, or any backend you&apos;ve built.
               </p>
             </div>
             <div className="flex flex-col items-center text-center sm:items-start sm:text-left">
@@ -172,8 +172,8 @@ export default function Home() {
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-stone-900 font-serif text-white text-sm font-semibold">
                 3
               </div>
-              <h3 className="mt-4 text-sm font-semibold text-stone-900">Send it anywhere</h3>
-              <p className="mt-1 text-sm text-stone-500">Auto-POST transcripts to any webhook.</p>
+              <h3 className="mt-4 text-sm font-semibold text-stone-900">Send it to your stack</h3>
+              <p className="mt-1 text-sm text-stone-500">Auto-POST to your server, agent, or any webhook.</p>
             </div>
           </div>
 
@@ -227,8 +227,8 @@ export default function Home() {
                 </span>
               </summary>
               <div className="pb-5 text-sm leading-relaxed text-stone-500">
-                Any HTTPS endpoint. Plug into Zapier, Make, n8n, Notion, Airtable, your AI agent, or your own backend.
-                Requests are signed with a shared secret and retried on failure.{" "}
+                Any HTTPS endpoint. Plug into n8n, Node-RED, Home Assistant, Zapier, Make, Notion, your AI agent, or
+                your own self-hosted backend. Requests are signed with a shared secret and retried on failure.{" "}
                 <Link href="/docs" className="text-red-500 underline-offset-2 hover:underline">
                   Read the docs
                 </Link>

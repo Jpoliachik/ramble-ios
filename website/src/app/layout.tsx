@@ -9,32 +9,32 @@ const SITE_URL = "https://goodloop.dev/ramble";
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Ramble — Voice that goes somewhere",
+    default: "Ramble — Voice in, webhooks out",
     template: "%s — Ramble",
   },
   description:
-    "Record on the go. Get accurate transcripts. Pipe them into your agent, workflow, or automation. Open source, private by design, no accounts.",
+    "Speak a thought and Ramble POSTs the transcript straight to your stack — your AI agent, n8n, Home Assistant, Zapier, or any webhook. Open source, no account, no cloud required.",
   openGraph: {
     type: "website",
     siteName: "Ramble",
-    title: "Ramble — Voice that goes somewhere",
+    title: "Ramble — Voice in, webhooks out",
     description:
-      "Record on the go. Get accurate transcripts. Pipe them into your agent, workflow, or automation.",
+      "Speak a thought and Ramble POSTs the transcript straight to your stack — your AI agent, n8n, Home Assistant, or any webhook.",
     url: SITE_URL,
     images: [
       {
         url: `${SITE_URL}/og-image.png`,
         width: 1200,
         height: 630,
-        alt: "Ramble — Voice that goes somewhere",
+        alt: "Ramble — Voice in, webhooks out",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Ramble — Voice that goes somewhere",
+    title: "Ramble — Voice in, webhooks out",
     description:
-      "Record on the go. Get accurate transcripts. Pipe them into your agent, workflow, or automation.",
+      "Speak a thought and Ramble POSTs the transcript straight to your stack — your AI agent, n8n, Home Assistant, or any webhook.",
     images: [`${SITE_URL}/og-image.png`],
   },
 };

@@ -20,26 +20,28 @@ Open source, private by design, no accounts.
 
 ## Who it's for
 
+- **Automation builders & self-hosters** — Developers, tinkerers, homelabbers, and the r/selfhosted crowd who want to pipe voice into their own stack. The webhook turns Ramble into a voice input device for anything they've built — an AI agent, an n8n or Node-RED flow, Home Assistant, a custom backend on their own server. They value that it's MIT-licensed, runs without an account, and stores nothing on our servers. This is the lead audience: they have somewhere for their thoughts to go, and they need a great microphone for it.
+
 - **Transcription enthusiasts** — People who care about accuracy and want access to the best speech-to-text models as soon as they're available. They'll pay for cloud transcription because clean, reliable transcripts matter to them.
 
-- **Automation builders** — Developers, tinkerers, and agent builders who want to pipe voice into their stack. The webhook turns Ramble into a voice input device for anything — agents, workflows, databases, custom backends.
-
-Both audiences value privacy and transparency. Open source isn't a footnote — it's why they trust the app.
+These audiences value privacy and transparency above all. Open source isn't a footnote — it's why they trust the app, and the reason they'll recommend it on Reddit and GitHub.
 
 ## Positioning
 
-Ramble is voice capture that goes somewhere. Not another note-taking app. Not another AI assistant. A simple, private tool that captures your voice accurately and makes it available to whatever system you want.
+Ramble is the voice front-end for your stack. Not another note-taking app, not another AI assistant — the capture layer that turns a spoken thought into text and POSTs it straight to whatever system you've already built: an AI agent, an n8n or Node-RED flow, Home Assistant, a Zapier automation, or your own backend on your own server.
 
-The pitch: get your thoughts out on the go — while you walk, while you're away from a screen — and then do something with them.
+The pitch: speak a thought on the go, and it's already where you work — no copy-paste, no app to go back and check. You bring the system; Ramble is the microphone for it.
 
-## Tagline (draft — iterating)
+## Tagline
 
-Working options:
-- "Capture your voice. Do something with it."
-- "Voice in. Text out. Anywhere."
-- "Talk. Transcribe. Automate."
+**Primary:** Voice in. Webhooks out.
 
-The tagline should convey: (1) capture on the go, (2) accurate transcripts, (3) act on them. "Tap. Talk. It's captured." works for capture but undersells the automation angle.
+Secondary / contextual:
+- "Talk to your stack."
+- "The microphone for your automations."
+- "Your voice, your endpoint."
+
+Retired — do not use: "Voice that goes somewhere," "goes somewhere," "voice that goes anywhere." Too vague; that was the old positioning and it undersold the wedge. Always name the destination (your server, an agent, n8n, Home Assistant, a webhook).
 
 ## Tone
 
@@ -87,15 +89,31 @@ iOS asset names are kebab-case (`brand-red`, `onboarding-bg`, etc.); SwiftUI acc
 
 https://apps.apple.com/app/id6761857751
 
-## App Store description (draft)
+## App Store metadata (ASO)
 
-> Your voice, accurately transcribed. Then do something with it.
+Discovery strategy: don't fight for "transcribe" / "voice to text" — unwinnable for a new app, and not why Ramble is special. Own the high-intent, low-competition niche instead: voice → webhook → your own stack. Lead the messaging at the r/selfhosted / automation-builder crowd (open source, no account, your own endpoint); let the lower-weight keyword field net the adjacent generic terms.
+
+**Name** (≤30): `Ramble: Voice to Webhook`
+**Subtitle** (≤30): `Open-source dictation to API`
+**Keywords** (≤100, comma-separated, no spaces, singular — App Store handles plurals and cross-field phrasing):
+`selfhost,n8n,zapier,notion,transcribe,speech,agent,automation,gpt,claude,memo,text,audio,recorder`
+
+Alternate keyword swaps for the self-host crowd (lower search volume, higher signal): `homeassistant`, `nodered`, `api`, `opensource`.
+
+### App Store description
+
+> Voice in, webhooks out.
 >
-> Ramble gives you the best speech-to-text models — Groq Whisper, Deepgram, OpenAI — or free on-device transcription with Apple Speech. Record from your phone or Apple Watch.
+> Ramble turns your voice into text and POSTs it straight to your own endpoint — your AI agent, n8n, Node-RED, Home Assistant, Zapier, or any HTTPS webhook. Speak a thought and it's already in your stack.
 >
-> Walk, think, talk. Your transcript is waiting. Send it to a webhook automatically — connect to AI agents, workflows, or any HTTPS endpoint.
+> Open source and private by design. No account. No login. Nothing stored on our servers — audio and transcripts stay on your device unless you choose to send them somewhere. The whole app is MIT-licensed on GitHub. Verify it yourself.
 >
-> Open source. No accounts. No servers. Your data stays yours.
+> • Free, no account: on-device transcription (Apple Speech) + webhook delivery. No subscription required.
+> • Optional cloud models — Groq Whisper, Deepgram Nova-3, OpenAI GPT-4o — for $3.99/month when you want top accuracy.
+> • Record from iPhone or Apple Watch with no screen. Walk, talk, done.
+> • Signed requests, automatic retries, full webhook API docs.
+>
+> Built for people who've already built somewhere for their thoughts to go.
 
 ## Design principles
 
@@ -116,5 +134,7 @@ https://apps.apple.com/app/id6761857751
 - Don't say "AI-powered" — meaningless buzzword in this context
 - Don't say "revolutionary" or "game-changing"
 - Don't compare directly to Voice Memos or other apps
-- Don't oversell Apple Watch as the primary differentiator (it's a feature, not the identity)
+- Don't oversell Apple Watch as the primary differentiator (it's a feature, not the identity — show it in a screenshot, don't headline it)
 - Don't promise features that aren't shipped
+- Don't use "goes somewhere" / "anywhere" — name the destination (your server, an agent, n8n, a webhook). Vague destinations were the old, underperforming positioning.
+- Don't lead with the $3.99 subscription — for the open-source / self-host crowd, "free, no account, your own endpoint" is the hook; cloud models are an optional add-on, never the headline.
