@@ -55,6 +55,8 @@ final class StorageService {
 
     func addRecording(_ recording: Recording) {
         var recordings = loadRecordings()
+        // Never store the same recording twice (e.g. a re-transferred watch recording).
+        guard !recordings.contains(where: { $0.id == recording.id }) else { return }
         recordings.insert(recording, at: 0)
         saveRecordings(recordings)
     }

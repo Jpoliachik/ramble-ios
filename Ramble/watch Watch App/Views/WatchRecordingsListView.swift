@@ -8,6 +8,7 @@ import SwiftUI
 struct WatchRecordingsListView: View {
     @StateObject private var history = WatchRecordingHistory.shared
     @StateObject private var syncQueue = WatchSyncQueue.shared
+    @StateObject private var connectivity = WatchConnectivityService.shared
 
     var body: some View {
         Group {
@@ -21,15 +22,45 @@ struct WatchRecordingsListView: View {
                         .foregroundStyle(.secondary)
                 }
             } else {
-                List(history.entries) { entry in
-                    WatchRecordingRow(
-                        entry: entry,
-                        isPending: syncQueue.jobs.contains(where: { $0.id == entry.id })
-                    )
+                List {
+                    if syncQueue.pendingCount > 0 {
+                        Section {
+                            syncNowButton
+                        }
+                    }
+
+                    Section {
+                        ForEach(history.entries) { entry in
+                            WatchRecordingRow(
+                                entry: entry,
+                                isPending: syncQueue.jobs.contains(where: { $0.id == entry.id })
+                            )
+                        }
+                    }
                 }
             }
         }
         .navigationTitle("Recordings")
+    }
+
+    @ViewBuilder
+    private var syncNowButton: some View {
+        Button {
+            // Manual force-push: re-send anything still pending to the phone.
+            syncQueue.pruneOrphanedJobs()
+            connectivity.retryPendingTransfers()
+        } label: {
+            HStack {
+                if syncQueue.isSyncing {
+                    ProgressView()
+                    Text("Syncing…")
+                } else {
+                    Image(systemName: "arrow.up.circle.fill")
+                    Text("Sync \(syncQueue.pendingCount) Now")
+                }
+            }
+        }
+        .disabled(syncQueue.isSyncing)
     }
 }
 

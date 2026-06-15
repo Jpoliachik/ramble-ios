@@ -165,31 +165,40 @@ extension PhoneConnectivityService: WCSessionDelegate {
             return
         }
 
+        let recordingId = UUID(uuidString: metadata.recordingId) ?? UUID()
         let audioFileName = "\(metadata.recordingId).m4a"
         let destinationURL = StorageService.audioDirectory.appendingPathComponent(audioFileName)
 
-        do {
-            if FileManager.default.fileExists(atPath: destinationURL.path) {
-                try FileManager.default.removeItem(at: destinationURL)
+        Task { @MainActor in
+            // Idempotency: the watch re-transfers a recording if it never received the
+            // completion callback (e.g. the watch app was suspended or killed mid-transfer).
+            // Without this guard the same recording is added twice and re-enqueued for
+            // transcription, producing the duplicate + stuck "transcribing" entries.
+            guard !storageService.loadRecordings().contains(where: { $0.id == recordingId }) else {
+                print("Ignoring duplicate watch recording: \(metadata.recordingId)")
+                return
             }
-            try FileManager.default.copyItem(at: file.fileURL, to: destinationURL)
 
-            let recording = Recording(
-                id: UUID(uuidString: metadata.recordingId) ?? UUID(),
-                createdAt: metadata.createdAt,
-                duration: metadata.duration,
-                audioFileName: audioFileName
-            )
+            do {
+                if FileManager.default.fileExists(atPath: destinationURL.path) {
+                    try FileManager.default.removeItem(at: destinationURL)
+                }
+                try FileManager.default.copyItem(at: file.fileURL, to: destinationURL)
 
-            Task { @MainActor in
+                let recording = Recording(
+                    id: recordingId,
+                    createdAt: metadata.createdAt,
+                    duration: metadata.duration,
+                    audioFileName: audioFileName
+                )
+
                 storageService.addRecording(recording)
                 TranscriptionQueueService.shared.enqueue(recordingId: recording.id)
+
+                print("Received recording from watch: \(metadata.recordingId)")
+            } catch {
+                print("Failed to save watch recording: \(error)")
             }
-
-            print("Received recording from watch: \(metadata.recordingId)")
-
-        } catch {
-            print("Failed to save watch recording: \(error)")
         }
     }
 }
