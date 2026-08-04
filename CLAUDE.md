@@ -17,6 +17,7 @@ These are free features from existing providers (no extra API calls or cost):
 - [ ] **Speaker diarization** — opt-in toggle. Deepgram has `diarize=true`, OpenAI has a separate `gpt-4o-transcribe-diarize` model (GPT-Transcribe itself doesn't do speaker labels). Great for conversations/meetings.
 - [x] **Language hint** — language picker in settings, passed to all providers. Improves accuracy for non-English users.
 - [ ] **Recording context** — GPT-Transcribe takes a free-form `prompt` describing the recording's topic or setting, separate from the keyword list. A short "what these recordings usually are" field in Settings would feed it.
+- [ ] **Multiple language hints** — the picker sends one language. GPT-Transcribe accepts several via `languages[]` and Deepgram has `multi`, so a multi-select would help people who codeswitch mid-recording.
 
 ### Future
 
@@ -137,7 +138,7 @@ Thin stateless Cloudflare Worker. Receives audio, forwards to transcription prov
 | Whisper v3 Turbo  | Groq     | Fast and accurate — best all-around (default) |
 | Whisper Large v3  | Groq     | Best for accents and multilingual audio       |
 | Nova-3            | Deepgram | Strong English accuracy, smart formatting     |
-| GPT-Transcribe    | OpenAI   | Highest accuracy in noisy environments        |
+| GPT-Transcribe    | OpenAI   | Highest accuracy on noisy real-world audio    |
 
 ## Pre-Launch Checklist
 

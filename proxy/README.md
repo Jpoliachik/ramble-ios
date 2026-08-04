@@ -30,7 +30,7 @@ Retired model keys keep working — `openai-gpt-4o-transcribe` resolves to `open
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `audio` | yes | The recording. The app sends 16 kHz mono AAC, chunked client-side under the 25 MB provider limit. |
+| `audio` | yes | The recording. The app sends 16 kHz mono AAC, split client-side into pieces under 24 MB and 20 minutes so every request stays inside the providers' size and length limits. |
 | `model` | no | One of the keys above. Defaults to `whisper-large-v3-turbo`. |
 | `language` | no | ISO-639-1 hint. Omit to auto-detect. |
 | `vocabulary` | no | Comma- or newline-separated names and jargon. |
