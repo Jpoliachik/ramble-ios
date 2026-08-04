@@ -23,28 +23,26 @@ export async function hashDeviceId(deviceId) {
  *
  * Data point schema:
  *   index1  — hashed device ID (for unique-user queries)
- *   blob1   — model name (e.g. "whisper-large-v3-turbo")
- *   blob2   — provider (e.g. "groq", "deepgram", "openai")
+ *   blob1   — model ID (e.g. "whisper-large-v3-turbo"), canonical: requests
+ *             using a legacy alias are recorded under the model they resolve to
+ *   blob2   — provider ("groq", "deepgram", "openai")
  *   blob3   — outcome ("success" or "error")
  *   blob4   — error detail (empty on success)
  *   double1 — audio file size in bytes
  *   double2 — transcript character length (0 on error)
  *   double3 — processing duration in ms
  */
-export async function writeTranscriptionEvent(env, { deviceId, model, audioSize, textLength, durationMs, error }) {
+export async function writeTranscriptionEvent(
+  env,
+  { deviceId, model, provider, audioSize, textLength, durationMs, error },
+) {
   if (!env.USAGE_ANALYTICS) return;
 
   const hashedId = await hashDeviceId(deviceId);
 
-  const provider = model.startsWith('deepgram-')
-    ? 'deepgram'
-    : model.startsWith('openai-')
-      ? 'openai'
-      : 'groq';
-
   env.USAGE_ANALYTICS.writeDataPoint({
     indexes: [hashedId],
-    blobs: [model, provider, error ? 'error' : 'success', error || ''],
+    blobs: [model, provider || 'unknown', error ? 'error' : 'success', error || ''],
     doubles: [audioSize || 0, textLength || 0, durationMs || 0],
   });
 }
