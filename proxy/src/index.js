@@ -215,25 +215,25 @@ async function handleTranscribe(request, env) {
   }
   const durationMs = Date.now() - startTime;
 
-  // Post-process: Whisper occasionally echoes the `prompt` (keyword hint) at
-  // the tail of the transcript. Only Groq gets its hints via `prompt` —
-  // Deepgram uses `keyterm` and GPT-Transcribe uses `keywords[]`, neither of
-  // which leaks into the output.
-  if (!result.error && keywords.length > 0 && model.provider === 'groq') {
-    result.result = stripPromptEcho(result.result, keywords.join(', '));
-  }
-
-  // Post-process: strip fillers from Whisper/OpenAI output. Deepgram handles
-  // this itself via `filler_words`, so we skip it there.
-  if (!result.error && removeFillerWords && model.provider !== 'deepgram') {
-    result.result = stripFillerWords(result.result);
-  }
-
-  // Post-process: paragraph breaks. Deepgram returns them natively and Groq
-  // derives them from segment timings; GPT-Transcribe returns a single block of
-  // text, so fall back to grouping sentences. No-op when the transcript already
-  // has paragraphs or is too short to need them.
+  // --- Post-processing ---
   if (!result.error) {
+    // Whisper occasionally echoes the `prompt` (keyword hint) at the tail of
+    // the transcript. Only Groq gets its hints via `prompt` — Deepgram uses
+    // `keyterm` and GPT-Transcribe uses `keywords[]`, neither of which leaks
+    // into the output.
+    if (keywords.length > 0 && model.provider === 'groq') {
+      result.result = stripPromptEcho(result.result, keywords.join(', '));
+    }
+
+    // Deepgram filters fillers itself via `filler_words`, so we skip it there.
+    if (removeFillerWords && model.provider !== 'deepgram') {
+      result.result = stripFillerWords(result.result);
+    }
+
+    // Paragraph breaks: Deepgram returns them natively and Groq derives them
+    // from segment timings; GPT-Transcribe returns a single block of text, so
+    // fall back to grouping sentences. No-op when the transcript already has
+    // paragraphs or is too short to need them.
     result.result = formatTextIntoParagraphs(result.result);
   }
 
