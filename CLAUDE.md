@@ -12,10 +12,11 @@ For full brand positioning, audience, tone, and messaging guidelines, see **`doc
 
 These are free features from existing providers (no extra API calls or cost):
 
-- [ ] **Deepgram auto-paragraphs** — add `paragraphs=true` to Deepgram API call; instant readability improvement for longer recordings
-- [ ] **Filler word removal toggle** — settings toggle to strip "um", "uh", etc. Deepgram supports natively; client-side regex for Groq/OpenAI
-- [ ] **Speaker diarization** — opt-in toggle. Deepgram has `diarize=true`, OpenAI has `gpt-4o-transcribe-diarize` model. Labels speakers in transcript. Great for conversations/meetings.
-- [ ] **Language hint** — language picker in settings, passed to all providers. Improves accuracy for non-English users.
+- [x] **Deepgram auto-paragraphs** — `paragraphs=true` on the Deepgram call. Groq derives paragraphs from segment timings; models that return plain text (GPT-Transcribe, Apple Speech) get sentence grouping instead.
+- [x] **Filler word removal toggle** — settings toggle. Deepgram via `filler_words`, client-side regex for Groq/OpenAI.
+- [ ] **Speaker diarization** — opt-in toggle. Deepgram has `diarize=true`, OpenAI has a separate `gpt-4o-transcribe-diarize` model (GPT-Transcribe itself doesn't do speaker labels). Great for conversations/meetings.
+- [x] **Language hint** — language picker in settings, passed to all providers. Improves accuracy for non-English users.
+- [ ] **Recording context** — GPT-Transcribe takes a free-form `prompt` describing the recording's topic or setting, separate from the keyword list. A short "what these recordings usually are" field in Settings would feed it.
 
 ### Future
 
@@ -43,6 +44,19 @@ xcodebuild -project Ramble/Ramble.xcodeproj -scheme Ramble -destination 'platfor
 # Build watch app
 xcodebuild -project Ramble/Ramble.xcodeproj -scheme "watch Watch App" -destination 'platform=watchOS Simulator,name=Apple Watch Series 11 (46mm)'
 ```
+
+### Proxy
+
+```bash
+cd proxy
+npm ci
+npm test         # Unit tests for request shaping + transcript formatting
+npm run dev      # Local Worker via wrangler
+```
+
+Tests need no credentials or Worker runtime — they cover the pure helpers in
+`src/index.js`. CI runs them on every PR touching `proxy/**` and gates the
+deploy on them.
 
 ### Website
 
@@ -123,7 +137,7 @@ Thin stateless Cloudflare Worker. Receives audio, forwards to transcription prov
 | Whisper v3 Turbo  | Groq     | Fast and accurate — best all-around (default) |
 | Whisper Large v3  | Groq     | Best for accents and multilingual audio       |
 | Nova-3            | Deepgram | Strong English accuracy, smart formatting     |
-| GPT-4o Transcribe | OpenAI   | Highest accuracy in noisy environments        |
+| GPT-Transcribe    | OpenAI   | Highest accuracy in noisy environments        |
 
 ## Pre-Launch Checklist
 

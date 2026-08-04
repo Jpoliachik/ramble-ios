@@ -119,7 +119,7 @@ export default function Home() {
               </div>
               <h3 className="mt-4 text-base font-semibold text-stone-900">Best-in-class transcription</h3>
               <p className="mt-2 text-sm leading-relaxed text-stone-500">
-                Choose from the latest cloud models — Groq Whisper, Deepgram Nova-3, OpenAI GPT-4o Transcribe — or use
+                Choose from the latest cloud models — Groq Whisper, Deepgram Nova-3, OpenAI GPT-Transcribe — or use
                 free on-device Apple Speech. New models added as they ship.
               </p>
             </div>
@@ -202,7 +202,7 @@ export default function Home() {
               </summary>
               <div className="pb-5 text-sm leading-relaxed text-stone-500">
                 Yes — on-device transcription via Apple Speech and webhook delivery are completely free. Cloud
-                transcription models (Groq Whisper, Deepgram Nova-3, OpenAI GPT-4o) are an optional{" "}
+                transcription models (Groq Whisper, Deepgram Nova-3, OpenAI GPT-Transcribe) are an optional{" "}
                 <span className="text-stone-700">$3.99/month</span> subscription.
               </div>
             </details>
@@ -244,7 +244,7 @@ export default function Home() {
               </summary>
               <div className="pb-5 text-sm leading-relaxed text-stone-500">
                 On-device uses Apple Speech — free, works offline, accuracy varies by device. Cloud routes audio through
-                the model you pick (Whisper, Nova-3, GPT-4o) for sharper transcripts on accents, technical terms, and
+                the model you pick (Whisper, Nova-3, GPT-Transcribe) for sharper transcripts on accents, technical terms, and
                 noisy environments.
               </div>
             </details>
