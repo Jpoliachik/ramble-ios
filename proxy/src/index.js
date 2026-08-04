@@ -53,9 +53,9 @@ const DEEPGRAM_NOVA3_LANGUAGES = new Set([
 ]);
 
 // Filler words stripped from Whisper/OpenAI output when remove_filler_words=true.
-// Deepgram already excludes fillers by default. Conservative list — only the
-// disfluencies most users want gone, not slang ("like", "you know") which is
-// often meaningful.
+// Deepgram does its own filtering via the `filler_words` parameter. Conservative
+// list — only the disfluencies most users want gone, not slang ("like", "you
+// know") which is often meaningful.
 const FILLER_REGEX = /\b(?:um+|uh+|er+|ah+|hmm+|mhm+|uhm+|erm+)\b[\s,.;:!?]*/gi;
 
 // Keyword hints. GPT-Transcribe rejects a request outright if any keyword
@@ -194,7 +194,7 @@ async function handleTranscribe(request, env) {
   const keywords = parseKeywords(formData.get('vocabulary') || '');
   const removeFillerWords = formData.get('remove_filler_words') === 'true';
 
-  const options = { language, keywords };
+  const options = { language, keywords, removeFillerWords };
 
   console.log(
     `[transcribe] device=${deviceId} model=${model.id} lang=${language || 'auto'} keywords=${keywords.length} fillers=${removeFillerWords ? 'strip' : 'keep'} file=${audio.name} size=${audio.size}`,
@@ -223,8 +223,8 @@ async function handleTranscribe(request, env) {
     result.result = stripPromptEcho(result.result, keywords.join(', '));
   }
 
-  // Post-process: strip fillers from Whisper/OpenAI output.
-  // Deepgram's default excludes fillers, so we skip it there.
+  // Post-process: strip fillers from Whisper/OpenAI output. Deepgram handles
+  // this itself via `filler_words`, so we skip it there.
   if (!result.error && removeFillerWords && model.provider !== 'deepgram') {
     result.result = stripFillerWords(result.result);
   }
@@ -311,13 +311,8 @@ async function transcribeWithGroq(audio, modelName, options, env) {
 
 // --- Deepgram Transcription ---
 
-async function transcribeWithDeepgram(audio, options, env) {
-  if (!env.DEEPGRAM_API_KEY) {
-    return { error: 'Deepgram API key not configured', status: 503 };
-  }
-
-  const audioBuffer = await audio.arrayBuffer();
-
+/** Query string for Deepgram's `/v1/listen`. */
+function buildDeepgramParams(options) {
   const params = new URLSearchParams({
     model: 'nova-3',
     smart_format: 'true',
@@ -327,12 +322,29 @@ async function transcribeWithDeepgram(audio, options, env) {
     // user's pick is more accurate than overriding with `multi` on the chance
     // they might also speak another language.
     language: resolveDeepgramLanguage(options.language),
+    // Deepgram strips "uh" and "um" unless asked not to, so the toggle is
+    // bidirectional here: keeping fillers means opting into them explicitly.
+    // Without this, turning the setting off left Deepgram transcripts
+    // filler-free anyway, unlike every other model.
+    filler_words: options.removeFillerWords ? 'false' : 'true',
   });
+
   // Keyterm prompting is repeated once per term. Nova-3 supports it for both
   // monolingual and `multi` requests, so it applies whatever the language hint.
   for (const term of options.keywords) {
     params.append('keyterm', term);
   }
+
+  return params;
+}
+
+async function transcribeWithDeepgram(audio, options, env) {
+  if (!env.DEEPGRAM_API_KEY) {
+    return { error: 'Deepgram API key not configured', status: 503 };
+  }
+
+  const audioBuffer = await audio.arrayBuffer();
+  const params = buildDeepgramParams(options);
 
   let res;
   try {
@@ -746,6 +758,7 @@ export {
   DEFAULT_MODEL,
   resolveModel,
   parseKeywords,
+  buildDeepgramParams,
   buildWhisperPrompt,
   stripPromptEcho,
   stripFillerWords,

@@ -10,6 +10,7 @@ import {
   DEFAULT_MODEL,
   resolveModel,
   parseKeywords,
+  buildDeepgramParams,
   buildWhisperPrompt,
   stripPromptEcho,
   stripFillerWords,
@@ -237,6 +238,40 @@ describe('formatTextIntoParagraphs', () => {
     const cjk = '今日は新しいビルドを出荷します。'.repeat(60);
     const result = formatTextIntoParagraphs(cjk);
     assert.ok(result.includes('\n\n'), 'expected paragraph breaks in CJK text');
+  });
+});
+
+describe('buildDeepgramParams', () => {
+  const options = { language: null, keywords: [], removeFillerWords: false };
+
+  it('requests Nova-3 with smart formatting and paragraphs', () => {
+    const params = buildDeepgramParams(options);
+    assert.equal(params.get('model'), 'nova-3');
+    assert.equal(params.get('smart_format'), 'true');
+    assert.equal(params.get('paragraphs'), 'true');
+  });
+
+  it('opts into filler words when the user is not removing them', () => {
+    assert.equal(buildDeepgramParams(options).get('filler_words'), 'true');
+  });
+
+  it('opts out of filler words when the user is removing them', () => {
+    const params = buildDeepgramParams({ ...options, removeFillerWords: true });
+    assert.equal(params.get('filler_words'), 'false');
+  });
+
+  it('sends one keyterm per keyword', () => {
+    const params = buildDeepgramParams({ ...options, keywords: ['Goodloop', 'Ramble'] });
+    assert.deepEqual(params.getAll('keyterm'), ['Goodloop', 'Ramble']);
+  });
+
+  it('sends no keyterm when there are no keywords', () => {
+    assert.deepEqual(buildDeepgramParams(options).getAll('keyterm'), []);
+  });
+
+  it('passes the resolved language hint', () => {
+    assert.equal(buildDeepgramParams(options).get('language'), 'multi');
+    assert.equal(buildDeepgramParams({ ...options, language: 'de' }).get('language'), 'de');
   });
 });
 
