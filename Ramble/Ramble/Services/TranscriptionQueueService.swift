@@ -182,9 +182,13 @@ final class TranscriptionQueueService: ObservableObject {
                 )
                 rawText = try await proxyService.transcribe(request)
             } else if #available(iOS 26.0, *) {
-                rawText = try await speechAnalyzer.transcribe(audioURL: audioURL)
+                // Cloud transcripts come back paragraphed from the proxy;
+                // on-device output is one block, so group it here for parity.
+                let onDevice = try await speechAnalyzer.transcribe(audioURL: audioURL)
+                rawText = TranscriptFormatter.paragraphs(from: onDevice)
             } else {
-                rawText = try await legacySpeech.transcribe(audioURL: audioURL)
+                let onDevice = try await legacySpeech.transcribe(audioURL: audioURL)
+                rawText = TranscriptFormatter.paragraphs(from: onDevice)
             }
             let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
 
