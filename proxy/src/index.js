@@ -380,11 +380,13 @@ async function transcribeWithDeepgram(audio, options, env) {
 
 // --- OpenAI Transcription ---
 
-async function transcribeWithOpenAI(audio, upstreamModel, options, env) {
-  if (!env.OPENAI_API_KEY) {
-    return { error: 'OpenAI API key not configured', status: 503 };
-  }
-
+/**
+ * Multipart body for OpenAI's `/v1/audio/transcriptions`.
+ *
+ * Array fields are repeated with a `[]` suffix — the wire format OpenAI's own
+ * SDKs generate for `keywords` and `languages`.
+ */
+function buildOpenAIForm(audio, upstreamModel, options) {
   const form = new FormData();
   form.append('file', audio, audio.name || 'recording.m4a');
   form.append('model', upstreamModel);
@@ -404,6 +406,16 @@ async function transcribeWithOpenAI(audio, upstreamModel, options, env) {
   for (const term of options.keywords) {
     form.append('keywords[]', term);
   }
+
+  return form;
+}
+
+async function transcribeWithOpenAI(audio, upstreamModel, options, env) {
+  if (!env.OPENAI_API_KEY) {
+    return { error: 'OpenAI API key not configured', status: 503 };
+  }
+
+  const form = buildOpenAIForm(audio, upstreamModel, options);
 
   let res;
   try {
@@ -758,6 +770,7 @@ export {
   DEFAULT_MODEL,
   resolveModel,
   parseKeywords,
+  buildOpenAIForm,
   buildDeepgramParams,
   buildWhisperPrompt,
   stripPromptEcho,

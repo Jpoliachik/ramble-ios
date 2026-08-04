@@ -10,6 +10,7 @@ import {
   DEFAULT_MODEL,
   resolveModel,
   parseKeywords,
+  buildOpenAIForm,
   buildDeepgramParams,
   buildWhisperPrompt,
   stripPromptEcho,
@@ -238,6 +239,55 @@ describe('formatTextIntoParagraphs', () => {
     const cjk = '今日は新しいビルドを出荷します。'.repeat(60);
     const result = formatTextIntoParagraphs(cjk);
     assert.ok(result.includes('\n\n'), 'expected paragraph breaks in CJK text');
+  });
+});
+
+describe('buildOpenAIForm', () => {
+  const audio = new File([new Uint8Array([1, 2, 3])], 'recording.m4a', { type: 'audio/m4a' });
+  const options = { language: null, keywords: [], removeFillerWords: false };
+  const build = (overrides = {}) =>
+    buildOpenAIForm(audio, 'gpt-transcribe', { ...options, ...overrides });
+
+  it('sends the audio and the model', () => {
+    const form = build();
+    assert.ok(form.get('file') instanceof File);
+    assert.equal(form.get('model'), 'gpt-transcribe');
+  });
+
+  it('asks for json — the only format gpt-transcribe returns', () => {
+    assert.equal(build().get('response_format'), 'json');
+  });
+
+  it('sends the language hint as a repeated languages[] field', () => {
+    const form = build({ language: 'fr' });
+    assert.deepEqual(form.getAll('languages[]'), ['fr']);
+  });
+
+  it('never sends the legacy language field, which the model rejects alongside languages', () => {
+    assert.equal(build({ language: 'fr' }).get('language'), null);
+  });
+
+  it('omits the language field entirely when auto-detecting', () => {
+    const form = build();
+    assert.deepEqual(form.getAll('languages[]'), []);
+    assert.equal(form.get('language'), null);
+  });
+
+  it('sends one keywords[] entry per keyword', () => {
+    const form = build({ keywords: ['Goodloop', 'AC-42'] });
+    assert.deepEqual(form.getAll('keywords[]'), ['Goodloop', 'AC-42']);
+  });
+
+  it('does not put keywords in the prompt, which the model can echo back', () => {
+    assert.equal(build({ keywords: ['Goodloop'] }).get('prompt'), null);
+  });
+
+  it('sends no keyword fields when the vocabulary is empty', () => {
+    assert.deepEqual(build().getAll('keywords[]'), []);
+  });
+
+  it('does not send chunking_strategy, which only the diarize model requires', () => {
+    assert.equal(build().get('chunking_strategy'), null);
   });
 });
 
