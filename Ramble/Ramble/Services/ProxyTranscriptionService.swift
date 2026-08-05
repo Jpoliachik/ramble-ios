@@ -90,7 +90,12 @@ final class ProxyTranscriptionService {
             }
         }
 
-        return transcripts.joined(separator: " ")
+        // Each chunk comes back already broken into paragraphs, so joining on a
+        // space would run the tail of one chunk into the head of the next and
+        // leave the seams as the only places in a long transcript without a
+        // break. A chunk boundary is a pause in the recording — treat it like
+        // any other paragraph break.
+        return transcripts.joined(separator: "\n\n")
     }
 
     private func splitAudioIntoChunks(audioURL: URL) async throws -> [URL] {

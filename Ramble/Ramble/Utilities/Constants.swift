@@ -26,7 +26,10 @@ enum Constants {
         /// an hour and a half of speech. Recordings past this are split.
         static let maxSingleUploadDuration: Double = 1200
 
-        /// Duration per chunk when splitting large audio files (20 minutes)
+        /// Duration per chunk when splitting large audio files (20 minutes).
+        /// Must stay at or below `maxSingleUploadDuration` — a chunk is itself a
+        /// single upload, so a larger value here would produce chunks the
+        /// providers reject.
         static let chunkDurationSeconds: Double = 1200
     }
 }

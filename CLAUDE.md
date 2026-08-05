@@ -13,7 +13,7 @@ For full brand positioning, audience, tone, and messaging guidelines, see **`doc
 These are free features from existing providers (no extra API calls or cost):
 
 - [x] **Deepgram auto-paragraphs** — `paragraphs=true` on the Deepgram call. Groq derives paragraphs from segment timings; models that return plain text (GPT-Transcribe, Apple Speech) get sentence grouping instead.
-- [x] **Filler word removal toggle** — settings toggle. Deepgram via `filler_words`, client-side regex for Groq/OpenAI.
+- [x] **Filler word removal toggle** — settings toggle. Regex strip on the proxy for every provider, plus Deepgram's `filler_words` parameter (which only covers "uh"/"um" in English, so it can't carry the setting alone). Note Deepgram drops those two regardless on `multi`/non-English requests, so "keep fillers" isn't fully honorable there.
 - [ ] **Speaker diarization** — opt-in toggle. Deepgram has `diarize=true`, OpenAI has a separate `gpt-4o-transcribe-diarize` model (GPT-Transcribe itself doesn't do speaker labels). Great for conversations/meetings.
 - [x] **Language hint** — language picker in settings, passed to all providers. Improves accuracy for non-English users.
 - [ ] **Recording context** — GPT-Transcribe takes a free-form `prompt` describing the recording's topic or setting, separate from the keyword list. A short "what these recordings usually are" field in Settings would feed it.

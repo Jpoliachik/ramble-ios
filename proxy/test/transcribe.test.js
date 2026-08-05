@@ -15,6 +15,7 @@ import {
   buildWhisperPrompt,
   stripPromptEcho,
   stripFillerWords,
+  postProcessTranscript,
   formatSegmentsIntoParagraphs,
   formatTextIntoParagraphs,
   resolveDeepgramLanguage,
@@ -239,6 +240,73 @@ describe('formatTextIntoParagraphs', () => {
     const cjk = '今日は新しいビルドを出荷します。'.repeat(60);
     const result = formatTextIntoParagraphs(cjk);
     assert.ok(result.includes('\n\n'), 'expected paragraph breaks in CJK text');
+  });
+});
+
+describe('postProcessTranscript', () => {
+  const base = { provider: 'groq', keywords: [], removeFillerWords: false };
+  const run = (text, overrides = {}) => postProcessTranscript(text, { ...base, ...overrides });
+
+  it('strips an echoed keyword prompt on Groq, which hints via `prompt`', () => {
+    const text = `Shipping the new build today. ${buildWhisperPrompt('Goodloop, Ramble')}`;
+    assert.equal(run(text, { keywords: ['Goodloop', 'Ramble'] }), 'Shipping the new build today.');
+  });
+
+  it('leaves the transcript alone on providers that hint structurally', () => {
+    // Deepgram uses `keyterm` and GPT-Transcribe `keywords[]`; neither echoes,
+    // so an actual spoken mention of a keyword must survive.
+    const text = 'We were talking about Goodloop, Ramble';
+    for (const provider of ['deepgram', 'openai']) {
+      assert.equal(run(text, { provider, keywords: ['Goodloop', 'Ramble'] }), text);
+    }
+  });
+
+  it('honors the filler-word setting on every provider, Deepgram included', () => {
+    // Deepgram's own `filler_words` covers only "uh"/"um" and only in English,
+    // so the regex pass has to run there too or the toggle silently does
+    // nothing for the rest of the list.
+    const text = 'Um, I think, er, we should ship it.';
+    for (const provider of ['groq', 'deepgram', 'openai']) {
+      assert.equal(
+        run(text, { provider, removeFillerWords: true }),
+        'I think, we should ship it.',
+        `fillers survived on ${provider}`,
+      );
+    }
+  });
+
+  it('keeps fillers when the setting is off', () => {
+    const text = 'Um, I think we should ship it.';
+    for (const provider of ['groq', 'deepgram', 'openai']) {
+      assert.equal(run(text, { provider }), text);
+    }
+  });
+
+  it('strips fillers before grouping paragraphs, not after', () => {
+    // A transcript that only clears the paragraph threshold because of its
+    // fillers should come back as one block once they are gone.
+    const padding = 'We should ship the build today. '.repeat(14);
+    const fillers = 'Um, uh, er, ah, hmm, '.repeat(12);
+    const text = `${padding}${fillers}`.trim();
+    assert.ok(text.length > 500, 'fixture should start above the paragraph threshold');
+
+    const result = run(text, { removeFillerWords: true });
+    assert.doesNotMatch(result, /\bum\b/i, 'fillers should be gone');
+    assert.ok(result.length < 500, 'fixture should end below the threshold');
+    assert.ok(!result.includes('\n\n'), 'a short transcript should stay one block');
+  });
+
+  it('adds paragraph breaks to a long single block from any provider', () => {
+    const text = 'This is a sentence of a reasonable length that a person might say. '.repeat(12);
+    for (const provider of ['groq', 'deepgram', 'openai']) {
+      assert.ok(run(text, { provider }).includes('\n\n'), `no paragraphs on ${provider}`);
+    }
+  });
+
+  it('leaves provider-supplied paragraph breaks untouched', () => {
+    const half = 'This is a sentence of a reasonable length that a person might say. '.repeat(5);
+    const text = `${half}\n\n${half}`.trim();
+    assert.equal(run(text, { provider: 'deepgram' }), text);
   });
 });
 

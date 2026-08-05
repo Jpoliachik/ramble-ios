@@ -42,7 +42,7 @@ Each provider takes those hints differently, which is the reason the proxy exist
 |---|---|---|---|
 | Vocabulary | `prompt` (framed as a sentence, echo stripped from the result) | one `keyterm` per term | one `keywords[]` per term |
 | Language | `language` | `language`, or `multi` to auto-detect | `languages[]` (sending `language` too is rejected) |
-| Filler words | stripped from the response | `filler_words` parameter | stripped from the response |
+| Filler words | stripped from the response | `filler_words` parameter, plus the same strip — Deepgram's own filtering covers only "uh"/"um" and only in English | stripped from the response |
 | Paragraphs | from segment timings, breaking on pauses | native `paragraphs=true` | grouped from sentences — the model returns plain text with no timings |
 
 Response is `{"text": "..."}`, or `{"error": "..."}` with a 4xx/5xx status.

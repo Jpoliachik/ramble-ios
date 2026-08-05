@@ -52,10 +52,11 @@ const DEEPGRAM_NOVA3_LANGUAGES = new Set([
   'ru','sk','sv','ta','te','th','tl','tr','uk','ur','vi','zh',
 ]);
 
-// Filler words stripped from Whisper/OpenAI output when remove_filler_words=true.
-// Deepgram does its own filtering via the `filler_words` parameter. Conservative
-// list — only the disfluencies most users want gone, not slang ("like", "you
-// know") which is often meaningful.
+// Filler words stripped from any provider's output when remove_filler_words=true.
+// Deepgram also filters natively via `filler_words`, but only "uh" and "um" and
+// only in English, so this still does the work for the rest. Conservative list —
+// only the disfluencies most users want gone, not slang ("like", "you know")
+// which is often meaningful.
 const FILLER_REGEX = /\b(?:um+|uh+|er+|ah+|hmm+|mhm+|uhm+|erm+)\b[\s,.;:!?]*/gi;
 
 // Keyword hints. GPT-Transcribe rejects a request outright if any keyword
@@ -217,24 +218,11 @@ async function handleTranscribe(request, env) {
 
   // --- Post-processing ---
   if (!result.error) {
-    // Whisper occasionally echoes the `prompt` (keyword hint) at the tail of
-    // the transcript. Only Groq gets its hints via `prompt` — Deepgram uses
-    // `keyterm` and GPT-Transcribe uses `keywords[]`, neither of which leaks
-    // into the output.
-    if (keywords.length > 0 && model.provider === 'groq') {
-      result.result = stripPromptEcho(result.result, keywords.join(', '));
-    }
-
-    // Deepgram filters fillers itself via `filler_words`, so we skip it there.
-    if (removeFillerWords && model.provider !== 'deepgram') {
-      result.result = stripFillerWords(result.result);
-    }
-
-    // Paragraph breaks: Deepgram returns them natively and Groq derives them
-    // from segment timings; GPT-Transcribe returns a single block of text, so
-    // fall back to grouping sentences. No-op when the transcript already has
-    // paragraphs or is too short to need them.
-    result.result = formatTextIntoParagraphs(result.result);
+    result.result = postProcessTranscript(result.result, {
+      provider: model.provider,
+      keywords,
+      removeFillerWords,
+    });
   }
 
   if (result.error) {
@@ -326,6 +314,11 @@ function buildDeepgramParams(options) {
     // bidirectional here: keeping fillers means opting into them explicitly.
     // Without this, turning the setting off left Deepgram transcripts
     // filler-free anyway, unlike every other model.
+    //
+    // Deepgram documents this as English-only, so on a `multi` or non-English
+    // request it may be ignored and fillers dropped regardless. Nothing can
+    // recover them after the fact; the reverse direction (strip) is covered by
+    // the regex pass in postProcessTranscript, which is language-agnostic.
     filler_words: options.removeFillerWords ? 'false' : 'true',
   });
 
@@ -612,6 +605,40 @@ function formatSegmentsIntoParagraphs(segments, pauseThreshold = 2.0) {
 }
 
 /**
+ * Cleanup applied to a successful transcript, in order: strip any echoed
+ * keyword prompt, honor the filler-word setting, then make sure the text has
+ * paragraph breaks. Pure, so the ordering is covered by tests — stripping
+ * fillers before grouping matters, since removing them can drop a transcript
+ * back under the length where paragraphs are worth adding.
+ */
+function postProcessTranscript(text, { provider, keywords, removeFillerWords }) {
+  let result = text;
+
+  // Whisper occasionally echoes the `prompt` (keyword hint) at the tail of the
+  // transcript. Only Groq gets its hints via `prompt` — Deepgram uses `keyterm`
+  // and GPT-Transcribe uses `keywords[]`, neither of which leaks into output.
+  if (keywords.length > 0 && provider === 'groq') {
+    result = stripPromptEcho(result, keywords.join(', '));
+  }
+
+  // Every provider gets the regex pass, Deepgram included. `filler_words=false`
+  // asks Deepgram to do its own filtering, but that only covers "uh" and "um"
+  // and only for English — so for the rest of the list (er, ah, hmm, erm), or
+  // on a `multi`/non-English request, the regex is what actually honors the
+  // setting. Running both is harmless: the regex is a superset.
+  if (removeFillerWords) {
+    result = stripFillerWords(result);
+  }
+
+  // Paragraph breaks: Deepgram returns them natively, and Groq derives them
+  // from segment timings whenever the speaker pauses. GPT-Transcribe always
+  // returns one block, and so does a gap-free Groq recording, so fall back to
+  // grouping sentences. No-op on text that already has paragraph breaks or is
+  // too short to need them.
+  return formatTextIntoParagraphs(result);
+}
+
+/**
  * Group a plain-text transcript into paragraphs by grouping sentences, for
  * providers that return text without timings. Deliberately conservative:
  * returns the text untouched when it already has paragraph breaks, is short
@@ -775,6 +802,7 @@ export {
   buildWhisperPrompt,
   stripPromptEcho,
   stripFillerWords,
+  postProcessTranscript,
   formatSegmentsIntoParagraphs,
   formatTextIntoParagraphs,
   resolveDeepgramLanguage,
