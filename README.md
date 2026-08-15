@@ -6,7 +6,7 @@ iPhone + Apple Watch. Open source, private by design, no accounts.
 
 ## Why Ramble
 
-- **Best-in-class transcription** — Cloud models (Groq Whisper, Deepgram Nova-3, OpenAI GPT-4o Transcribe) or free on-device Apple Speech.
+- **Best-in-class transcription** — Cloud models (Groq Whisper, Deepgram Nova-3, OpenAI GPT-Transcribe) or free on-device Apple Speech.
 - **Webhook-native** — Every transcript can POST to any HTTPS endpoint. Signed requests, automatic retries.
 - **Capture on the go** — Record from Apple Watch or phone. Walk, think, talk.
 - **Private by architecture** — No accounts, no servers. Audio stays on-device unless you send it somewhere. Open source is the proof.

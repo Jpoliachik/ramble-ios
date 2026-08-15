@@ -9,8 +9,9 @@ import SwiftUI
 
 @MainActor
 final class SettingsViewModel: ObservableObject {
-    /// Hard cap on the custom-vocabulary field. Whisper's `prompt` accepts up
-    /// to ~224 tokens (~900 chars); beyond that the provider silently
+    /// Hard cap on the custom-vocabulary field, set by the tightest provider
+    /// budget: Whisper's `prompt` accepts ~224 tokens (~900 chars) and
+    /// Deepgram's keyterms ~500 tokens, and beyond that the provider silently
     /// truncates. We clamp on input so the user sees the limit instead of
     /// getting silently lossy hints.
     static let maxVocabularyLength = 900

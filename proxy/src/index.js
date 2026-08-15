@@ -7,18 +7,38 @@ import {
   jwsSignatureToRaw,
 } from './crypto.js';
 
-const ALLOWED_MODELS = [
-  'whisper-large-v3-turbo',
-  'whisper-large-v3',
-  'deepgram-nova-3',
-  'openai-gpt-4o-transcribe',
-];
+// Model IDs the app may request, mapped to the provider that serves them and
+// that provider's own model name. Mirror of `CloudModel` in
+// Ramble/Models/Settings.swift — keep in sync.
+const MODELS = {
+  'whisper-large-v3-turbo': { provider: 'groq', upstream: 'whisper-large-v3-turbo' },
+  'whisper-large-v3': { provider: 'groq', upstream: 'whisper-large-v3' },
+  'deepgram-nova-3': { provider: 'deepgram', upstream: 'nova-3' },
+  // GPT-Transcribe replaced the gpt-4o-transcribe family (OpenAI's own Real
+  // World Audio Benchmark: 8.98% WER vs 15.21% for Whisper). Unlike the 4o
+  // models it takes structured `keywords[]`/`languages[]` hints and returns
+  // JSON only — see transcribeWithOpenAI.
+  'openai-gpt-transcribe': { provider: 'openai', upstream: 'gpt-transcribe' },
+};
 const DEFAULT_MODEL = 'whisper-large-v3-turbo';
 
-// OpenAI's `gpt-4o-transcribe` retires around June 2026; `gpt-4o-transcribe-diarize`
-// is the GA successor (retires 2027-04-16). We ignore diarization metadata and
-// extract only the plain transcript.
-const OPENAI_MODEL = 'gpt-4o-transcribe-diarize';
+// Model IDs that shipped in older app versions. Those builds are still in
+// users' hands and can't be updated retroactively, so their requests resolve
+// to the current replacement instead of failing.
+const MODEL_ALIASES = {
+  'openai-gpt-4o-transcribe': 'openai-gpt-transcribe',
+};
+
+/**
+ * Resolve a client-requested model ID to `{ id, provider, upstream }`, or null
+ * if it isn't one we serve. `id` is the canonical ID — aliases resolve to their
+ * replacement so analytics doesn't split one model across two names.
+ */
+function resolveModel(requested) {
+  const id = MODEL_ALIASES[requested] ?? requested;
+  const entry = MODELS[id];
+  return entry ? { id, ...entry } : null;
+}
 
 // Languages Deepgram Nova-3 supports as a `language=` hint. Mirror of
 // `CloudModel.deepgramNova3Languages` in Ramble/Models/Settings.swift —
@@ -33,10 +53,25 @@ const DEEPGRAM_NOVA3_LANGUAGES = new Set([
 ]);
 
 // Filler words stripped from Whisper/OpenAI output when remove_filler_words=true.
-// Deepgram already excludes fillers by default. Conservative list — only the
-// disfluencies most users want gone, not slang ("like", "you know") which is
-// often meaningful.
+// Deepgram does its own filtering via the `filler_words` parameter. Conservative
+// list — only the disfluencies most users want gone, not slang ("like", "you
+// know") which is often meaningful.
 const FILLER_REGEX = /\b(?:um+|uh+|er+|ah+|hmm+|mhm+|uhm+|erm+)\b[\s,.;:!?]*/gi;
+
+// Keyword hints. GPT-Transcribe rejects a request outright if any keyword
+// contains `<`, `>`, or a line break, and Deepgram caps keyterms at ~500 tokens
+// (~100 words) per request — so both the shape and the size are bounded here.
+// The app already clamps the field to 900 characters on input.
+const MAX_KEYWORDS = 100;
+const MAX_KEYWORD_LENGTH = 100;
+
+// Paragraph reconstruction for providers that return plain text. Below
+// PARAGRAPH_MIN_LENGTH a transcript reads fine as one block; above it,
+// sentences accumulate until a paragraph reaches PARAGRAPH_TARGET_LENGTH.
+const PARAGRAPH_MIN_LENGTH = 500;
+const PARAGRAPH_TARGET_LENGTH = 350;
+const PARAGRAPH_ORPHAN_LENGTH = 80;
+
 const APPLE_BUNDLE_ID = 'dev.goodloop.Ramble';
 const PREMIUM_PRODUCT_ID = 'dev.goodloop.ramble.premium.monthly2';
 
@@ -149,50 +184,64 @@ async function handleTranscribe(request, env) {
 
   // --- Model selection ---
   const requestedModel = formData.get('model') || DEFAULT_MODEL;
-  if (!ALLOWED_MODELS.includes(requestedModel)) {
-    return json({ error: `Invalid model. Allowed: ${ALLOWED_MODELS.join(', ')}` }, 400);
+  const model = resolveModel(requestedModel);
+  if (!model) {
+    return json({ error: `Invalid model. Allowed: ${Object.keys(MODELS).join(', ')}` }, 400);
   }
 
   // --- Optional transcription tuning ---
   const language = (formData.get('language') || '').trim().toLowerCase() || null;
-  const vocabulary = (formData.get('vocabulary') || '').trim();
+  const keywords = parseKeywords(formData.get('vocabulary') || '');
   const removeFillerWords = formData.get('remove_filler_words') === 'true';
 
-  const options = { language, vocabulary };
+  const options = { language, keywords, removeFillerWords };
 
   console.log(
-    `[transcribe] device=${deviceId} model=${requestedModel} lang=${language || 'auto'} vocab=${vocabulary ? 'yes' : 'no'} fillers=${removeFillerWords ? 'strip' : 'keep'} file=${audio.name} size=${audio.size}`,
+    `[transcribe] device=${deviceId} model=${model.id} lang=${language || 'auto'} keywords=${keywords.length} fillers=${removeFillerWords ? 'strip' : 'keep'} file=${audio.name} size=${audio.size}`,
   );
 
   // --- Route to appropriate backend ---
   const startTime = Date.now();
   let result;
-  if (requestedModel.startsWith('deepgram-')) {
-    result = await transcribeWithDeepgram(audio, options, env);
-  } else if (requestedModel.startsWith('openai-')) {
-    result = await transcribeWithOpenAI(audio, options, env);
-  } else {
-    result = await transcribeWithGroq(audio, requestedModel, options, env);
+  switch (model.provider) {
+    case 'deepgram':
+      result = await transcribeWithDeepgram(audio, options, env);
+      break;
+    case 'openai':
+      result = await transcribeWithOpenAI(audio, model.upstream, options, env);
+      break;
+    default:
+      result = await transcribeWithGroq(audio, model.upstream, options, env);
   }
   const durationMs = Date.now() - startTime;
 
-  // Post-process: Whisper occasionally echoes the `prompt` (vocabulary hint)
-  // at the tail of the transcript. Deepgram uses `keyterm` instead, so only
-  // strip for Whisper-based providers.
-  if (!result.error && vocabulary && !requestedModel.startsWith('deepgram-')) {
-    result.result = stripPromptEcho(result.result, vocabulary);
-  }
+  // --- Post-processing ---
+  if (!result.error) {
+    // Whisper occasionally echoes the `prompt` (keyword hint) at the tail of
+    // the transcript. Only Groq gets its hints via `prompt` — Deepgram uses
+    // `keyterm` and GPT-Transcribe uses `keywords[]`, neither of which leaks
+    // into the output.
+    if (keywords.length > 0 && model.provider === 'groq') {
+      result.result = stripPromptEcho(result.result, keywords.join(', '));
+    }
 
-  // Post-process: strip fillers from Whisper/OpenAI output.
-  // Deepgram's default excludes fillers, so we skip it there.
-  if (!result.error && removeFillerWords && !requestedModel.startsWith('deepgram-')) {
-    result.result = stripFillerWords(result.result);
+    // Deepgram filters fillers itself via `filler_words`, so we skip it there.
+    if (removeFillerWords && model.provider !== 'deepgram') {
+      result.result = stripFillerWords(result.result);
+    }
+
+    // Paragraph breaks: Deepgram returns them natively and Groq derives them
+    // from segment timings; GPT-Transcribe returns a single block of text, so
+    // fall back to grouping sentences. No-op when the transcript already has
+    // paragraphs or is too short to need them.
+    result.result = formatTextIntoParagraphs(result.result);
   }
 
   if (result.error) {
     writeTranscriptionEvent(env, {
       deviceId,
-      model: requestedModel,
+      model: model.id,
+      provider: model.provider,
       audioSize: audio.size,
       textLength: 0,
       durationMs,
@@ -206,7 +255,8 @@ async function handleTranscribe(request, env) {
 
   writeTranscriptionEvent(env, {
     deviceId,
-    model: requestedModel,
+    model: model.id,
+    provider: model.provider,
     audioSize: audio.size,
     textLength,
     durationMs,
@@ -226,9 +276,9 @@ async function transcribeWithGroq(audio, modelName, options, env) {
   if (options.language) {
     groqForm.append('language', options.language);
   }
-  if (options.vocabulary) {
+  if (options.keywords.length > 0) {
     // Whisper `prompt` accepts up to ~224 tokens of context — names, jargon, etc.
-    groqForm.append('prompt', buildWhisperPrompt(options.vocabulary));
+    groqForm.append('prompt', buildWhisperPrompt(options.keywords.join(', ')));
   }
 
   let groqRes;
@@ -261,13 +311,8 @@ async function transcribeWithGroq(audio, modelName, options, env) {
 
 // --- Deepgram Transcription ---
 
-async function transcribeWithDeepgram(audio, options, env) {
-  if (!env.DEEPGRAM_API_KEY) {
-    return { error: 'Deepgram API key not configured', status: 503 };
-  }
-
-  const audioBuffer = await audio.arrayBuffer();
-
+/** Query string for Deepgram's `/v1/listen`. */
+function buildDeepgramParams(options) {
   const params = new URLSearchParams({
     model: 'nova-3',
     smart_format: 'true',
@@ -277,18 +322,29 @@ async function transcribeWithDeepgram(audio, options, env) {
     // user's pick is more accurate than overriding with `multi` on the chance
     // they might also speak another language.
     language: resolveDeepgramLanguage(options.language),
+    // Deepgram strips "uh" and "um" unless asked not to, so the toggle is
+    // bidirectional here: keeping fillers means opting into them explicitly.
+    // Without this, turning the setting off left Deepgram transcripts
+    // filler-free anyway, unlike every other model.
+    filler_words: options.removeFillerWords ? 'false' : 'true',
   });
-  if (options.vocabulary) {
-    // Deepgram supports `keyterm` repeated; a single comma-separated list is
-    // accepted as one term but multiple terms work better — split on commas/newlines.
-    const terms = options.vocabulary
-      .split(/[,\n]+/)
-      .map((t) => t.trim())
-      .filter(Boolean);
-    for (const term of terms) {
-      params.append('keyterm', term);
-    }
+
+  // Keyterm prompting is repeated once per term. Nova-3 supports it for both
+  // monolingual and `multi` requests, so it applies whatever the language hint.
+  for (const term of options.keywords) {
+    params.append('keyterm', term);
   }
+
+  return params;
+}
+
+async function transcribeWithDeepgram(audio, options, env) {
+  if (!env.DEEPGRAM_API_KEY) {
+    return { error: 'Deepgram API key not configured', status: 503 };
+  }
+
+  const audioBuffer = await audio.arrayBuffer();
+  const params = buildDeepgramParams(options);
 
   let res;
   try {
@@ -324,25 +380,42 @@ async function transcribeWithDeepgram(audio, options, env) {
 
 // --- OpenAI Transcription ---
 
-async function transcribeWithOpenAI(audio, options, env) {
+/**
+ * Multipart body for OpenAI's `/v1/audio/transcriptions`.
+ *
+ * Array fields are repeated with a `[]` suffix — the wire format OpenAI's own
+ * SDKs generate for `keywords` and `languages`.
+ */
+function buildOpenAIForm(audio, upstreamModel, options) {
+  const form = new FormData();
+  form.append('file', audio, audio.name || 'recording.m4a');
+  form.append('model', upstreamModel);
+  // `gpt-transcribe` returns JSON only — `verbose_json`, `srt` and `vtt` aren't
+  // valid for it, so no segment timings come back and paragraph breaks are
+  // reconstructed from the text instead.
+  form.append('response_format', 'json');
+  // The new models take `languages[]` (repeated, ISO-639-1) rather than
+  // Whisper's single `language`, and reject requests that send both.
+  if (options.language) {
+    form.append('languages[]', options.language);
+  }
+  // Literal terms belong in `keywords[]`, not `prompt`: the model treats them
+  // as optional hints it only uses when the audio actually contains them, so
+  // there's nothing to echo back into the transcript. `prompt` stays free for
+  // describing the recording itself.
+  for (const term of options.keywords) {
+    form.append('keywords[]', term);
+  }
+
+  return form;
+}
+
+async function transcribeWithOpenAI(audio, upstreamModel, options, env) {
   if (!env.OPENAI_API_KEY) {
     return { error: 'OpenAI API key not configured', status: 503 };
   }
 
-  const form = new FormData();
-  form.append('file', audio, audio.name || 'recording.m4a');
-  form.append('model', OPENAI_MODEL);
-  // diarize model returns `diarized_json`; we ignore speaker labels and
-  // concatenate segment text. `chunking_strategy=auto` is required for audio
-  // longer than 30s.
-  form.append('response_format', 'diarized_json');
-  form.append('chunking_strategy', 'auto');
-  if (options.language) {
-    form.append('language', options.language);
-  }
-  if (options.vocabulary) {
-    form.append('prompt', buildWhisperPrompt(options.vocabulary));
-  }
+  const form = buildOpenAIForm(audio, upstreamModel, options);
 
   let res;
   try {
@@ -364,20 +437,14 @@ async function transcribeWithOpenAI(audio, options, env) {
 
   const data = await res.json();
 
-  // diarized_json: { segments: [{ speaker, text, start, end }, ...] }
-  // plain json: { text: "..." }
-  if (Array.isArray(data.segments) && data.segments.length > 0) {
-    const hasTimings = data.segments.every((s) => typeof s.start === 'number' && typeof s.end === 'number');
-    return {
-      result: hasTimings
-        ? formatSegmentsIntoParagraphs(data.segments)
-        : data.segments.map((s) => (s.text || '').trim()).filter(Boolean).join(' '),
-    };
+  // json: { text: "...", languages: [{ code: "en" }] }. `languages` is the
+  // model's own detection and may be an empty array — we don't use it, the
+  // transcript is all the app needs.
+  if (typeof data.text !== 'string') {
+    return { error: 'No transcript in OpenAI response', status: 502 };
   }
-  if (typeof data.text === 'string') {
-    return { result: data.text };
-  }
-  return { error: 'No transcript in OpenAI response', status: 502 };
+
+  return { result: data.text };
 }
 
 // --- Apple JWS Verification ---
@@ -545,9 +612,84 @@ function formatSegmentsIntoParagraphs(segments, pauseThreshold = 2.0) {
 }
 
 /**
- * Remove disfluencies ("um", "uh", "er", "hmm", etc.) from a transcript and
- * collapse the resulting whitespace.
+ * Group a plain-text transcript into paragraphs by grouping sentences, for
+ * providers that return text without timings. Deliberately conservative:
+ * returns the text untouched when it already has paragraph breaks, is short
+ * enough to read as one block, or has no sentence boundaries to break on.
  */
+function formatTextIntoParagraphs(text) {
+  if (!text) return text;
+
+  const trimmed = text.trim();
+  if (trimmed.length < PARAGRAPH_MIN_LENGTH) return trimmed;
+  // Already paragraphed by the provider — leave it alone.
+  if (/\n\s*\n/.test(trimmed)) return trimmed;
+
+  // Sentence = run of non-terminator characters plus its trailing terminators
+  // and any closing quote/bracket. Covers CJK terminators too.
+  const sentences = trimmed.match(/[^.!?…。！？]+(?:[.!?…。！？]+["'”’)\]]*|$)/g);
+  if (!sentences || sentences.length < 2) return trimmed;
+
+  const paragraphs = [];
+  let current = '';
+
+  for (const sentence of sentences) {
+    const clean = sentence.trim();
+    if (!clean) continue;
+    current = current ? `${current} ${clean}` : clean;
+    if (current.length >= PARAGRAPH_TARGET_LENGTH) {
+      paragraphs.push(current);
+      current = '';
+    }
+  }
+
+  if (current) {
+    // Fold a stubby remainder into the previous paragraph rather than leaving
+    // a one-line orphan at the end.
+    if (paragraphs.length > 0 && current.length < PARAGRAPH_ORPHAN_LENGTH) {
+      paragraphs[paragraphs.length - 1] += ` ${current}`;
+    } else {
+      paragraphs.push(current);
+    }
+  }
+
+  return paragraphs.join('\n\n');
+}
+
+/**
+ * Normalize the user's custom-vocabulary field into discrete keyword hints.
+ *
+ * Providers take these as structured lists (`keywords[]` for GPT-Transcribe,
+ * repeated `keyterm` for Deepgram), and GPT-Transcribe rejects the whole
+ * request if any keyword is multi-line or contains `<` or `>` — so sanitize
+ * rather than trust the field.
+ */
+function parseKeywords(vocabulary) {
+  if (!vocabulary) return [];
+
+  const seen = new Set();
+  const keywords = [];
+
+  for (const raw of vocabulary.split(/[,\n\r]+/)) {
+    const term = raw
+      .replace(/[<>]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, MAX_KEYWORD_LENGTH)
+      .trim();
+    if (!term) continue;
+
+    const key = term.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    keywords.push(term);
+
+    if (keywords.length >= MAX_KEYWORDS) break;
+  }
+
+  return keywords;
+}
+
 function resolveDeepgramLanguage(code) {
   if (!code) return 'multi';
   if (DEEPGRAM_NOVA3_LANGUAGES.has(code)) return code;
@@ -585,6 +727,10 @@ function stripPromptEcho(text, vocabulary) {
   return text;
 }
 
+/**
+ * Remove disfluencies ("um", "uh", "er", "hmm", etc.) from a transcript and
+ * collapse the resulting whitespace.
+ */
 function stripFillerWords(text) {
   if (!text) return text;
   const stripped = text.replace(FILLER_REGEX, '');
@@ -613,3 +759,23 @@ function corsHeaders() {
     'Access-Control-Allow-Headers': 'Content-Type, X-Device-ID, Authorization, X-App-Attest, X-App-Attest-Key-Id',
   };
 }
+
+// --- Exported for tests (see proxy/test) ---
+// The Worker entry point is the default export above; these are the pure
+// request-shaping and transcript-formatting helpers, exported so `npm test`
+// can cover them without a live Worker or provider credentials.
+export {
+  MODELS,
+  MODEL_ALIASES,
+  DEFAULT_MODEL,
+  resolveModel,
+  parseKeywords,
+  buildOpenAIForm,
+  buildDeepgramParams,
+  buildWhisperPrompt,
+  stripPromptEcho,
+  stripFillerWords,
+  formatSegmentsIntoParagraphs,
+  formatTextIntoParagraphs,
+  resolveDeepgramLanguage,
+};

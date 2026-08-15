@@ -182,7 +182,7 @@ enum CloudModel: String, Codable, CaseIterable, Identifiable {
     case whisperLargeV3Turbo = "whisper-large-v3-turbo"
     case whisperLargeV3 = "whisper-large-v3"
     case deepgramNova3 = "deepgram-nova-3"
-    case openAIGPT4oTranscribe = "openai-gpt-4o-transcribe"
+    case openAIGPTTranscribe = "openai-gpt-transcribe"
 
     var id: String { rawValue }
 
@@ -191,7 +191,7 @@ enum CloudModel: String, Codable, CaseIterable, Identifiable {
         case .whisperLargeV3Turbo: return "Groq Whisper v3 Turbo"
         case .whisperLargeV3: return "Groq Whisper Large v3"
         case .deepgramNova3: return "Deepgram Nova-3"
-        case .openAIGPT4oTranscribe: return "GPT-4o Transcribe"
+        case .openAIGPTTranscribe: return "GPT-Transcribe"
         }
     }
 
@@ -200,7 +200,7 @@ enum CloudModel: String, Codable, CaseIterable, Identifiable {
         case .whisperLargeV3Turbo: return "Fast & accurate default"
         case .whisperLargeV3: return "Accents & multilingual"
         case .deepgramNova3: return "Clean English formatting"
-        case .openAIGPT4oTranscribe: return "Best for noisy audio"
+        case .openAIGPTTranscribe: return "Best for noisy audio"
         }
     }
 
@@ -208,17 +208,33 @@ enum CloudModel: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .whisperLargeV3Turbo, .whisperLargeV3: return "logo-groq"
         case .deepgramNova3: return "logo-deepgram"
-        case .openAIGPT4oTranscribe: return "logo-openai"
+        case .openAIGPTTranscribe: return "logo-openai"
+        }
+    }
+
+    /// Backward-compatible decoding. Retired model IDs map to whatever replaced
+    /// them, so a stored preference survives a model swap, and an unrecognized
+    /// ID falls back to the default rather than failing the whole decode.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(String.self)
+        switch rawValue {
+        // GPT-Transcribe replaced the gpt-4o-transcribe family.
+        case "openai-gpt-4o-transcribe":
+            self = .openAIGPTTranscribe
+        default:
+            self = CloudModel(rawValue: rawValue) ?? .whisperLargeV3Turbo
         }
     }
 
     /// Languages this model accepts as a hint (excluding `.auto`, which is
     /// always allowed). Used by the picker to show only relevant rows.
-    /// Whisper-based models cover the full enum; Nova-3 has a fixed subset.
+    /// Whisper and GPT-Transcribe both cover the full enum; Nova-3 has a
+    /// fixed subset.
     var supportedLanguages: Set<TranscriptionLanguage> {
         switch self {
-        case .whisperLargeV3Turbo, .whisperLargeV3, .openAIGPT4oTranscribe:
-            return Self.whisperLanguages
+        case .whisperLargeV3Turbo, .whisperLargeV3, .openAIGPTTranscribe:
+            return Self.broadLanguageSupport
         case .deepgramNova3:
             return Self.deepgramNova3Languages
         }
@@ -228,12 +244,15 @@ enum CloudModel: String, Codable, CaseIterable, Identifiable {
         language == .auto || supportedLanguages.contains(language)
     }
 
-    /// Whisper supports ~99 languages — the full enum is a subset of that.
-    /// Authoritative list (OpenAI / Groq both use the same Whisper model):
-    ///   https://platform.openai.com/docs/guides/speech-to-text/supported-languages
+    /// Every language in the enum. Whisper supports ~99 languages, and
+    /// GPT-Transcribe accepts ISO-639-1 codes across a comparable range
+    /// (OpenAI doesn't publish a per-model list), so the enum is a subset of
+    /// what both models take.
+    /// Authoritative lists:
     ///   https://github.com/openai/whisper#available-models-and-languages
     ///   https://console.groq.com/docs/speech-to-text
-    private static let whisperLanguages: Set<TranscriptionLanguage> =
+    ///   https://developers.openai.com/api/docs/guides/transcription
+    private static let broadLanguageSupport: Set<TranscriptionLanguage> =
         Set(TranscriptionLanguage.allCases.filter { $0 != .auto })
 
     /// Deepgram Nova-3 monolingual language codes. Mirror of

@@ -20,7 +20,32 @@ That's it. No logging of audio or transcripts. No database. No user accounts.
 | Whisper v3 Turbo | Groq | `whisper-large-v3-turbo` (default) |
 | Whisper Large v3 | Groq | `whisper-large-v3` |
 | Nova-3 | Deepgram | `deepgram-nova-3` |
-| GPT-4o Transcribe | OpenAI | `openai-gpt-4o-transcribe` |
+| GPT-Transcribe | OpenAI | `openai-gpt-transcribe` |
+
+Retired model keys keep working — `openai-gpt-4o-transcribe` resolves to `openai-gpt-transcribe`, so app versions already on people's phones don't break when a model is replaced.
+
+## Transcription Request
+
+`POST /transcribe` takes multipart form data:
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `audio` | yes | The recording. The app sends 16 kHz mono AAC, split client-side into pieces under 24 MB and 20 minutes so every request stays inside the providers' size and length limits. |
+| `model` | no | One of the keys above. Defaults to `whisper-large-v3-turbo`. |
+| `language` | no | ISO-639-1 hint. Omit to auto-detect. |
+| `vocabulary` | no | Comma- or newline-separated names and jargon. |
+| `remove_filler_words` | no | `"true"` to strip "um", "uh", and friends. |
+
+Each provider takes those hints differently, which is the reason the proxy exists rather than the app calling providers directly:
+
+| | Groq (Whisper) | Deepgram Nova-3 | OpenAI GPT-Transcribe |
+|---|---|---|---|
+| Vocabulary | `prompt` (framed as a sentence, echo stripped from the result) | one `keyterm` per term | one `keywords[]` per term |
+| Language | `language` | `language`, or `multi` to auto-detect | `languages[]` (sending `language` too is rejected) |
+| Filler words | stripped from the response | `filler_words` parameter | stripped from the response |
+| Paragraphs | from segment timings, breaking on pauses | native `paragraphs=true` | grouped from sentences — the model returns plain text with no timings |
+
+Response is `{"text": "..."}`, or `{"error": "..."}` with a 4xx/5xx status.
 
 ## Endpoints
 
@@ -126,6 +151,11 @@ On-device transcription (Apple Speech) never contacts the proxy, so it generates
 ```bash
 npm install
 npm run dev
+npm test        # Unit tests — no credentials or Worker runtime needed
 ```
+
+`npm test` covers the pure parts: model resolution, keyword sanitizing, language
+resolution, and transcript formatting. CI runs it on every PR touching `proxy/`
+and the deploy is gated on it.
 
 You'll likely want to set `DEV_BYPASS_TOKEN` as a var in `wrangler.toml` during development to skip subscription verification.

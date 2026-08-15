@@ -34,21 +34,35 @@ final class ProxyTranscriptionService {
         // Best-effort attestation before the first request
         try? await appAttestService.attestIfNeeded()
 
-        // Check file size to determine if chunking is needed
+        // Providers cap both the size and the length of a single request, and
+        // at 16 kHz mono AAC the length limit is hit first by a wide margin —
+        // 25 minutes of speech is only a few MB.
         let attributes = try FileManager.default.attributesOfItem(atPath: request.audioURL.path)
         let fileSize = attributes[.size] as? Int ?? 0
+        let duration = await audioDuration(of: request.audioURL) ?? 0
 
-        if fileSize < Constants.Transcription.maxSingleUploadSize {
-            let audioData = try Data(contentsOf: request.audioURL)
-            return try await uploadAndTranscribe(
-                audioData: audioData, baseURL: baseURL, request: request,
-                deviceId: settings.deviceId
-            )
-        } else {
+        let isOversized = fileSize >= Constants.Transcription.maxSingleUploadSize
+        let isTooLong = duration > Constants.Transcription.maxSingleUploadDuration
+
+        if isOversized || isTooLong {
             return try await transcribeChunked(
                 baseURL: baseURL, request: request, deviceId: settings.deviceId
             )
         }
+
+        let audioData = try Data(contentsOf: request.audioURL)
+        return try await uploadAndTranscribe(
+            audioData: audioData, baseURL: baseURL, request: request,
+            deviceId: settings.deviceId
+        )
+    }
+
+    /// Duration in seconds, or nil when the asset can't be read — in which case
+    /// the file-size check alone decides whether to chunk.
+    private func audioDuration(of url: URL) async -> Double? {
+        guard let duration = try? await AVURLAsset(url: url).load(.duration) else { return nil }
+        let seconds = CMTimeGetSeconds(duration)
+        return seconds.isFinite && seconds > 0 ? seconds : nil
     }
 
     // MARK: - Chunked Transcription

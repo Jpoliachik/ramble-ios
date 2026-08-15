@@ -5,10 +5,32 @@ on:
     branches: [main]
     paths:
       - 'proxy/**'
+  pull_request:
+    paths:
+      - 'proxy/**'
   workflow_dispatch:
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: proxy
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - run: npm ci
+
+      - run: npm test
+
   deploy:
+    # A red test run must not reach production. Pull requests stop at `test`.
+    needs: test
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     defaults:
       run:

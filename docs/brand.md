@@ -10,7 +10,7 @@ Open source, private by design, no accounts.
 
 ## What makes Ramble different
 
-1. **Best-in-class transcription** — Choose from the latest cloud models (Groq Whisper, Deepgram Nova-3, OpenAI GPT-4o Transcribe) or use Apple's on-device speech recognition. Cloud models deliver better accuracy — especially in noisy environments, with accents, or when speaking quickly — and produce cleaner punctuation and formatting. New models get added as they ship.
+1. **Best-in-class transcription** — Choose from the latest cloud models (Groq Whisper, Deepgram Nova-3, OpenAI GPT-Transcribe) or use Apple's on-device speech recognition. Cloud models deliver better accuracy — especially in noisy environments, with accents, or when speaking quickly — and produce cleaner punctuation and formatting. New models get added as they ship.
 
 2. **Webhook-native** — Every transcript can automatically POST to any HTTPS endpoint. Connect Ramble to an AI agent, a Zapier workflow, a Notion database, or your own backend. Capture your thoughts, then do something with them.
 
@@ -75,7 +75,7 @@ iOS asset names are kebab-case (`brand-red`, `onboarding-bg`, etc.); SwiftUI acc
 ## Key messages
 
 ### For transcription enthusiasts
-"The best speech-to-text models, right when they ship. Groq Whisper, Deepgram Nova-3, OpenAI GPT-4o Transcribe — pick the one that fits. Or use Apple Speech for free, on-device transcription that never leaves your phone."
+"The best speech-to-text models, right when they ship. Groq Whisper, Deepgram Nova-3, OpenAI GPT-Transcribe — pick the one that fits. Or use Apple Speech for free, on-device transcription that never leaves your phone."
 
 ### For automation builders
 "Every transcript can POST to a webhook. Connect Ramble to your agent, your workflow, or your own backend. Signed requests, automatic retries, full API docs."
