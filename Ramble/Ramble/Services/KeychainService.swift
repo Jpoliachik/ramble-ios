@@ -41,14 +41,18 @@ enum KeychainService {
     static func setString(_ value: String, forKey key: String) {
         let data = Data(value.utf8)
 
-        // Try to update first
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: key
         ]
+        // Readable after first unlock post-boot so background tasks (e.g.
+        // overnight watch sync) can generate App Attest assertions while the
+        // device is locked. The default is `WhenUnlocked`, which blocks reads
+        // while the device is locked and causes silent attestation failures.
         let attributes: [String: Any] = [
-            kSecValueData as String: data
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         ]
 
         let updateStatus = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
@@ -56,6 +60,7 @@ enum KeychainService {
         if updateStatus == errSecItemNotFound {
             var newItem = query
             newItem[kSecValueData as String] = data
+            newItem[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
             SecItemAdd(newItem as CFDictionary, nil)
         }
     }

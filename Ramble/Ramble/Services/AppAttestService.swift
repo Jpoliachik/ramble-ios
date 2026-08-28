@@ -31,6 +31,26 @@ final class AppAttestService {
         KeychainService.string(forKey: Self.isAttestedKey) == "true"
     }
 
+    // MARK: - Migration
+
+    /// Re-writes existing keychain items so they're readable while the device is
+    /// locked (post first unlock). Older installs wrote items with the default
+    /// `WhenUnlocked` accessibility, which blocked background transcription for
+    /// watch-synced recordings received while the phone was locked overnight.
+    func migrateKeychainAccessibilityIfNeeded() {
+        let migrationKey = "appAttestKeychainAccessibilityMigrated"
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: migrationKey) else { return }
+
+        if let existingKeyId = KeychainService.string(forKey: Self.keyIdKey) {
+            KeychainService.setString(existingKeyId, forKey: Self.keyIdKey)
+        }
+        if let existingIsAttested = KeychainService.string(forKey: Self.isAttestedKey) {
+            KeychainService.setString(existingIsAttested, forKey: Self.isAttestedKey)
+        }
+        defaults.set(true, forKey: migrationKey)
+    }
+
     // MARK: - Key Generation
 
     /// Generates an App Attest key if one doesn't already exist. Returns the keyId.
@@ -91,10 +111,14 @@ final class AppAttestService {
                 keyId, clientDataHash: clientDataHash
             )
             return (keyId: keyId, assertion: assertion)
-        } catch {
-            // Key may have been invalidated (e.g. after iOS restore).
-            // Reset state so a fresh attestation happens on the next attempt.
+        } catch let error as DCError where error.code == .invalidKey {
+            // The key is genuinely gone (e.g. device restore, app reinstall).
+            // Drop state so the next attempt re-attests.
             resetState()
+            return nil
+        } catch {
+            // Transient failure (network, system busy, locked-keychain edge
+            // cases). Leave attestation state intact so the retry can reuse it.
             return nil
         }
     }
