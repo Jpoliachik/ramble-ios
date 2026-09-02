@@ -193,15 +193,15 @@ struct SettingsView: View {
                 }
 
                 if viewModel.useAdditionalLanguages {
+                    // No label: the toggle above already says what this is, the same
+                    // way the dictionary's field needs no second heading.
                     NavigationLink {
                         SpokenLanguagesPickerView(selection: $viewModel.spokenLanguages)
                     } label: {
-                        HStack {
-                            Text("Additional languages")
-                            Spacer()
-                            Text(spokenLanguagesSummary)
-                                .foregroundStyle(.secondary)
-                        }
+                        Text(spokenLanguagesSummary)
+                            .foregroundStyle(
+                                viewModel.spokenLanguages.isEmpty ? Color.secondary : Color.primary
+                            )
                     }
                 }
             }
@@ -338,7 +338,8 @@ struct SettingsView: View {
 
     private var spokenLanguagesSummary: String {
         let selected = viewModel.spokenLanguages.filter { $0 != .auto }
-        guard !selected.isEmpty else { return "None" }
+        // Reads as a placeholder when empty, like the dictionary's example text.
+        guard !selected.isEmpty else { return "e.g. German, Spanish" }
         return selected.map(\.displayName).joined(separator: ", ")
     }
 

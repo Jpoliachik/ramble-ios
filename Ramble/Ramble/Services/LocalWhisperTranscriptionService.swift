@@ -5,6 +5,7 @@
 
 import AVFoundation
 import Combine
+import CoreML
 import Foundation
 import SpeakerKit
 import WhisperKit
@@ -38,7 +39,35 @@ final class LocalWhisperTranscriptionService: ObservableObject {
     /// single value is enough.
     @Published private(set) var progressLabel: String?
 
+    /// Where the audio encoder runs.
+    ///
+    /// The Neural Engine is faster and far more power-efficient once loaded, but
+    /// Apple's ANE compiler specializes the 626 MB encoder for the device on first
+    /// use, which takes minutes. The GPU skips that compilation entirely and loads
+    /// in seconds, at the cost of slower, less efficient decoding.
+    ///
+    /// So it depends on the recording: for a short ramble the load *is* the wait,
+    /// and for a long one decoding dominates and the Neural Engine pays for itself.
+    private enum ComputeMode {
+        case fastStart  // GPU encoder
+        case efficient  // Neural Engine encoder
+
+        var options: ModelComputeOptions {
+            switch self {
+            case .fastStart:
+                return ModelComputeOptions(audioEncoderCompute: .cpuAndGPU)
+            case .efficient:
+                return ModelComputeOptions(audioEncoderCompute: .cpuAndNeuralEngine)
+            }
+        }
+    }
+
+    /// Above this, decoding takes long enough that the Neural Engine's speed
+    /// outweighs its one-off compilation.
+    private static let efficientModeThreshold: TimeInterval = 60
+
     private var pipe: WhisperKit?
+    private var pipeMode: ComputeMode?
     private var loadTask: Task<WhisperKit, Error>?
     private var speakerKit: SpeakerKit?
     private var downloadTask: Task<Void, Error>?
@@ -157,7 +186,9 @@ final class LocalWhisperTranscriptionService: ObservableObject {
     /// go through `keepModelWarm()`.
     private func preload() {
         guard pipe == nil, let folder = Self.savedModelFolder else { return }
-        Task { _ = try? await loadPipe(modelFolder: folder) }
+        // Fast start: at launch there is no recording to measure, and most rambles
+        // are short. A long one reloads onto the Neural Engine when it arrives.
+        Task { _ = try? await loadPipe(modelFolder: folder, mode: .fastStart) }
     }
 
     // MARK: - Download
@@ -236,16 +267,17 @@ final class LocalWhisperTranscriptionService: ObservableObject {
 
         defer { progressLabel = nil }
 
-        // On a cold start CoreML has to specialize 626 MB of weights for this chip,
-        // which is most of the wait, so it gets its own label.
-        progressLabel = pipe == nil ? "Loading model…" : "Transcribing… 0%"
-        let pipe = try await loadPipe(modelFolder: modelFolder)
-
         // Whisper decodes in 30s windows. Window count is the only progress signal
         // the API exposes, and it's close enough to drive a percentage.
         let audioFile = try AVAudioFile(forReading: audioURL)
         let seconds = Double(audioFile.length) / audioFile.fileFormat.sampleRate
         let totalWindows = max(1, Int(ceil(seconds / 30)))
+
+        // On a cold start CoreML has to specialize 626 MB of weights for this chip,
+        // which is most of the wait, so it gets its own label.
+        let mode: ComputeMode = seconds >= Self.efficientModeThreshold ? .efficient : .fastStart
+        progressLabel = pipe == nil ? "Loading model…" : "Transcribing… 0%"
+        let pipe = try await loadPipe(modelFolder: modelFolder, mode: mode)
         progressLabel = "Transcribing… 0%"
 
         // No decoder prompt. Whisper's only vocabulary channel is `promptTokens`,
@@ -715,27 +747,37 @@ final class LocalWhisperTranscriptionService: ObservableObject {
     /// moments later both used to see `pipe == nil` and each build a WhisperKit,
     /// so 626 MB of weights got specialized twice at once, competing for the
     /// Neural Engine and memory.
-    private func loadPipe(modelFolder: URL) async throws -> WhisperKit {
-        if let pipe { return pipe }
+    private func loadPipe(modelFolder: URL, mode: ComputeMode) async throws -> WhisperKit {
+        // An already-loaded pipeline is reused even if it isn't the preferred mode,
+        // except when a long recording would rather pay for the Neural Engine than
+        // decode slowly on the GPU. Reloading costs that compilation once.
+        if let pipe, let pipeMode {
+            let worthReloading = mode == .efficient && pipeMode == .fastStart
+            if !worthReloading { return pipe }
+            self.pipe = nil
+            self.pipeMode = nil
+        }
         if let loadTask { return try await loadTask.value }
 
         let task = Task { () throws -> WhisperKit in
-            try await self.buildPipe(modelFolder: modelFolder)
+            try await self.buildPipe(modelFolder: modelFolder, mode: mode)
         }
         loadTask = task
         defer { loadTask = nil }
 
         let created = try await task.value
         pipe = created
+        pipeMode = mode
         return created
     }
 
-    private func buildPipe(modelFolder: URL) async throws -> WhisperKit {
+    private func buildPipe(modelFolder: URL, mode: ComputeMode) async throws -> WhisperKit {
         let startedAt = Date()
         let config = WhisperKitConfig(
             model: Self.modelVariant,
             downloadBase: Self.downloadBase,
             modelFolder: modelFolder.path,
+            computeOptions: mode.options,
             verbose: false,
             logLevel: .error,
             prewarm: false,
