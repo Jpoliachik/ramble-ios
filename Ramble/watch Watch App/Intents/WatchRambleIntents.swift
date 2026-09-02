@@ -11,9 +11,9 @@ struct WatchStartRecordingIntent: AppIntent {
     static var openAppWhenRun = true
 
     @MainActor
-    func perform() async throws -> some IntentResult & ProvidesDialog {
+    func perform() async throws -> some IntentResult {
         WatchRecordingManager.shared.startRecording()
-        return .result(dialog: "Recording started.")
+        return .result()
     }
 }
 
@@ -23,12 +23,11 @@ struct WatchStopRecordingIntent: AppIntent {
     static var openAppWhenRun = true
 
     @MainActor
-    func perform() async throws -> some IntentResult & ProvidesDialog {
-        guard WatchRecordingManager.shared.isRecording else {
-            return .result(dialog: "No recording in progress.")
+    func perform() async throws -> some IntentResult {
+        if WatchRecordingManager.shared.isRecording {
+            WatchRecordingManager.shared.stopRecordingAndTransfer()
         }
-        WatchRecordingManager.shared.stopRecordingAndTransfer()
-        return .result(dialog: "Recording saved.")
+        return .result()
     }
 }
 
@@ -38,14 +37,13 @@ struct WatchToggleRecordingIntent: AppIntent {
     static var openAppWhenRun = true
 
     @MainActor
-    func perform() async throws -> some IntentResult & ProvidesDialog {
+    func perform() async throws -> some IntentResult {
         let manager = WatchRecordingManager.shared
         if manager.isRecording {
             manager.stopRecordingAndTransfer()
-            return .result(dialog: "Recording saved.")
         } else {
             manager.startRecording()
-            return .result(dialog: "Recording started.")
         }
+        return .result()
     }
 }

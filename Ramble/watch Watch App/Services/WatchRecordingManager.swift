@@ -39,6 +39,13 @@ final class WatchRecordingManager: ObservableObject {
         }
     }
 
+    /// Stop and throw the audio away: nothing is queued, nothing reaches the phone.
+    func cancelRecording() {
+        guard let result = audioRecorder.stopRecording() else { return }
+        connectivity.sendRecordingStopped()
+        try? FileManager.default.removeItem(at: result.url)
+    }
+
     func stopRecordingAndTransfer() {
         guard let result = audioRecorder.stopRecording() else { return }
         connectivity.sendRecordingStopped()
