@@ -326,13 +326,16 @@ final class TranscriptionQueueService: ObservableObject {
                         storageService.saveRecordings(withNote)
                     }
                 }
-                if let loadSeconds = localWhisper.consumeLastModelLoadSeconds() {
+                if let load = localWhisper.consumeLastModelLoad() {
                     // Attribution for a slow transcript: cold model load or decoding.
+                    // A load that spanned a suspension reports elapsed time, since
+                    // the process was frozen for part of it.
+                    let note = load.spannedSuspension
+                        ? "Whisper model ready after \(String(format: "%.0f", load.seconds))s elapsed, app was suspended for part of it"
+                        : "Whisper model loaded in \(String(format: "%.1f", load.seconds))s"
                     var withLoad = storageService.loadRecordings()
                     if let i = withLoad.firstIndex(where: { $0.id == job.recordingId }) {
-                        withLoad[i].activityLog.append(
-                            ActivityEntry("Whisper model loaded in \(String(format: "%.1f", loadSeconds))s")
-                        )
+                        withLoad[i].activityLog.append(ActivityEntry(note))
                         storageService.saveRecordings(withLoad)
                     }
                 }

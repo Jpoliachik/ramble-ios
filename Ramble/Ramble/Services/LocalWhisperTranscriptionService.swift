@@ -7,6 +7,7 @@ import AVFoundation
 import Combine
 import CoreML
 import Foundation
+import UIKit
 import SpeakerKit
 import WhisperKit
 
@@ -711,12 +712,19 @@ final class LocalWhisperTranscriptionService: ObservableObject {
     /// Recorded so a slow first transcription can be attributed to CoreML
     /// specialization rather than guessed at.
     private var lastModelLoadSeconds: TimeInterval?
+    private var lastModelLoadSpannedSuspension = false
 
     /// Read the cold-load duration once and clear it, so only the transcription
     /// that actually paid for the load gets the log entry.
-    func consumeLastModelLoadSeconds() -> TimeInterval? {
-        defer { lastModelLoadSeconds = nil }
-        return lastModelLoadSeconds
+    /// The elapsed load time, and whether the app was suspended during it. When it
+    /// was, the number is elapsed time rather than work done.
+    func consumeLastModelLoad() -> (seconds: TimeInterval, spannedSuspension: Bool)? {
+        defer {
+            lastModelLoadSeconds = nil
+            lastModelLoadSpannedSuspension = false
+        }
+        guard let lastModelLoadSeconds else { return nil }
+        return (lastModelLoadSeconds, lastModelLoadSpannedSuspension)
     }
 
     /// What diarization actually did on the last run, for the activity log. Errors
@@ -768,6 +776,16 @@ final class LocalWhisperTranscriptionService: ObservableObject {
 
     private func buildPipe(modelFolder: URL) async throws -> WhisperKit {
         let startedAt = Date()
+        // Wall clock keeps running while iOS has the process suspended, so a load
+        // that spans a suspension reads as minutes when the work took seconds.
+        // Watch for it rather than reporting a number that can't be interpreted.
+        var wasSuspended = UIApplication.shared.applicationState != .active
+        let observer = NotificationCenter.default.addObserver(
+            forName: UIApplication.didEnterBackgroundNotification,
+            object: nil,
+            queue: .main
+        ) { _ in wasSuspended = true }
+        defer { NotificationCenter.default.removeObserver(observer) }
         let config = WhisperKitConfig(
             model: Self.modelVariant,
             downloadBase: Self.downloadBase,
@@ -780,6 +798,7 @@ final class LocalWhisperTranscriptionService: ObservableObject {
         )
         let created = try await WhisperKit(config)
         lastModelLoadSeconds = Date().timeIntervalSince(startedAt)
+        lastModelLoadSpannedSuspension = wasSuspended
         print("[Whisper] model loaded in \(String(format: "%.1f", lastModelLoadSeconds ?? 0))s")
         return created
     }
