@@ -38,6 +38,49 @@ enum AppearanceMode: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// On-device Whisper builds worth offering. Both are quantized CoreML conversions
+/// of multilingual Whisper, so both cover its ~99 languages; they trade accuracy
+/// for size, and size is what decides how long Apple's Neural Engine compiler
+/// takes on first use.
+///
+/// Deliberately not offered: `distil-whisper` variants are English-only, and the
+/// unquantized builds are close to a gigabyte.
+enum LocalWhisperModel: String, Codable, CaseIterable, Identifiable {
+    case turbo
+    case small
+
+    var id: String { rawValue }
+
+    /// Folder name in https://huggingface.co/argmaxinc/whisperkit-coreml
+    var variant: String {
+        switch self {
+        case .turbo: return "openai_whisper-large-v3-v20240930_626MB"
+        case .small: return "openai_whisper-small_216MB"
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .turbo: return "Whisper v3 Turbo"
+        case .small: return "Whisper Small"
+        }
+    }
+
+    var sizeLabel: String {
+        switch self {
+        case .turbo: return "626 MB"
+        case .small: return "216 MB"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .turbo: return "Most accurate, slow to load the first time"
+        case .small: return "Loads and transcribes faster, less accurate"
+        }
+    }
+}
+
 enum TranscriptionProvider: String, Codable, CaseIterable, Identifiable {
     case appleSpeech = "apple_speech"
     case localWhisper = "local_whisper"
@@ -62,7 +105,7 @@ enum TranscriptionProvider: String, Codable, CaseIterable, Identifiable {
                 return "Free, on-device"
             }
         case .localWhisper:
-            return "On-device · \(LocalWhisperTranscriptionService.modelDownloadSizeLabel) download"
+            return "On-device · Whisper, works offline"
         case .cloudTranscription:
             return "Premium cloud-powered models"
         }
@@ -279,6 +322,8 @@ struct Settings: Codable {
     var transcriptionLanguage: TranscriptionLanguage
     var customVocabulary: String
     var removeFillerWords: Bool
+    /// Which on-device Whisper build to use.
+    var localWhisperModel: LocalWhisperModel
     /// Speaker attribution, on-device Whisper only.
     var identifySpeakers: Bool
     /// Languages actually spoken, on-device Whisper only. Two or more makes each
@@ -323,6 +368,7 @@ struct Settings: Codable {
         transcriptionLanguage: TranscriptionLanguage = .auto,
         customVocabulary: String = "",
         removeFillerWords: Bool = false,
+        localWhisperModel: LocalWhisperModel = .turbo,
         identifySpeakers: Bool = false,
         spokenLanguages: [TranscriptionLanguage] = [],
         useAdditionalLanguages: Bool = false,
@@ -338,6 +384,7 @@ struct Settings: Codable {
         self.transcriptionLanguage = transcriptionLanguage
         self.customVocabulary = customVocabulary
         self.removeFillerWords = removeFillerWords
+        self.localWhisperModel = localWhisperModel
         self.identifySpeakers = identifySpeakers
         self.spokenLanguages = spokenLanguages
         self.useAdditionalLanguages = useAdditionalLanguages
@@ -380,6 +427,8 @@ struct Settings: Codable {
 
         removeFillerWords = try container.decodeIfPresent(Bool.self, forKey: .removeFillerWords) ?? false
 
+        localWhisperModel = try container.decodeIfPresent(LocalWhisperModel.self, forKey: .localWhisperModel) ?? .turbo
+
         identifySpeakers = try container.decodeIfPresent(Bool.self, forKey: .identifySpeakers) ?? false
 
         spokenLanguages = try container.decodeIfPresent([TranscriptionLanguage].self, forKey: .spokenLanguages) ?? []
@@ -414,6 +463,7 @@ struct Settings: Codable {
         try container.encode(transcriptionLanguage, forKey: .transcriptionLanguage)
         try container.encode(customVocabulary, forKey: .customVocabulary)
         try container.encode(removeFillerWords, forKey: .removeFillerWords)
+        try container.encode(localWhisperModel, forKey: .localWhisperModel)
         try container.encode(identifySpeakers, forKey: .identifySpeakers)
         try container.encode(spokenLanguages, forKey: .spokenLanguages)
         try container.encode(useAdditionalLanguages, forKey: .useAdditionalLanguages)
@@ -432,6 +482,7 @@ struct Settings: Codable {
         case transcriptionLanguage
         case customVocabulary
         case removeFillerWords
+        case localWhisperModel
         case identifySpeakers
         case spokenLanguages
         case useAdditionalLanguages

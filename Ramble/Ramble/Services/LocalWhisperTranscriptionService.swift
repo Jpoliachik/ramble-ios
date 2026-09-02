@@ -21,10 +21,11 @@ import WhisperKit
 final class LocalWhisperTranscriptionService: ObservableObject {
     static let shared = LocalWhisperTranscriptionService()
 
-    /// Argmax's recommended variant for iPhone: large-v3 turbo, quantized to 626 MB.
-    /// https://huggingface.co/argmaxinc/whisperkit-coreml
-    static let modelVariant = "openai_whisper-large-v3-v20240930_626MB"
-    static let modelDownloadSizeLabel = "626 MB"
+    /// The model the user picked, read at call time so a change in Settings takes
+    /// effect on the next transcription.
+    private var selectedModel: LocalWhisperModel {
+        SettingsService.shared.load().localWhisperModel
+    }
 
     enum State: Equatable {
         case notDownloaded
@@ -33,7 +34,13 @@ final class LocalWhisperTranscriptionService: ObservableObject {
         case failed(String)
     }
 
-    @Published private(set) var state: State
+    /// Download state per model, since both can be on disk at once and the picker
+    /// shows progress for whichever is downloading.
+    @Published private(set) var states: [LocalWhisperModel: State] = [:]
+
+    func state(of model: LocalWhisperModel) -> State {
+        states[model] ?? (Self.savedModelFolder(for: model) == nil ? .notDownloaded : .ready)
+    }
 
     /// Live status while a transcription runs, e.g. "Loading model…" or
     /// "Transcribing… 40%". Nil when idle. Only one job runs at a time, so a
@@ -41,9 +48,10 @@ final class LocalWhisperTranscriptionService: ObservableObject {
     @Published private(set) var progressLabel: String?
 
     private var pipe: WhisperKit?
+    private var pipeModel: LocalWhisperModel?
     private var loadTask: Task<WhisperKit, Error>?
     private var speakerKit: SpeakerKit?
-    private var downloadTask: Task<Void, Error>?
+    private var downloadTasks: [LocalWhisperModel: Task<Void, Error>] = [:]
     private var lastReportedPercent = 0
 
     /// Below this, Whisper was unsure enough about a stretch that another language
@@ -52,7 +60,9 @@ final class LocalWhisperTranscriptionService: ObservableObject {
     /// How much better a challenger must score before it replaces a stretch.
     private static let winningMargin: Float = 0.15
 
-    private static let modelFolderKey = "localWhisperModelFolder"
+    private static func modelFolderKey(for model: LocalWhisperModel) -> String {
+        "localWhisperModelFolder.\(model.rawValue)"
+    }
 
     /// Application Support, not Caches — iOS may evict Caches under disk pressure,
     /// and a 626 MB re-download is not something to lose silently.
@@ -69,27 +79,28 @@ final class LocalWhisperTranscriptionService: ObservableObject {
     /// can lose the `UserDefaults` write while the 626 MB of weights sit there
     /// perfectly intact, and re-downloading them because of a missing key is the
     /// worst failure this service has, so a miss falls back to looking on disk.
-    private static var savedModelFolder: URL? {
-        if let path = UserDefaults.standard.string(forKey: modelFolderKey),
+    private static func savedModelFolder(for model: LocalWhisperModel) -> URL? {
+        let key = modelFolderKey(for: model)
+        if let path = UserDefaults.standard.string(forKey: key),
            FileManager.default.fileExists(atPath: path) {
             return URL(fileURLWithPath: path)
         }
-        guard let found = locateModelFolderOnDisk() else { return nil }
-        UserDefaults.standard.set(found.path, forKey: modelFolderKey)
+        guard let found = locateModelFolderOnDisk(variant: model.variant) else { return nil }
+        UserDefaults.standard.set(found.path, forKey: key)
         return found
     }
 
     /// Look for a `<variant>` directory under the download base that actually holds
     /// compiled CoreML models. A half-finished download leaves the directory without
     /// them, and that must not read as installed.
-    private static func locateModelFolderOnDisk() -> URL? {
+    private static func locateModelFolderOnDisk(variant: String) -> URL? {
         let fileManager = FileManager.default
         guard let enumerator = fileManager.enumerator(
             at: downloadBase,
             includingPropertiesForKeys: [.isDirectoryKey]
         ) else { return nil }
 
-        for case let url as URL in enumerator where url.lastPathComponent == modelVariant {
+        for case let url as URL in enumerator where url.lastPathComponent == variant {
             let contents = (try? fileManager.contentsOfDirectory(atPath: url.path)) ?? []
             if contents.contains(where: { $0.hasSuffix(".mlmodelc") }) {
                 return url
@@ -98,90 +109,89 @@ final class LocalWhisperTranscriptionService: ObservableObject {
         return nil
     }
 
-    private init() {
-        state = Self.savedModelFolder == nil ? .notDownloaded : .ready
-    }
+    private init() {}
 
-    var isModelInstalled: Bool { Self.savedModelFolder != nil }
-
-    var isDownloading: Bool {
-        if case .downloading = state { return true }
-        return false
+    func isInstalled(_ model: LocalWhisperModel) -> Bool {
+        Self.savedModelFolder(for: model) != nil
     }
 
     /// Why recording is currently blocked, or nil if it isn't. Recording while the
     /// selected model is still downloading would just queue a job that fails, so the
     /// record button stays disabled until the weights are on disk.
     var recordingBlockedReason: String? {
-        guard SettingsService.shared.load().transcriptionProvider == .localWhisper else { return nil }
-        // Disk wins over `state`: once the weights are there, recording is fine
-        // whatever the in-memory progress says.
-        if isModelInstalled { return nil }
-        switch state {
+        let settings = SettingsService.shared.load()
+        guard settings.transcriptionProvider == .localWhisper else { return nil }
+
+        let model = settings.localWhisperModel
+        // Disk wins over the published state: once the weights are there, recording
+        // is fine whatever the in-memory progress says.
+        if isInstalled(model) { return nil }
+
+        switch state(of: model) {
         case .ready:
             return nil
         case .downloading(let fraction):
-            return "Downloading Whisper model… \(Int(fraction * 100))%"
+            return "Downloading \(model.displayName)… \(Int(fraction * 100))%"
         case .notDownloaded:
-            return "Whisper model not downloaded — start it in Settings"
+            return "\(model.displayName) not downloaded, start it in Settings"
         case .failed:
-            return "Whisper model download failed — retry in Settings"
+            return "\(model.displayName) download failed, retry in Settings"
         }
     }
 
     /// Pick a download back up after a relaunch. The transfer itself runs on a
     /// background URLSession, so leaving the app doesn't cancel it, but the
     /// in-process progress publisher dies with the process.
+    func resumeDownloadIfNeeded() {
+        let settings = SettingsService.shared.load()
+        guard settings.transcriptionProvider == .localWhisper else { return }
+        let model = settings.localWhisperModel
+
+        guard !isInstalled(model) else {
+            preload(model)
+            return
+        }
+        guard downloadTasks[model] == nil else { return }
+        Task { try? await downloadModel(model) }
+    }
+
     /// Start (or keep) the model resident while the app is in use. Safe to call
     /// repeatedly: it no-ops once the pipeline is loaded.
     func keepModelWarm() {
-        guard SettingsService.shared.load().transcriptionProvider == .localWhisper else { return }
-        preload()
-    }
-
-    func resumeDownloadIfNeeded() {
-        guard SettingsService.shared.load().transcriptionProvider == .localWhisper else { return }
-
-        guard !isModelInstalled else {
-            preload()
-            return
-        }
-        guard downloadTask == nil else { return }
-        Task { try? await downloadModel() }
+        let settings = SettingsService.shared.load()
+        guard settings.transcriptionProvider == .localWhisper else { return }
+        preload(settings.localWhisperModel)
     }
 
     /// Load the pipeline ahead of the first recording. CoreML specialization of the
     /// weights takes most of a cold transcription's wall clock, and doing it at
     /// launch means the first transcript isn't the one that pays for it.
-    ///
-    /// The loaded pipeline is then held for the life of the process, so a second
-    /// recording in the same session pays nothing. Internal, because callers should
-    /// go through `keepModelWarm()`.
-    private func preload() {
-        guard pipe == nil, let folder = Self.savedModelFolder else { return }
-        Task { _ = try? await loadPipe(modelFolder: folder) }
+    private func preload(_ model: LocalWhisperModel) {
+        guard pipeModel != model || pipe == nil else { return }
+        guard let folder = Self.savedModelFolder(for: model) else { return }
+        Task { _ = try? await loadPipe(modelFolder: folder, model: model) }
     }
 
     // MARK: - Download
 
-    /// Download the model. Reentrant: a second call while a download is in flight
-    /// awaits the first one instead of starting a parallel 626 MB transfer.
-    func downloadModel() async throws {
-        if isModelInstalled {
-            state = .ready
+    /// Download a model. Reentrant per model: a second call while that download is
+    /// in flight awaits the first instead of starting a parallel transfer.
+    func downloadModel(_ model: LocalWhisperModel) async throws {
+        if isInstalled(model) {
+            states[model] = .ready
             return
         }
 
-        if let existing = downloadTask {
+        if let existing = downloadTasks[model] {
             try await existing.value
             return
         }
 
         let task = Task { @MainActor in
-            state = .downloading(0)
+            states[model] = .downloading(0)
             do {
                 let folder = try await WhisperKit.download(
-                    variant: Self.modelVariant,
+                    variant: model.variant,
                     downloadBase: Self.downloadBase,
                     useBackgroundSession: true
                 ) { progress in
@@ -189,30 +199,33 @@ final class LocalWhisperTranscriptionService: ObservableObject {
                         // Progress callbacks arrive off the main actor, so a late one can
                         // land after `.ready` was set and pin the UI at 100% forever.
                         // Only a download still in flight may move the progress.
-                        guard case .downloading = self.state else { return }
-                        self.state = .downloading(progress.fractionCompleted)
+                        guard case .downloading = self.state(of: model) else { return }
+                        self.states[model] = .downloading(progress.fractionCompleted)
                     }
                 }
-                UserDefaults.standard.set(folder.path, forKey: Self.modelFolderKey)
-                state = .ready
-                preload()
+                UserDefaults.standard.set(folder.path, forKey: Self.modelFolderKey(for: model))
+                states[model] = .ready
+                preload(model)
             } catch {
-                state = .failed(error.localizedDescription)
+                states[model] = .failed(error.localizedDescription)
                 throw error
             }
         }
-        downloadTask = task
-        defer { downloadTask = nil }
+        downloadTasks[model] = task
+        defer { downloadTasks[model] = nil }
         try await task.value
     }
 
-    func deleteModel() {
-        pipe = nil
-        if let folder = Self.savedModelFolder {
+    func deleteModel(_ model: LocalWhisperModel) {
+        if pipeModel == model {
+            pipe = nil
+            pipeModel = nil
+        }
+        if let folder = Self.savedModelFolder(for: model) {
             try? FileManager.default.removeItem(at: folder)
         }
-        UserDefaults.standard.removeObject(forKey: Self.modelFolderKey)
-        state = .notDownloaded
+        UserDefaults.standard.removeObject(forKey: Self.modelFolderKey(for: model))
+        states[model] = .notDownloaded
     }
 
     /// A segment plus the language whose decoding run produced it.
@@ -232,7 +245,8 @@ final class LocalWhisperTranscriptionService: ObservableObject {
         guard FileManager.default.fileExists(atPath: audioURL.path) else {
             throw TranscriptionError.audioFileNotFound
         }
-        guard let modelFolder = Self.savedModelFolder else {
+        let model = selectedModel
+        guard let modelFolder = Self.savedModelFolder(for: model) else {
             throw TranscriptionError.whisperModelNotDownloaded
         }
 
@@ -270,7 +284,7 @@ final class LocalWhisperTranscriptionService: ObservableObject {
         // no candidates leaves detection to the model.
         let effectiveLanguage = candidates.first ?? .auto
 
-        let pipe = try await loadPipe(modelFolder: modelFolder)
+        let pipe = try await loadPipe(modelFolder: modelFolder, model: model)
         progressLabel = "Transcribing… 0%"
 
         let picked: [PickedSegment]
@@ -759,22 +773,29 @@ final class LocalWhisperTranscriptionService: ObservableObject {
     /// moments later both used to see `pipe == nil` and each build a WhisperKit,
     /// so 626 MB of weights got specialized twice at once, competing for the
     /// Neural Engine and memory.
-    private func loadPipe(modelFolder: URL) async throws -> WhisperKit {
-        if let pipe { return pipe }
+    private func loadPipe(modelFolder: URL, model: LocalWhisperModel) async throws -> WhisperKit {
+        // Switching model in Settings has to drop the loaded pipeline, otherwise the
+        // old weights keep answering.
+        if let pipe, pipeModel == model { return pipe }
+        if pipeModel != model {
+            pipe = nil
+            pipeModel = nil
+        }
         if let loadTask { return try await loadTask.value }
 
         let task = Task { () throws -> WhisperKit in
-            try await self.buildPipe(modelFolder: modelFolder)
+            try await self.buildPipe(modelFolder: modelFolder, model: model)
         }
         loadTask = task
         defer { loadTask = nil }
 
         let created = try await task.value
         pipe = created
+        pipeModel = model
         return created
     }
 
-    private func buildPipe(modelFolder: URL) async throws -> WhisperKit {
+    private func buildPipe(modelFolder: URL, model: LocalWhisperModel) async throws -> WhisperKit {
         let startedAt = Date()
         // Wall clock keeps running while iOS has the process suspended, so a load
         // that spans a suspension reads as minutes when the work took seconds.
@@ -787,7 +808,7 @@ final class LocalWhisperTranscriptionService: ObservableObject {
         ) { _ in wasSuspended = true }
         defer { NotificationCenter.default.removeObserver(observer) }
         let config = WhisperKitConfig(
-            model: Self.modelVariant,
+            model: model.variant,
             downloadBase: Self.downloadBase,
             modelFolder: modelFolder.path,
             verbose: false,

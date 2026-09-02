@@ -31,6 +31,7 @@ final class SettingsViewModel: ObservableObject {
         }
     }
     @Published var removeFillerWords: Bool = false
+    @Published var localWhisperModel: LocalWhisperModel = .turbo
     @Published var identifySpeakers: Bool = false
     @Published var spokenLanguages: [TranscriptionLanguage] = []
     @Published var useAdditionalLanguages: Bool = false
@@ -90,6 +91,7 @@ final class SettingsViewModel: ObservableObject {
         transcriptionLanguage = settings.transcriptionLanguage
         customVocabulary = settings.customVocabulary
         removeFillerWords = settings.removeFillerWords
+        localWhisperModel = settings.localWhisperModel
         identifySpeakers = settings.identifySpeakers
         spokenLanguages = settings.spokenLanguages
         useAdditionalLanguages = settings.useAdditionalLanguages
@@ -110,6 +112,7 @@ final class SettingsViewModel: ObservableObject {
             transcriptionLanguage: transcriptionLanguage,
             customVocabulary: customVocabulary,
             removeFillerWords: removeFillerWords,
+            localWhisperModel: localWhisperModel,
             identifySpeakers: identifySpeakers,
             spokenLanguages: spokenLanguages,
             useAdditionalLanguages: useAdditionalLanguages,

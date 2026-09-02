@@ -114,10 +114,10 @@ struct AppleSpeechRow: View {
     }
 }
 
-/// On-device Whisper row. Selecting it kicks off the model download if the
-/// weights aren't on disk yet, and the subtitle doubles as the progress readout
-/// so the prototype needs no extra chrome.
+/// One on-device Whisper build. Selecting it starts its download if the weights
+/// aren't there yet, and the subtitle doubles as the progress readout.
 struct LocalWhisperRow: View {
+    let model: LocalWhisperModel
     let isSelected: Bool
     let onTap: () -> Void
 
@@ -125,30 +125,30 @@ struct LocalWhisperRow: View {
 
     var body: some View {
         TranscriptionModelRow(
-            title: TranscriptionProvider.localWhisper.displayName,
+            title: model.displayName,
             subtitle: subtitle,
-            logo: .system(TranscriptionProvider.localWhisper.iconName),
+            logo: .system("waveform"),
             isSelected: isSelected,
             onTap: {
                 onTap()
-                if !service.isModelInstalled {
-                    Task { try? await service.downloadModel() }
+                if !service.isInstalled(model) {
+                    Task { try? await service.downloadModel(model) }
                 }
             }
         )
     }
 
     private var subtitle: String {
-        if service.isModelInstalled { return "On-device · works offline" }
-        switch service.state {
+        if service.isInstalled(model) { return "\(model.subtitle) · downloaded" }
+        switch service.state(of: model) {
         case .notDownloaded:
-            return "On-device · tap to download \(LocalWhisperTranscriptionService.modelDownloadSizeLabel)"
+            return "\(model.subtitle) · tap to download \(model.sizeLabel)"
         case .downloading(let fraction):
             return "Downloading… \(Int(fraction * 100))%"
         case .ready:
-            return "On-device · works offline"
+            return "\(model.subtitle) · downloaded"
         case .failed(let message):
-            return "Download failed — \(message)"
+            return "Download failed: \(message)"
         }
     }
 }

@@ -83,11 +83,18 @@ struct SettingsView: View {
                     isSelected: viewModel.transcriptionProvider == .appleSpeech,
                     onTap: { viewModel.transcriptionProvider = .appleSpeech }
                 )
-                BrandRowDivider()
-                LocalWhisperRow(
-                    isSelected: viewModel.transcriptionProvider == .localWhisper,
-                    onTap: { viewModel.transcriptionProvider = .localWhisper }
-                )
+                ForEach(LocalWhisperModel.allCases) { model in
+                    BrandRowDivider()
+                    LocalWhisperRow(
+                        model: model,
+                        isSelected: viewModel.transcriptionProvider == .localWhisper
+                            && viewModel.localWhisperModel == model,
+                        onTap: {
+                            viewModel.transcriptionProvider = .localWhisper
+                            viewModel.localWhisperModel = model
+                        }
+                    )
+                }
             }
             .listRowBackground(Color.clear)
             .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
