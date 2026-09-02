@@ -99,8 +99,13 @@ final class BackgroundTaskService {
             transcriptionQueue.resumePendingJobs()
             webhookQueue.resumePendingJobs()
 
-            let deadline = Date().addingTimeInterval(25)
-            while (transcriptionQueue.hasActiveWork || webhookQueue.hasActiveWork) && Date() < deadline {
+            // No self-imposed deadline. A BGProcessingTask is given far longer than
+            // the ~30s of a UIKit assertion, and the system tells us when to stop
+            // through `expirationHandler`. Cutting this off at 25s meant an
+            // on-device transcription, where loading the model alone can take
+            // minutes on first use, could never finish here.
+            while transcriptionQueue.hasActiveWork || webhookQueue.hasActiveWork {
+                if Task.isCancelled { break }
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
             }
         }
