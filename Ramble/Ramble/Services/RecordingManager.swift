@@ -6,6 +6,7 @@
 import AVFoundation
 import Combine
 import Foundation
+import UIKit
 
 @MainActor
 final class RecordingManager: ObservableObject {
@@ -99,9 +100,21 @@ final class RecordingManager: ObservableObject {
         // no audio and fails with "no speech detected".
         let recordingId = recording.id
         let audioURL = recording.audioFileURL
+        // Stopping from a Live Activity, a widget or a Shortcut happens while the
+        // app is in the background, where it holds no background assertion and is
+        // suspended as soon as the intent returns. Without this the transcript only
+        // appears when the app is next opened, the same failure the watch handoff
+        // had.
+        let needsBackgroundTime = UIApplication.shared.applicationState != .active
+
         Task { [transcriptionQueue] in
             await Self.waitForFinalizedAudio(at: audioURL, expecting: duration)
             transcriptionQueue.enqueue(recordingId: recordingId)
+
+            if needsBackgroundTime {
+                BackgroundTaskService.shared.beginImmediateBackgroundProcessing()
+                BackgroundTaskService.shared.scheduleSyncTask()
+            }
         }
 
         currentRecording = nil
