@@ -40,6 +40,7 @@ enum AppearanceMode: String, Codable, CaseIterable, Identifiable {
 
 enum TranscriptionProvider: String, Codable, CaseIterable, Identifiable {
     case appleSpeech = "apple_speech"
+    case localWhisper = "local_whisper"
     case cloudTranscription = "cloud_transcription"
 
     var id: String { rawValue }
@@ -47,6 +48,7 @@ enum TranscriptionProvider: String, Codable, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .appleSpeech: return "Apple Speech"
+        case .localWhisper: return "Whisper v3 Turbo"
         case .cloudTranscription: return "Cloud Transcription"
         }
     }
@@ -59,6 +61,8 @@ enum TranscriptionProvider: String, Codable, CaseIterable, Identifiable {
             } else {
                 return "Free, on-device"
             }
+        case .localWhisper:
+            return "On-device · \(LocalWhisperTranscriptionService.modelDownloadSizeLabel) download"
         case .cloudTranscription:
             return "Premium cloud-powered models"
         }
@@ -67,13 +71,14 @@ enum TranscriptionProvider: String, Codable, CaseIterable, Identifiable {
     var iconName: String {
         switch self {
         case .appleSpeech: return "iphone"
+        case .localWhisper: return "waveform"
         case .cloudTranscription: return "cloud.fill"
         }
     }
 
     var isCloud: Bool {
         switch self {
-        case .appleSpeech: return false
+        case .appleSpeech, .localWhisper: return false
         case .cloudTranscription: return true
         }
     }
@@ -81,7 +86,7 @@ enum TranscriptionProvider: String, Codable, CaseIterable, Identifiable {
     /// The base URL for cloud transcription providers
     var baseURL: String? {
         switch self {
-        case .appleSpeech: return nil
+        case .appleSpeech, .localWhisper: return nil
         case .cloudTranscription: return "https://ramble-transcription-proxy.jpoliachik.workers.dev"
         }
     }
@@ -93,6 +98,8 @@ enum TranscriptionProvider: String, Codable, CaseIterable, Identifiable {
         switch rawValue {
         case "apple_speech", "on_device":
             self = .appleSpeech
+        case "local_whisper":
+            self = .localWhisper
         case "cloud_transcription", "groq_whisper", "proxy":
             self = .cloudTranscription
         default:
@@ -272,13 +279,40 @@ struct Settings: Codable {
     var transcriptionLanguage: TranscriptionLanguage
     var customVocabulary: String
     var removeFillerWords: Bool
+    /// Speaker attribution, on-device Whisper only.
+    var identifySpeakers: Bool
+    /// Languages actually spoken, on-device Whisper only. Two or more makes each
+    /// 30-second window pick between them instead of guessing from all 99.
+    var spokenLanguages: [TranscriptionLanguage]
+    /// Whether the extra languages and the dictionary are actually applied. Kept
+    /// separate from the values so switching a feature off doesn't discard what
+    /// the user typed.
+    var useAdditionalLanguages: Bool
+    var useDictionary: Bool
     var webhookURL: String?
+    var webhookEnabled: Bool
     var webhookSecret: String
     var deviceId: String
     var appearanceMode: AppearanceMode
 
-    /// Whether webhook delivery is configured. Any non-empty URL means "send it."
+    /// Whether webhook delivery should run: a destination exists and it isn't paused.
     var isWebhookConfigured: Bool {
+        guard webhookEnabled, let url = webhookURL else { return false }
+        return !url.isEmpty
+    }
+
+    /// The dictionary to actually send, empty when the feature is switched off.
+    var effectiveVocabulary: String {
+        useDictionary ? customVocabulary : ""
+    }
+
+    /// The extra languages to actually use, empty when the feature is switched off.
+    var effectiveAdditionalLanguages: [TranscriptionLanguage] {
+        useAdditionalLanguages ? spokenLanguages : []
+    }
+
+    /// A destination is saved, whether or not delivery is currently paused.
+    var hasWebhookDestination: Bool {
         guard let url = webhookURL else { return false }
         return !url.isEmpty
     }
@@ -289,7 +323,12 @@ struct Settings: Codable {
         transcriptionLanguage: TranscriptionLanguage = .auto,
         customVocabulary: String = "",
         removeFillerWords: Bool = false,
+        identifySpeakers: Bool = false,
+        spokenLanguages: [TranscriptionLanguage] = [],
+        useAdditionalLanguages: Bool = false,
+        useDictionary: Bool = false,
         webhookURL: String? = nil,
+        webhookEnabled: Bool = true,
         webhookSecret: String = Self.generateSecret(),
         deviceId: String = UUID().uuidString,
         appearanceMode: AppearanceMode = .system
@@ -299,7 +338,12 @@ struct Settings: Codable {
         self.transcriptionLanguage = transcriptionLanguage
         self.customVocabulary = customVocabulary
         self.removeFillerWords = removeFillerWords
+        self.identifySpeakers = identifySpeakers
+        self.spokenLanguages = spokenLanguages
+        self.useAdditionalLanguages = useAdditionalLanguages
+        self.useDictionary = useDictionary
         self.webhookURL = webhookURL
+        self.webhookEnabled = webhookEnabled
         self.webhookSecret = webhookSecret
         self.deviceId = deviceId
         self.appearanceMode = appearanceMode
@@ -316,6 +360,10 @@ struct Settings: Codable {
 
         webhookURL = try container.decodeIfPresent(String.self, forKey: .webhookURL)
 
+        // Absent for anyone upgrading from a build without the pause switch, and
+        // their destination was active, so default to on.
+        webhookEnabled = try container.decodeIfPresent(Bool.self, forKey: .webhookEnabled) ?? true
+
         webhookSecret = try container.decodeIfPresent(String.self, forKey: .webhookSecret)
             ?? Self.generateSecret()
 
@@ -331,6 +379,17 @@ struct Settings: Codable {
         customVocabulary = try container.decodeIfPresent(String.self, forKey: .customVocabulary) ?? ""
 
         removeFillerWords = try container.decodeIfPresent(Bool.self, forKey: .removeFillerWords) ?? false
+
+        identifySpeakers = try container.decodeIfPresent(Bool.self, forKey: .identifySpeakers) ?? false
+
+        spokenLanguages = try container.decodeIfPresent([TranscriptionLanguage].self, forKey: .spokenLanguages) ?? []
+
+        // Absent for anyone upgrading from before the switches existed, where a
+        // stored value meant the feature was in use.
+        useAdditionalLanguages = try container.decodeIfPresent(Bool.self, forKey: .useAdditionalLanguages)
+            ?? !spokenLanguages.isEmpty
+        useDictionary = try container.decodeIfPresent(Bool.self, forKey: .useDictionary)
+            ?? !customVocabulary.isEmpty
 
         appearanceMode = try container.decodeIfPresent(AppearanceMode.self, forKey: .appearanceMode)
             ?? .system
@@ -355,7 +414,12 @@ struct Settings: Codable {
         try container.encode(transcriptionLanguage, forKey: .transcriptionLanguage)
         try container.encode(customVocabulary, forKey: .customVocabulary)
         try container.encode(removeFillerWords, forKey: .removeFillerWords)
+        try container.encode(identifySpeakers, forKey: .identifySpeakers)
+        try container.encode(spokenLanguages, forKey: .spokenLanguages)
+        try container.encode(useAdditionalLanguages, forKey: .useAdditionalLanguages)
+        try container.encode(useDictionary, forKey: .useDictionary)
         try container.encodeIfPresent(webhookURL, forKey: .webhookURL)
+        try container.encode(webhookEnabled, forKey: .webhookEnabled)
         try container.encode(appearanceMode, forKey: .appearanceMode)
         // webhookSecret and deviceId are stored in Keychain, not on disk
     }
@@ -368,12 +432,16 @@ struct Settings: Codable {
         case transcriptionLanguage
         case customVocabulary
         case removeFillerWords
+        case identifySpeakers
+        case spokenLanguages
+        case useAdditionalLanguages
+        case useDictionary
         case webhookURL
+        case webhookEnabled
         case webhookSecret
         case deviceId
         case appearanceMode
         // Legacy keys for migration
-        case webhookEnabled
         case proxyBaseURL
         case apiBaseURL
         case apiToken

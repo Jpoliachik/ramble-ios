@@ -14,6 +14,10 @@ enum Constants {
     enum Recording {
         /// Duration threshold for a soft "long recording" warning (30 minutes)
         static let longWarningDuration: TimeInterval = 30 * 60
+
+        /// Below this a recording holds no usable speech, so transcription is
+        /// skipped rather than attempted and failed.
+        static let minimumTranscribableDuration: TimeInterval = 0.5
     }
 
     enum Transcription {
