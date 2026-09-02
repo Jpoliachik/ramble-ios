@@ -52,8 +52,7 @@ struct RecordingRowView: View {
 
     private var transcribingPlaceholder: some View {
         HStack(spacing: 6) {
-            ProgressView()
-                .controlSize(.mini)
+            // No icon here: the trailing badge already shows progress.
             Text(recording.status == .transcribing ? "Transcribing..." : "Waiting...")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
@@ -66,8 +65,9 @@ struct RecordingRowView: View {
         case .completed:
             switch recording.webhookStatus {
             case .pending, .sending:
-                ProgressView()
-                    .controlSize(.mini)
+                Image(systemName: "paperplane.fill")
+                    .foregroundStyle(.blue)
+                    .font(.subheadline)
             case .failed:
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)
@@ -81,7 +81,12 @@ struct RecordingRowView: View {
             Image(systemName: recording.isModelNotInstalled ? "arrow.down.circle.fill" : "exclamationmark.circle.fill")
                 .foregroundStyle(recording.isModelNotInstalled ? .orange : .red)
                 .font(.subheadline)
-        case .transcribing, .recorded:
+        case .transcribing:
+            // Same slot and size as the completed checkmark, so the row doesn't
+            // shift as a recording moves through the queue.
+            ProgressView()
+                .controlSize(.mini)
+        case .recorded:
             EmptyView()
         }
     }

@@ -114,6 +114,45 @@ struct AppleSpeechRow: View {
     }
 }
 
+/// On-device Whisper row. Selecting it kicks off the model download if the
+/// weights aren't on disk yet, and the subtitle doubles as the progress readout
+/// so the prototype needs no extra chrome.
+struct LocalWhisperRow: View {
+    let isSelected: Bool
+    let onTap: () -> Void
+
+    @ObservedObject private var service = LocalWhisperTranscriptionService.shared
+
+    var body: some View {
+        TranscriptionModelRow(
+            title: TranscriptionProvider.localWhisper.displayName,
+            subtitle: subtitle,
+            logo: .system(TranscriptionProvider.localWhisper.iconName),
+            isSelected: isSelected,
+            onTap: {
+                onTap()
+                if !service.isModelInstalled {
+                    Task { try? await service.downloadModel() }
+                }
+            }
+        )
+    }
+
+    private var subtitle: String {
+        if service.isModelInstalled { return "On-device · works offline" }
+        switch service.state {
+        case .notDownloaded:
+            return "On-device · tap to download \(LocalWhisperTranscriptionService.modelDownloadSizeLabel)"
+        case .downloading(let fraction):
+            return "Downloading… \(Int(fraction * 100))%"
+        case .ready:
+            return "On-device · works offline"
+        case .failed(let message):
+            return "Download failed — \(message)"
+        }
+    }
+}
+
 /// Cloud model row driven entirely by `CloudModel`. Adding a new case to the
 /// enum surfaces it in every picker automatically.
 struct CloudModelRow: View {

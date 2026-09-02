@@ -9,7 +9,7 @@ struct RecordingDetailView: View {
     let recordingId: UUID
     @Environment(\.dismiss) private var dismiss
     @State private var recording: Recording?
-    @State private var showCopied = false
+    @State private var shareItems: [Any]?
     @State private var isRetrying = false
     @State private var isDownloadingModel = false
     @State private var showDeleteConfirmation = false
@@ -17,6 +17,8 @@ struct RecordingDetailView: View {
     @State private var isTranscriptExpanded = false
     @State private var transcriptFullHeight: CGFloat = 0
     @State private var transcriptLimitedHeight: CGFloat = 0
+
+    @ObservedObject private var localWhisper = LocalWhisperTranscriptionService.shared
 
     private var isTranscriptTruncated: Bool {
         transcriptFullHeight > transcriptLimitedHeight + 1
@@ -70,13 +72,14 @@ struct RecordingDetailView: View {
         } message: {
             Text("This will permanently delete the recording and its transcript.")
         }
-        .overlay(alignment: .top) {
-            if showCopied {
-                copiedToast
-                    .transition(.move(edge: .top).combined(with: .opacity))
+        .sheet(isPresented: Binding(
+            get: { shareItems != nil },
+            set: { if !$0 { shareItems = nil } }
+        )) {
+            if let shareItems {
+                ShareSheet(activityItems: shareItems)
             }
         }
-        .animation(.easeInOut(duration: 0.2), value: showCopied)
         .onAppear { refreshRecording() }
         .onReceive(NotificationCenter.default.publisher(for: StorageService.recordingsDidChangeNotification)) { _ in
             refreshRecording()
@@ -124,12 +127,14 @@ struct RecordingDetailView: View {
                     Text("Queued")
                 }
             case .transcribing:
-                ProgressView().scaleEffect(0.7)
+                // An icon rather than a spinner, so the badge reads the same way as
+                // the queued, completed and failed states next to it.
+                Image(systemName: "waveform")
                 Text("Transcribing")
             case .completed:
                 switch recording.webhookStatus {
                 case .pending, .sending:
-                    ProgressView().scaleEffect(0.7)
+                    Image(systemName: "paperplane.fill")
                     Text("Sending webhook")
                 case .failed:
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -188,6 +193,21 @@ struct RecordingDetailView: View {
                     .foregroundStyle(.secondary)
             }
             #endif
+
+            if FileManager.default.fileExists(atPath: recording.audioFileURL.path) {
+                Button {
+                    HapticService.buttonTap()
+                    shareItems = [recording.audioFileURL]
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 16))
+                            .frame(width: 22)
+                        Text("Share audio")
+                        Spacer()
+                    }
+                }
+            }
         }
     }
 
@@ -195,7 +215,15 @@ struct RecordingDetailView: View {
 
     private func transcriptSection(_ recording: Recording) -> some View {
         Section {
-            if let transcription = recording.transcription, !transcription.isEmpty {
+            // Status first: a re-transcribe should show progress, not the previous
+            // transcript sitting there looking finished.
+            if recording.status == .transcribing {
+                HStack(spacing: 8) {
+                    ProgressView().scaleEffect(0.8)
+                    Text(localWhisper.progressLabel ?? "Transcribing...")
+                        .foregroundStyle(.secondary)
+                }
+            } else if let transcription = recording.transcription, !transcription.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(transcription)
                         .font(.body)
@@ -226,12 +254,21 @@ struct RecordingDetailView: View {
                         .buttonStyle(.bordered)
                         .controlSize(.small)
                     }
-                }
-            } else if recording.status == .transcribing {
-                HStack(spacing: 8) {
-                    ProgressView().scaleEffect(0.8)
-                    Text("Transcribing...")
-                        .foregroundStyle(.secondary)
+
+                    // Below the transcript, matching "Share audio" under the player.
+                    Button {
+                        HapticService.buttonTap()
+                        shareItems = [transcription]
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.system(size: 16))
+                                .frame(width: 22)
+                            Text("Share transcript")
+                            Spacer()
+                        }
+                    }
+                    .padding(.top, 4)
                 }
             } else if recording.isModelNotInstalled {
                 modelNotInstalledView
@@ -243,33 +280,16 @@ struct RecordingDetailView: View {
                     .italic()
             }
         } header: {
-            HStack {
-                Text("Transcript")
-                Spacer()
-                if let transcription = recording.transcription, !transcription.isEmpty {
-                    Button {
-                        HapticService.buttonTap()
-                        UIPasteboard.general.string = transcription
-                        showCopied = true
-                        Task {
-                            try? await Task.sleep(nanoseconds: 1_500_000_000)
-                            showCopied = false
-                        }
-                    } label: {
-                        Label("Copy", systemImage: showCopied ? "checkmark" : "doc.on.doc")
-                            .font(.caption)
-                    }
-                    .buttonStyle(.bordered)
-                    .buttonBorderShape(.capsule)
-                    .controlSize(.small)
-                }
-            }
+            Text("Transcript")
         }
     }
 
     private func errorView(_ error: String, isFailed: Bool) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Label(isFailed ? "Error" : "Retrying", systemImage: isFailed ? "xmark.circle" : "arrow.clockwise")
+            HStack(spacing: 4) {
+                Image(systemName: isFailed ? "xmark.circle" : "arrow.clockwise")
+                Text(isFailed ? "Error" : "Retrying")
+            }
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(isFailed ? .red : .orange)
             Text(error)
@@ -318,6 +338,24 @@ struct RecordingDetailView: View {
                     }
                 }
                 .disabled(isDownloadingModel)
+            } else if recording.status == .transcribing {
+                // While a job is running, the only useful action is stopping it.
+                // A retry button here was disabled and did nothing.
+                Button(role: .destructive) {
+                    HapticService.warning()
+                    transcriptionQueue.cancelTranscription(recordingId: recording.id)
+                    refreshRecording()
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "stop.circle")
+                            .font(.system(size: 16))
+                            .foregroundStyle(Color.brandRed)
+                            .frame(width: 22)
+                        Text("Stop transcribing")
+                            .foregroundStyle(Color.brandRed)
+                        Spacer()
+                    }
+                }
             } else {
                 let cloudLimitReached = SettingsService.shared.load().transcriptionProvider.isCloud
                     && recording.cloudTranscriptionCount >= TranscriptionJob.maxCloudTranscriptions
@@ -342,7 +380,7 @@ struct RecordingDetailView: View {
                         }
                     }
                 }
-                .disabled(isRetrying || recording.status == .transcribing || cloudLimitReached)
+                .disabled(isRetrying || cloudLimitReached || transcriptionQueue.isQueued(recordingId: recording.id))
 
                 if cloudLimitReached {
                     Text("Cloud transcription limit reached (\(TranscriptionJob.maxCloudTranscriptions)). Switch to on-device transcription in Settings to continue.")
@@ -418,8 +456,8 @@ struct RecordingDetailView: View {
         switch recording.status {
         case .failed: return "Retry Transcription"
         case .completed: return "Re-transcribe"
-        case .recorded: return "Transcribe"
-        default: return "Transcribing..."
+        case .recorded, .transcribing:
+            return transcriptionQueue.isQueued(recordingId: recording.id) ? "Queued" : "Transcribe"
         }
     }
 
@@ -442,15 +480,6 @@ struct RecordingDetailView: View {
         }
     }
 
-    private var copiedToast: some View {
-        Label("Copied", systemImage: "checkmark.circle.fill")
-            .font(.subheadline.weight(.medium))
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(.ultraThinMaterial, in: .capsule)
-            .shadow(radius: 4)
-            .padding(.top, 8)
-    }
 }
 
 #Preview {

@@ -6,6 +6,7 @@ import SwiftUI
 
 struct RecordButtonView: View {
     let isRecording: Bool
+    var isDisabled: Bool = false
     let action: () -> Void
 
     @State private var pulseScale: CGFloat = 1.0
@@ -33,6 +34,8 @@ struct RecordButtonView: View {
             .frame(width: buttonSize + 8, height: buttonSize + 8)
         }
         .buttonStyle(.plain)
+        .disabled(isDisabled)
+        .opacity(isDisabled ? 0.35 : 1)
         .animation(.easeInOut(duration: 0.25), value: isRecording)
         .onChange(of: isRecording) { _, newValue in
             if newValue {

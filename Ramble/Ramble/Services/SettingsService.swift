@@ -16,9 +16,16 @@ final class SettingsService {
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
+    /// In-memory copy of the last loaded/saved settings. Every write goes through
+    /// `save`, so this stays authoritative, and it keeps `load()` cheap enough to
+    /// call from a SwiftUI body.
+    private var cached: Settings?
+
     private init() {}
 
     func load() -> Settings {
+        if let cached { return cached }
+
         var settings: Settings
         if let data = try? Data(contentsOf: settingsFile),
            let decoded = try? decoder.decode(Settings.self, from: data) {
@@ -49,10 +56,12 @@ final class SettingsService {
             guard let data = try? encoder.encode(settings) else { return settings }
             try? data.write(to: settingsFile)
         }
+        cached = settings
         return settings
     }
 
     func save(_ settings: Settings) {
+        cached = settings
         KeychainService.setString(settings.webhookSecret, forKey: Self.webhookSecretKey)
         KeychainService.setString(settings.deviceId, forKey: Self.deviceIdKey)
 
