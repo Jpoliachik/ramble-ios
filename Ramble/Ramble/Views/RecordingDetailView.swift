@@ -338,7 +338,8 @@ struct RecordingDetailView: View {
                     }
                 }
                 .disabled(isDownloadingModel)
-            } else if recording.status == .transcribing {
+            } else if recording.status == .transcribing
+                        || transcriptionQueue.isQueued(recordingId: recording.id) {
                 // While a job is running, the only useful action is stopping it.
                 // A retry button here was disabled and did nothing.
                 Button(role: .destructive) {
@@ -351,7 +352,7 @@ struct RecordingDetailView: View {
                             .font(.system(size: 16))
                             .foregroundStyle(Color.brandRed)
                             .frame(width: 22)
-                        Text("Stop transcribing")
+                        Text(recording.status == .transcribing ? "Stop transcribing" : "Stop retrying")
                             .foregroundStyle(Color.brandRed)
                         Spacer()
                     }
@@ -380,7 +381,7 @@ struct RecordingDetailView: View {
                         }
                     }
                 }
-                .disabled(isRetrying || cloudLimitReached || transcriptionQueue.isQueued(recordingId: recording.id))
+                .disabled(isRetrying || cloudLimitReached)
 
                 if cloudLimitReached {
                     Text("Cloud transcription limit reached (\(TranscriptionJob.maxCloudTranscriptions)). Switch to on-device transcription in Settings to continue.")
@@ -457,7 +458,7 @@ struct RecordingDetailView: View {
         case .failed: return "Retry Transcription"
         case .completed: return "Re-transcribe"
         case .recorded, .transcribing:
-            return transcriptionQueue.isQueued(recordingId: recording.id) ? "Queued" : "Transcribe"
+            return "Transcribe"
         }
     }
 

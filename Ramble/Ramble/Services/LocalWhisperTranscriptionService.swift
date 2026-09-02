@@ -277,8 +277,6 @@ final class LocalWhisperTranscriptionService: ObservableObject {
         // which is most of the wait, so it gets its own label.
         let mode: ComputeMode = seconds >= Self.efficientModeThreshold ? .efficient : .fastStart
         progressLabel = pipe == nil ? "Loading model…" : "Transcribing… 0%"
-        let pipe = try await loadPipe(modelFolder: modelFolder, mode: mode)
-        progressLabel = "Transcribing… 0%"
 
         // No decoder prompt. Whisper's only vocabulary channel is `promptTokens`,
         // and on this device a two-word dictionary cost the end of the transcript
@@ -298,25 +296,83 @@ final class LocalWhisperTranscriptionService: ObservableObject {
             if !candidates.contains(candidate) { candidates.append(candidate) }
         }
 
-        if candidates.count >= 2 {
-            let merged = try await bestOfSegments(
-                languages: candidates,
-                pipe: pipe,
-                audioPath: audioURL.path,
-                promptTokens: promptTokens,
-                wordTimestamps: identifySpeakers
-            )
-            return try await finish(
-                picked: merged,
-                audioURL: audioURL,
-                identifySpeakers: identifySpeakers
-            )
-        }
-
         // One candidate pins that language even if the main picker says Auto-detect;
         // no candidates leaves detection to the model.
         let effectiveLanguage = candidates.first ?? .auto
 
+        // The GPU encoder is not a supported configuration for every model on every
+        // chip: it fails at prediction time with "Unable to compute the asynchronous
+        // prediction using ML Program". That can't be detected up front, so a
+        // failure on the fast path is retried on the Neural Engine, which is the
+        // configuration WhisperKit defaults to and treats as supported.
+        let picked = try await withComputeFallback(
+            preferred: mode,
+            modelFolder: modelFolder
+        ) { pipe in
+            if candidates.count >= 2 {
+                return try await self.bestOfSegments(
+                    languages: candidates,
+                    pipe: pipe,
+                    audioPath: audioURL.path,
+                    promptTokens: promptTokens,
+                    wordTimestamps: identifySpeakers
+                )
+            }
+            return try await self.singleLanguageSegments(
+                pipe: pipe,
+                audioURL: audioURL,
+                language: effectiveLanguage,
+                promptTokens: promptTokens,
+                wordTimestamps: identifySpeakers,
+                totalWindows: totalWindows
+            )
+        }
+
+        lastReportedPercent = 0
+
+        return try await finish(
+            picked: picked,
+            audioURL: audioURL,
+            identifySpeakers: identifySpeakers
+        )
+    }
+
+    /// Run a decode, falling back from the GPU encoder to the Neural Engine if
+    /// CoreML refuses the prediction. Reloading pays the ANE compilation, which is
+    /// still better than failing.
+    private func withComputeFallback(
+        preferred: ComputeMode,
+        modelFolder: URL,
+        decode: (WhisperKit) async throws -> [PickedSegment]
+    ) async throws -> [PickedSegment] {
+        let pipe = try await loadPipe(modelFolder: modelFolder, mode: preferred)
+        progressLabel = "Transcribing… 0%"
+
+        do {
+            return try await decode(pipe)
+        } catch {
+            guard preferred == .fastStart else { throw error }
+
+            lastDiagnostics.append("GPU decode failed, retried on the Neural Engine")
+            self.pipe = nil
+            self.pipeMode = nil
+            lastReportedPercent = 0
+            progressLabel = "Loading model…"
+
+            let fallback = try await loadPipe(modelFolder: modelFolder, mode: .efficient)
+            progressLabel = "Transcribing… 0%"
+            return try await decode(fallback)
+        }
+    }
+
+    private func singleLanguageSegments(
+        pipe: WhisperKit,
+        audioURL: URL,
+        language effectiveLanguage: TranscriptionLanguage,
+        promptTokens: [Int]?,
+        wordTimestamps: Bool,
+        totalWindows: Int
+    ) async throws -> [PickedSegment] {
         let results = try await pipe.transcribe(
             audioPath: audioURL.path,
             decodeOptions: DecodingOptions(
@@ -326,7 +382,7 @@ final class LocalWhisperTranscriptionService: ObservableObject {
                 skipSpecialTokens: true,
                 // Speaker attribution needs per-word timings to line the transcript
                 // up against the diarization timeline.
-                wordTimestamps: identifySpeakers,
+                wordTimestamps: wordTimestamps,
                 promptTokens: promptTokens,
                 // Whisper invents text over silence, which is where the stray
                 // Japanese came from. Suppressing blanks curbs the worst of it.
@@ -352,15 +408,9 @@ final class LocalWhisperTranscriptionService: ObservableObject {
                 return Task.isCancelled ? false : nil
             }
         )
-        lastReportedPercent = 0
-
-        return try await finish(
-            picked: results.flatMap { result in
-                result.segments.map { PickedSegment(segment: $0, language: result.language) }
-            },
-            audioURL: audioURL,
-            identifySpeakers: identifySpeakers
-        )
+        return results.flatMap { result in
+            result.segments.map { PickedSegment(segment: $0, language: result.language) }
+        }
     }
 
     /// Turn the chosen segments into the final transcript, attributing speakers when
@@ -373,6 +423,10 @@ final class LocalWhisperTranscriptionService: ObservableObject {
         identifySpeakers: Bool
     ) async throws -> String {
         let ordered = picked.sorted { $0.segment.start < $1.segment.start }
+        let covered = ordered.reduce(0.0) { $0 + Double($1.segment.end - $1.segment.start) }
+        lastDiagnostics.append(
+            "Transcript built from \(ordered.count) segments, \(ordered.reduce(0) { $0 + $1.segment.text.count }) chars, \(String(format: "%.0f", covered))s covered"
+        )
 
         if identifySpeakers {
             do {
@@ -473,6 +527,8 @@ final class LocalWhisperTranscriptionService: ObservableObject {
                 ))
             }
         }
+
+        lastDiagnostics.append("Grouped into \(turns.count) speaker turns, \(turns.reduce(0) { $0 + $1.text.count }) chars")
 
         guard turns.count > 1 else { return "" }
 
@@ -641,6 +697,14 @@ final class LocalWhisperTranscriptionService: ObservableObject {
             })
         }
 
+        for (index, run) in runs.enumerated() {
+            let chars = run.reduce(0) { $0 + $1.segment.text.count }
+            let covered = run.reduce(0.0) { $0 + Double($1.segment.end - $1.segment.start) }
+            lastDiagnostics.append(
+                "Decoded \(languages[index].rawValue): \(run.count) segments, \(chars) chars, \(String(format: "%.0f", covered))s covered"
+            )
+        }
+
         guard let reference = runs.first else { return [] }
         let challengers = runs.dropFirst()
         var chosen: [PickedSegment] = []
@@ -678,6 +742,8 @@ final class LocalWhisperTranscriptionService: ObservableObject {
 
             if best.picks.first?.language != anchor.language {
                 replacedStretches += 1
+                let swapped = best.picks.reduce(0) { $0 + $1.segment.text.count }
+                        lastDiagnostics.append("Swapped \(String(format: "%.0f", anchor.segment.start))-\(String(format: "%.0f", anchor.segment.end))s: \(anchor.segment.text.count) chars \(anchor.language ?? "?") to \(swapped) chars \(best.picks.first?.language ?? "?")")
             }
             chosen.append(contentsOf: best.picks)
         }
@@ -685,6 +751,8 @@ final class LocalWhisperTranscriptionService: ObservableObject {
         if replacedStretches > 0 {
             lastDiagnostics.append("\(replacedStretches) stretch\(replacedStretches == 1 ? "" : "es") transcribed in another language")
         }
+
+        lastDiagnostics.append("Kept \(chosen.count) segments, \(chosen.reduce(0) { $0 + $1.segment.text.count }) chars")
 
         // A challenger's segments can span two anchors, so the same stretch could
         // otherwise be appended twice.
