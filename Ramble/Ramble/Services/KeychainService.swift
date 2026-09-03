@@ -10,11 +10,13 @@ enum KeychainService {
     private static let service = "dev.goodloop.ramble"
 
     /// Readable while the device is locked, as long as it has been unlocked once
-    /// since boot. The default (`WhenUnlocked`) is wrong here: Ramble reads the
-    /// webhook secret from background work that runs on a locked phone (a watch
-    /// recording arriving, a queued webhook, a Live Activity button), where the
-    /// item would simply be unavailable.
-    private static let accessibility = kSecAttrAccessibleAfterFirstUnlock
+    /// since boot, and never synced off this device. The default (`WhenUnlocked`)
+    /// is wrong here: Ramble reads the webhook secret from background work that
+    /// runs on a locked phone (a watch recording arriving, a queued webhook, a
+    /// Live Activity button), where the item would simply be unavailable.
+    ///
+    /// Same level as the App Attest key uses, so the two don't diverge.
+    private static let accessibility = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
 
     /// Why a read didn't return a value. "Not there" and "couldn't be read" have to
     /// be told apart: treating a failed read as absence is what let a locked device

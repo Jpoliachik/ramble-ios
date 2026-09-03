@@ -18,6 +18,10 @@ struct RambleApp: App {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
 
     init() {
+        // Before anything reads settings: brings keychain items written by older
+        // builds up to an accessibility background work can actually read.
+        SettingsService.shared.migrateKeychainAccessibilityIfNeeded()
+
         BackgroundTaskService.shared.registerBackgroundTasks()
         _ = PhoneConnectivityService.shared
         HapticService.prepare()

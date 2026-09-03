@@ -23,6 +23,34 @@ final class SettingsService {
 
     private init() {}
 
+    /// Rewrite the stored secret and device id with the current accessibility.
+    ///
+    /// Setting it on write only helps items that get written again, and these two
+    /// normally never are: `load` seeds them once and then only reads. Without this
+    /// an existing install keeps `WhenUnlocked` items that background work cannot
+    /// read on a locked phone.
+    func migrateKeychainAccessibilityIfNeeded() {
+        let flag = "keychainAccessibilityMigrated"
+        guard !UserDefaults.standard.bool(forKey: flag) else { return }
+
+        var migrated = true
+        for key in [Self.webhookSecretKey, Self.deviceIdKey] {
+            switch KeychainService.read(forKey: key) {
+            case .found(let value):
+                KeychainService.setString(value, forKey: key)
+            case .notFound:
+                continue
+            case .unavailable:
+                // Locked at launch. Leave the flag unset and try again next time.
+                migrated = false
+            }
+        }
+
+        if migrated {
+            UserDefaults.standard.set(true, forKey: flag)
+        }
+    }
+
     func load() -> Settings {
         if let cached { return cached }
 
