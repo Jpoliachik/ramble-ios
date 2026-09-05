@@ -69,8 +69,9 @@ struct RecordComplicationView: View {
             Label("Ramble", systemImage: "waveform")
 
         case .accessoryRectangular:
+            // The only family with room for more than a glyph.
             HStack(spacing: 8) {
-                mark
+                glyph
                 VStack(alignment: .leading, spacing: 0) {
                     Text("Ramble")
                         .font(.headline)
@@ -83,8 +84,11 @@ struct RecordComplicationView: View {
             }
 
         case .accessoryCorner:
-            // The glyph sits in the corner, with the name on the curve beside it.
-            mark
+            // One glyph, with the name on the curve. Corner scales its content into
+            // a small curved area, so anything with two elements side by side (the
+            // record dot next to the bars) collapses into two unreadable shapes,
+            // which is what the Nike face showed.
+            glyph
                 .widgetLabel("Ramble")
 
         default:
@@ -92,21 +96,18 @@ struct RecordComplicationView: View {
             // accessory background so it reads as a button on any face.
             ZStack {
                 AccessoryWidgetBackground()
-                mark
+                glyph
             }
         }
     }
 
-    /// Echoes the app icon: the record dot with the waveform bars beside it.
-    /// Faces render complications monochrome or tinted, so this leans on shape
-    /// rather than Ramble's red.
-    private var mark: some View {
-        HStack(spacing: 1.5) {
-            Circle()
-                .frame(width: 7, height: 7)
-            Image(systemName: "waveform")
-                .font(.system(size: 13, weight: .semibold))
-        }
-        .widgetAccentable()
+    /// A single symbol, deliberately, and sized by the system rather than by a
+    /// point value. Faces render complications monochrome or tinted and give the
+    /// same family very different amounts of room (a 40mm corner against an Ultra
+    /// rectangular), so the icon has to survive on its own and scale itself.
+    private var glyph: some View {
+        Image(systemName: "waveform")
+            .imageScale(.large)
+            .widgetAccentable()
     }
 }
