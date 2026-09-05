@@ -27,7 +27,7 @@ struct OnboardingTranscribeStep: View {
                         Text("Voice ") + Text("in").italic() + Text(", words ") + Text("back").italic() + Text(".")
                     }
 
-                    OnboardingBody(text: "Choose your model. Apple Speech is free and on-device. Cloud models are sharper - if accuracy is important.")
+                    OnboardingBody(text: "Choose your model. Apple Speech is free and instant. Whisper is free too, and stays on-device after a one-time download. Cloud models are sharper - if accuracy is important.")
                 }
                 .padding(.horizontal, 24)
                 .onboardingAppear(delay: 0.2)
@@ -86,6 +86,14 @@ struct OnboardingTranscribeStep: View {
                 isSelected: viewModel.isAppleSelected,
                 onTap: viewModel.selectApple
             )
+            ForEach(LocalWhisperModel.allCases) { model in
+                BrandRowDivider()
+                LocalWhisperRow(
+                    model: model,
+                    isSelected: viewModel.isLocalWhisperSelected(model),
+                    onTap: { viewModel.selectLocalWhisper(model) }
+                )
+            }
         }
         .padding(.horizontal, 16)
     }
@@ -115,6 +123,7 @@ struct OnboardingTranscribeStep: View {
 final class OnboardingTranscribeViewModel: ObservableObject {
     @Published var transcriptionProvider: TranscriptionProvider
     @Published var cloudModel: CloudModel
+    @Published var localWhisperModel: LocalWhisperModel
     @Published var showPaywall = false
 
     /// Cloud model tapped while locked — applied after successful purchase.
@@ -126,6 +135,7 @@ final class OnboardingTranscribeViewModel: ObservableObject {
         let loaded = SettingsService.shared.load()
         transcriptionProvider = loaded.transcriptionProvider
         cloudModel = loaded.cloudModel
+        localWhisperModel = loaded.localWhisperModel
     }
 
     var isAppleSelected: Bool {
@@ -136,9 +146,21 @@ final class OnboardingTranscribeViewModel: ObservableObject {
         transcriptionProvider == .cloudTranscription && cloudModel == model
     }
 
+    func isLocalWhisperSelected(_ model: LocalWhisperModel) -> Bool {
+        transcriptionProvider == .localWhisper && localWhisperModel == model
+    }
+
     func selectApple() {
         HapticService.selection()
         transcriptionProvider = .appleSpeech
+    }
+
+    /// `LocalWhisperRow` starts the model download itself; this only records the
+    /// choice, which `commit()` persists when the user advances.
+    func selectLocalWhisper(_ model: LocalWhisperModel) {
+        HapticService.selection()
+        transcriptionProvider = .localWhisper
+        localWhisperModel = model
     }
 
     func tapCloud(_ model: CloudModel) {
@@ -170,6 +192,7 @@ final class OnboardingTranscribeViewModel: ObservableObject {
         var current = settingsService.load()
         current.transcriptionProvider = transcriptionProvider
         current.cloudModel = cloudModel
+        current.localWhisperModel = localWhisperModel
         settingsService.save(current)
     }
 }

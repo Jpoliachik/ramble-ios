@@ -16,6 +16,7 @@ struct WatchMainView: View {
     @State private var phoneRecordingDuration: TimeInterval = 0
     @State private var durationTimer: Timer?
     @State private var stopRequestCancellable: AnyCancellable?
+    @State private var showCancelConfirmation = false
 
     private var isRecording: Bool {
         recordingManager.isRecording || connectivity.phoneIsRecording
@@ -36,15 +37,7 @@ struct WatchMainView: View {
                 Spacer()
 
                 // Status area above the button
-                if showSaved {
-                    HStack(spacing: 4) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                        Text("Saved")
-                            .font(.caption)
-                    }
-                    .transition(.opacity)
-                } else if isRecording {
+                if isRecording {
                     VStack(spacing: 4) {
                         // Phone recording indicator
                         if connectivity.phoneIsRecording {
@@ -81,15 +74,51 @@ struct WatchMainView: View {
                     .transition(.opacity)
                 }
 
-                // Record button
-                WatchRecordButtonView(
-                    isRecording: isRecording,
-                    audioLevel: recordingManager.audioLevel
-                ) {
-                    Task {
-                        await toggleRecording()
+                // Record button, with discard tucked to its left while this watch
+                // is the one recording. Same arrangement as the iPhone controls, so
+                // the two apps read the same way. A phone recording is the phone's
+                // to cancel.
+                // On save the whole button becomes the confirmation, rather than a
+                // checkmark laid over a record button that now means something else.
+                if showSaved {
+                    savedConfirmation
+                } else {
+                    ZStack {
+                        WatchRecordButtonView(
+                            isRecording: isRecording,
+                            audioLevel: recordingManager.audioLevel
+                        ) {
+                            Task {
+                                await toggleRecording()
+                            }
+                        }
+
+                        if recordingManager.isRecording {
+                            HStack {
+                                Button {
+                                    if recordingManager.currentDuration > 30 {
+                                        showCancelConfirmation = true
+                                    } else {
+                                        cancelRecording()
+                                    }
+                                } label: {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(.secondary)
+                                        .frame(width: 26, height: 26)
+                                        .background(.ultraThinMaterial, in: Circle())
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Discard recording")
+
+                                Spacer()
+                            }
+                            .transition(.opacity)
+                        }
                     }
                 }
+
+
 
                 Spacer()
             }
@@ -111,6 +140,14 @@ struct WatchMainView: View {
                     }
                 }
             }
+        }
+        .confirmationDialog(
+            "Discard recording?",
+            isPresented: $showCancelConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Discard", role: .destructive) { cancelRecording() }
+            Button("Keep Recording", role: .cancel) {}
         }
         .onAppear {
             subscribeToStopRequests()
@@ -184,10 +221,31 @@ struct WatchMainView: View {
         }
     }
 
+    /// Occupies the record button's exact footprint, so the control doesn't shift
+    /// and the confirmation reads as that button having completed.
+    private var savedConfirmation: some View {
+        ZStack {
+            Circle()
+                .stroke(Color.green, lineWidth: 4)
+                .frame(width: 80, height: 80)
+            Image(systemName: "checkmark")
+                .font(.system(size: 34, weight: .semibold))
+                .foregroundStyle(.green)
+        }
+        .frame(width: 88, height: 88)
+        .transition(.scale(scale: 0.85).combined(with: .opacity))
+        .accessibilityLabel("Saved")
+    }
+
     private func showSavedConfirmation() async {
         showSaved = true
-        try? await Task.sleep(nanoseconds: 1_500_000_000)
+        try? await Task.sleep(nanoseconds: 900_000_000)
         showSaved = false
+    }
+
+    private func cancelRecording() {
+        WatchHapticService.recordStop()
+        recordingManager.cancelRecording()
     }
 
     private func formatDuration(_ duration: TimeInterval) -> String {

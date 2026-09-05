@@ -10,6 +10,8 @@ import Speech
 enum TranscriptionError: Error, LocalizedError {
     case audioFileNotFound
     case modelNotInstalled
+    case whisperModelNotDownloaded
+    case noSpeechDetected
     case localeNotSupported
     case speechAnalyzerUnavailable
     case recognitionFailed(String)
@@ -25,6 +27,10 @@ enum TranscriptionError: Error, LocalizedError {
             return "Audio file not found"
         case .modelNotInstalled:
             return SpeechAnalyzerTranscriptionService.modelNotInstalledError
+        case .whisperModelNotDownloaded:
+            return "Whisper model not downloaded — download it in Settings and retry."
+        case .noSpeechDetected:
+            return "No speech detected"
         case .localeNotSupported:
             return "Speech recognition is not supported for your language"
         case .speechAnalyzerUnavailable:
@@ -73,7 +79,7 @@ final class LegacySpeechTranscriptionService {
 
         let text = result.bestTranscription.formattedString
         guard !text.isEmpty else {
-            throw TranscriptionError.recognitionFailed("No speech detected")
+            throw TranscriptionError.noSpeechDetected
         }
         return text
     }
@@ -84,28 +90,55 @@ final class LegacySpeechTranscriptionService {
 final class SpeechAnalyzerTranscriptionService {
     static let modelNotInstalledError = "Speech model not downloaded. Tap to download and retry."
 
-    /// Check whether the speech model for the current locale is installed on-device.
+    /// Pick the supported locale that best matches the user's.
+    ///
+    /// Never compare BCP-47 identifiers directly. A device set to English with a
+    /// different region format (Settings → General → Language & Region) reports
+    /// something like `en-US-u-rg-dezzzz`, which matches no entry in
+    /// `supportedLocales` even though English is fully supported. So match on
+    /// language and region components, and fall back to any locale sharing the
+    /// language.
+    @available(iOS 26.0, *)
+    private func bestMatch(in candidates: [Locale]) -> Locale? {
+        let current = Locale.current
+        guard let language = current.language.languageCode?.identifier else { return nil }
+
+        if let sameRegion = candidates.first(where: {
+            $0.language.languageCode?.identifier == language
+                && $0.region?.identifier == current.region?.identifier
+        }) {
+            return sameRegion
+        }
+        return candidates.first { $0.language.languageCode?.identifier == language }
+    }
+
+    /// The locale transcription should actually use, or nil if the user's language
+    /// isn't supported at all.
+    @available(iOS 26.0, *)
+    private func resolvedLocale() async -> Locale? {
+        bestMatch(in: await SpeechTranscriber.supportedLocales)
+    }
+
+    /// Check whether the speech model for the user's language is installed on-device.
     func isModelInstalled() async -> Bool {
         guard #available(iOS 26.0, *) else { return false }
-        let locale = Locale.current
-        let installed = await SpeechTranscriber.installedLocales
-        return installed.contains { $0.identifier(.bcp47) == locale.identifier(.bcp47) }
+        return bestMatch(in: await SpeechTranscriber.installedLocales) != nil
     }
 
-    /// Check whether the current locale is supported at all.
+    /// Check whether the user's language is supported at all.
     func isLocaleSupported() async -> Bool {
         guard #available(iOS 26.0, *) else { return false }
-        let locale = Locale.current
-        let supported = await SpeechTranscriber.supportedLocales
-        return supported.contains { $0.identifier(.bcp47) == locale.identifier(.bcp47) }
+        return await resolvedLocale() != nil
     }
 
-    /// Download the speech model for the current locale. No-op if already installed.
+    /// Download the speech model for the user's language. No-op if already installed.
     func downloadModel() async throws {
         guard #available(iOS 26.0, *) else {
             throw TranscriptionError.speechAnalyzerUnavailable
         }
-        let locale = Locale.current
+        guard let locale = await resolvedLocale() else {
+            throw TranscriptionError.localeNotSupported
+        }
         let transcriber = SpeechTranscriber(
             locale: locale,
             transcriptionOptions: [],
@@ -152,7 +185,9 @@ final class SpeechAnalyzerTranscriptionService {
             throw TranscriptionError.modelNotInstalled
         }
 
-        let locale = Locale.current
+        guard let locale = await resolvedLocale() else {
+            throw TranscriptionError.localeNotSupported
+        }
         let transcriber = SpeechTranscriber(
             locale: locale,
             transcriptionOptions: [],
@@ -181,7 +216,7 @@ final class SpeechAnalyzerTranscriptionService {
         let result = try await transcriptionFuture
 
         guard !result.isEmpty else {
-            throw TranscriptionError.recognitionFailed("No speech detected")
+            throw TranscriptionError.noSpeechDetected
         }
 
         return result

@@ -76,3 +76,37 @@ enum TranscriptFormatter {
         return sentences
     }
 }
+
+extension TranscriptFormatter {
+    /// Filler words the proxy strips server-side for cloud models. On-device
+    /// transcription never went through the proxy, so the "Remove filler words"
+    /// toggle did nothing for Apple Speech or local Whisper.
+    ///
+    /// Mirror of `FILLER_REGEX` in proxy/src/index.js: only the disfluencies most
+    /// people want gone, not slang like "like" or "you know", which carries meaning.
+    private static let fillerPattern = "\\b(?:um+|uh+|er+|ah+|hmm+|mhm+|uhm+|erm+)\\b[\\s,.;:!?]*"
+
+    static func removingFillerWords(from text: String) -> String {
+        guard let regex = try? NSRegularExpression(pattern: fillerPattern, options: [.caseInsensitive]) else {
+            return text
+        }
+        let stripped = regex.stringByReplacingMatches(
+            in: text,
+            range: NSRange(text.startIndex..., in: text),
+            withTemplate: ""
+        )
+
+        // Collapse the spaces the removal leaves behind without flattening
+        // paragraph breaks, same as the proxy does.
+        return stripped
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map { line in
+                line.replacingOccurrences(of: "[ \t]+", with: " ", options: .regularExpression)
+                    .replacingOccurrences(of: "\\s+([,.!?;:])", with: "$1", options: .regularExpression)
+                    .trimmingCharacters(in: .whitespaces)
+            }
+            .joined(separator: "\n")
+            .replacingOccurrences(of: "\n{3,}", with: "\n\n", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}

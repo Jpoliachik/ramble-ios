@@ -203,7 +203,15 @@ struct WebhookDestinationEditor: View {
             Button(role: .destructive) {
                 showRemoveConfirmation = true
             } label: {
-                Label("Remove destination", systemImage: "trash")
+                HStack(spacing: 12) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 16))
+                        .foregroundStyle(Color.brandRed)
+                        .frame(width: 22)
+                    Text("Remove destination")
+                        .foregroundStyle(Color.brandRed)
+                    Spacer()
+                }
             }
         }
     }

@@ -87,10 +87,18 @@ final class PhoneConnectivityService: NSObject, ObservableObject {
                     self.watchRecordingStartTime = Date(timeIntervalSince1970: startTime)
                 }
                 self.watchIsRecording = true
+                // watchOS has no ActivityKit, so the watch shows the *iPhone's*
+                // Live Activity in its Smart Stack. Starting one here is what puts a
+                // watch recording on the wrist, and on the phone's lock screen while
+                // it sits in a pocket.
+                LiveActivityService.shared.start(
+                    startedAt: self.watchRecordingStartTime ?? Date()
+                )
 
             case "recordingStopped":
                 self.watchIsRecording = false
                 self.watchRecordingStartTime = nil
+                LiveActivityService.shared.stop()
 
             case "stopRequest":
                 self.stopRequestReceived.send()
@@ -178,12 +186,23 @@ extension PhoneConnectivityService: WCSessionDelegate {
                 id: UUID(uuidString: metadata.recordingId) ?? UUID(),
                 createdAt: metadata.createdAt,
                 duration: metadata.duration,
-                audioFileName: audioFileName
+                audioFileName: audioFileName,
+                activityLog: [
+                    ActivityEntry("Recording captured on Apple Watch", timestamp: metadata.createdAt),
+                    ActivityEntry("Recording received from Apple Watch"),
+                ]
             )
 
             Task { @MainActor in
                 storageService.addRecording(recording)
                 TranscriptionQueueService.shared.enqueue(recordingId: recording.id)
+
+                // A file transfer can wake the app in the background, where the app never
+                // becomes active and so never gets the didEnterBackground assertion. Without
+                // this the app is suspended mid-transcription and the transcript only appears
+                // after the user reopens Ramble.
+                BackgroundTaskService.shared.beginImmediateBackgroundProcessing()
+                BackgroundTaskService.shared.scheduleSyncTask()
             }
 
             print("Received recording from watch: \(metadata.recordingId)")

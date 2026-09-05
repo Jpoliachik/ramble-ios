@@ -9,6 +9,8 @@ struct RecordingControlsView: View {
     let duration: TimeInterval
     var inputSourceName: String? = nil
     var audioLevel: Float = 0
+    /// Non-nil disables the record button and shows the reason underneath.
+    var blockedReason: String? = nil
     let onToggleRecording: () -> Void
     var onCancel: (() -> Void)? = nil
 
@@ -30,7 +32,11 @@ struct RecordingControlsView: View {
             }
 
             ZStack {
-                RecordButtonView(isRecording: isRecording, action: onToggleRecording)
+                RecordButtonView(
+                    isRecording: isRecording,
+                    isDisabled: !isRecording && blockedReason != nil,
+                    action: onToggleRecording
+                )
 
                 if isRecording {
                     HStack {
@@ -70,6 +76,14 @@ struct RecordingControlsView: View {
                         .offset(x: 90)
                         .transition(.opacity)
                 }
+            }
+
+            if !isRecording, let blockedReason {
+                Text(blockedReason)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .transition(.opacity)
             }
 
             if isRecording {

@@ -11,9 +11,9 @@ struct StartRecordingIntent: AppIntent {
     static var openAppWhenRun = true
 
     @MainActor
-    func perform() async throws -> some IntentResult & ProvidesDialog {
+    func perform() async throws -> some IntentResult {
         await RecordingManager.shared.startRecording()
-        return .result(dialog: "Recording started.")
+        return .result()
     }
 }
 
@@ -23,12 +23,11 @@ struct StopRecordingIntent: AppIntent {
     static var openAppWhenRun = true
 
     @MainActor
-    func perform() async throws -> some IntentResult & ProvidesDialog {
-        guard RecordingManager.shared.isRecording else {
-            return .result(dialog: "No recording in progress.")
+    func perform() async throws -> some IntentResult {
+        if RecordingManager.shared.isRecording {
+            RecordingManager.shared.stopRecording()
         }
-        RecordingManager.shared.stopRecording()
-        return .result(dialog: "Recording saved.")
+        return .result()
     }
 }
 
@@ -38,14 +37,13 @@ struct ToggleRecordingIntent: AppIntent {
     static var openAppWhenRun = true
 
     @MainActor
-    func perform() async throws -> some IntentResult & ProvidesDialog {
+    func perform() async throws -> some IntentResult {
         let manager = RecordingManager.shared
         if manager.isRecording {
             manager.stopRecording()
-            return .result(dialog: "Recording saved.")
         } else {
             await manager.startRecording()
-            return .result(dialog: "Recording started.")
         }
+        return .result()
     }
 }

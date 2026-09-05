@@ -31,8 +31,16 @@ final class SettingsViewModel: ObservableObject {
         }
     }
     @Published var removeFillerWords: Bool = false
+    @Published var localWhisperModel: LocalWhisperModel = .turbo
+    @Published var identifySpeakers: Bool = false
+    @Published var spokenLanguages: [TranscriptionLanguage] = []
+    @Published var useAdditionalLanguages: Bool = false
+    @Published var useDictionary: Bool = false
     @Published var showSubscriptionPaywall = false
     @Published var webhookURL: String = ""
+    /// Pause switch for a configured destination. Saved immediately, because the
+    /// toggle has no separate Save affordance next to it.
+    @Published var webhookEnabled: Bool = true
     @Published var webhookSecret: String = ""
     @Published var deviceId: String = ""
     @Published var totalRecordings: Int = 0
@@ -83,7 +91,13 @@ final class SettingsViewModel: ObservableObject {
         transcriptionLanguage = settings.transcriptionLanguage
         customVocabulary = settings.customVocabulary
         removeFillerWords = settings.removeFillerWords
+        localWhisperModel = settings.localWhisperModel
+        identifySpeakers = settings.identifySpeakers
+        spokenLanguages = settings.spokenLanguages
+        useAdditionalLanguages = settings.useAdditionalLanguages
+        useDictionary = settings.useDictionary
         webhookURL = settings.webhookURL ?? ""
+        webhookEnabled = settings.webhookEnabled
         webhookSecret = settings.webhookSecret
         deviceId = settings.deviceId
         appearanceMode = settings.appearanceMode
@@ -98,7 +112,13 @@ final class SettingsViewModel: ObservableObject {
             transcriptionLanguage: transcriptionLanguage,
             customVocabulary: customVocabulary,
             removeFillerWords: removeFillerWords,
+            localWhisperModel: localWhisperModel,
+            identifySpeakers: identifySpeakers,
+            spokenLanguages: spokenLanguages,
+            useAdditionalLanguages: useAdditionalLanguages,
+            useDictionary: useDictionary,
             webhookURL: webhookURL.isEmpty ? nil : webhookURL,
+            webhookEnabled: webhookEnabled,
             webhookSecret: webhookSecret,
             deviceId: deviceId,
             appearanceMode: appearanceMode

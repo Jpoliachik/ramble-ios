@@ -114,6 +114,45 @@ struct AppleSpeechRow: View {
     }
 }
 
+/// One on-device Whisper build. Selecting it starts its download if the weights
+/// aren't there yet, and the subtitle doubles as the progress readout.
+struct LocalWhisperRow: View {
+    let model: LocalWhisperModel
+    let isSelected: Bool
+    let onTap: () -> Void
+
+    @ObservedObject private var service = LocalWhisperTranscriptionService.shared
+
+    var body: some View {
+        TranscriptionModelRow(
+            title: model.displayName,
+            subtitle: subtitle,
+            logo: .system("waveform"),
+            isSelected: isSelected,
+            onTap: {
+                onTap()
+                if !service.isInstalled(model) {
+                    Task { try? await service.downloadModel(model) }
+                }
+            }
+        )
+    }
+
+    private var subtitle: String {
+        if service.isInstalled(model) { return "\(model.subtitle) · downloaded" }
+        switch service.state(of: model) {
+        case .notDownloaded:
+            return "\(model.subtitle) · tap to download \(model.sizeLabel)"
+        case .downloading(let fraction):
+            return "Downloading… \(Int(fraction * 100))%"
+        case .ready:
+            return "\(model.subtitle) · downloaded"
+        case .failed(let message):
+            return "Download failed: \(message)"
+        }
+    }
+}
+
 /// Cloud model row driven entirely by `CloudModel`. Adding a new case to the
 /// enum surfaces it in every picker automatically.
 struct CloudModelRow: View {

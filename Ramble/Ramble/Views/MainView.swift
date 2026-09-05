@@ -6,6 +6,7 @@ import SwiftUI
 
 struct MainView: View {
     @StateObject private var viewModel = RecordingViewModel()
+    @ObservedObject private var localWhisper = LocalWhisperTranscriptionService.shared
     @State private var showSettings = false
     @State private var scrollOffset: CGFloat = 0
     @State private var showOnboardingToast = false
@@ -69,6 +70,7 @@ struct MainView: View {
                     duration: viewModel.currentDuration,
                     inputSourceName: viewModel.inputSourceName,
                     audioLevel: viewModel.audioLevel,
+                    blockedReason: localWhisper.recordingBlockedReason,
                     onToggleRecording: {
                         Task {
                             await viewModel.toggleRecording()

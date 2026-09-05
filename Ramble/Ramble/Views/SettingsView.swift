@@ -83,6 +83,18 @@ struct SettingsView: View {
                     isSelected: viewModel.transcriptionProvider == .appleSpeech,
                     onTap: { viewModel.transcriptionProvider = .appleSpeech }
                 )
+                ForEach(LocalWhisperModel.allCases) { model in
+                    BrandRowDivider()
+                    LocalWhisperRow(
+                        model: model,
+                        isSelected: viewModel.transcriptionProvider == .localWhisper
+                            && viewModel.localWhisperModel == model,
+                        onTap: {
+                            viewModel.transcriptionProvider = .localWhisper
+                            viewModel.localWhisperModel = model
+                        }
+                    )
+                }
             }
             .listRowBackground(Color.clear)
             .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
@@ -156,25 +168,67 @@ struct SettingsView: View {
     }
 
     private var cloudTuningSection: some View {
-        // Shown always — when on Apple Speech the section renders as a locked
-        // teaser so the user can see what cloud unlocks.
-        let isCloud = viewModel.transcriptionProvider.isCloud
+        // Shown always — on Apple Speech the section renders as a locked teaser so
+        // the user can see what the other models unlock. Local Whisper takes both
+        // a language hint and the vocabulary, so it gets the section unlocked too.
+        let isTunable = viewModel.transcriptionProvider.isCloud
+            || viewModel.transcriptionProvider == .localWhisper
+        let supportedLanguages: Set<TranscriptionLanguage> = viewModel.transcriptionProvider == .localWhisper
+            ? Set(TranscriptionLanguage.allCases.filter { $0 != .auto })
+            : viewModel.cloudModel.supportedLanguages
         return Section {
             NavigationLink {
                 LanguagePickerView(
                     selection: $viewModel.transcriptionLanguage,
-                    supported: viewModel.cloudModel.supportedLanguages
+                    supported: supportedLanguages
                 )
             } label: {
                 HStack {
-                    Text("Language")
+                    Text("Main language")
                     Spacer()
                     Text(viewModel.transcriptionLanguage.displayName)
                         .foregroundStyle(.secondary)
                 }
             }
 
+            if viewModel.transcriptionProvider == .localWhisper {
+                VStack(alignment: .leading, spacing: 6) {
+                    Toggle("Multiple languages", isOn: $viewModel.useAdditionalLanguages)
+                    Text("Transcribe meetings that use more than one language.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                if viewModel.useAdditionalLanguages {
+                    // No label: the toggle above already says what this is, the same
+                    // way the dictionary's field needs no second heading.
+                    NavigationLink {
+                        SpokenLanguagesPickerView(selection: $viewModel.spokenLanguages)
+                    } label: {
+                        Text(spokenLanguagesSummary)
+                            .foregroundStyle(
+                                viewModel.spokenLanguages.isEmpty ? Color.secondary : Color.primary
+                            )
+                    }
+                }
+            }
+
+            let isLocal = viewModel.transcriptionProvider == .localWhisper
+            // On-device, the dictionary is applied by Apple Intelligence, so it
+            // needs the model to be there.
+            let dictionaryAvailable = viewModel.transcriptionProvider.isCloud
+                || (isLocal && appleIntelligenceUnavailable == nil)
+
             VStack(alignment: .leading, spacing: 6) {
+                Toggle("Dictionary", isOn: $viewModel.useDictionary)
+                    .disabled(!dictionaryAvailable)
+                Text(dictionaryDescription(isLocal: isLocal, available: dictionaryAvailable))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .opacity(dictionaryAvailable ? 1 : 0.5)
+
+            if dictionaryAvailable, viewModel.useDictionary {
                 TextField(
                     "e.g. Goodloop, Ramble, Cloudflare Workers",
                     text: $viewModel.customVocabulary,
@@ -183,23 +237,31 @@ struct SettingsView: View {
                 .lineLimit(2...5)
                 .textInputAutocapitalization(.words)
                 .autocorrectionDisabled()
-                Text("Names, jargon, and phrases the model might miss. Comma-separated.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
 
             Toggle("Remove filler words", isOn: $viewModel.removeFillerWords)
+
+            if viewModel.transcriptionProvider == .localWhisper {
+                VStack(alignment: .leading, spacing: 6) {
+                    Toggle("Identify speakers", isOn: $viewModel.identifySpeakers)
+                    Text("Labels each speaker turn on-device. Downloads a small extra model the first time, and adds time to every transcription.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+
+            }
         } header: {
-            SettingsSubsectionLabel(title: "Cloud · tuning") {
-                if !isCloud {
+            SettingsSubsectionLabel(title: "Tuning") {
+                if !isTunable {
                     Image(systemName: "lock.fill")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(Color.obInkFaint)
                 }
             }
         }
-        .disabled(!isCloud)
-        .opacity(isCloud ? 1 : 0.5)
+        .disabled(!isTunable)
+        .opacity(isTunable ? 1 : 0.5)
     }
 
     private var webhookSection: some View {
@@ -228,6 +290,18 @@ struct SettingsView: View {
                             .font(.caption)
                             .foregroundStyle(Color.obInkFaint)
                     }
+                    .opacity(viewModel.webhookEnabled ? 1 : 0.4)
+                }
+
+                Toggle(isOn: $viewModel.webhookEnabled) {
+                    Text(viewModel.webhookEnabled ? "Sending transcripts" : "Paused")
+                        .font(.body)
+                        .foregroundStyle(Color.obInk)
+                }
+                .tint(Color.brandRed)
+                .onChange(of: viewModel.webhookEnabled) { _, _ in
+                    HapticService.selection()
+                    viewModel.save()
                 }
             }
         } header: {
@@ -251,6 +325,29 @@ struct SettingsView: View {
         } footer: {
             Text("Create automations, send to an AI agent — anywhere that accepts an HTTPS POST. Make sure this is a trusted URL.")
         }
+    }
+
+    private var appleIntelligenceUnavailable: AppleIntelligenceService.Unavailable? {
+        AppleIntelligenceService.unavailableReason()
+    }
+
+    private func dictionaryDescription(isLocal: Bool, available: Bool) -> String {
+        if available {
+            return isLocal
+                ? "Names and jargon. Apple Intelligence corrects these on-device after transcribing."
+                : "Names, jargon, and phrases the model might miss."
+        }
+        if isLocal, let reason = appleIntelligenceUnavailable {
+            return "On-device, the dictionary is applied by Apple Intelligence, but \(reason.rawValue)."
+        }
+        return "Cloud models only."
+    }
+
+    private var spokenLanguagesSummary: String {
+        let selected = viewModel.spokenLanguages.filter { $0 != .auto }
+        // Reads as a placeholder when empty, like the dictionary's example text.
+        guard !selected.isEmpty else { return "e.g. German, Spanish" }
+        return selected.map(\.displayName).joined(separator: ", ")
     }
 
     private var destinationHost: String {
@@ -611,6 +708,8 @@ struct DebugSheet: View {
     @ObservedObject var viewModel: SettingsViewModel
     @State private var attestStatus = ""
     @State private var isReattesting = false
+    @State private var modelTestResult = ""
+    @State private var isTestingModel = false
 
     var body: some View {
         NavigationView {
@@ -629,6 +728,37 @@ struct DebugSheet: View {
                             }
                             .buttonStyle(.plain)
                         }
+                    }
+                }
+
+                Section("Apple Intelligence") {
+                    HStack {
+                        Text("Availability")
+                        Spacer()
+                        Text(AppleIntelligenceService.unavailableReason()?.rawValue ?? "Available")
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.trailing)
+                    }
+
+                    Button {
+                        isTestingModel = true
+                        Task {
+                            modelTestResult = await AppleIntelligenceService.selfTest()
+                            isTestingModel = false
+                        }
+                    } label: {
+                        HStack {
+                            Text(isTestingModel ? "Asking the model..." : "Run model test")
+                            Spacer()
+                            if isTestingModel { ProgressView().controlSize(.small) }
+                        }
+                    }
+                    .disabled(isTestingModel)
+
+                    if !modelTestResult.isEmpty {
+                        Text(modelTestResult)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 }
 
@@ -829,6 +959,46 @@ extension SettingsSubsectionLabel where Trailing == EmptyView {
 /// selected transcription path (provider + model). The caller is responsible
 /// for resetting `selection` to `.auto` if the user switches to a path that
 /// doesn't support their previously chosen language.
+/// Multi-select sibling of `LanguagePickerView`, for the languages actually
+/// spoken. Order is selection order, which is also the decode order.
+struct SpokenLanguagesPickerView: View {
+    @Binding var selection: [TranscriptionLanguage]
+
+    private var visibleLanguages: [TranscriptionLanguage] {
+        TranscriptionLanguage.sortedCases.filter { $0 != .auto }
+    }
+
+    var body: some View {
+        List {
+            Section {
+                ForEach(visibleLanguages) { language in
+                    Button {
+                        if let index = selection.firstIndex(of: language) {
+                            selection.remove(at: index)
+                        } else {
+                            selection.append(language)
+                        }
+                        HapticService.selection()
+                    } label: {
+                        HStack {
+                            Text(language.displayName)
+                                .foregroundStyle(Color.obInk)
+                            Spacer()
+                            if selection.contains(language) {
+                                Image(systemName: "checkmark")
+                                    .foregroundStyle(Color.brandRed)
+                            }
+                        }
+                    }
+                }
+            } footer: {
+                Text("Only needed if a recording switches language part way through. Each language here adds a full transcription pass on top of the main language, so one extra language roughly doubles the time.")
+            }
+        }
+        .navigationTitle("Additional languages")
+    }
+}
+
 struct LanguagePickerView: View {
     @Binding var selection: TranscriptionLanguage
     let supported: Set<TranscriptionLanguage>
