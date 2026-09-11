@@ -7,6 +7,20 @@ import AVFoundation
 import Combine
 import Foundation
 
+enum WatchRecordingError: LocalizedError {
+    case microphonePermissionDenied
+    case audioSessionUnavailable(Error)
+
+    var errorDescription: String? {
+        switch self {
+        case .microphonePermissionDenied:
+            return "Ramble needs microphone access. Turn it on in Settings > Privacy > Microphone."
+        case .audioSessionUnavailable:
+            return "The microphone is busy. Try again in a moment."
+        }
+    }
+}
+
 @MainActor
 final class WatchAudioRecorderService: NSObject, ObservableObject {
     @Published private(set) var isRecording = false
@@ -18,11 +32,24 @@ final class WatchAudioRecorderService: NSObject, ObservableObject {
     private var timer: Timer?
     private(set) var currentRecordingURL: URL?
 
-    func startRecording() throws -> URL {
-        let session = AVAudioSession.sharedInstance()
-        // allowBluetooth enables AirPods/Bluetooth HFP mic input
-        try session.setCategory(.playAndRecord, mode: .default, options: [.allowBluetooth])
-        try session.setActive(true)
+    /// Returns true once the microphone is usable, prompting the first time.
+    func ensureMicrophonePermission() async -> Bool {
+        switch AVAudioApplication.shared.recordPermission {
+        case .granted:
+            return true
+        case .denied:
+            return false
+        default:
+            return await withCheckedContinuation { continuation in
+                AVAudioApplication.requestRecordPermission { granted in
+                    continuation.resume(returning: granted)
+                }
+            }
+        }
+    }
+
+    func startRecording() async throws -> URL {
+        try await activateSession()
 
         let recordingId = UUID().uuidString
         let documentsPath = FileManager.default.urls(
@@ -51,6 +78,29 @@ final class WatchAudioRecorderService: NSObject, ObservableObject {
         startTimer()
 
         return audioURL
+    }
+
+    /// Activating the session can fail for a beat when the app was cold-launched
+    /// by an App Intent (Action Button, Siri) and isn't frontmost yet, so retry.
+    private func activateSession() async throws {
+        let session = AVAudioSession.sharedInstance()
+        // allowBluetooth enables AirPods/Bluetooth HFP mic input
+        try session.setCategory(.playAndRecord, mode: .default, options: [.allowBluetooth])
+
+        var lastError: Error?
+        for attempt in 0..<3 {
+            do {
+                try session.setActive(true)
+                return
+            } catch {
+                lastError = error
+                try? await Task.sleep(nanoseconds: UInt64(150_000_000 * (attempt + 1)))
+            }
+        }
+
+        throw WatchRecordingError.audioSessionUnavailable(
+            lastError ?? NSError(domain: NSOSStatusErrorDomain, code: -1)
+        )
     }
 
     func stopRecording() -> (url: URL, duration: TimeInterval)? {

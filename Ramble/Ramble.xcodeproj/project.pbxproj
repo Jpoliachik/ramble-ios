@@ -450,7 +450,7 @@
 				DEVELOPMENT_TEAM = SW6VLKWS7Q;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = watch;
+				INFOPLIST_KEY_CFBundleDisplayName = Ramble;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Ramble needs microphone access to record your voice journals.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = dev.goodloop.Ramble;
@@ -484,7 +484,7 @@
 				DEVELOPMENT_TEAM = SW6VLKWS7Q;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = watch;
+				INFOPLIST_KEY_CFBundleDisplayName = Ramble;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Ramble needs microphone access to record your voice journals.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = dev.goodloop.Ramble;

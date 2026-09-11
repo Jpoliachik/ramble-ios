@@ -12,10 +12,13 @@ struct WatchMainView: View {
     @StateObject private var syncQueue = WatchSyncQueue.shared
     @StateObject private var history = WatchRecordingHistory.shared
 
-    @State private var showSaved = false
     @State private var phoneRecordingDuration: TimeInterval = 0
     @State private var durationTimer: Timer?
     @State private var stopRequestCancellable: AnyCancellable?
+
+    private var showSaved: Bool {
+        recordingManager.recentlySaved
+    }
 
     private var isRecording: Bool {
         recordingManager.isRecording || connectivity.phoneIsRecording
@@ -44,6 +47,12 @@ struct WatchMainView: View {
                             .font(.caption)
                     }
                     .transition(.opacity)
+                } else if let error = recordingManager.lastError {
+                    Text(error)
+                        .font(.caption2)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.orange)
+                        .transition(.opacity)
                 } else if isRecording {
                     VStack(spacing: 4) {
                         // Phone recording indicator
@@ -95,6 +104,7 @@ struct WatchMainView: View {
             }
             .animation(.easeInOut(duration: 0.3), value: isRecording)
             .animation(.easeInOut(duration: 0.2), value: showSaved)
+            .animation(.easeInOut(duration: 0.2), value: recordingManager.lastError)
             .padding()
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -136,17 +146,14 @@ struct WatchMainView: View {
         stopRequestCancellable = connectivity.stopRequestReceived
             .receive(on: DispatchQueue.main)
             .sink {
-                Task {
-                    await stopFromPhoneRequest()
+                Task { @MainActor in
+                    stopFromPhoneRequest()
                 }
             }
     }
 
-    private func stopFromPhoneRequest() async {
-        guard recordingManager.isRecording else { return }
-        WatchHapticService.recordStop()
+    private func stopFromPhoneRequest() {
         recordingManager.stopRecordingAndTransfer()
-        await showSavedConfirmation()
     }
 
     private func startPhoneDurationTimer() {
@@ -174,20 +181,7 @@ struct WatchMainView: View {
             return
         }
 
-        if recordingManager.isRecording {
-            WatchHapticService.recordStop()
-            recordingManager.stopRecordingAndTransfer()
-            await showSavedConfirmation()
-        } else {
-            WatchHapticService.recordStart()
-            recordingManager.startRecording()
-        }
-    }
-
-    private func showSavedConfirmation() async {
-        showSaved = true
-        try? await Task.sleep(nanoseconds: 1_500_000_000)
-        showSaved = false
+        await recordingManager.toggleRecording()
     }
 
     private func formatDuration(_ duration: TimeInterval) -> String {
