@@ -14,6 +14,7 @@ final class RecordingViewModel: ObservableObject {
     @Published private(set) var currentDuration: TimeInterval = 0
     @Published private(set) var inputSourceName: String?
     @Published private(set) var audioLevel: Float = 0
+    @Published private(set) var recordingStartError: RecordingStartError?
 
     // Watch recording state (exposed from connectivity)
     @Published private(set) var watchIsRecording = false
@@ -43,6 +44,7 @@ final class RecordingViewModel: ObservableObject {
         recordingManager.$currentDuration.assign(to: &$currentDuration)
         recordingManager.$inputSourceName.assign(to: &$inputSourceName)
         recordingManager.$audioLevel.assign(to: &$audioLevel)
+        recordingManager.$startError.assign(to: &$recordingStartError)
     }
 
     private func observeConnectivity() {
@@ -97,9 +99,17 @@ final class RecordingViewModel: ObservableObject {
             HapticService.recordStop()
             recordingManager.stopRecording()
         } else {
-            HapticService.recordStart()
             await recordingManager.startRecording()
+            if recordingManager.isRecording {
+                HapticService.recordStart()
+            } else {
+                HapticService.warning()
+            }
         }
+    }
+
+    func dismissRecordingStartError() {
+        recordingManager.clearStartError()
     }
 
     func cancelRecording() {
