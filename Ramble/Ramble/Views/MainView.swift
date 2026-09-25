@@ -116,6 +116,24 @@ struct MainView: View {
             .sheet(isPresented: $showSettings) {
                 SettingsView()
             }
+            .alert(
+                "Couldn't start recording",
+                isPresented: Binding(
+                    get: { viewModel.recordingStartError != nil },
+                    set: { if !$0 { viewModel.dismissRecordingStartError() } }
+                ),
+                presenting: viewModel.recordingStartError
+            ) { error in
+                if error == .microphoneDenied {
+                    Button("Open Settings") {
+                        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+                        UIApplication.shared.open(url)
+                    }
+                }
+                Button("OK", role: .cancel) {}
+            } message: { error in
+                Text(error.message)
+            }
         }
         .onAppear {
             triggerOnboardingToastIfNeeded()

@@ -325,8 +325,11 @@ struct RecordingDetailView: View {
                 Button {
                     HapticService.buttonTap()
                     isRetrying = true
-                    transcriptionQueue.retry(recordingId: recording.id)
                     Task {
+                        // Covers recordings made on the Watch, where no phone-side
+                        // recording start ever prompted for speech recognition
+                        await LegacySpeechTranscriptionService.requestAuthorizationIfNeeded()
+                        transcriptionQueue.retry(recordingId: recording.id)
                         try? await Task.sleep(nanoseconds: 500_000_000)
                         refreshRecording()
                         isRetrying = false

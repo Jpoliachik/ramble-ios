@@ -262,6 +262,22 @@ final class TranscriptionQueueService: ObservableObject {
             isProcessing = false
             processNextIfNeeded()
 
+        } catch TranscriptionError.speechPermissionDenied {
+            // No speech recognition consent — retrying on a timer can't fix it,
+            // only the user can (Retry prompts, or Settings if they declined)
+            var updatedRecordings = storageService.loadRecordings()
+            if let idx = updatedRecordings.firstIndex(where: { $0.id == job.recordingId }) {
+                updatedRecordings[idx].status = .failed
+                updatedRecordings[idx].lastError = TranscriptionError.speechPermissionDenied.localizedDescription
+                updatedRecordings[idx].activityLog.append(
+                    ActivityEntry("Transcription failed via \(providerLabel(for: job)) — speech recognition permission not granted")
+                )
+                storageService.saveRecordings(updatedRecordings)
+            }
+            removeJob(job)
+            isProcessing = false
+            processNextIfNeeded()
+
         } catch TranscriptionError.speechAnalyzerUnavailable {
             // iOS version too old for SpeechAnalyzer — fail immediately, don't retry
             var updatedRecordings = storageService.loadRecordings()
