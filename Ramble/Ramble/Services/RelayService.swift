@@ -142,6 +142,14 @@ final class RelayService: ObservableObject {
         isConfigured && hasInbox && UserDefaults.standard.integer(forKey: Self.connectionCountKey) > 0
     }
 
+    /// Name to show for "Waiting for …" copy. The connected agent's name when
+    /// every connection is the same kind; Muse otherwise (the MVP agent).
+    var primaryAgentName: String {
+        let types = Set(connections.map(\.agentType))
+        if types.count == 1, let only = types.first { return only.displayName }
+        return RelayAgent.muse.displayName
+    }
+
     // MARK: - App-facing calls
 
     /// Issues a single-use pairing code for one agent, creating this phone's

@@ -138,9 +138,9 @@ final class RelayQueueService: ObservableObject {
             updateRecording(job.recordingId) {
                 $0.relayStatus = .delivered
                 $0.activityLog.append(ActivityEntry(
-                    queued == 1
-                        ? "Waiting on the relay for 1 agent"
-                        : "Waiting on the relay for \(queued) agents",
+                    queued > 1
+                        ? "Waiting for \(queued) agents to pick it up"
+                        : "Waiting for Muse to pick it up",
                     httpStatus: 200
                 ))
             }

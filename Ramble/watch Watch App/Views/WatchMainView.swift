@@ -3,7 +3,6 @@
 //  watch Watch App
 //
 
-import Combine
 import SwiftUI
 
 struct WatchMainView: View {
@@ -15,22 +14,13 @@ struct WatchMainView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     @State private var showSaved = false
-    @State private var startFailed = false
-    @State private var phoneRecordingDuration: TimeInterval = 0
-    @State private var durationTimer: Timer?
-    @State private var stopRequestCancellable: AnyCancellable?
+    /// Set while a start failure is on screen; the text says what went wrong.
+    @State private var startFailureMessage: String?
+    /// Ignores extra taps while the mic permission prompt or session setup is pending.
+    @State private var isStarting = false
 
     private var isRecording: Bool {
-        recordingManager.isRecording || connectivity.phoneIsRecording
-    }
-
-    private var currentDuration: TimeInterval {
-        if recordingManager.isRecording {
-            return recordingManager.currentDuration
-        } else if connectivity.phoneIsRecording {
-            return phoneRecordingDuration
-        }
-        return 0
+        recordingManager.isRecording
     }
 
     var body: some View {
@@ -54,27 +44,32 @@ struct WatchMainView: View {
 
                 Spacer(minLength: 0)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .overlay {
+                // While recording, a tap anywhere stops. The button stays the
+                // accessible control and keeps the double-tap shortcut.
+                if isRecording {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            Task {
+                                await toggleRecording()
+                            }
+                        }
+                        .accessibilityHidden(true)
+                }
+            }
             .animation(.easeInOut(duration: 0.3), value: isRecording)
             .animation(.easeInOut(duration: 0.2), value: showSaved)
-            .animation(.easeInOut(duration: 0.2), value: startFailed)
+            .animation(.easeInOut(duration: 0.2), value: startFailureMessage)
         }
         .onAppear {
-            subscribeToStopRequests()
             refreshOnForeground()
-        }
-        .onDisappear {
-            stopRequestCancellable?.cancel()
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 refreshOnForeground()
-            }
-        }
-        .onChange(of: connectivity.phoneIsRecording) { _, isRecording in
-            if isRecording {
-                startPhoneDurationTimer()
-            } else {
-                stopPhoneDurationTimer()
             }
         }
     }
@@ -85,21 +80,19 @@ struct WatchMainView: View {
     private var statusArea: some View {
         if isRecording {
             VStack(spacing: 2) {
-                Text(WatchFormat.duration(currentDuration))
+                Text(WatchFormat.duration(recordingManager.currentDuration))
                     .font(.system(size: 28, weight: .bold, design: .serif))
                     .monospacedDigit()
                     .foregroundStyle(Color.brandRed)
                     .contentTransition(.numericText())
 
-                if connectivity.phoneIsRecording {
-                    statusLine("Recording on iPhone", symbol: "iphone", tint: .secondary)
-                } else if recordingManager.currentDuration >= 30 * 60 {
+                if recordingManager.currentDuration >= 30 * 60 {
                     statusLine("Long recording", symbol: "clock", tint: .orange)
                 }
             }
             .transition(.opacity)
-        } else if startFailed {
-            statusLine("Couldn't start recording", symbol: "mic.slash", tint: .orange)
+        } else if let startFailureMessage {
+            statusLine(startFailureMessage, symbol: "mic.slash", tint: .orange)
                 .transition(.opacity)
         } else if showSaved {
             statusLine("Saved on watch", symbol: "checkmark.circle", tint: .secondary)
@@ -136,14 +129,8 @@ struct WatchMainView: View {
             return (latestState.label, latestState.symbol, latestState.tint)
         }
 
-        let anyRetrying = syncQueue.jobs.contains { job in
-            job.retryCount > 0 && !connectivity.inFlightIDs.contains(job.id)
-        }
-        return (
-            "\(pendingCount) waiting to send",
-            anyRetrying ? "arrow.clockwise.circle" : "arrow.up.circle",
-            anyRetrying ? Color.orange : Color.secondary
-        )
+        // Waiting and retrying are normal; the watch keeps the audio until the phone has it.
+        return ("\(pendingCount) on watch, will send", "applewatch", Color.secondary)
     }
 
     private func state(for entry: WatchRecordingHistoryEntry) -> WatchRecordingState {
@@ -169,65 +156,32 @@ struct WatchMainView: View {
     // MARK: - Actions
 
     private func refreshOnForeground() {
-        connectivity.queryPhoneState()
         // Retry anything still waiting, including transfers from previous sessions
         syncQueue.pruneOrphanedJobs()
         connectivity.retryPendingTransfers()
     }
 
-    private func subscribeToStopRequests() {
-        stopRequestCancellable = connectivity.stopRequestReceived
-            .receive(on: DispatchQueue.main)
-            .sink {
-                Task {
-                    await stopFromPhoneRequest()
-                }
-            }
-    }
-
-    private func stopFromPhoneRequest() async {
-        guard recordingManager.isRecording else { return }
-        WatchHapticService.recordStop()
-        recordingManager.stopRecordingAndTransfer()
-        await showSavedConfirmation()
-    }
-
-    private func startPhoneDurationTimer() {
-        phoneRecordingDuration = 0
-        if let startTime = connectivity.phoneRecordingStartTime {
-            phoneRecordingDuration = Date().timeIntervalSince(startTime)
-        }
-        durationTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
-            if let startTime = connectivity.phoneRecordingStartTime {
-                phoneRecordingDuration = Date().timeIntervalSince(startTime)
-            }
-        }
-    }
-
-    private func stopPhoneDurationTimer() {
-        durationTimer?.invalidate()
-        durationTimer = nil
-        phoneRecordingDuration = 0
-    }
-
+    /// A tap always records on the watch, whatever the phone is doing.
     private func toggleRecording() async {
-        if connectivity.phoneIsRecording {
-            WatchHapticService.recordStop()
-            connectivity.requestPhoneStopRecording()
-            return
-        }
-
         if recordingManager.isRecording {
             WatchHapticService.recordStop()
             recordingManager.stopRecordingAndTransfer()
             await showSavedConfirmation()
         } else {
+            guard !isStarting else { return }
+            isStarting = true
+            defer { isStarting = false }
             showSaved = false
-            startFailed = false
-            WatchHapticService.recordStart()
-            if !recordingManager.startRecording() {
+            startFailureMessage = nil
+            if await recordingManager.startRecording() {
+                WatchHapticService.recordStart()
+            } else {
                 WatchHapticService.failure()
-                await showStartFailure()
+                await showStartFailure(
+                    recordingManager.isMicrophoneDenied
+                        ? "Allow microphone in Settings"
+                        : "Couldn't start recording"
+                )
             }
         }
     }
@@ -238,10 +192,12 @@ struct WatchMainView: View {
         showSaved = false
     }
 
-    private func showStartFailure() async {
-        startFailed = true
+    private func showStartFailure(_ message: String) async {
+        startFailureMessage = message
         try? await Task.sleep(nanoseconds: 3_000_000_000)
-        startFailed = false
+        if startFailureMessage == message {
+            startFailureMessage = nil
+        }
     }
 }
 

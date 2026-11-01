@@ -31,11 +31,11 @@ struct SettingsView: View {
     var body: some View {
         NavigationView {
             Form {
+                agentSection
+                webhookSection
                 freeTranscriptionSection
                 cloudTranscriptionSection
                 cloudTuningSection
-                agentSection
-                webhookSection
                 appearanceSection
                 statsSection
                 exportSection
@@ -261,7 +261,7 @@ struct SettingsView: View {
         } header: {
             VStack(alignment: .leading, spacing: 14) {
                 SettingsGroupTitle(
-                    title: "Send to your agent",
+                    title: "Destinations",
                     subtitle: "Record on your watch. Your agent handles it."
                 )
                 if relay.isConfigured && !relay.connections.isEmpty {
@@ -280,7 +280,7 @@ struct SettingsView: View {
     private var webhookSection: some View {
         Section {
             if viewModel.webhookURL.isEmpty {
-                BrandPlusActionCard(title: "Add a destination") {
+                BrandPlusActionCard(title: "Add a webhook") {
                     showDestinationEdit = true
                 }
                 .listRowBackground(Color.clear)
@@ -306,25 +306,17 @@ struct SettingsView: View {
                 }
             }
         } header: {
-            VStack(alignment: .leading, spacing: 14) {
-                SettingsGroupTitle(
-                    title: "Send via Webhook",
-                    subtitle: "Pipe transcripts to any URL."
-                ) {
-                    Button {
-                        showWebhookInfo = true
-                    } label: {
-                        Image(systemName: "info.circle")
-                            .font(.title3)
-                    }
+            // Part of Destinations, under the agent connections above.
+            SettingsSubsectionLabel(title: "Webhook") {
+                Button {
+                    showWebhookInfo = true
+                } label: {
+                    Image(systemName: "info.circle")
+                        .font(.subheadline)
                 }
-                SendVisual(endpointText: SendVisual.endpointText(for: viewModel.webhookURL))
-                    .padding(.bottom, 4)
-                SettingsSubsectionLabel("Destination")
             }
-            .textCase(.none)
         } footer: {
-            Text("Create automations, send to an AI agent — anywhere that accepts an HTTPS POST. Make sure this is a trusted URL.")
+            Text("Pipe transcripts to any URL that accepts an HTTPS POST. Make sure it's one you trust.")
         }
     }
 
@@ -861,7 +853,7 @@ struct WebhookDestinationEditSheet: View {
 
 // MARK: - Settings header components
 
-/// Serif group title — top-level grouping label (Transcribe, Send via Webhook).
+/// Serif group title — top-level grouping label (Destinations, Transcribe).
 /// Mirrors the onboarding headline aesthetic at a smaller size, with an
 /// optional friendly subtitle below.
 private struct SettingsGroupTitle<Trailing: View>: View {

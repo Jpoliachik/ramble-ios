@@ -30,9 +30,23 @@ final class WatchRecordingManager: ObservableObject {
         audioRecorder.$audioLevel.assign(to: &$audioLevel)
     }
 
+    private var isStarting = false
+
+    /// True when the user has turned the microphone off for Ramble.
+    var isMicrophoneDenied: Bool {
+        AVAudioApplication.shared.recordPermission == .denied
+    }
+
     /// Returns false if recording could not start (e.g. no microphone access).
+    /// Asks for microphone access first if it hasn't been asked yet.
     @discardableResult
-    func startRecording() -> Bool {
+    func startRecording() async -> Bool {
+        guard !isRecording, !isStarting else { return isRecording }
+        isStarting = true
+        defer { isStarting = false }
+
+        guard await Self.hasMicrophoneAccess() else { return false }
+
         do {
             _ = try audioRecorder.startRecording()
             connectivity.sendRecordingStarted()
@@ -40,6 +54,19 @@ final class WatchRecordingManager: ObservableObject {
         } catch {
             print("Failed to start recording: \(error)")
             return false
+        }
+    }
+
+    private static func hasMicrophoneAccess() async -> Bool {
+        switch AVAudioApplication.shared.recordPermission {
+        case .granted:
+            return true
+        case .denied:
+            return false
+        case .undetermined:
+            return await AVAudioApplication.requestRecordPermission()
+        @unknown default:
+            return true
         }
     }
 

@@ -17,8 +17,4 @@ enum WatchHapticService {
     static func failure() {
         WKInterfaceDevice.current().play(.failure)
     }
-
-    static func buttonTap() {
-        WKInterfaceDevice.current().play(.click)
-    }
 }

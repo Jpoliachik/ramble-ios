@@ -40,14 +40,14 @@ enum WatchRecordingState: Equatable {
         switch self {
         case .sending: return "Sending to iPhone"
         case .waitingForPhone: return "Waiting for iPhone"
-        case .onWatch(let retrying): return retrying ? "Not sent yet, retrying" : "Saved on watch"
+        case .onWatch: return "On watch, will send"
         case .notSent: return "Not sent"
         case .onPhone(let status):
             switch status {
             case .received: return "Sent to iPhone"
             case .transcribing: return "Transcribing"
             case .transcribed: return "Transcribed"
-            case .delivered: return "Delivered"
+            case .delivered: return "Delivered to Muse"
             case .failed: return "Check iPhone"
             }
         }
@@ -70,10 +70,10 @@ enum WatchRecordingState: Equatable {
         }
     }
 
-    /// Neutral while things are moving or done; orange only when something needs attention.
+    /// Neutral while things are moving or done, including retries. Orange only for real failures.
     var tint: Color {
         switch self {
-        case .onWatch(retrying: true), .notSent, .onPhone(.failed):
+        case .notSent, .onPhone(.failed):
             return .orange
         default:
             return .secondary

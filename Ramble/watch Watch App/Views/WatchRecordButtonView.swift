@@ -53,6 +53,7 @@ struct WatchRecordButtonView: View {
             .contentShape(Circle())
         }
         .buttonStyle(.plain)
+        .handGestureShortcut(.primaryAction)
         .animation(.easeInOut(duration: 0.3), value: isRecording)
         .accessibilityLabel(isRecording ? "Stop recording" : "Record")
     }

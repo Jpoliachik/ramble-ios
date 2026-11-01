@@ -19,9 +19,6 @@ struct WatchSyncJob: Codable, Identifiable {
 final class WatchSyncQueue: ObservableObject {
     static let shared = WatchSyncQueue()
 
-    @Published private(set) var pendingCount: Int = 0
-    @Published private(set) var isSyncing: Bool = false
-
     @Published private(set) var jobs: [WatchSyncJob] = []
 
     private static var queueFileURL: URL {
@@ -52,15 +49,12 @@ final class WatchSyncQueue: ObservableObject {
             duration: duration
         )
         jobs.append(job)
-        pendingCount = jobs.count
         saveQueue()
         return job
     }
 
     func markCompleted(jobId: UUID) {
         jobs.removeAll { $0.id == jobId }
-        pendingCount = jobs.count
-        isSyncing = !jobs.isEmpty && jobs.contains { $0.lastAttemptAt != nil }
         saveQueue()
 
         // Update recording history with sync timestamp
@@ -75,13 +69,7 @@ final class WatchSyncQueue: ObservableObject {
         // Never give up and never delete the audio here: the watch may hold the
         // only copy. Retries are spaced out by WatchConnectivityService.
 
-        pendingCount = jobs.count
-        isSyncing = false
         saveQueue()
-    }
-
-    func updateSyncingState(isActive: Bool) {
-        isSyncing = isActive
     }
 
     /// Returns all jobs that should be retried now
@@ -109,7 +97,6 @@ final class WatchSyncQueue: ObservableObject {
             }
             return !exists
         }
-        pendingCount = jobs.count
         saveQueue()
     }
 
@@ -122,7 +109,6 @@ final class WatchSyncQueue: ObservableObject {
               let decoded = try? JSONDecoder().decode([WatchSyncJob].self, from: data)
         else { return }
         jobs = decoded
-        pendingCount = jobs.count
     }
 
     private func saveQueue() {

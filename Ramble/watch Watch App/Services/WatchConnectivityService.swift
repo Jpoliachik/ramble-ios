@@ -11,19 +11,9 @@ import WatchConnectivity
 final class WatchConnectivityService: NSObject, ObservableObject {
     static let shared = WatchConnectivityService()
 
-    @Published var isTransferring = false
-    @Published var lastTransferSuccess: Bool?
-
     /// Recording IDs currently handed to WatchConnectivity and not yet finished.
     @Published private(set) var inFlightIDs: Set<UUID> = []
     @Published private(set) var isPhoneReachable = false
-
-    // Phone recording state
-    @Published var phoneIsRecording = false
-    @Published var phoneRecordingStartTime: Date?
-
-    // Signal when phone requests watch to stop recording
-    let stopRequestReceived = PassthroughSubject<Void, Never>()
 
     /// Maps in-flight WCSessionFileTransfer to the job ID so we can update the queue on completion.
     /// Ephemeral — if the app is killed, jobs stay in the persistent queue and retry on next launch.
@@ -65,16 +55,6 @@ final class WatchConnectivityService: NSObject, ObservableObject {
         sendMessage(message)
     }
 
-    func requestPhoneStopRecording() {
-        let message: [String: Any] = ["type": "stopRequest"]
-        sendMessage(message)
-    }
-
-    func queryPhoneState() {
-        let message: [String: Any] = ["type": "stateQuery"]
-        sendMessage(message)
-    }
-
     private func sendMessage(_ message: [String: Any]) {
         guard WCSession.default.activationState == .activated else { return }
 
@@ -87,36 +67,14 @@ final class WatchConnectivityService: NSObject, ObservableObject {
         }
     }
 
+    /// The watch doesn't act on any phone message yet. The phone may still send
+    /// recording-state messages ("recordingStarted", "stopRequest", "stateResponse");
+    /// they are ignored on purpose, so a tap on the watch always records on the watch.
     private func handleReceivedMessage(_ message: [String: Any]) {
         guard let type = message["type"] as? String else { return }
-
-        Task { @MainActor in
-            switch type {
-            case "recordingStarted":
-                if let startTime = message["startTime"] as? TimeInterval {
-                    self.phoneRecordingStartTime = Date(timeIntervalSince1970: startTime)
-                }
-                self.phoneIsRecording = true
-
-            case "recordingStopped":
-                self.phoneIsRecording = false
-                self.phoneRecordingStartTime = nil
-
-            case "stopRequest":
-                self.stopRequestReceived.send()
-
-            case "stateResponse":
-                let isRecording = message["isRecording"] as? Bool ?? false
-                if isRecording, let startTime = message["startTime"] as? TimeInterval {
-                    self.phoneRecordingStartTime = Date(timeIntervalSince1970: startTime)
-                } else {
-                    self.phoneRecordingStartTime = nil
-                }
-                self.phoneIsRecording = isRecording
-
-            default:
-                break
-            }
+        switch type {
+        default:
+            break
         }
     }
 
@@ -199,8 +157,6 @@ final class WatchConnectivityService: NSObject, ObservableObject {
     private func refreshTransferState() {
         let ids = Set(activeTransfers.values)
         if ids != inFlightIDs { inFlightIDs = ids }
-        isTransferring = !ids.isEmpty
-        syncQueue.updateSyncingState(isActive: !ids.isEmpty)
     }
 
     /// Back off after a failed transfer: 10s, 20s, 40s ... capped at 5 minutes.
@@ -292,14 +248,11 @@ extension WatchConnectivityService: WCSessionDelegate {
 
             if let error = error {
                 print("File transfer failed for job \(jobId): \(error)")
-                lastTransferSuccess = false
                 syncQueue.markFailed(jobId: jobId)
                 let attempts = syncQueue.jobs.first { $0.id == jobId }?.retryCount ?? 1
                 scheduleRetry(attempt: attempts)
             } else {
                 print("File transfer succeeded for job \(jobId)")
-                lastTransferSuccess = true
-
                 // Delete local file after successful transfer
                 let documentsDir = FileManager.default.urls(
                     for: .documentDirectory, in: .userDomainMask

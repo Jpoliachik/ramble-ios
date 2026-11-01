@@ -17,6 +17,8 @@ struct RecordingDetailView: View {
     @State private var isTranscriptExpanded = false
     @State private var transcriptFullHeight: CGFloat = 0
     @State private var transcriptLimitedHeight: CGFloat = 0
+    @State private var showConnectAgent = false
+    @ObservedObject private var relay = RelayService.shared
 
     private var isTranscriptTruncated: Bool {
         transcriptFullHeight > transcriptLimitedHeight + 1
@@ -77,6 +79,9 @@ struct RecordingDetailView: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: showCopied)
+        .sheet(isPresented: $showConnectAgent) {
+            ConnectAgentView(startPairingWith: .muse)
+        }
         .onAppear { refreshRecording() }
         .onReceive(NotificationCenter.default.publisher(for: StorageService.recordingsDidChangeNotification)) { _ in
             refreshRecording()
@@ -134,9 +139,17 @@ struct RecordingDetailView: View {
                 case .failed:
                     Image(systemName: "exclamationmark.triangle.fill")
                     Text(recording.relayStatus == .failed ? "Agent delivery failed" : "Webhook failed")
-                case .delivered, .none:
-                    Image(systemName: "checkmark.circle.fill")
-                    Text("Completed")
+                case .delivered:
+                    if recording.relayStatus == .delivered {
+                        Image(systemName: "clock")
+                        Text("Waiting for \(relay.primaryAgentName)")
+                    } else {
+                        Image(systemName: "checkmark.circle.fill")
+                        Text("Delivered")
+                    }
+                case .none:
+                    Image(systemName: "tray")
+                    Text("Not sent")
                 }
             case .failed:
                 Image(systemName: "exclamationmark.circle.fill")
@@ -159,7 +172,8 @@ struct RecordingDetailView: View {
             switch recording.deliveryStatus {
             case .sending, .pending: return .blue
             case .failed: return .orange
-            case .delivered, .none: return .green
+            case .delivered: return recording.relayStatus == .delivered ? .blue : .green
+            case .none: return .secondary
             }
         case .failed: return .red
         }
@@ -358,8 +372,21 @@ struct RecordingDetailView: View {
                 webhookActionRow(for: recording)
             }
 
-            if recording.relayStatus != nil && RelayService.shared.hasConnectedAgents {
-                relayActionRow(for: recording)
+            if relay.hasConnectedAgents {
+                if recording.relayStatus != nil || recording.status == .completed {
+                    relayActionRow(for: recording)
+                }
+            } else if recording.status == .completed && recording.deliveryStatus == nil {
+                Button {
+                    HapticService.buttonTap()
+                    showConnectAgent = true
+                } label: {
+                    Label("Connect Muse", systemImage: "link")
+                }
+            }
+        } footer: {
+            if recording.status == .completed && recording.deliveryStatus == nil && !relay.hasConnectedAgents {
+                Text("This transcript is only on your phone. Connect Muse to send it there.")
             }
         }
     }
@@ -413,7 +440,12 @@ struct RecordingDetailView: View {
                     refreshRecording()
                 }
             } label: {
-                Label("Send to Agent Again", systemImage: "arrow.up.circle")
+                Label(
+                    recording.relayStatus == nil
+                        ? "Send to \(relay.primaryAgentName)"
+                        : "Send to \(relay.primaryAgentName) Again",
+                    systemImage: "arrow.up.circle"
+                )
             }
         }
     }
