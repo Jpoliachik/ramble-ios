@@ -1,0 +1,120 @@
+name: CI
+
+# One gate for every pull request. Each area only runs when its files change,
+# and the final `CI passed` job sums them up, so branch protection needs to
+# require just that one check.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.filter.outputs.app }}
+      website: ${{ steps.filter.outputs.website }}
+      proxy: ${{ steps.filter.outputs.proxy }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            app:
+              - 'Ramble/**'
+              - '.github/workflows/ci.yml'
+            website:
+              - 'website/**'
+              - '.github/workflows/ci.yml'
+            proxy:
+              - 'proxy/**'
+              - '.github/workflows/ci.yml'
+
+  proxy:
+    name: Proxy tests
+    needs: changes
+    if: needs.changes.outputs.proxy == 'true' || github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: proxy
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: proxy/package-lock.json
+      - run: npm ci
+      - run: npm test
+
+  website:
+    name: Website lint, typecheck, build
+    needs: changes
+    if: needs.changes.outputs.website == 'true' || github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npm run build
+
+  app:
+    name: iOS + watchOS build
+    needs: changes
+    if: needs.changes.outputs.app == 'true' || github.event_name != 'pull_request'
+    runs-on: macos-26
+    timeout-minutes: 30
+    env:
+      PROJECT: Ramble/Ramble.xcodeproj
+      # CI only compiles for the simulator, so no signing identity is needed.
+      SIGNING: CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=
+    steps:
+      - uses: actions/checkout@v4
+      - name: Show Xcode
+        run: xcodebuild -version
+      - name: Build iOS app
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project "$PROJECT" -scheme Ramble \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build $SIGNING | xcbeautify --renderer github-actions
+      - name: Build watch app
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project "$PROJECT" -scheme "watch Watch App" \
+            -destination 'generic/platform=watchOS Simulator' \
+            -derivedDataPath build $SIGNING | xcbeautify --renderer github-actions
+
+  ci-passed:
+    name: CI passed
+    if: always()
+    needs: [changes, proxy, website, app]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any check failed or was cancelled
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
+      - run: echo "All checks that ran are green."
