@@ -12,13 +12,13 @@ Ramble can also POST each transcript to any HTTPS endpoint (webhooks), alongside
 
 ## Docs
 
-- [Full reference](https://goodloop.dev/ramble/llms-full.txt): Agent connection, the relay API (pair, pull, ack), what the relay stores, and the complete webhook API.
-- [Connect your agent](https://goodloop.dev/ramble/docs): Pairing, the agent loop, and the relay API.
-- [Webhooks](https://goodloop.dev/ramble/docs/webhooks): Payload format, signature verification, retries, automation platforms.
+- [Full reference](/llms-full.txt): Agent connection, the relay API (pair, pull, ack), what the relay stores, and the complete webhook API.
+- [Connect your agent](/docs): Pairing, the agent loop, and the relay API.
+- [Webhooks](/docs/webhooks): Payload format, signature verification, retries, automation platforms.
 
 ## Links
 
-- [Website](https://goodloop.dev/ramble)
-- [Privacy Policy](https://goodloop.dev/ramble/privacy)
-- [Terms of Use](https://goodloop.dev/ramble/terms)
+- [Website](/)
+- [Privacy Policy](/privacy)
+- [Terms of Use](/terms)
 - [App Store](https://apps.apple.com/app/id6761857751)

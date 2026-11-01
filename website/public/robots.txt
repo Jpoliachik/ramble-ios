@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://goodloop.dev/ramble/sitemap.txt

@@ -2,8 +2,16 @@
 // PLACEHOLDERS awaiting Justin's decision (handoff Section 7). Change them here
 // and every page follows. Search for "PLACEHOLDER" before shipping.
 
-export const BASE_PATH = "/ramble";
-export const SITE_URL = "https://goodloop.dev/ramble";
+// The site is served from the root of its own domain (no basePath).
+export const BASE_PATH = "";
+
+// PLACEHOLDER: Ramble's own domain isn't bought yet. Until NEXT_PUBLIC_SITE_URL
+// is set in Vercel, this falls back to the Vercel production URL for the build.
+export const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ??
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : "http://localhost:3000");
 export const APP_STORE_URL = "https://apps.apple.com/app/id6761857751";
 
 // PLACEHOLDER: one-time app price. Justin said "a couple dollars"; no number is locked.

@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 
-const BASE_PATH = "/ramble";
+import { BASE_PATH } from "../lib/site";
 
 export default function CopyLlmButton() {
   const [copied, setCopied] = useState(false);

@@ -1,7 +1,4 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- .",
-  "redirects": [
-    { "source": "/", "destination": "/ramble", "permanent": false }
-  ]
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- ."
 }

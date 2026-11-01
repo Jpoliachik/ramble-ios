@@ -28,7 +28,7 @@ These are free features from existing providers (no extra API calls or cost):
 - Open source the repo on GitHub
 - Free app on App Store (Apple Speech on-device transcription + webhook — costs nothing to run)
 - $3.99/month subscription unlocks cloud transcription models via Cloudflare Worker proxy
-- Marketing website at `goodloop.dev/ramble` (source in `website/`, static export)
+- Marketing website on Vercel, moving to Ramble's own domain (source in `website/`, static export)
 - **App Store URL:** https://apps.apple.com/app/id6761857751 (Apple ID: 6761857751)
 
 ## Build & Development
@@ -65,10 +65,10 @@ deploy on them.
 cd website
 npm install
 npm run build    # Static export to website/out/
-npm run dev      # Dev server at localhost:3000/ramble
+npm run dev      # Dev server at localhost:3000
 ```
 
-The site is configured with `basePath: "/ramble"` and `output: "export"`. The `out/` directory contains plain HTML/CSS/JS — copy it into the goodloop.dev repo to serve at `goodloop.dev/ramble`. No server runtime needed.
+The site is a static export (`output: "export"`) deployed on Vercel from the `website/` root directory, with a preview deployment for every PR that touches it. It is served from the root of Ramble's own domain (not chosen yet), so there is no `basePath`.
 
 **Pages:** Landing (`/`), Privacy Policy (`/privacy`), Terms of Use (`/terms`), Connect your agent + relay API (`/docs`), Webhook API Docs (`/docs/webhooks`)
 

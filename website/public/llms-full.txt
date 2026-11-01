@@ -6,7 +6,7 @@ Ramble is a watch app with an iPhone companion. You tap the watch and talk; the 
 
 This document covers the agent connection (Ramble Relay), its API, what it stores, and the webhook API.
 
-Placeholders: values marked (PLACEHOLDER) are proposed and not final. The hosted relay's hostname is not decided yet; examples use `https://<relay-host>`. It will be listed at https://goodloop.dev/ramble/docs at launch.
+Placeholders: values marked (PLACEHOLDER) are proposed and not final. The hosted relay's hostname is not decided yet; examples use `https://<relay-host>`. It will be listed in the docs at launch.
 
 # Part 1: Connect your agent
 
@@ -319,5 +319,5 @@ Webhooks fire after transcription completes — not after recording. Transcripti
 - One-time purchase: $2.99 (PLACEHOLDER). Includes on-device transcription, the agent connection (relay), and webhooks.
 - Optional cloud transcription: $3.99/month (PLACEHOLDER), cancel anytime in iOS Settings. Everything else keeps working without it. The transcription proxy is stateless and stores no audio or transcripts.
 - No accounts. Transcripts pass through the relay and are deleted on delivery, or after 30 days (PLACEHOLDER) at most if never picked up. Audio never goes to the relay.
-- Website: https://goodloop.dev/ramble
-- Docs: https://goodloop.dev/ramble/docs (agent) and https://goodloop.dev/ramble/docs/webhooks (webhooks)
+- Website: Ramble's own domain (not yet chosen)
+- Docs: /docs (agent) and /docs/webhooks (webhooks) on the website
