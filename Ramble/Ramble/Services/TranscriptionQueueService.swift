@@ -215,6 +215,9 @@ final class TranscriptionQueueService: ObservableObject {
                 WebhookQueueService.shared.enqueue(recordingId: job.recordingId)
             }
 
+            // Hand it to connected agents via the relay (no-op if none)
+            RelayQueueService.shared.enqueue(recordingId: job.recordingId)
+
             processNextIfNeeded()
 
         } catch TranscriptionError.subscriptionRequired {

@@ -16,6 +16,29 @@ enum Constants {
         static let longWarningDuration: TimeInterval = 30 * 60
     }
 
+    enum Relay {
+        /// The hosted Ramble Relay. Not chosen yet — until it is, the relay is
+        /// reachable only through the developer override in the debug sheet
+        /// (a self-hosted or `wrangler dev` relay).
+        static let hostedBaseURL: URL? = nil
+
+        /// UserDefaults key for the developer override above.
+        static let baseURLOverrideKey = "relayBaseURLOverride"
+
+        /// What the hosted relay's RETENTION_SECONDS is set to. Shown in the
+        /// privacy copy; keep in sync with relay/wrangler.toml.
+        static let retentionHours = 24
+
+        static var baseURL: URL? {
+            if let override = UserDefaults.standard.string(forKey: baseURLOverrideKey),
+               !override.isEmpty,
+               let url = URL(string: override) {
+                return url
+            }
+            return hostedBaseURL
+        }
+    }
+
     enum Transcription {
         /// Maximum file size for a single cloud upload (24 MB, under Whisper's 25 MB limit)
         static let maxSingleUploadSize = 24 * 1024 * 1024

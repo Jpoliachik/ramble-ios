@@ -64,7 +64,7 @@ struct RecordingRowView: View {
     private var statusIcon: some View {
         switch recording.status {
         case .completed:
-            switch recording.webhookStatus {
+            switch recording.deliveryStatus {
             case .pending, .sending:
                 ProgressView()
                     .controlSize(.mini)

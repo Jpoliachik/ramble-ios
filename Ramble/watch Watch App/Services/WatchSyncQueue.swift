@@ -22,9 +22,7 @@ final class WatchSyncQueue: ObservableObject {
     @Published private(set) var pendingCount: Int = 0
     @Published private(set) var isSyncing: Bool = false
 
-    private(set) var jobs: [WatchSyncJob] = []
-
-    private static let maxRetries = 50
+    @Published private(set) var jobs: [WatchSyncJob] = []
 
     private static var queueFileURL: URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -74,12 +72,8 @@ final class WatchSyncQueue: ObservableObject {
         jobs[idx].retryCount += 1
         jobs[idx].lastAttemptAt = Date()
 
-        // If we've exceeded max retries, give up (prevents infinite retries for corrupt files)
-        if jobs[idx].retryCount >= Self.maxRetries {
-            print("WatchSyncQueue: giving up on job \(jobId) after \(Self.maxRetries) retries")
-            deleteLocalFile(for: jobs[idx])
-            jobs.remove(at: idx)
-        }
+        // Never give up and never delete the audio here: the watch may hold the
+        // only copy. Retries are spaced out by WatchConnectivityService.
 
         pendingCount = jobs.count
         isSyncing = false
@@ -134,13 +128,5 @@ final class WatchSyncQueue: ObservableObject {
     private func saveQueue() {
         guard let data = try? JSONEncoder().encode(jobs) else { return }
         try? data.write(to: Self.queueFileURL)
-    }
-
-    private func deleteLocalFile(for job: WatchSyncJob) {
-        let documentsDir = FileManager.default.urls(
-            for: .documentDirectory, in: .userDomainMask
-        )[0]
-        let fileURL = documentsDir.appendingPathComponent(job.audioFileName)
-        try? FileManager.default.removeItem(at: fileURL)
     }
 }

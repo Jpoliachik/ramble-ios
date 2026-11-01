@@ -15,6 +15,7 @@ private enum SettingsLinks {
 struct SettingsView: View {
     @StateObject private var viewModel = SettingsViewModel()
     @ObservedObject private var subscriptionService = SubscriptionService.shared
+    @ObservedObject private var relay = RelayService.shared
     @Environment(\.dismiss) private var dismiss
     @State private var showDeleteConfirmation = false
     @State private var showExportShare = false
@@ -24,6 +25,8 @@ struct SettingsView: View {
     @State private var exportURL: URL?
     @State private var versionTapCount = 0
     @State private var showDebugSheet = false
+    @State private var showConnectAgent = false
+    @State private var connectAgentStart: RelayAgent?
 
     var body: some View {
         NavigationView {
@@ -31,6 +34,7 @@ struct SettingsView: View {
                 freeTranscriptionSection
                 cloudTranscriptionSection
                 cloudTuningSection
+                agentSection
                 webhookSection
                 appearanceSection
                 statsSection
@@ -67,6 +71,13 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showDestinationEdit) {
                 WebhookDestinationEditSheet(viewModel: viewModel)
+            }
+            .sheet(isPresented: $showConnectAgent) {
+                ConnectAgentView(startPairingWith: connectAgentStart)
+            }
+            .task {
+                guard relay.isConfigured, relay.hasInbox else { return }
+                try? await relay.refreshConnections()
             }
         }
     }
@@ -200,6 +211,70 @@ struct SettingsView: View {
         }
         .disabled(!isCloud)
         .opacity(isCloud ? 1 : 0.5)
+    }
+
+    private var agentSection: some View {
+        Section {
+            if !relay.isConfigured {
+                Text("The Ramble relay isn't available in this build yet.")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.obInkFaint)
+            } else {
+                if !relay.connections.isEmpty {
+                    BrandCard {
+                        ForEach(Array(relay.connections.enumerated()), id: \.element.id) { index, connection in
+                            Button {
+                                connectAgentStart = nil
+                                showConnectAgent = true
+                            } label: {
+                                HStack(spacing: 12) {
+                                    AgentConnectionRow(connection: connection)
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundStyle(Color.obInkFaint)
+                                }
+                                .padding(.vertical, 12)
+                                .padding(.horizontal, 16)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+
+                            if index < relay.connections.count - 1 {
+                                BrandRowDivider(leadingInset: 56)
+                            }
+                        }
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                    .listRowSeparator(.hidden)
+                }
+
+                BrandPlusActionCard(title: connectActionTitle) {
+                    // One provider on offer: skip the picker, go straight to a code.
+                    connectAgentStart = ConnectAgentView.onlyAgent
+                    showConnectAgent = true
+                }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                .listRowSeparator(.hidden)
+            }
+        } header: {
+            VStack(alignment: .leading, spacing: 14) {
+                SettingsGroupTitle(
+                    title: "Send to your agent",
+                    subtitle: "Record on your watch. Your agent handles it."
+                )
+                if relay.isConfigured && !relay.connections.isEmpty {
+                    SettingsSubsectionLabel("Connected")
+                }
+            }
+            .textCase(.none)
+        }
+    }
+
+    private var connectActionTitle: String {
+        if ConnectAgentView.onlyAgent != nil { return ConnectAgentView.connectTitle }
+        return relay.connections.isEmpty ? "Connect an agent" : "Connect another agent"
     }
 
     private var webhookSection: some View {
@@ -610,6 +685,7 @@ struct DebugSheet: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var viewModel: SettingsViewModel
     @State private var attestStatus = ""
+    @AppStorage(Constants.Relay.baseURLOverrideKey) private var relayBaseURLOverride = ""
     @State private var isReattesting = false
 
     var body: some View {
@@ -630,6 +706,28 @@ struct DebugSheet: View {
                             .buttonStyle(.plain)
                         }
                     }
+                }
+
+                Section {
+                    HStack {
+                        TextField("https://relay.example.com", text: $relayBaseURLOverride)
+                            .keyboardType(.URL)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                        if !relayBaseURLOverride.isEmpty {
+                            Button {
+                                relayBaseURLOverride = ""
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                } header: {
+                    Text("Relay")
+                } footer: {
+                    Text("Point at a self-hosted or `wrangler dev` relay, e.g. http://localhost:8787. Leave empty for the built-in relay. The server bypass key above is sent as the relay's X-Dev-Bypass header.")
                 }
 
                 Section("App Attest") {

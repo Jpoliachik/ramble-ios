@@ -14,6 +14,10 @@ final class WatchConnectivityService: NSObject, ObservableObject {
     @Published var isTransferring = false
     @Published var lastTransferSuccess: Bool?
 
+    /// Recording IDs currently handed to WatchConnectivity and not yet finished.
+    @Published private(set) var inFlightIDs: Set<UUID> = []
+    @Published private(set) var isPhoneReachable = false
+
     // Phone recording state
     @Published var phoneIsRecording = false
     @Published var phoneRecordingStartTime: Date?
@@ -26,6 +30,7 @@ final class WatchConnectivityService: NSObject, ObservableObject {
     private var activeTransfers: [WCSessionFileTransfer: UUID] = [:]
 
     private let syncQueue = WatchSyncQueue.shared
+    private var retryTask: Task<Void, Never>?
 
     override init() {
         super.init()
@@ -144,17 +149,21 @@ final class WatchConnectivityService: NSObject, ObservableObject {
             return
         }
 
-        isTransferring = true
-        syncQueue.updateSyncingState(isActive: true)
-
         let transfer = WCSession.default.transferFile(
             fileURL,
             metadata: ["recording": metadataString]
         )
         activeTransfers[transfer] = job.id
+        refreshTransferState()
     }
 
     func retryPendingTransfers() {
+        guard WCSession.default.activationState == .activated else { return }
+
+        // Transfers queued before the app was relaunched are still owned by the
+        // system. Track them again instead of sending a duplicate.
+        adoptOutstandingTransfers()
+
         let pendingJobs = syncQueue.jobsNeedingRetry()
         guard !pendingJobs.isEmpty else { return }
 
@@ -163,6 +172,53 @@ final class WatchConnectivityService: NSObject, ObservableObject {
             // Don't re-send jobs already in-flight
             guard !activeTransfers.values.contains(job.id) else { continue }
             transferJob(job)
+        }
+    }
+
+    private func adoptOutstandingTransfers() {
+        for transfer in WCSession.default.outstandingFileTransfers {
+            // Match by recording ID, not object identity: the system may hand back
+            // a different WCSessionFileTransfer instance for the same transfer.
+            guard let jobId = recordingId(for: transfer),
+                  !activeTransfers.values.contains(jobId),
+                  syncQueue.jobs.contains(where: { $0.id == jobId })
+            else { continue }
+            activeTransfers[transfer] = jobId
+        }
+        refreshTransferState()
+    }
+
+    private func recordingId(for transfer: WCSessionFileTransfer) -> UUID? {
+        guard let metadataString = transfer.file.metadata?["recording"] as? String,
+              let metadataData = metadataString.data(using: .utf8),
+              let metadata = try? JSONDecoder().decode(RecordingMetadata.self, from: metadataData)
+        else { return nil }
+        return UUID(uuidString: metadata.recordingId)
+    }
+
+    private func refreshTransferState() {
+        let ids = Set(activeTransfers.values)
+        if ids != inFlightIDs { inFlightIDs = ids }
+        isTransferring = !ids.isEmpty
+        syncQueue.updateSyncingState(isActive: !ids.isEmpty)
+    }
+
+    /// Back off after a failed transfer: 10s, 20s, 40s ... capped at 5 minutes.
+    private func scheduleRetry(attempt: Int) {
+        let delay = min(5 * pow(2.0, Double(max(attempt, 1))), 300)
+        retryTask?.cancel()
+        retryTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(delay))
+            guard !Task.isCancelled else { return }
+            self?.retryPendingTransfers()
+        }
+    }
+
+    private func updateReachability(_ reachable: Bool) {
+        let becameReachable = reachable && !isPhoneReachable
+        isPhoneReachable = reachable
+        if becameReachable {
+            retryPendingTransfers()
         }
     }
 }
@@ -182,11 +238,23 @@ extension WatchConnectivityService: WCSessionDelegate {
         // Load any pending state from application context
         if activationState == .activated {
             let context = session.receivedApplicationContext
-            if !context.isEmpty {
-                Task { @MainActor in
+            let reachable = session.isReachable
+            Task { @MainActor in
+                if !context.isEmpty {
                     self.handleReceivedMessage(context)
                 }
+                self.isPhoneReachable = reachable
+                // Launch-time retries run before activation finishes and are
+                // skipped, so pick up anything still queued now.
+                self.retryPendingTransfers()
             }
+        }
+    }
+
+    nonisolated func sessionReachabilityDidChange(_ session: WCSession) {
+        let reachable = session.isReachable
+        Task { @MainActor in
+            self.updateReachability(reachable)
         }
     }
 
@@ -211,17 +279,23 @@ extension WatchConnectivityService: WCSessionDelegate {
         error: Error?
     ) {
         Task { @MainActor in
-            guard let jobId = activeTransfers.removeValue(forKey: fileTransfer) else {
-                // Transfer we don't know about (possibly from before app restart)
-                // Update UI state based on remaining transfers
-                isTransferring = !activeTransfers.isEmpty
+            // Fall back to the metadata for transfers started before a relaunch.
+            guard let jobId = activeTransfers.removeValue(forKey: fileTransfer)
+                    ?? recordingId(for: fileTransfer),
+                  syncQueue.jobs.contains(where: { $0.id == jobId })
+            else {
+                refreshTransferState()
                 return
             }
+            // Drop any other handle tracked for the same recording
+            activeTransfers = activeTransfers.filter { $0.value != jobId }
 
             if let error = error {
                 print("File transfer failed for job \(jobId): \(error)")
                 lastTransferSuccess = false
                 syncQueue.markFailed(jobId: jobId)
+                let attempts = syncQueue.jobs.first { $0.id == jobId }?.retryCount ?? 1
+                scheduleRetry(attempt: attempts)
             } else {
                 print("File transfer succeeded for job \(jobId)")
                 lastTransferSuccess = true
@@ -239,8 +313,7 @@ extension WatchConnectivityService: WCSessionDelegate {
                 syncQueue.markCompleted(jobId: jobId)
             }
 
-            isTransferring = !activeTransfers.isEmpty
-            syncQueue.updateSyncingState(isActive: !activeTransfers.isEmpty)
+            refreshTransferState()
         }
     }
 }

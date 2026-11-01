@@ -30,12 +30,16 @@ final class WatchRecordingManager: ObservableObject {
         audioRecorder.$audioLevel.assign(to: &$audioLevel)
     }
 
-    func startRecording() {
+    /// Returns false if recording could not start (e.g. no microphone access).
+    @discardableResult
+    func startRecording() -> Bool {
         do {
             _ = try audioRecorder.startRecording()
             connectivity.sendRecordingStarted()
+            return true
         } catch {
             print("Failed to start recording: \(error)")
+            return false
         }
     }
 
@@ -45,9 +49,10 @@ final class WatchRecordingManager: ObservableObject {
 
         // Add to persistent queue FIRST, then attempt transfer
         let audioFileName = result.url.lastPathComponent
+        // createdAt is when the recording started, matching the phone's own recordings
         let job = syncQueue.addJob(
             audioFileName: audioFileName,
-            createdAt: Date(),
+            createdAt: Date().addingTimeInterval(-result.duration),
             duration: result.duration
         )
 
