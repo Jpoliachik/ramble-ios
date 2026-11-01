@@ -18,6 +18,7 @@ concurrency:
 
 permissions:
   contents: read
+  pull-requests: read  # paths-filter lists PR files via the API
 
 jobs:
   changes:
@@ -28,7 +29,7 @@ jobs:
       website: ${{ steps.filter.outputs.website }}
       proxy: ${{ steps.filter.outputs.proxy }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dorny/paths-filter@v3
         id: filter
         with:
@@ -52,8 +53,8 @@ jobs:
       run:
         working-directory: proxy
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: npm
@@ -70,8 +71,8 @@ jobs:
       run:
         working-directory: website
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: npm
@@ -94,7 +95,7 @@ jobs:
       # CI only compiles for the simulator, so no signing identity is needed.
       SIGNING: CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Show Xcode
         run: xcodebuild -version
       - name: Build iOS app
