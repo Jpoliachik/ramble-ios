@@ -17,6 +17,12 @@ Copy for the watch-to-agent release. Character counts are for the text inside ea
 Ramble: Watch to Agent
 ```
 
+Alternative (26 / 30), clearer for people who don't know what "Watch to Agent" means:
+
+```
+Ramble: Talk to Your Agent
+```
+
 If the current listing name should stay as "Ramble", that works too; the subtitle carries the message.
 
 ## Subtitle (30 / 30)
@@ -25,24 +31,25 @@ If the current listing name should stay as "Ramble", that works too; the subtitl
 Say it. Your agent handles it.
 ```
 
-## Promotional text (162 / 170)
+## Promotional text (161 / 170)
 
 ```
-Tap your Apple Watch and say it. Ramble transcribes it on your iPhone and hands it to your agent, which takes care of it later. Connect with a short pairing code.
+Tap your Apple Watch and talk. Your iPhone transcribes it and passes it to your agent, which takes care of it within minutes. Set up with one short pairing code.
 ```
 
-## Keywords (99 / 100)
+## Keywords (98 / 100)
 
 Comma-separated, no spaces after commas. Leaves out "Ramble" and words already in the name and subtitle where possible, and no third-party product names (App Review rejects those).
 
 ```
-wrist,todo,voice,dictation,transcribe,speech to text,whisper,webhook,inbox,capture,memo,notes,relay
+wrist,todo,voice,dictation,transcribe,speech to text,whisper,webhook,reminder,assistant,memo,notes
 ```
 
-## Description (2698 / 4000)
+## Description (2756 / 4000)
 
 ```
 Record on your watch. Your agent handles it.
+Works with Muse today.
 
 Tap your Apple Watch and talk. Put your arm down. Ramble transcribes what you said on your iPhone and forwards it to your agent, which takes care of it on its next check-in. No phone out, no screen, no reply to wait for.
 
@@ -57,8 +64,8 @@ Your agent checks in on a schedule, so a few minutes between talking and the age
 
 PRIVATE BY DESIGN
 - No accounts. No sign-up, no email.
-- Audio stays on your devices. Only the transcript text is sent on.
-- Transcripts pass through Ramble Relay, a small inbox that holds them until your agent picks them up. When your agent confirms it has them, they're deleted. Anything not picked up is deleted after 24 hours.
+- With on-device transcription, audio never leaves your iPhone. Only the transcript text goes to your agent.
+- Transcripts pass through Ramble Relay, a small inbox that holds them until your agent picks them up. Once your agent picks them up, they're deleted. Anything not picked up is deleted after 24 hours.
 - The relay stores no names, emails, IP addresses, or audio. Credentials are kept only as hashes.
 - Disconnect an agent or tap Delete everything now at any time.
 - Open source. Read the code, or run your own relay.
@@ -83,7 +90,7 @@ Every transcript can also POST to any HTTPS endpoint you choose. Signed requests
 PRICING
 Ramble is a one-time purchase. On-device transcription, agent forwarding, and webhooks are included.
 
-Cloud transcription is an optional subscription. Cancel anytime in iOS Settings, and everything else keeps working.
+Cloud transcription is an optional subscription. Cancel any time in iOS Settings, and everything else keeps working.
 
 Requires an Apple Watch paired with an iPhone for watch recording. You can also record on iPhone.
 
@@ -91,14 +98,14 @@ Privacy Policy: https://goodloop.dev/ramble/privacy
 Terms of Use: https://goodloop.dev/ramble/terms
 ```
 
-## What's New (528 / 4000)
+## What's New (529 / 4000)
 
 ```
 Ramble now sends what you say to your agent.
 
 - Connect agent: tap it in Settings, get a short pairing code, and paste it to your agent. Muse connects today. More agents later.
 - Ramble Relay: transcripts wait in a private inbox until your agent picks them up, then they're deleted. Unclaimed transcripts are deleted after 24 hours. Audio never goes there.
-- Disconnect or Delete everything now, anytime.
+- Disconnect or Delete everything now, any time.
 - Ramble is now a one-time purchase. Cloud transcription stays an optional subscription.
 - Webhooks work exactly as before.
 ```

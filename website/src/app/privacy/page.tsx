@@ -5,7 +5,7 @@ import { GITHUB_URL, PAIR_CODE_TTL, RETENTION } from "@/lib/site";
 export const metadata: Metadata = {
   title: "Privacy Policy",
   description:
-    "Ramble privacy policy. No accounts. Audio stays on your phone. Transcripts pass through the relay and are deleted on delivery.",
+    "Ramble privacy policy. No accounts. With on-device transcription, audio stays on your phone. Transcripts pass through the relay and are deleted on delivery.",
 };
 
 const link = "underline hover:text-stone-900";
@@ -17,14 +17,14 @@ export default function PrivacyPolicy() {
       <article className="mx-auto max-w-2xl px-6 py-16 sm:py-24">
         <Link
           href="/"
-          className="text-sm text-stone-400 hover:text-stone-600 transition-colors"
+          className="text-sm text-stone-500 hover:text-stone-900 transition-colors"
         >
           &larr; Back to Ramble
         </Link>
         <h1 className="mt-8 text-3xl font-semibold tracking-tight text-stone-900">
           Privacy Policy
         </h1>
-        <p className="mt-2 text-sm text-stone-400">
+        <p className="mt-2 text-sm text-stone-500">
           Last updated: November 1, 2026
         </p>
 

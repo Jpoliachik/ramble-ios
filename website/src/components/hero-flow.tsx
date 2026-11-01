@@ -73,7 +73,7 @@ export default function HeroFlow() {
       </div>
 
       {/* Arrow with traveling dot */}
-      <div className="relative flex h-3 w-10 sm:w-16 shrink-0 items-center text-stone-400">
+      <div className="relative flex h-3 w-10 sm:w-16 shrink-0 items-center text-stone-500">
         <div className="h-[1.5px] w-full rounded-full bg-current" />
         <svg
           className="absolute -right-[2px] top-1/2 -translate-y-1/2"

@@ -96,7 +96,7 @@ export default function AgentDocs() {
 
         <article className="min-w-0 max-w-3xl">
           <div className="flex items-center justify-between">
-            <Link href="/" className="text-sm text-stone-400 hover:text-stone-600 transition-colors">
+            <Link href="/" className="text-sm text-stone-500 hover:text-stone-900 transition-colors">
               &larr; Back to Ramble
             </Link>
             <CopyLlmButton />
@@ -130,7 +130,7 @@ export default function AgentDocs() {
                 <strong>{RETENTION}</strong>.
               </p>
               <p>
-                This is asynchronous on purpose. Your agent pulls every few minutes, so expect a short wait between
+                This is asynchronous on purpose. Your agent checks about every {PULL_CADENCE}, so expect a short wait between
                 recording and action. The agent doesn&apos;t need to reply. If your phone is offline, recordings queue
                 on the watch and phone and go out when it reconnects.
               </p>
@@ -141,7 +141,7 @@ export default function AgentDocs() {
               <SectionHeader id="pairing">Pairing</SectionHeader>
               <ol className="list-decimal space-y-2 pl-5">
                 <li>
-                  On your iPhone, open <strong>Settings &rarr; Connect agent</strong>{" "}and pick your agent.
+                  On your iPhone, open <strong>Settings &rarr; Connect agent</strong>{" "}and tap Muse.
                 </li>
                 <li>
                   Ramble shows a short code like <InlineCode>{PAIR_CODE_EXAMPLE}</InlineCode>.
@@ -192,7 +192,7 @@ export default function AgentDocs() {
               <p>
                 Record something short on your watch to try it. Muse picks it up on its next scheduled check.
               </p>
-              <p className="text-stone-400">More agents later.</p>
+              <p className="text-stone-500">More agents later.</p>
             </section>
 
             {/* Instructions for the agent */}
@@ -273,7 +273,7 @@ export default function AgentDocs() {
               <p>
                 <InlineCode>created_at</InlineCode>{" "}is when you recorded. <InlineCode>duration</InlineCode>{" "}is in
                 seconds. Field names match the{" "}
-                <Link href="/docs/webhooks" className="text-red-500 underline-offset-2 hover:underline">
+                <Link href="/docs/webhooks" className="text-red-600 underline-offset-2 hover:underline">
                   webhook payload
                 </Link>
                 .
@@ -416,7 +416,7 @@ npx wrangler deploy`}
                   href={RELAY_README_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-red-500 underline-offset-2 hover:underline"
+                  className="text-red-600 underline-offset-2 hover:underline"
                 >
                   relay README on GitHub
                 </a>
@@ -426,7 +426,7 @@ npx wrangler deploy`}
 
             <p className="border-t border-stone-200 pt-8 text-stone-500">
               Prefer to send transcripts to your own server or an automation platform? See{" "}
-              <Link href="/docs/webhooks" className="text-red-500 underline-offset-2 hover:underline">
+              <Link href="/docs/webhooks" className="text-red-600 underline-offset-2 hover:underline">
                 Webhooks
               </Link>
               .

@@ -37,8 +37,8 @@ function Param({
     <div className="border-b border-stone-100 px-4 py-3 last:border-0">
       <div className="flex items-baseline gap-3">
         <span className="font-mono text-[13px] font-semibold text-stone-900">{name}</span>
-        <span className="font-mono text-xs text-stone-400">{type}</span>
-        {!required && <span className="rounded bg-stone-100 px-1.5 py-0.5 text-xs text-stone-400">optional</span>}
+        <span className="font-mono text-xs text-stone-500">{type}</span>
+        {!required && <span className="rounded bg-stone-100 px-1.5 py-0.5 text-xs text-stone-500">optional</span>}
       </div>
       <p className="mt-1 text-sm text-stone-500">{children}</p>
     </div>
@@ -54,7 +54,7 @@ export default function WebhookDocs() {
         {/* Main content */}
         <article className="min-w-0 max-w-3xl">
           <div className="flex items-center justify-between">
-            <Link href="/docs" className="text-sm text-stone-400 hover:text-stone-600 transition-colors">
+            <Link href="/docs" className="text-sm text-stone-500 hover:text-stone-900 transition-colors">
               &larr; Connect your agent
             </Link>
             <CopyLlmButton />
@@ -67,7 +67,7 @@ export default function WebhookDocs() {
             Every time you finish a recording, Ramble POSTs the transcript to each destination you&apos;ve added — an
             automation platform, an AI agent, your own backend, or all of them at once. Three steps to set it up.
             Webhooks work alongside the{" "}
-            <Link href="/docs" className="text-red-500 underline-offset-2 hover:underline">
+            <Link href="/docs" className="text-red-600 underline-offset-2 hover:underline">
               agent connection
             </Link>
             ; use either or both.
@@ -116,7 +116,7 @@ export default function WebhookDocs() {
                       className="rounded-lg border border-stone-200 px-4 py-3 text-center font-semibold text-stone-900 transition-colors hover:border-stone-400 hover:bg-stone-50"
                     >
                       Zapier
-                      <span className="mt-0.5 block text-xs font-normal text-stone-400">Setup guide &rarr;</span>
+                      <span className="mt-0.5 block text-xs font-normal text-stone-500">Setup guide &rarr;</span>
                     </a>
                     <a
                       href="https://www.make.com/en/help/tools/webhooks"
@@ -125,7 +125,7 @@ export default function WebhookDocs() {
                       className="rounded-lg border border-stone-200 px-4 py-3 text-center font-semibold text-stone-900 transition-colors hover:border-stone-400 hover:bg-stone-50"
                     >
                       Make
-                      <span className="mt-0.5 block text-xs font-normal text-stone-400">Setup guide &rarr;</span>
+                      <span className="mt-0.5 block text-xs font-normal text-stone-500">Setup guide &rarr;</span>
                     </a>
                     <a
                       href="https://support.airtable.com/docs/when-webhook-received-trigger"
@@ -134,7 +134,7 @@ export default function WebhookDocs() {
                       className="rounded-lg border border-stone-200 px-4 py-3 text-center font-semibold text-stone-900 transition-colors hover:border-stone-400 hover:bg-stone-50"
                     >
                       Airtable
-                      <span className="mt-0.5 block text-xs font-normal text-stone-400">Setup guide &rarr;</span>
+                      <span className="mt-0.5 block text-xs font-normal text-stone-500">Setup guide &rarr;</span>
                     </a>
                     <a
                       href="https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.webhook/"
@@ -143,11 +143,11 @@ export default function WebhookDocs() {
                       className="rounded-lg border border-stone-200 px-4 py-3 text-center font-semibold text-stone-900 transition-colors hover:border-stone-400 hover:bg-stone-50"
                     >
                       n8n
-                      <span className="mt-0.5 block text-xs font-normal text-stone-400">Setup guide &rarr;</span>
+                      <span className="mt-0.5 block text-xs font-normal text-stone-500">Setup guide &rarr;</span>
                     </a>
                   </div>
 
-                  <p className="mt-3 text-xs text-stone-400">
+                  <p className="mt-3 text-xs text-stone-500">
                     <strong>Notion</strong>{" "}and <strong>IFTTT</strong>{" "}don&apos;t accept incoming webhooks directly — use Zapier or Make as a bridge.
                   </p>
                 </div>

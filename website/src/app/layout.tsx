@@ -6,9 +6,9 @@ import "./globals.css";
 
 const TITLE = "Ramble: Record on your watch. Your agent handles it.";
 const DESCRIPTION =
-  "Tap your Apple Watch and talk. Your iPhone transcribes it, and your agent picks it up and takes it from there. On-device transcription, no accounts, open source.";
+  "Tap your Apple Watch and say it: remind me to book the dentist, add oat milk to the list. Your iPhone transcribes it and Muse takes care of it. On-device transcription, no accounts, open source.";
 const SHORT_DESCRIPTION =
-  "Tap your Apple Watch and talk. Your iPhone transcribes it. Your agent handles it.";
+  "Tap your Apple Watch and talk. Your iPhone transcribes it and Muse takes care of it.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

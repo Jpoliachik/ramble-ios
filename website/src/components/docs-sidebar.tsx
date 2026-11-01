@@ -71,7 +71,7 @@ export default function DocsSidebar({ page }: { page: DocsPage }) {
               key={p.key}
               href={p.href}
               className={`block py-1 transition-colors ${
-                p.key === page ? "text-red-500 font-medium" : "text-stone-400 hover:text-stone-900"
+                p.key === page ? "text-red-600 font-medium" : "text-stone-500 hover:text-stone-900"
               }`}
             >
               {p.label}
@@ -90,7 +90,7 @@ export default function DocsSidebar({ page }: { page: DocsPage }) {
               } ${
                 activeId === section.id
                   ? "text-stone-900 font-medium"
-                  : "text-stone-400 hover:text-stone-900"
+                  : "text-stone-500 hover:text-stone-900"
               }`}
             >
               {section.label}
