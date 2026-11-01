@@ -41,43 +41,39 @@ function SectionHeading({ eyebrow, children, sub }: { eyebrow: string; children:
 
 const steps = [
   {
-    title: "Tap your Watch and talk",
-    body: "Raise your wrist, tap record, say what's on your mind. No screen to read, nothing to type.",
+    title: "Say it",
+    body: "Tap your watch and talk. A to-do, an idea, something to look up later. Messy is fine.",
   },
   {
-    title: "Your iPhone transcribes",
-    body: "On-device with Apple Speech by default. The audio stays on your phone.",
+    title: "Ramble writes it down",
+    body: "Your iPhone turns it into text. The audio stays on your phone.",
   },
   {
-    title: "Your agent picks it up",
-    body: `Your agent checks in on a schedule, about every ${PULL_CADENCE}, and handles what you said.`,
-  },
-  {
-    title: "Then it's gone",
-    body: "Once your agent has it, Ramble deletes its copy.",
+    title: "Your agent takes it",
+    body: `Muse picks it up within about ${PULL_CADENCE} and deals with it. You don't have to.`,
   },
 ];
 
 const privacyPoints = [
   {
     Icon: AudioLines,
-    title: "Audio never goes to the relay",
-    body: "Only transcript text does. Apple Speech transcribes on your iPhone by default.",
+    title: "Audio stays on your phone",
+    body: "Only the text is sent on. With Apple Speech, transcription happens on your iPhone too.",
   },
   {
     Icon: Trash2,
-    title: "Deleted on delivery",
-    body: "The relay holds transcript text only until your agent picks it up. Then it's deleted.",
+    title: "Deleted once delivered",
+    body: "Ramble holds the text until your agent picks it up. Then it's deleted.",
   },
   {
     Icon: UserX,
     title: "No accounts",
-    body: "No email, no name, no login. We identify inboxes, not people.",
+    body: "No email, no name, no login.",
   },
   {
     Icon: Clock,
-    title: "Nothing kept for long",
-    body: `If your agent never picks a transcript up, it's deleted after ${RETENTION} at most. That window is long so nothing is lost if your agent has trouble checking in.`,
+    title: `${RETENTION} at most`,
+    body: `If your agent never picks something up, it's deleted after ${RETENTION}. Long enough to ride out an agent hiccup.`,
   },
 ];
 
@@ -98,7 +94,7 @@ const included = [
 const faqs: { q: string; a: ReactNode }[] = [
   {
     q: "Why not just talk to Muse directly?",
-    a: "You can, if your phone is out. Ramble is for when it isn't: on a walk, driving, between meetings. One tap on your wrist, no app to open, no reply to read.",
+    a: "You can, if your phone is out. Ramble is for when it isn't: on a walk, in the car, between meetings. One tap, say it, done.",
   },
   {
     q: "What if I stop using Muse?",
@@ -106,11 +102,11 @@ const faqs: { q: string; a: ReactNode }[] = [
   },
   {
     q: "Does my agent reply on my watch?",
-    a: "No. Ramble is one-way. You say it, your agent handles it on its own time. Check the results in your agent later.",
+    a: "No. You say it and move on. Your agent handles it on its own time, and you can check in with it later.",
   },
   {
     q: "How fast does it get to my agent?",
-    a: `Transcription takes seconds once the recording is on your iPhone. Your agent checks for new transcripts about every ${PULL_CADENCE}, so expect minutes, not seconds.`,
+    a: `Usually within ${PULL_CADENCE}. Transcription takes seconds; your agent checks for new ones on a schedule.`,
   },
   {
     q: "Which agents can I connect?",
@@ -120,11 +116,9 @@ const faqs: { q: string; a: ReactNode }[] = [
     q: "What does the relay store?",
     a: (
       <>
-        Transcript text waiting for pickup, with its recording time and duration. Plus what it needs to route it: a
-        random inbox id, hashed credentials, and when each agent connected and last checked in. Text is deleted the
-        moment your agent picks it up. If it never does, the text is deleted after {RETENTION} at most. The window is
-        that long so nothing is lost if your agent has trouble checking in for a while. No audio, no accounts, no names, emails,
-        or IP addresses.{" "}
+        Only the text waiting for your agent, with when it was recorded and how long it was, plus what it needs to
+        route it. Text is deleted when your agent picks it up, or after {RETENTION} if it never does. No audio, no
+        accounts, no names, emails, or IP addresses.{" "}
         <Link href="/privacy" className={inlineLink}>
           Privacy policy
         </Link>
@@ -136,8 +130,7 @@ const faqs: { q: string; a: ReactNode }[] = [
     q: "Do webhooks still work?",
     a: (
       <>
-        Yes, exactly as before. Ramble can POST every transcript to any HTTPS endpoint, signed with your secret and
-        retried on failure. Use it alongside your agent or on its own.{" "}
+        Yes. Ramble can still send every transcript to your own HTTPS endpoint, alongside your agent or instead of it.{" "}
         <Link href="/docs/webhooks" className={inlineLink}>
           Webhook docs
         </Link>
@@ -147,11 +140,11 @@ const faqs: { q: string; a: ReactNode }[] = [
   },
   {
     q: "Do I need my phone nearby?",
-    a: "Not to record. The Watch records on its own. Recordings sync to your iPhone the next time it's in range, and transcription and delivery happen there.",
+    a: "Not to record. The watch records on its own and syncs to your iPhone when it's back in range.",
   },
   {
     q: "What if I'm offline?",
-    a: "Nothing gets lost. Recordings wait in a queue on your Watch and iPhone and go out when you're back online. Each one shows its status along the way.",
+    a: "Nothing gets lost. Recordings wait on your watch and iPhone and go out when you're back online.",
   },
   {
     q: "How do I cancel cloud transcription?",
@@ -184,14 +177,14 @@ export default function Home() {
             <div className="hero-enter-logo">
               <HeroFlow />
             </div>
-            <h1 className="hero-enter-title font-serif text-4xl font-semibold tracking-tight text-stone-900 sm:text-5xl lg:text-[3.25rem] lg:leading-[1.1]">
-              Record on your watch.
+            <h1 className="hero-enter-title font-serif text-4xl font-semibold tracking-tight text-stone-900 sm:text-5xl lg:text-[2.9rem] lg:leading-[1.1]">
+              Ramble into your watch.
               <br />
               <span className="italic text-red-500">Your agent handles it.</span>
             </h1>
             <p className="hero-enter-subtitle mt-6 max-w-xl text-base leading-relaxed text-stone-500 sm:text-lg lg:text-xl">
-              Tap your Apple Watch and say it: remind me to book the dentist, add oat milk to the list. Your iPhone
-              transcribes it and Muse takes care of it.
+              Got a thought? Tap your watch and say it. Ramble writes it down and hands it to Muse, so you can stop
+              holding onto it.
             </p>
             <div className="hero-enter-buttons mt-10 flex flex-col items-center gap-3 lg:items-start">
               <div className="flex flex-col items-center gap-4 sm:flex-row">
@@ -199,12 +192,12 @@ export default function Home() {
                   <AppleLogo />
                   Download on the App Store
                 </a>
-                <a href="#connect" className={secondaryButton}>
-                  See how pairing works
+                <a href="#how" className={secondaryButton}>
+                  How it works
                   <span aria-hidden="true">&darr;</span>
                 </a>
               </div>
-              <p className="text-sm text-stone-500">{APP_PRICE}, one time. Works with Muse. No account.</p>
+              <p className="text-sm text-stone-500">{APP_PRICE}, once. Works with Muse.</p>
             </div>
           </div>
 
@@ -266,12 +259,10 @@ export default function Home() {
       </section>
 
       {/* How it works */}
-      <section className="border-t border-stone-200 bg-stone-50">
+      <section id="how" className="scroll-mt-20 border-t border-stone-200 bg-stone-50">
         <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
-          <SectionHeading eyebrow="How it works">
-            Say it once. <span className="italic">It&apos;s handled.</span>
-          </SectionHeading>
-          <ol className="mt-14 grid gap-10 sm:grid-cols-2 sm:gap-x-12 lg:grid-cols-4 lg:gap-8">
+          <SectionHeading eyebrow="How it works">Say it, then forget about it.</SectionHeading>
+          <ol className="mt-14 grid gap-10 sm:grid-cols-3 sm:gap-8">
             {steps.map((step, i) => (
               <li key={step.title} className="text-left">
                 <div className={stepBadge}>{i + 1}</div>
@@ -280,18 +271,14 @@ export default function Home() {
               </li>
             ))}
           </ol>
-          <p className="mt-12 text-center text-sm text-stone-500">
-            It&apos;s asynchronous on purpose. You don&apos;t wait for a reply. Your agent works through it while you get
-            on with your day.
-          </p>
         </div>
       </section>
 
       {/* Connect your agent */}
       <section id="connect" className="scroll-mt-20 border-t border-stone-200">
         <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
-          <SectionHeading eyebrow="Connect your agent" sub="Ramble works with Muse. Pairing takes about a minute.">
-            Hook it up to <span className="italic text-red-500">Muse</span>.
+          <SectionHeading eyebrow="Setup" sub="Takes about a minute.">
+            Connect Muse
           </SectionHeading>
 
           <div className="mt-14 grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] lg:gap-16">
@@ -301,8 +288,7 @@ export default function Home() {
                 <div>
                   <h3 className="text-sm font-semibold text-stone-900">Get a pairing code</h3>
                   <p className="mt-1 text-sm leading-relaxed text-stone-500">
-                    In Ramble on your iPhone, open Settings → Connect agent → Muse. Ramble shows a short code. It works
-                    once and expires in {PAIR_CODE_TTL}.
+                    On your iPhone, open Ramble → Settings → Connect agent → Muse. You&apos;ll get a short code.
                   </p>
                 </div>
               </li>
@@ -311,18 +297,17 @@ export default function Home() {
                 <div>
                   <h3 className="text-sm font-semibold text-stone-900">Tell Muse</h3>
                   <p className="mt-1 text-sm leading-relaxed text-stone-500">
-                    Say &ldquo;I downloaded Ramble, connect it&rdquo; and paste the code. Muse uses it to connect. Its
-                    access is limited to picking up your transcripts.
+                    Say &ldquo;I downloaded Ramble, connect it&rdquo; and paste the code. Muse can only pick up your
+                    transcripts, nothing else.
                   </p>
                 </div>
               </li>
               <li className="flex gap-4">
                 <span className={stepBadge}>3</span>
                 <div>
-                  <h3 className="text-sm font-semibold text-stone-900">Talk to your Watch</h3>
+                  <h3 className="text-sm font-semibold text-stone-900">Start talking</h3>
                   <p className="mt-1 text-sm leading-relaxed text-stone-500">
-                    Muse checks for new recordings about every {PULL_CADENCE}. Expect minutes, not seconds. Disconnect
-                    from the same screen any time. Muse loses access and anything still waiting is deleted.
+                    That&apos;s it. You can disconnect from the same screen any time.
                   </p>
                 </div>
               </li>
@@ -354,7 +339,7 @@ export default function Home() {
             <div className="rounded-xl border border-stone-200 p-5">
               <h3 className="text-sm font-semibold text-stone-900">More agents later</h3>
               <p className="mt-1 text-sm leading-relaxed text-stone-500">
-                Muse is the one we support today. Curious how the connection works?{" "}
+                Muse is the only one for now. Curious how it works under the hood?{" "}
                 <Link href="/docs" className={inlineLink}>
                   Read the docs
                 </Link>
@@ -364,7 +349,7 @@ export default function Home() {
             <div className="rounded-xl border border-stone-200 p-5">
               <h3 className="text-sm font-semibold text-stone-900">Have your own endpoint?</h3>
               <p className="mt-1 text-sm leading-relaxed text-stone-500">
-                Webhooks still work. Ramble can POST each transcript to any HTTPS URL, signed and retried.{" "}
+                Ramble can also send each transcript to any HTTPS URL.{" "}
                 <Link href="/docs/webhooks" className={inlineLink}>
                   Webhook docs
                 </Link>
@@ -378,11 +363,8 @@ export default function Home() {
       {/* Transcription */}
       <section className="border-t border-stone-200 bg-stone-50">
         <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
-          <SectionHeading
-            eyebrow="Transcription"
-            sub="Apple Speech runs on your iPhone by default. Free, private, works out of the box."
-          >
-            On-device by default. <span className="italic">Cloud if you want it.</span>
+          <SectionHeading eyebrow="Transcription" sub="Apple Speech runs on your iPhone and is included. Cloud models are optional.">
+            On your phone by default
           </SectionHeading>
           <div className="mx-auto mt-12 max-w-3xl overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-stone-200/80">
             <div className="flex items-center justify-between gap-4 border-b border-stone-200 bg-sage-50 px-5 py-4">
@@ -397,7 +379,7 @@ export default function Home() {
             <div className="px-5 py-4">
               <p className="text-sm font-semibold text-stone-900">Cloud models</p>
               <p className="text-sm text-stone-500">
-                Groq, Deepgram, and OpenAI, for sharper transcripts on accents, jargon, or wind. {CLOUD_PRICE}.
+                More accurate with accents, jargon, or background noise. {CLOUD_PRICE}.
               </p>
             </div>
             <details className="group border-t border-stone-200">
@@ -431,9 +413,7 @@ export default function Home() {
       {/* Pricing */}
       <section className="border-t border-stone-200">
         <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
-          <SectionHeading eyebrow="Pricing">
-            Pay once. <span className="italic">Cloud is optional.</span>
-          </SectionHeading>
+          <SectionHeading eyebrow="Pricing">Pay once</SectionHeading>
           <div className="mx-auto mt-12 grid max-w-3xl gap-6 sm:grid-cols-2">
             <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-stone-200/80">
               <p className="text-sm font-semibold text-stone-900">Ramble</p>
@@ -467,7 +447,7 @@ export default function Home() {
                 )}
               </p>
               <p className="mt-6 text-sm leading-relaxed text-stone-500">
-                Groq, Deepgram, and OpenAI models. Cancel any time in iOS Settings; everything else keeps working.
+                For better accuracy. Cancel any time and everything else keeps working.
               </p>
             </div>
           </div>
@@ -477,11 +457,8 @@ export default function Home() {
       {/* Privacy */}
       <section className="border-t border-stone-200 bg-stone-50">
         <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
-          <SectionHeading
-            eyebrow="Privacy"
-            sub="Your transcripts pass through the relay on their way to your agent. They don't live there."
-          >
-            Passes through. <span className="italic">Doesn&apos;t stay.</span>
+          <SectionHeading eyebrow="Privacy" sub="Ramble keeps your words only as long as it takes to get them to your agent.">
+            Your thoughts don&apos;t stick around
           </SectionHeading>
           <div className="mt-14 grid gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8">
             {privacyPoints.map(({ Icon, title, body }) => (
@@ -495,9 +472,8 @@ export default function Home() {
             ))}
           </div>
           <p className="mx-auto mt-12 max-w-3xl text-center text-sm leading-relaxed text-stone-500">
-            Disconnect any time from the app, and anything still waiting is deleted. Pairing codes and agent tokens are
-            stored only as hashes. If you turn on cloud transcription, audio goes to the model you pick through a proxy
-            that stores nothing.{" "}
+            Disconnect any time and anything still waiting is deleted. With cloud transcription on, audio goes to the
+            model you pick and isn&apos;t stored.{" "}
             <Link href="/privacy" className={inlineLink}>
               Full privacy policy
             </Link>
@@ -530,10 +506,10 @@ export default function Home() {
       <section className="border-t border-stone-200 bg-stone-50">
         <div className="mx-auto max-w-5xl px-6 py-20 text-center sm:py-24">
           <h2 className="font-serif text-3xl font-semibold tracking-tight text-stone-900 sm:text-4xl">
-            Tap. Talk. <span className="italic text-red-500">Handled.</span>
+            Get it off your mind.
           </h2>
           <p className="mt-4 text-base text-stone-500">
-            {APP_PRICE}, one time. Apple Watch and iPhone. Works with Muse. No accounts.
+            {APP_PRICE}, once. For Apple Watch and iPhone.
           </p>
           <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
             <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className={primaryButton}>

@@ -4,11 +4,11 @@ import Header from "../components/header";
 import { BASE_PATH, SITE_URL } from "../lib/site";
 import "./globals.css";
 
-const TITLE = "Ramble: Record on your watch. Your agent handles it.";
+const TITLE = "Ramble: Talk to your watch. Your agent handles it.";
 const DESCRIPTION =
-  "Tap your Apple Watch and say it: remind me to book the dentist, add oat milk to the list. Your iPhone transcribes it and Muse takes care of it. On-device transcription, no accounts, transcripts deleted on delivery.";
+  "Got a thought? Tap your Apple Watch and say it. Ramble writes it down and hands it to Muse, so you can stop holding onto it. Transcripts are deleted once delivered.";
 const SHORT_DESCRIPTION =
-  "Tap your Apple Watch and talk. Your iPhone transcribes it and Muse takes care of it.";
+  "Tap your Apple Watch and say it. Ramble hands it to Muse.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
