@@ -17,10 +17,11 @@ enum Constants {
     }
 
     enum Relay {
-        /// The hosted Ramble Relay. Not chosen yet — until it is, the relay is
-        /// reachable only through the developer override in the debug sheet
-        /// (a self-hosted or `wrangler dev` relay).
-        static let hostedBaseURL: URL? = nil
+        /// The hosted Ramble Relay. It's served by the same Worker as cloud
+        /// transcription (proxy/), so it shares that host and its App Attest
+        /// state. Until the Worker's D1 database is set up, relay calls get a
+        /// 503 and the Connect screen shows that error.
+        static let hostedBaseURL = URL(string: "https://ramble-transcription-proxy.jpoliachik.workers.dev")
 
         /// UserDefaults key for the developer override above.
         static let baseURLOverrideKey = "relayBaseURLOverride"

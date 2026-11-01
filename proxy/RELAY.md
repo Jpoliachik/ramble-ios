@@ -2,7 +2,7 @@
 
 The relay moves transcripts from Ramble to your agent. You talk to your watch, Ramble transcribes on the phone, and the relay holds the text until your agent picks it up. When the agent acknowledges it, the relay deletes it. Anything not picked up is deleted after 24 hours.
 
-It's a Cloudflare Worker with a small D1 database. The code is here so you can check exactly what it does, or run your own.
+It runs in the same Cloudflare Worker as the [transcription proxy](README.md), under its own routes, with a small D1 database. The code is `src/relay.js`. It's here so you can check exactly what it does, or run your own.
 
 ## What it stores
 
@@ -38,12 +38,12 @@ Watch ──► iPhone (transcribe) ──POST /inbox──► relay ──GET /
 
 | Direction | Credential | Header |
 |---|---|---|
-| App → relay | Inbox secret, plus an App Attest assertion when creating an inbox or uploading | `Authorization: Bearer rmbi_…`, `X-App-Attest-Key-Id`, `X-App-Attest` |
+| App → relay | Inbox secret. Creating the inbox also needs an App Attest assertion. | `Authorization: Bearer rmbi_…` (and `X-App-Attest-Key-Id`, `X-App-Attest` on `POST /inboxes`) |
 | Agent → relay | Connection token from the pairing exchange | `Authorization: Bearer rmba_…` |
 
-App Attest uses the same scheme as the [transcription proxy](../proxy/README.md#app-attest-implementation-notes): the assertion signs a SHA-256 of the raw request body. The hosted relay shares the proxy's `ATTEST_KV`, so a device attested with the proxy doesn't attest again. A self-hosted relay serves `/attest/challenge` and `/attest` itself.
+App Attest is checked once, when the phone creates its inbox. That proves the inbox belongs to a real copy of Ramble on a real Apple device. It uses the same scheme and storage as `/transcribe` (see [App Attest Implementation Notes](README.md#app-attest-implementation-notes)), so a device that attested for cloud transcription doesn't attest again.
 
-Disconnect, Delete everything, listing connections, and issuing pairing codes need only the inbox secret, so the kill switches keep working even if attestation is having a bad day.
+Everything after that needs only the inbox secret: uploads, pairing codes, listing connections, Disconnect, and Delete everything. Delivery and the kill switches keep working even if attestation is having a bad day.
 
 Each credential works only on its own side: an agent token can't upload or manage connections, and the inbox secret can't pull.
 
@@ -56,7 +56,7 @@ All bodies are JSON. Errors are `{"error": "..."}` with a 4xx/5xx status.
 | Method | Path | Auth | Body → Response |
 |---|---|---|---|
 | `POST` | `/inboxes` | App Attest | — → `201 {"inbox_id", "inbox_secret"}` (secret is returned once) |
-| `POST` | `/inbox` | App Attest + inbox secret | `{"recording_id", "created_at", "duration", "transcription"}` → `{"queued": <agents>, "expires_at"}` |
+| `POST` | `/inbox` | inbox secret | `{"recording_id", "created_at", "duration", "transcription"}` → `{"queued": <agents>, "expires_at"}` |
 | `DELETE` | `/inbox[?connection_id=]` | inbox secret | — → `{"deleted": <n>}` |
 | `POST` | `/pair/code` | inbox secret | `{"agent_type": "muse" \| "chatgpt" \| "grok" \| "claude" \| "other"}` → `201 {"code", "agent_type", "expires_at"}` |
 | `GET` | `/connections` | inbox secret | — → `{"connections": [{"id", "agent_type", "created_at", "last_pull_at", "pending"}]}` |
@@ -119,12 +119,7 @@ Authorization: Bearer rmba_…
 
 Deletes those items now. Up to 500 ids per call. Ack only after the agent has durably handled the item; an unacked item is retried on the next pull until it expires.
 
-### Other
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/health` | `{"status": "ok"}` |
-| `POST` | `/attest/challenge`, `/attest` | App Attest registration (same as the proxy) |
+The Worker's `/health`, `/attest/challenge`, and `/attest` endpoints serve the relay too.
 
 ## For agents
 
@@ -138,33 +133,33 @@ The loop is small enough to describe to any agent that can make HTTP requests an
 
 ## Deploy Your Own
 
-You need a Cloudflare account. The free tier is enough for personal use.
+The relay deploys with the proxy. Follow [Deploy Your Own](README.md#deploy-your-own) first, then:
 
-1. `cd relay && npm ci`
-2. `cp wrangler.example.toml wrangler.toml` and set `account_id`.
-3. Create the database and apply the schema:
+1. Create the database:
    ```bash
-   npx wrangler d1 create ramble-relay          # paste the id into wrangler.toml
+   npx wrangler d1 create ramble-relay
+   ```
+2. In `wrangler.toml`, uncomment the `[[d1_databases]]` block and paste the id.
+3. Apply the schema:
+   ```bash
    npx wrangler d1 migrations apply ramble-relay --remote
    ```
-4. Create the App Attest store, or reuse your proxy's:
-   ```bash
-   npx wrangler kv namespace create ATTEST_KV  # paste the id into wrangler.toml
-   ```
-5. Optionally set `RETENTION_SECONDS` in `wrangler.toml` (default 86400, 24 hours).
-6. `npx wrangler deploy`
+4. Optionally set `RETENTION_SECONDS` under `[vars]` (default 86400, 24 hours).
+5. `npx wrangler deploy`
 
-App Attest only works from a real device running a copy of Ramble whose bundle ID matches. For simulator testing, `npx wrangler secret put DEV_BYPASS_TOKEN` and send it as `X-Dev-Bypass`; leave it unset in production.
+Until the D1 binding exists, relay routes answer `503` and transcription works as before.
 
-`relay/wrangler.toml` is git-ignored so account-specific ids don't get committed.
+App Attest only works from a real device running a copy of Ramble whose bundle ID matches. For simulator testing, `npx wrangler secret put DEV_BYPASS_TOKEN` and send it as `X-Dev-Bypass`. Leave it unset in production.
+
+In the app, the debug sheet (tap the version number in Settings) has a relay URL override for pointing at your deployment.
 
 ### Local development
 
 ```bash
-cp wrangler.example.toml wrangler.toml       # any placeholder ids work locally
+cp wrangler.toml wrangler.local.toml          # uncomment the D1 block; any id works locally
 echo 'DEV_BYPASS_TOKEN="dev"' > .dev.vars
-npx wrangler d1 migrations apply ramble-relay --local
-npm run dev
+npx wrangler d1 migrations apply ramble-relay --local -c wrangler.local.toml
+npx wrangler dev -c wrangler.local.toml
 ```
 
 ## Tests
@@ -173,4 +168,4 @@ npm run dev
 npm test
 ```
 
-The tests run every endpoint against the real schema, using Node's built-in SQLite in place of D1. App Attest is stubbed because it needs a real device. CI runs them on every PR touching `relay/` or the proxy's attest code.
+The relay tests run every endpoint against the real schema, using Node's built-in SQLite in place of D1. App Attest is stubbed because it needs a real device. CI runs them with the proxy's tests on every PR touching `proxy/`.

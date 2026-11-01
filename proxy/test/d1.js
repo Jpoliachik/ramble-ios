@@ -5,7 +5,7 @@
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 
-const SCHEMA = new URL('../migrations/0001_init.sql', import.meta.url);
+const SCHEMA = new URL('../migrations/0001_relay.sql', import.meta.url);
 
 export function createTestDB() {
   const sqlite = new DatabaseSync(':memory:');

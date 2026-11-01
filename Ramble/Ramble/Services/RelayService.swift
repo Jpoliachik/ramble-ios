@@ -193,7 +193,9 @@ final class RelayService: ObservableObject {
             "transcription": transcription,
         ]
         let body = try JSONSerialization.data(withJSONObject: payload)
-        let data = try await send("POST", "inbox", body: body, auth: try await ensureInbox(), attest: true)
+        // No attestation here: the device proved itself once when the inbox
+        // was created, and delivery shouldn't hinge on attestation working.
+        let data = try await send("POST", "inbox", body: body, auth: try await ensureInbox())
         return try decoder.decode(UploadResult.self, from: data).queued
     }
 

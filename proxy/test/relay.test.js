@@ -12,7 +12,8 @@ import {
   PAIR_CODE_ALPHABET,
   PAIR_CODE_TTL_SECONDS,
   generatePairCode,
-  handleRequest,
+  handleRelayRequest,
+  isRelayPath,
   normalizePairCode,
   purgeExpired,
   retentionSeconds,
@@ -48,7 +49,7 @@ async function call(method, path, { body, auth, attest = true, headers = {} } = 
     headers: h,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  const res = await handleRequest(request, env, {
+  const res = await handleRelayRequest(request, env, {
     now,
     verifyAssertion: async () => (attestOK ? { valid: true } : { valid: false, reason: 'stub' }),
   });
@@ -189,12 +190,13 @@ describe('upload, pull, ack', () => {
     assert.equal(db.sqlite.prepare('SELECT COUNT(*) AS n FROM entries').get().n, 0);
   });
 
-  it('requires attestation and the inbox secret to upload', async () => {
+  it('needs only the inbox secret to upload, so attestation never blocks delivery', async () => {
     const secret = await newInbox();
-    await connect(secret);
+    const { token } = await connect(secret);
     attestOK = false;
-    assert.equal((await upload(secret, recording(1))).status, 403);
-    attestOK = true;
+    const res = await call('POST', '/inbox', { auth: secret, attest: false, body: recording(1) });
+    assert.equal(res.status, 200);
+    assert.equal((await pull(token)).body.items.length, 1);
     assert.equal((await upload(undefined, recording(1))).status, 401);
     assert.equal((await upload('rmbi_wrong', recording(1))).status, 401);
   });
@@ -413,8 +415,21 @@ describe('helpers', () => {
 });
 
 describe('routing', () => {
-  it('answers health and 404s the rest', async () => {
-    assert.equal((await call('GET', '/health', { attest: false })).status, 200);
-    assert.equal((await call('GET', '/nope', { attest: false })).status, 404);
+  it('claims only relay paths', () => {
+    for (const p of ['/inboxes', '/inbox', '/inbox/ack', '/pair/code', '/pair/exchange', '/connections', '/connections/con_abc']) {
+      assert.ok(isRelayPath(p), p);
+    }
+    for (const p of ['/transcribe', '/health', '/attest', '/attest/challenge', '/analytics', '/inbox/x/y']) {
+      assert.ok(!isRelayPath(p), p);
+    }
+  });
+
+  it('404s unknown methods on relay paths', async () => {
+    assert.equal((await call('PUT', '/inbox', { attest: false })).status, 404);
+  });
+
+  it('answers 503 until the D1 binding exists', async () => {
+    env = {};
+    assert.equal((await call('GET', '/inbox', { attest: false })).status, 503);
   });
 });

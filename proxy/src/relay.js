@@ -1,4 +1,6 @@
 // Ramble Relay — moves transcripts from the Ramble app to the user's agent.
+// Served by the same Worker as the transcription proxy (see index.js), from
+// its own D1 database. See RELAY.md.
 //
 // The app uploads a transcript; the relay queues one copy per connected agent;
 // each agent pulls its copy and acknowledges it, which deletes it. Anything
@@ -6,17 +8,14 @@
 // relay — transcription happens before upload.
 //
 // Two credentials, two directions:
-//   App   → relay: inbox secret (Bearer rmbi_…) + App Attest on create/upload
+//   App   → relay: inbox secret (Bearer rmbi_…); App Attest once, when the
+//                  inbox is created, so delivery never depends on attestation
 //   Agent → relay: connection token (Bearer rmba_…), obtained by exchanging a
 //                  single-use pairing code the user reads off the app
 //
 // We identify inboxes, not people. There are no accounts.
 
-import {
-  handleAttest,
-  handleAttestChallenge,
-  verifyAssertionForRequest,
-} from '../../proxy/src/attest.js';
+import { verifyAssertionForRequest } from './attest.js';
 
 // --- Limits and defaults -----------------------------------------------------
 
@@ -45,26 +44,25 @@ export const MAX_ACK_IDS = 500;
 const INBOX_SECRET_PREFIX = 'rmbi_';
 const AGENT_TOKEN_PREFIX = 'rmba_';
 
-// --- Worker entry points -----------------------------------------------------
+// --- Routing -----------------------------------------------------------------
 
-export default {
-  async fetch(request, env) {
-    return handleRequest(request, env);
-  },
+export const RELAY_PATHS = /^\/(inboxes|inbox|inbox\/ack|pair\/code|pair\/exchange|connections(\/[^/]+)?)$/;
 
-  // Backstop for expiry. Reads already filter out expired rows, so this only
-  // reclaims space; a late cron never makes an expired transcript visible.
-  async scheduled(_event, env) {
-    const result = await purgeExpired(env.DB, Date.now());
-    console.log(`[expire] entries=${result.entries} pair_codes=${result.pairCodes}`);
-  },
-};
+export function isRelayPath(pathname) {
+  return RELAY_PATHS.test(pathname);
+}
 
 /**
- * Route a request. `deps` lets tests supply a clock and stand in for App
- * Attest, which can't be exercised without a real device.
+ * Route a relay request (index.js sends anything matching RELAY_PATHS here).
+ * `deps` lets tests supply a clock and stand in for App Attest, which can't
+ * be exercised without a real device.
  */
-export async function handleRequest(request, env, deps = {}) {
+export async function handleRelayRequest(request, env, deps = {}) {
+  if (!env.DB) {
+    // The D1 binding isn't configured on this deployment yet.
+    return json({ error: 'Relay not enabled on this server' }, 503);
+  }
+
   const now = deps.now ?? Date.now();
   const verifyAssertion = deps.verifyAssertion ?? verifyAssertionForRequest;
   const ctx = { env, db: env.DB, now, verifyAssertion };
@@ -74,19 +72,6 @@ export async function handleRequest(request, env, deps = {}) {
   const method = request.method;
 
   try {
-    if (pathname === '/health') return json({ status: 'ok' });
-
-    // App Attest registration, so a self-hosted relay can stand alone. The
-    // hosted relay shares ATTEST_KV with the transcription proxy, so devices
-    // that already attested there don't need to again.
-    if (pathname === '/attest/challenge' && method === 'POST') {
-      return json(await handleAttestChallenge(request, env));
-    }
-    if (pathname === '/attest' && method === 'POST') {
-      const result = await handleAttest(request, env);
-      return result.error ? json({ error: result.error }, result.status) : json({ status: 'ok' });
-    }
-
     // App-facing
     if (pathname === '/inboxes' && method === 'POST') return createInbox(request, ctx);
     if (pathname === '/inbox' && method === 'POST') return uploadTranscript(request, ctx);
@@ -129,19 +114,15 @@ async function createInbox(request, ctx) {
 }
 
 /**
- * POST /inbox — App Attest + inbox secret. Fans the transcript out to one
+ * POST /inbox — inbox secret. Fans the transcript out to one
  * queue entry per connected agent. Idempotent on recording_id, so the app's
  * retry queue can resend safely.
  */
 async function uploadTranscript(request, ctx) {
-  const body = await request.arrayBuffer();
-  const attest = await checkAttestation(request, body, ctx);
-  if (attest) return attest;
-
   const inbox = await authenticateInbox(request, ctx);
   if (!inbox) return unauthorized();
 
-  const parsed = parseJSON(body);
+  const parsed = parseJSON(await request.arrayBuffer());
   if (!parsed) return json({ error: 'Invalid JSON body' }, 400);
   const upload = validateUpload(parsed);
   if (upload.error) return json({ error: upload.error }, 400);
