@@ -1,8 +1,12 @@
 # Ramble Relay
 
-The relay moves transcripts from Ramble to your agent. You talk to your watch, Ramble transcribes on the phone, and the relay holds the text until your agent picks it up. When the agent acknowledges it, the relay deletes it. Anything not picked up is deleted after 24 hours.
+The relay moves transcripts from Ramble to your agent. You talk to your watch, Ramble transcribes on the phone, and the relay holds the text until your agent picks it up. Transcripts here are temporary by design:
 
-It runs in the same Cloudflare Worker as the [transcription proxy](README.md), under its own routes, with a small D1 database. The code is `src/relay.js`. It's here so you can check exactly what it does, or run your own.
+- **Picked up → deleted.** The text is deleted the moment the agent acknowledges it.
+- **Never picked up → deleted after 30 days.** Long enough to ride out an agent outage, then gone.
+- **Audio never comes here.** Transcription happens on the phone first. On-device Apple Speech touches no server at all.
+
+It runs in the same Cloudflare Worker as the [transcription proxy](README.md), under its own routes, with a small D1 database. The code is `src/relay.js`.
 
 ## What it stores
 
@@ -13,7 +17,8 @@ This is the whole list:
 | Inbox | random id, hash of the app's inbox secret, created time | — |
 | Pairing code | hash of the code, inbox id, agent type, expiry | used, replaced, or 10 minutes pass |
 | Connection | random id, inbox id, agent type, hash of the agent's token, created and last-pull times | you tap Disconnect |
-| Queued transcript | recording id, recorded-at time, duration, text, expiry — one copy per connected agent | the agent acks it, you disconnect or tap Delete everything, or the retention window passes |
+| Queued transcript | recording id, recorded-at time, duration, text, expiry — one copy per connected agent | text: when the agent acks it, you disconnect, you tap Delete everything, or 30 days pass unclaimed |
+| Pickup receipt | the same row after ack, with the text removed: recording id, pickup time | 24 hours after pickup |
 
 There are no accounts, emails, names, IP addresses, or audio. Audio never reaches the relay: transcription happens before upload, and on-device Apple Speech touches no server at all. Credentials are stored only as SHA-256 hashes. Logs record counts and ids, never transcript text.
 
@@ -24,14 +29,14 @@ We identify inboxes, not people.
 ```
 Watch ──► iPhone (transcribe) ──POST /inbox──► relay ──GET /inbox──► agent
                                                  ▲                      │
-                                                 └──POST /inbox/ack─────┘ (deleted)
+                                                 └──POST /inbox/ack─────┘ (text deleted)
 ```
 
 1. **Inbox.** When you turn the relay on, the app creates an inbox (`POST /inboxes`, App Attest required) and keeps the returned inbox secret in the Keychain.
 2. **Pairing.** Settings → Connect agent shows a short code like `K7QX-MP4D`. You tell your agent "I downloaded Ramble, connect it" and paste the code. The agent exchanges it once for a long-lived token (`POST /pair/exchange`). This is the same shape as OAuth's device authorization grant: the code is single-use and dies in 10 minutes, so pasting it in chat is safe. The token goes in the agent's secret storage and never appears in chat.
 3. **Upload.** Each transcript is uploaded once (`POST /inbox`) and copied into one queue per connected agent. If Muse acks first, ChatGPT's copy is untouched.
-4. **Pull and ack.** The agent pulls on a schedule (`GET /inbox`), handles each transcript, then acks (`POST /inbox/ack`), which deletes it immediately.
-5. **Expiry.** Unacknowledged transcripts disappear from pulls the moment they expire. A cron job every 15 minutes deletes them from disk.
+4. **Pull and ack.** The agent pulls on a schedule (`GET /inbox`), handles each transcript, then acks (`POST /inbox/ack`), which deletes the text immediately. A text-free receipt stays 24 hours so the phone can show "Picked up by Muse" (`GET /receipts`).
+5. **Expiry.** Anything not picked up within 30 days disappears from pulls the moment it expires. A cron job every 15 minutes deletes expired rows from disk.
 6. **Disconnect.** Tapping Disconnect (`DELETE /connections/:id`) kills the token and deletes its queue. Delete everything now (`DELETE /inbox`) empties every queue.
 
 ## Authentication
@@ -61,6 +66,7 @@ All bodies are JSON. Errors are `{"error": "..."}` with a 4xx/5xx status.
 | `POST` | `/pair/code` | inbox secret | `{"agent_type": "muse" \| "chatgpt" \| "grok" \| "claude" \| "other"}` → `201 {"code", "agent_type", "expires_at"}` |
 | `GET` | `/connections` | inbox secret | — → `{"connections": [{"id", "agent_type", "created_at", "last_pull_at", "pending"}]}` |
 | `DELETE` | `/connections/:id` | inbox secret | — → `{"status": "revoked"}` |
+| `GET` | `/receipts` | inbox secret | — → `{"receipts": [{"recording_id", "connection_id", "agent_type", "picked_up_at"}]}` (last 24 hours, no text) |
 
 The upload body uses the same field names as the [webhook payload](../docs/webhook-api.md). Uploads are idempotent on `recording_id`, so the app's retry queue can resend safely. Issuing a new pairing code cancels the previous one. An inbox can have up to 10 connected agents.
 
@@ -74,7 +80,7 @@ POST /pair/exchange
 ```
 
 ```json
-{"token": "rmba_…", "connection_id": "con_…", "agent_type": "muse", "retention_seconds": 86400}
+{"token": "rmba_…", "connection_id": "con_…", "agent_type": "muse", "unacked_retention_seconds": 2592000}
 ```
 
 Codes are case-insensitive and ignore spaces and dashes.
@@ -114,10 +120,10 @@ Authorization: Bearer rmba_…
 ```
 
 ```json
-{"deleted": 1}
+{"acknowledged": 1}
 ```
 
-Deletes those items now. Up to 500 ids per call. Ack only after the agent has durably handled the item; an unacked item is retried on the next pull until it expires.
+Deletes the text of those items now. Up to 500 ids per call. Ack only after the agent has durably handled the item; an unacked item is retried on the next pull until it expires.
 
 The Worker's `/health`, `/attest/challenge`, and `/attest` endpoints serve the relay too.
 
@@ -131,9 +137,9 @@ The loop is small enough to describe to any agent that can make HTTP requests an
 4. `POST /inbox/ack` with the ids you handled.
 5. If a pull returns `401`, the user disconnected. Stop polling and tell them.
 
-## Deploy Your Own
+## Setting up the relay
 
-The relay deploys with the proxy. Follow [Deploy Your Own](README.md#deploy-your-own) first, then:
+The relay deploys with the proxy. On an existing proxy deployment:
 
 1. Create the database:
    ```bash
@@ -144,14 +150,14 @@ The relay deploys with the proxy. Follow [Deploy Your Own](README.md#deploy-your
    ```bash
    npx wrangler d1 migrations apply ramble-relay --remote
    ```
-4. Optionally set `RETENTION_SECONDS` under `[vars]` (default 86400, 24 hours).
+4. Retention is set by `UNACKED_RETENTION_SECONDS` (default 2592000, 30 days) and `RECEIPT_RETENTION_SECONDS` (default 86400, 24 hours) under `[vars]`.
 5. `npx wrangler deploy`
 
 Until the D1 binding exists, relay routes answer `503` and transcription works as before.
 
 App Attest only works from a real device running a copy of Ramble whose bundle ID matches. For simulator testing, `npx wrangler secret put DEV_BYPASS_TOKEN` and send it as `X-Dev-Bypass`. Leave it unset in production.
 
-In the app, the debug sheet (tap the version number in Settings) has a relay URL override for pointing at your deployment.
+In the app, the debug sheet (tap the version number in Settings) has a relay URL override for pointing at a test deployment.
 
 ### Local development
 

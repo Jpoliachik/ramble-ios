@@ -31,6 +31,9 @@ struct Recording: Identifiable, Codable, Hashable {
     /// `.delivered` means the relay accepted it and queued it for every
     /// connected agent.
     var relayStatus: WebhookStatus?
+    /// When a connected agent acknowledged this transcript on the relay (and
+    /// the relay deleted the text). Learned from `GET /receipts`.
+    var agentPickedUpAt: Date?
     var lastError: String?
     var activityLog: [ActivityEntry]
     var cloudTranscriptionCount: Int
@@ -71,6 +74,7 @@ struct Recording: Identifiable, Codable, Hashable {
         transcription = try container.decodeIfPresent(String.self, forKey: .transcription)
         webhookStatus = try container.decodeIfPresent(WebhookStatus.self, forKey: .webhookStatus)
         relayStatus = try container.decodeIfPresent(WebhookStatus.self, forKey: .relayStatus)
+        agentPickedUpAt = try container.decodeIfPresent(Date.self, forKey: .agentPickedUpAt)
 
         // New status field, or migrate from old transcriptionStatus/status values
         if let statusString = try? container.decode(String.self, forKey: .status) {
@@ -113,6 +117,11 @@ struct Recording: Identifiable, Codable, Hashable {
         return statuses.isEmpty ? nil : .delivered
     }
 
+    /// The relay has it but no agent has picked it up yet.
+    var isWaitingForAgent: Bool {
+        relayStatus == .delivered && agentPickedUpAt == nil
+    }
+
     var audioFileURL: URL {
         StorageService.audioDirectory.appendingPathComponent(audioFileName)
     }
@@ -125,7 +134,7 @@ struct Recording: Identifiable, Codable, Hashable {
     private enum CodingKeys: String, CodingKey {
         case id, createdAt, duration, audioFileName
         case status
-        case transcription, webhookStatus, relayStatus, lastError, activityLog, cloudTranscriptionCount
+        case transcription, webhookStatus, relayStatus, agentPickedUpAt, lastError, activityLog, cloudTranscriptionCount
         // Legacy keys for migration
         case transcriptionStatus
         case lastTranscriptionError
@@ -141,6 +150,7 @@ struct Recording: Identifiable, Codable, Hashable {
         try container.encodeIfPresent(transcription, forKey: .transcription)
         try container.encodeIfPresent(webhookStatus, forKey: .webhookStatus)
         try container.encodeIfPresent(relayStatus, forKey: .relayStatus)
+        try container.encodeIfPresent(agentPickedUpAt, forKey: .agentPickedUpAt)
         try container.encodeIfPresent(lastError, forKey: .lastError)
         if !activityLog.isEmpty {
             try container.encode(activityLog, forKey: .activityLog)

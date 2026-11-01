@@ -140,9 +140,12 @@ struct RecordingDetailView: View {
                     Image(systemName: "exclamationmark.triangle.fill")
                     Text(recording.relayStatus == .failed ? "Agent delivery failed" : "Webhook failed")
                 case .delivered:
-                    if recording.relayStatus == .delivered {
+                    if recording.isWaitingForAgent {
                         Image(systemName: "clock")
                         Text("Waiting for \(relay.primaryAgentName)")
+                    } else if recording.agentPickedUpAt != nil {
+                        Image(systemName: "checkmark.circle.fill")
+                        Text("Picked up by \(relay.primaryAgentName)")
                     } else {
                         Image(systemName: "checkmark.circle.fill")
                         Text("Delivered")
@@ -172,7 +175,7 @@ struct RecordingDetailView: View {
             switch recording.deliveryStatus {
             case .sending, .pending: return .blue
             case .failed: return .orange
-            case .delivered: return recording.relayStatus == .delivered ? .blue : .green
+            case .delivered: return recording.isWaitingForAgent ? .blue : .green
             case .none: return .secondary
             }
         case .failed: return .red

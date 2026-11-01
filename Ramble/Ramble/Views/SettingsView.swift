@@ -9,7 +9,6 @@ private enum SettingsLinks {
     static let privacy = URL(string: "https://goodloop.dev/ramble/privacy")!
     static let terms = URL(string: "https://goodloop.dev/ramble/terms")!
     static let docs = URL(string: "https://goodloop.dev/ramble/docs")!
-    static let github = URL(string: "https://github.com/Jpoliachik/ramble-ios")!
 }
 
 struct SettingsView: View {
@@ -162,7 +161,7 @@ struct SettingsView: View {
                 }
             }
         } footer: {
-            Text("Cloud transcription routes through our open-source proxy. No audio or text is stored on our servers.")
+            Text("Cloud transcription sends audio through our proxy to the provider. The proxy doesn't keep the audio or the text.")
         }
     }
 
@@ -503,24 +502,9 @@ struct TranscriptionInfoSheet: View {
                     InfoBlock(
                         icon: "lock.shield",
                         title: "Cloud models are private too",
-                        text: "Cloud transcription routes through our open-source proxy. No audio or text is stored on our servers — your audio goes to the provider and the transcript comes back. That's it."
+                        text: "Cloud transcription sends your audio through our proxy to the provider, and the transcript comes back. The proxy doesn't keep the audio or the text."
                     )
 
-                    InfoBlock(
-                        icon: "eye",
-                        title: "Don't take our word for it",
-                        text: "Ramble is fully open source. Check the code on GitHub — no accounts, no user data stored. Your audio and transcriptions never touch our servers."
-                    )
-
-                    Link(destination: SettingsLinks.github) {
-                        HStack {
-                            Spacer()
-                            Label("View Source on GitHub", systemImage: "chevron.left.forwardslash.chevron.right")
-                            Spacer()
-                        }
-                        .padding(.vertical, 12)
-                    }
-                    .buttonStyle(.bordered)
                 }
                 .padding()
             }
@@ -561,19 +545,19 @@ struct PrivacyInfoSheet: View {
                     InfoBlock(
                         icon: "cloud",
                         title: "Cloud transcription is opt-in",
-                        text: "If you choose a cloud model, audio is sent through our open-source proxy to the provider, transcribed, and the text comes back. We don't store the audio or the transcript."
+                        text: "If you choose a cloud model, audio is sent through our proxy to the provider, transcribed, and the text comes back. The proxy doesn't keep the audio or the transcript."
                     )
 
                     InfoBlock(
                         icon: "paperplane",
                         title: "Webhooks go where you point them",
-                        text: "If you configure a webhook, transcripts are POSTed to a URL you control. That's the only place transcripts ever leave your device — and only when you set it up."
+                        text: "If you configure a webhook, transcripts are POSTed straight from your phone to a URL you control. Nothing is kept on our side."
                     )
 
                     InfoBlock(
-                        icon: "chevron.left.forwardslash.chevron.right",
-                        title: "Open source",
-                        text: "Ramble is open source. Read the code, audit the proxy, run your own. No accounts, no analytics."
+                        icon: "tray.and.arrow.up",
+                        title: "Your agent's inbox is temporary",
+                        text: "When you connect an agent, transcripts wait on the Ramble relay until it picks them up. The text is deleted the moment it does. Anything never picked up is deleted after \(Constants.Relay.unclaimedRetentionDays) days. Audio never goes there. No accounts."
                     )
 
                     Link(destination: SettingsLinks.privacy) {

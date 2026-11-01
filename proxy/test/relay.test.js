@@ -7,7 +7,8 @@ import { beforeEach, describe, it } from 'node:test';
 
 import {
   AGENT_TYPES,
-  DEFAULT_RETENTION_SECONDS,
+  DEFAULT_RECEIPT_RETENTION_SECONDS,
+  DEFAULT_UNACKED_RETENTION_SECONDS,
   MAX_CONNECTIONS_PER_INBOX,
   PAIR_CODE_ALPHABET,
   PAIR_CODE_TTL_SECONDS,
@@ -16,7 +17,7 @@ import {
   isRelayPath,
   normalizePairCode,
   purgeExpired,
-  retentionSeconds,
+  retention,
   validateUpload,
 } from '../src/relay.js';
 import { createTestDB } from './d1.js';
@@ -121,7 +122,7 @@ describe('pairing', () => {
     assert.equal(first.status, 201);
     assert.match(first.body.token, /^rmba_/);
     assert.equal(first.body.agent_type, 'muse');
-    assert.equal(first.body.retention_seconds, DEFAULT_RETENTION_SECONDS);
+    assert.equal(first.body.unacked_retention_seconds, DEFAULT_UNACKED_RETENTION_SECONDS);
 
     const second = await call('POST', '/pair/exchange', { attest: false, body: { code: code.code } });
     assert.equal(second.status, 400);
@@ -181,12 +182,17 @@ describe('upload, pull, ack', () => {
     assert.equal(item.recording_id, recording(1).recording_id);
     assert.equal(item.created_at, '2026-11-01T11:59:00Z');
     assert.equal(item.duration, 12.5);
-    assert.equal(item.expires_at, new Date(T0 + DEFAULT_RETENTION_SECONDS * 1000).toISOString());
+    assert.equal(item.expires_at, new Date(T0 + DEFAULT_UNACKED_RETENTION_SECONDS * 1000).toISOString());
     assert.equal(got.body.next_since, item.id);
     assert.equal(got.body.has_more, false);
 
-    assert.deepEqual((await ack(token, [item.id])).body, { deleted: 1 });
+    assert.deepEqual((await ack(token, [item.id])).body, { acknowledged: 1 });
     assert.equal((await pull(token)).body.items.length, 0);
+
+    // The text is gone at ack; only a text-free receipt remains, briefly.
+    assert.equal(db.sqlite.prepare("SELECT COUNT(*) AS n FROM entries WHERE text != ''").get().n, 0);
+    now = T0 + DEFAULT_RECEIPT_RETENTION_SECONDS * 1000;
+    await purgeExpired(db, now);
     assert.equal(db.sqlite.prepare('SELECT COUNT(*) AS n FROM entries').get().n, 0);
   });
 
@@ -250,7 +256,7 @@ describe('upload, pull, ack', () => {
     const b = await connect(secret);
     await upload(secret, recording(1));
     const bItem = (await pull(b.token)).body.items[0];
-    assert.deepEqual((await ack(a.token, [bItem.id])).body, { deleted: 0 });
+    assert.deepEqual((await ack(a.token, [bItem.id])).body, { acknowledged: 0 });
     assert.equal((await pull(b.token)).body.items.length, 1);
   });
 
@@ -299,9 +305,9 @@ describe('expiry', () => {
     const { token } = await connect(secret);
     await upload(secret, recording(1));
 
-    now = T0 + DEFAULT_RETENTION_SECONDS * 1000 - 1;
+    now = T0 + DEFAULT_UNACKED_RETENTION_SECONDS * 1000 - 1;
     assert.equal((await pull(token)).body.items.length, 1);
-    now = T0 + DEFAULT_RETENTION_SECONDS * 1000;
+    now = T0 + DEFAULT_UNACKED_RETENTION_SECONDS * 1000;
     assert.equal((await pull(token)).body.items.length, 0);
 
     // Still on disk until the scheduled purge runs.
@@ -318,8 +324,63 @@ describe('expiry', () => {
     assert.equal((await purgeExpired(db, T0 + PAIR_CODE_TTL_SECONDS * 1000)).pairCodes, 1);
   });
 
-  it('honors a configured retention window', async () => {
-    env.RETENTION_SECONDS = '3600';
+  it('keeps unacked transcripts 30 days by default, through an agent outage', async () => {
+    const secret = await newInbox();
+    const { token } = await connect(secret);
+    await upload(secret, recording(1));
+    now = T0 + 29 * 24 * HOUR;
+    assert.equal((await pull(token)).body.items.length, 1);
+  });
+
+  it('deletes text at ack and re-acking is a no-op', async () => {
+    const secret = await newInbox();
+    const { token } = await connect(secret);
+    await upload(secret, recording(1));
+    await upload(secret, recording(2));
+    const [first] = (await pull(token)).body.items;
+    await ack(token, [first.id]);
+    assert.deepEqual((await pull(token)).body.items.map((i) => i.transcription), ['thought 2']);
+    const row = db.sqlite.prepare('SELECT text, acked_at FROM entries WHERE id = ?').get(first.id);
+    assert.equal(row.text, '');
+    assert.equal(row.acked_at, T0);
+    assert.deepEqual((await ack(token, [first.id])).body, { acknowledged: 0 });
+  });
+
+  it('never lengthens retention when acking near expiry', async () => {
+    const secret = await newInbox();
+    const { token } = await connect(secret);
+    await upload(secret, recording(1));
+    const [item] = (await pull(token)).body.items;
+    now = T0 + DEFAULT_UNACKED_RETENTION_SECONDS * 1000 - HOUR;
+    await ack(token, [item.id]);
+    const row = db.sqlite.prepare('SELECT expires_at FROM entries WHERE id = ?').get(item.id);
+    assert.equal(row.expires_at, T0 + DEFAULT_UNACKED_RETENTION_SECONDS * 1000);
+  });
+
+  it('gives the phone pickup receipts without text', async () => {
+    const secret = await newInbox();
+    const { token } = await connect(secret, 'muse');
+    await upload(secret, recording(1));
+    await upload(secret, recording(2));
+    const [first] = (await pull(token)).body.items;
+    now = T0 + HOUR;
+    await ack(token, [first.id]);
+
+    const res = await call('GET', '/receipts', { auth: secret, attest: false });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.receipts.length, 1);
+    assert.equal(res.body.receipts[0].recording_id, recording(1).recording_id);
+    assert.equal(res.body.receipts[0].agent_type, 'muse');
+    assert.equal(res.body.receipts[0].picked_up_at, new Date(T0 + HOUR).toISOString());
+    assert.ok(!JSON.stringify(res.body).includes('thought'));
+    assert.equal((await call('GET', '/receipts', { auth: token, attest: false })).status, 401);
+
+    const conns = (await call('GET', '/connections', { auth: secret, attest: false })).body.connections;
+    assert.equal(conns[0].pending, 1);
+  });
+
+  it('honors configured retention windows', async () => {
+    env.UNACKED_RETENTION_SECONDS = '3600';
     const secret = await newInbox();
     const { token } = await connect(secret);
     await upload(secret, recording(1));
@@ -404,9 +465,13 @@ describe('helpers', () => {
   });
 
   it('falls back to the default retention for bad config', () => {
-    assert.equal(retentionSeconds({}), DEFAULT_RETENTION_SECONDS);
-    assert.equal(retentionSeconds({ RETENTION_SECONDS: 'soon' }), DEFAULT_RETENTION_SECONDS);
-    assert.equal(retentionSeconds({ RETENTION_SECONDS: '604800' }), 604800);
+    assert.deepEqual(retention({}), {
+      unacked: DEFAULT_UNACKED_RETENTION_SECONDS,
+      receipt: DEFAULT_RECEIPT_RETENTION_SECONDS,
+    });
+    assert.equal(retention({ UNACKED_RETENTION_SECONDS: 'soon' }).unacked, DEFAULT_UNACKED_RETENTION_SECONDS);
+    assert.equal(retention({ UNACKED_RETENTION_SECONDS: '5184000' }).unacked, 5184000);
+    assert.equal(retention({ RECEIPT_RETENTION_SECONDS: '3600' }).receipt, 3600);
   });
 
   it('lists the agents the app offers', () => {
@@ -416,7 +481,7 @@ describe('helpers', () => {
 
 describe('routing', () => {
   it('claims only relay paths', () => {
-    for (const p of ['/inboxes', '/inbox', '/inbox/ack', '/pair/code', '/pair/exchange', '/connections', '/connections/con_abc']) {
+    for (const p of ['/inboxes', '/inbox', '/inbox/ack', '/pair/code', '/pair/exchange', '/connections', '/connections/con_abc', '/receipts']) {
       assert.ok(isRelayPath(p), p);
     }
     for (const p of ['/transcribe', '/health', '/attest', '/attest/challenge', '/analytics', '/inbox/x/y']) {

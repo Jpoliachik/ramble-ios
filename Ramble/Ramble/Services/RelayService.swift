@@ -169,7 +169,30 @@ final class RelayService: ObservableObject {
         let data = try await send("GET", "connections", auth: try await ensureInbox())
         let list = try decoder.decode(ConnectionList.self, from: data).connections
         setConnections(list)
+        try? await syncReceipts()
         return list
+    }
+
+    /// Marks recordings an agent has picked up. The relay keeps text-free
+    /// receipts for 24 hours, so this runs on every connection refresh.
+    func syncReceipts() async throws {
+        guard hasInbox else { return }
+        let data = try await send("GET", "receipts", auth: try await ensureInbox())
+        let receipts = try decoder.decode(ReceiptList.self, from: data).receipts
+        guard !receipts.isEmpty else { return }
+
+        let storage = StorageService.shared
+        var recordings = storage.loadRecordings()
+        var changed = false
+        for receipt in receipts {
+            guard let id = UUID(uuidString: receipt.recordingId),
+                  let idx = recordings.firstIndex(where: { $0.id == id }),
+                  recordings[idx].agentPickedUpAt == nil else { continue }
+            recordings[idx].agentPickedUpAt = receipt.pickedUpAt
+            recordings[idx].activityLog.append(ActivityEntry("Picked up by \(receipt.agentType.displayName)"))
+            changed = true
+        }
+        if changed { storage.saveRecordings(recordings) }
     }
 
     /// Disconnect: kills the agent's token on the relay and deletes its queue.
@@ -316,6 +339,16 @@ private struct CreatedInbox: Decodable {
 
 private struct ConnectionList: Decodable {
     let connections: [RelayConnection]
+}
+
+private struct ReceiptList: Decodable {
+    let receipts: [Receipt]
+}
+
+private struct Receipt: Decodable {
+    let recordingId: String
+    let agentType: RelayAgent
+    let pickedUpAt: Date
 }
 
 private struct UploadResult: Decodable {

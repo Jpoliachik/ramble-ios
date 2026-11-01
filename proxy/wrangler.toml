@@ -7,8 +7,11 @@ compatibility_date = "2024-12-01"
 enabled = true
 
 [vars]
-# How long an unacknowledged relay transcript waits before deletion (seconds).
-RETENTION_SECONDS = "86400"
+# Relay retention (seconds). Text is deleted the moment the agent acks it.
+# Transcripts never picked up are deleted after 30 days, so an agent outage
+# loses nothing. A text-free pickup receipt lives 24 hours for the phone.
+UNACKED_RETENTION_SECONDS = "2592000"
+RECEIPT_RETENTION_SECONDS = "86400"
 APPLE_BUNDLE_ID = "dev.goodloop.Ramble"
 PREMIUM_PRODUCT_ID = "dev.goodloop.ramble.premium.monthly2"
 

@@ -3,8 +3,11 @@
 // its own D1 database. See RELAY.md.
 //
 // The app uploads a transcript; the relay queues one copy per connected agent;
-// each agent pulls its copy and acknowledges it, which deletes it. Anything
-// not acknowledged expires after RETENTION_SECONDS. Audio never reaches the
+// each agent pulls its copy and acknowledges it, which deletes the text right
+// away. A text-free receipt (recording id + time) stays RECEIPT_RETENTION_
+// SECONDS (default 24h) so the phone can show "Picked up". Copies never
+// picked up are deleted after UNACKED_RETENTION_SECONDS (default 30 days),
+// long enough to ride out an agent outage. Audio never reaches the
 // relay — transcription happens before upload.
 //
 // Two credentials, two directions:
@@ -19,10 +22,10 @@ import { verifyAssertionForRequest } from './attest.js';
 
 // --- Limits and defaults -----------------------------------------------------
 
-// How long an unacknowledged transcript waits before it's deleted. Proposed
-// default, pending Justin's call — override per deployment with the
-// RETENTION_SECONDS var.
-export const DEFAULT_RETENTION_SECONDS = 24 * 60 * 60;
+// Retention. Defaults pending Justin's confirmation (30 vs 60 days); override
+// per deployment with UNACKED_RETENTION_SECONDS and RECEIPT_RETENTION_SECONDS.
+export const DEFAULT_UNACKED_RETENTION_SECONDS = 30 * 24 * 60 * 60;
+export const DEFAULT_RECEIPT_RETENTION_SECONDS = 24 * 60 * 60;
 
 // Pairing codes are read off the phone and pasted into chat, so they're
 // short and die fast.
@@ -46,7 +49,7 @@ const AGENT_TOKEN_PREFIX = 'rmba_';
 
 // --- Routing -----------------------------------------------------------------
 
-export const RELAY_PATHS = /^\/(inboxes|inbox|inbox\/ack|pair\/code|pair\/exchange|connections(\/[^/]+)?)$/;
+export const RELAY_PATHS = /^\/(inboxes|inbox|inbox\/ack|pair\/code|pair\/exchange|connections(\/[^/]+)?|receipts)$/;
 
 export function isRelayPath(pathname) {
   return RELAY_PATHS.test(pathname);
@@ -78,6 +81,7 @@ export async function handleRelayRequest(request, env, deps = {}) {
     if (pathname === '/inbox' && method === 'DELETE') return purgeInbox(request, url, ctx);
     if (pathname === '/pair/code' && method === 'POST') return createPairCode(request, ctx);
     if (pathname === '/connections' && method === 'GET') return listConnections(request, ctx);
+    if (pathname === '/receipts' && method === 'GET') return listReceipts(request, ctx);
     const connMatch = pathname.match(/^\/connections\/([A-Za-z0-9_-]+)$/);
     if (connMatch && method === 'DELETE') return revokeConnection(request, connMatch[1], ctx);
 
@@ -132,7 +136,7 @@ async function uploadTranscript(request, ctx) {
     .bind(inbox.id)
     .all();
 
-  const expiresAt = ctx.now + retentionSeconds(ctx.env) * 1000;
+  const expiresAt = ctx.now + retention(ctx.env).unacked * 1000;
   if (connections.length > 0) {
     await ctx.db.batch(
       connections.map((c) =>
@@ -221,7 +225,8 @@ async function listConnections(request, ctx) {
     .prepare(
       `SELECT c.id, c.agent_type, c.created_at, c.last_pull_at,
               (SELECT COUNT(*) FROM entries e
-                WHERE e.connection_id = c.id AND e.expires_at > ?) AS pending
+                WHERE e.connection_id = c.id AND e.acked_at IS NULL
+                  AND e.expires_at > ?) AS pending
          FROM connections c WHERE c.inbox_id = ? ORDER BY c.created_at`,
     )
     .bind(ctx.now, inbox.id)
@@ -292,7 +297,8 @@ async function exchangePairCode(request, ctx) {
       token,
       connection_id: id,
       agent_type: pairing.agent_type,
-      retention_seconds: retentionSeconds(ctx.env),
+      unacked_retention_seconds: retention(ctx.env).unacked,
+
     },
     201,
   );
@@ -315,7 +321,7 @@ async function pullInbox(request, url, ctx) {
       .prepare(
         `SELECT id, recording_id, recorded_at, duration, text, expires_at
            FROM entries
-          WHERE connection_id = ? AND id > ? AND expires_at > ?
+          WHERE connection_id = ? AND id > ? AND expires_at > ? AND acked_at IS NULL
           ORDER BY id LIMIT ?`,
       )
       .bind(connection.id, since, ctx.now, limit + 1),
@@ -331,7 +337,11 @@ async function pullInbox(request, url, ctx) {
   });
 }
 
-/** POST /inbox/ack {"ids": [...]} — agent token. Deletes those entries now. */
+/**
+ * POST /inbox/ack {"ids": [...]} — agent token. Deletes the transcript text
+ * now and leaves a text-free receipt for the phone, which expires after the
+ * receipt window. Acking an already-acked id is a no-op.
+ */
 async function ackEntries(request, ctx) {
   const connection = await authenticateAgent(request, ctx);
   if (!connection) return unauthorized();
@@ -347,11 +357,44 @@ async function ackEntries(request, ctx) {
 
   const placeholders = ids.map(() => '?').join(',');
   const result = await ctx.db
-    .prepare(`DELETE FROM entries WHERE connection_id = ? AND id IN (${placeholders})`)
-    .bind(connection.id, ...ids)
+    .prepare(
+      `UPDATE entries SET acked_at = ?, text = '', expires_at = MIN(expires_at, ?)
+        WHERE connection_id = ? AND acked_at IS NULL AND expires_at > ?
+          AND id IN (${placeholders})`,
+    )
+    .bind(ctx.now, ctx.now + retention(ctx.env).receipt * 1000, connection.id, ctx.now, ...ids)
     .run();
 
-  return json({ deleted: result.meta.changes });
+  return json({ acknowledged: result.meta.changes });
+}
+
+/**
+ * GET /receipts — inbox secret. Which recordings each agent has picked up in
+ * the last receipt window. The phone uses this to show "Picked up by Muse".
+ * Ids and times only; the text was deleted at ack.
+ */
+async function listReceipts(request, ctx) {
+  const inbox = await authenticateInbox(request, ctx);
+  if (!inbox) return unauthorized();
+
+  const { results } = await ctx.db
+    .prepare(
+      `SELECT e.recording_id, e.connection_id, c.agent_type, e.acked_at
+         FROM entries e JOIN connections c ON c.id = e.connection_id
+        WHERE c.inbox_id = ? AND e.acked_at IS NOT NULL AND e.expires_at > ?
+        ORDER BY e.acked_at`,
+    )
+    .bind(inbox.id, ctx.now)
+    .all();
+
+  return json({
+    receipts: results.map((r) => ({
+      recording_id: r.recording_id,
+      connection_id: r.connection_id,
+      agent_type: r.agent_type,
+      picked_up_at: new Date(r.acked_at).toISOString(),
+    })),
+  });
 }
 
 // --- Expiry ------------------------------------------------------------------
@@ -452,9 +495,16 @@ export function normalizePairCode(input) {
   return String(input).toUpperCase().replace(/[\s-]/g, '').slice(0, 32);
 }
 
-export function retentionSeconds(env) {
-  const configured = Number(env.RETENTION_SECONDS);
-  return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_RETENTION_SECONDS;
+/** Retention windows in seconds, from env vars or the defaults. */
+export function retention(env) {
+  const read = (value, fallback) => {
+    const n = Number(value);
+    return Number.isFinite(n) && n > 0 ? n : fallback;
+  };
+  return {
+    unacked: read(env.UNACKED_RETENTION_SECONDS, DEFAULT_UNACKED_RETENTION_SECONDS),
+    receipt: read(env.RECEIPT_RETENTION_SECONDS, DEFAULT_RECEIPT_RETENTION_SECONDS),
+  };
 }
 
 function formatEntry(row) {

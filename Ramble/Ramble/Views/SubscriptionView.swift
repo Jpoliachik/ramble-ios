@@ -89,7 +89,7 @@ struct SubscriptionView: View {
             BrandFeatureRow(
                 icon: "lock.shield",
                 title: "Still private",
-                subtitle: "Audio routes through our open-source proxy. Nothing stored."
+                subtitle: "Audio goes through our proxy to the provider. The proxy keeps nothing."
             )
         }
     }

@@ -2,14 +2,17 @@
 // relay's real SQL against the real schema. Covers only what the relay uses:
 // prepare().bind().first()/all()/run() and batch().
 
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 
-const SCHEMA = new URL('../migrations/0001_relay.sql', import.meta.url);
+const MIGRATIONS = new URL('../migrations/', import.meta.url);
 
 export function createTestDB() {
   const sqlite = new DatabaseSync(':memory:');
-  sqlite.exec(readFileSync(SCHEMA, 'utf8'));
+  // Apply every migration in order, the way `wrangler d1 migrations apply` does.
+  for (const file of readdirSync(MIGRATIONS).filter((f) => f.endsWith('.sql')).sort()) {
+    sqlite.exec(readFileSync(new URL(file, MIGRATIONS), 'utf8'));
+  }
 
   const plain = (row) => (row ? { ...row } : null);
   const returnsRows = (sql) => /^\s*SELECT/i.test(sql) || /\bRETURNING\b/i.test(sql);

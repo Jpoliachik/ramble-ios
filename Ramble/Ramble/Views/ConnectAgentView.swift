@@ -312,7 +312,7 @@ struct ConnectAgentView: View {
     private var privacySection: some View {
         Section {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Transcripts wait on the Ramble relay until your agent picks them up, then they're deleted. Anything not picked up is deleted after \(Constants.Relay.retentionHours) hours.")
+                Text("Transcripts wait on the Ramble relay until your agent picks them up. The text is deleted the moment it does. Anything never picked up is deleted after \(Constants.Relay.unclaimedRetentionDays) days.")
                 Text("Audio never leaves your phone.")
                 Text("No accounts. The relay knows this inbox, not you.")
                 Text("Each agent can read only this phone's transcripts and can't do anything else.")

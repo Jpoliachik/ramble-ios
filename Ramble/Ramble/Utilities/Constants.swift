@@ -26,9 +26,9 @@ enum Constants {
         /// UserDefaults key for the developer override above.
         static let baseURLOverrideKey = "relayBaseURLOverride"
 
-        /// What the hosted relay's RETENTION_SECONDS is set to. Shown in the
-        /// privacy copy; keep in sync with relay/wrangler.toml.
-        static let retentionHours = 24
+        /// What the hosted relay's UNACKED_RETENTION_SECONDS is set to, in
+        /// days. Shown in the privacy copy; keep in sync with proxy/wrangler.toml.
+        static let unclaimedRetentionDays = 30
 
         static var baseURL: URL? {
             if let override = UserDefaults.standard.string(forKey: baseURLOverrideKey),
