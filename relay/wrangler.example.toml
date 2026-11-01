@@ -1,0 +1,34 @@
+# Copy to wrangler.toml and fill in the placeholders. See README.md →
+# Deploy Your Own.
+name = "ramble-relay"
+main = "src/index.js"
+compatibility_date = "2024-12-01"
+account_id = "YOUR_CLOUDFLARE_ACCOUNT_ID"
+
+[observability]
+enabled = true
+
+[vars]
+# How long an unacknowledged transcript waits before it's deleted (seconds).
+# 86400 = 24 hours.
+RETENTION_SECONDS = "86400"
+
+# Expiry backstop. Reads already hide expired transcripts; this reclaims space.
+[triggers]
+crons = ["*/15 * * * *"]
+
+# Queues, connections, pairing codes.
+# SETUP REQUIRED: `npx wrangler d1 create ramble-relay`, paste the id below,
+# then `npx wrangler d1 migrations apply ramble-relay --remote`.
+[[d1_databases]]
+binding = "DB"
+database_name = "ramble-relay"
+database_id = "YOUR_D1_DATABASE_ID"
+migrations_dir = "migrations"
+
+# App Attest state (device keys, counters, challenges). To accept devices that
+# already attested with a transcription proxy, use that proxy's ATTEST_KV id.
+# Otherwise create one: `npx wrangler kv namespace create ATTEST_KV`.
+[[kv_namespaces]]
+binding = "ATTEST_KV"
+id = "YOUR_KV_NAMESPACE_ID"

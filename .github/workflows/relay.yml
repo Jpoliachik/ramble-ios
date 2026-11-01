@@ -1,0 +1,37 @@
+name: Relay
+
+# Tests only for now. Deployment waits on the relay's hostname, D1 database,
+# and a tracked wrangler.toml — see relay/README.md.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'relay/**'
+      - 'proxy/src/attest.js'
+      - 'proxy/src/crypto.js'
+      - '.github/workflows/relay.yml'
+  pull_request:
+    paths:
+      - 'relay/**'
+      - 'proxy/src/attest.js'
+      - 'proxy/src/crypto.js'
+      - '.github/workflows/relay.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: relay
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - run: npm ci
+
+      - run: npm test

@@ -63,3 +63,7 @@ Ramble/Ramble/Secrets.swift
 
 # Claude Code
 .claude/
+
+# Relay: real config holds account-specific ids; only the example is tracked
+relay/wrangler.toml
+relay/node_modules/
