@@ -6,6 +6,8 @@ name: CI
 
 on:
   pull_request:
+    # ready_for_review lets the Mac build run once a draft is marked ready.
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
   workflow_dispatch:
@@ -44,7 +46,7 @@ jobs:
   proxy:
     name: Proxy tests
     needs: changes
-    if: needs.changes.outputs.proxy == 'true' || github.event_name != 'pull_request'
+    if: needs.changes.outputs.proxy == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -62,7 +64,7 @@ jobs:
   website:
     name: Website lint, typecheck, build
     needs: changes
-    if: needs.changes.outputs.website == 'true' || github.event_name != 'pull_request'
+    if: needs.changes.outputs.website == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -82,7 +84,9 @@ jobs:
   app:
     name: iOS + watchOS build
     needs: changes
-    if: needs.changes.outputs.app == 'true' || github.event_name != 'pull_request'
+    # macOS minutes bill at 10x on private repos, so skip draft PRs and
+    # anything that doesn't touch the app.
+    if: needs.changes.outputs.app == 'true' && github.event.pull_request.draft != true
     runs-on: macos-26
     timeout-minutes: 30
     env:
