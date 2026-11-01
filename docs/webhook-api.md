@@ -4,7 +4,7 @@ Ramble can POST each transcript to a URL you configure. This doc is the complete
 
 ## Setup
 
-In the Ramble app, go to **Settings → Webhook** and toggle it on. Enter your HTTPS endpoint URL.
+In the Ramble app, go to **Settings → Send via Webhook** and tap **Add a destination**. Enter your HTTPS endpoint URL.
 
 > The URL must use HTTPS. Localhost, private IPs, and cloud metadata endpoints are blocked.
 
@@ -135,7 +135,7 @@ app.listen(3000, () => console.log("Listening on :3000"));
 
 ## Test Webhooks
 
-Tap **Settings → Send Test Webhook** to fire a test payload at your endpoint. The test payload is identical to a real one, with two differences: `test` is `true`, and `recording_id` is prefixed with `test-`. Filter on either to skip test payloads in production.
+Open the destination from **Settings → Send via Webhook** and send a test to fire a test payload at your endpoint. The test payload is identical to a real one, with two differences: `test` is `true`, and `recording_id` is prefixed with `test-`. Filter on either to skip test payloads in production.
 
 ```json
 {

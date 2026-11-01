@@ -29,13 +29,17 @@ npm run dev      # Dev server at localhost:3000/ramble
 | Route | File | Description |
 |-------|------|-------------|
 | `/` | `src/app/page.tsx` | Landing page — hero, value props, how-it-works, pricing |
-| `/docs` | `src/app/docs/page.tsx` | Webhook API docs (developer-targeted) |
+| `/docs` | `src/app/docs/page.tsx` | Connect your agent: pairing, Muse, relay API, what the relay stores, self-host |
+| `/docs/webhooks` | `src/app/docs/webhooks/page.tsx` | Webhook API docs (developer-targeted) |
 | `/privacy` | `src/app/privacy/page.tsx` | Privacy policy |
 | `/terms` | `src/app/terms/page.tsx` | Terms of use |
 
 ## Shared components
 
-- `src/components/code-block.tsx` — Client component with copy-to-clipboard button, used in docs page
+- `src/components/code-block.tsx` — Client component with copy-to-clipboard button, used in docs pages
+- `src/components/docs-sidebar.tsx` — Docs page switcher + "On this page" nav; pass `page="agent"` or `page="webhooks"`
+- `src/lib/site.ts` — Shared constants (prices, retention, relay URL, pairing code). Several are placeholders
+- `public/llms.txt` / `public/llms-full.txt` — Agent-readable summary and full reference; keep in sync with the docs pages
 - Footer is in `src/app/layout.tsx` (shared across all pages)
 
 ## Style

@@ -1,18 +1,26 @@
 # Ramble
 
-> Voice capture app for iPhone and Apple Watch. Record your thoughts on the go, get accurate transcripts, and pipe them into your agent, workflow, or automation via webhook. Open source, private by design, no accounts.
+> Record on your Apple Watch. Your agent handles it. Ramble is an open-source watch app (with an iPhone companion) that transcribes what you say and forwards the transcript to your personal agent, which picks it up on a schedule. No accounts.
 
-Ramble auto-POSTs every transcript to any HTTPS endpoint you configure. Works out of the box with Zapier, Make, Airtable, and n8n — or build your own endpoint.
+Tap the watch and talk. The iPhone transcribes the recording (Apple Speech on-device by default; optional cloud models by subscription). Ramble uploads the transcript text, never audio, to the Ramble Relay, a small open-source Cloudflare Worker. The relay keeps one queued copy per connected agent. The agent pulls on a schedule (suggested every 15 minutes), handles each transcript, and acknowledges it, which deletes it from the relay. Anything unacknowledged is deleted after 24 hours (proposed default, not final). This is asynchronous; a few minutes of latency is expected.
+
+Muse is the supported agent today. More agents later.
+
+Pairing: iPhone Settings → Connect agent → Muse. Ramble shows a single-use code like K7QX-MP4D (8 characters, expires in 10 minutes). The user tells the agent "I downloaded Ramble, connect it" and pastes the code. The agent exchanges it once for a long-lived token (rmba_…) scoped to that inbox, read + ack only. Disconnect in the app revokes the token and deletes its queue.
+
+Ramble can also POST each transcript to any HTTPS endpoint (webhooks), alongside or instead of the agent connection.
 
 ## Docs
 
-- [Webhook API — Full Reference](https://goodloop.dev/ramble/llms-full.txt): Complete webhook setup including automation platform guides, payload format, signature verification, and code examples.
+- [Full reference](https://goodloop.dev/ramble/llms-full.txt): Agent connection, the relay API (pair, pull, ack), what the relay stores, self-hosting, and the complete webhook API.
+- [Connect your agent](https://goodloop.dev/ramble/docs): Pairing, the agent loop, and the relay API.
+- [Webhooks](https://goodloop.dev/ramble/docs/webhooks): Payload format, signature verification, retries, automation platforms.
 
 ## Links
 
 - [Website](https://goodloop.dev/ramble)
-- [Documentation](https://goodloop.dev/ramble/docs)
 - [Privacy Policy](https://goodloop.dev/ramble/privacy)
 - [Terms of Use](https://goodloop.dev/ramble/terms)
 - [GitHub](https://github.com/Jpoliachik/ramble-ios)
-- [App Store](https://apps.apple.com/app/ramble)
+- [Relay source and Deploy Your Own](https://github.com/Jpoliachik/ramble-ios/blob/main/relay/README.md)
+- [App Store](https://apps.apple.com/app/id6761857751)

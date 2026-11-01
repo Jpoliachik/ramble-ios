@@ -70,7 +70,7 @@ npm run dev      # Dev server at localhost:3000/ramble
 
 The site is configured with `basePath: "/ramble"` and `output: "export"`. The `out/` directory contains plain HTML/CSS/JS — copy it into the goodloop.dev repo to serve at `goodloop.dev/ramble`. No server runtime needed.
 
-**Pages:** Landing (`/`), Privacy Policy (`/privacy`), Terms of Use (`/terms`), Webhook API Docs (`/docs`)
+**Pages:** Landing (`/`), Privacy Policy (`/privacy`), Terms of Use (`/terms`), Connect your agent + relay API (`/docs`), Webhook API Docs (`/docs/webhooks`)
 
 ## Architecture
 

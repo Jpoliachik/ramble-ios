@@ -1,15 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BrainCircuit, Zap, Code, Workflow, GitBranch } from "lucide-react";
+import { Sparkles, Webhook } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 const destinations: { label: string; Icon: LucideIcon }[] = [
-  { label: "Your Agent", Icon: BrainCircuit },
-  { label: "Zapier", Icon: Zap },
-  { label: "Your API", Icon: Code },
-  { label: "Make", Icon: Workflow },
-  { label: "n8n", Icon: GitBranch },
+  { label: "Muse", Icon: Sparkles },
+  { label: "Webhook", Icon: Webhook },
 ];
 
 const SLIDE_MS = 350;
@@ -41,7 +38,7 @@ export default function HeroFlow() {
   const Prev = prevIndex !== null ? destinations[prevIndex] : null;
 
   return (
-    <div className="mb-8 flex items-center gap-3 sm:gap-4" aria-label="Ramble sends transcripts to your destination of choice">
+    <div className="mb-8 flex items-center gap-3 sm:gap-4" aria-label="Ramble sends transcripts to your agent">
       {/* Left tile: Ramble app icon */}
       <div className="flex h-16 w-16 sm:h-20 sm:w-20 shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-stone-200/80">
         <svg
@@ -125,7 +122,7 @@ export default function HeroFlow() {
           </div>
         </div>
         <span className="sr-only">
-          Send to your agent, Zapier, your API, Make, or n8n.
+          Send to Muse, your agent, or to your own webhook.
         </span>
       </div>
 
