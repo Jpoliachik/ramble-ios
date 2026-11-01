@@ -1,13 +1,12 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { AudioLines, Code, Trash2, UserX } from "lucide-react";
+import { AudioLines, Clock, Trash2, UserX } from "lucide-react";
 import HeroFlow from "../components/hero-flow";
 import {
   APP_PRICE,
   APP_STORE_URL,
   BASE_PATH,
   CLOUD_PRICE,
-  GITHUB_URL,
   PAIR_CODE_EXAMPLE,
   PAIR_CODE_TTL,
   PULL_CADENCE,
@@ -26,14 +25,6 @@ function AppleLogo() {
   return (
     <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
-    </svg>
-  );
-}
-
-function GitHubLogo() {
-  return (
-    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
     </svg>
   );
 }
@@ -76,7 +67,7 @@ const privacyPoints = [
   {
     Icon: Trash2,
     title: "Deleted on delivery",
-    body: `The relay holds text until your agent picks it up. Anything unclaimed is deleted after ${RETENTION}.`,
+    body: "The relay holds transcript text only until your agent picks it up. Then it's deleted.",
   },
   {
     Icon: UserX,
@@ -84,9 +75,9 @@ const privacyPoints = [
     body: "No email, no name, no login. We identify inboxes, not people.",
   },
   {
-    Icon: Code,
-    title: "Open source",
-    body: "The app, the relay, and the transcription proxy. Read the code, or run your own relay.",
+    Icon: Clock,
+    title: "Nothing kept for long",
+    body: `If your agent never picks a transcript up, it's deleted after ${RETENTION} at most. That window is long so nothing is lost if your agent has trouble checking in.`,
   },
 ];
 
@@ -131,25 +122,13 @@ const faqs: { q: string; a: ReactNode }[] = [
       <>
         Transcript text waiting for pickup, with its recording time and duration. Plus what it needs to route it: a
         random inbox id, hashed credentials, and when each agent connected and last checked in. Text is deleted the
-        moment your agent picks it up, or after {RETENTION} if it never does. No audio, no accounts, no names, emails,
+        moment your agent picks it up. If it never does, the text is deleted after {RETENTION} at most. The window is
+        that long so nothing is lost if your agent has trouble checking in for a while. No audio, no accounts, no names, emails,
         or IP addresses.{" "}
         <Link href="/privacy" className={inlineLink}>
           Privacy policy
         </Link>
         .
-      </>
-    ),
-  },
-  {
-    q: "Can I run my own relay?",
-    a: (
-      <>
-        Yes. The relay is a small open-source Cloudflare Worker. Deploy it to your own Cloudflare account (the free tier
-        is fine) and point Ramble at it. The code is in{" "}
-        <a href={`${GITHUB_URL}/tree/main/relay`} target="_blank" rel="noopener noreferrer" className={inlineLink}>
-          relay/
-        </a>{" "}
-        on GitHub.
       </>
     ),
   },
@@ -173,18 +152,6 @@ const faqs: { q: string; a: ReactNode }[] = [
   {
     q: "What if I'm offline?",
     a: "Nothing gets lost. Recordings wait in a queue on your Watch and iPhone and go out when you're back online. Each one shows its status along the way.",
-  },
-  {
-    q: "Is Ramble open source?",
-    a: (
-      <>
-        Yes, MIT licensed, on{" "}
-        <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className={inlineLink}>
-          GitHub
-        </a>
-        . Audit it, build it yourself, or fork it.
-      </>
-    ),
   },
   {
     q: "How do I cancel cloud transcription?",
@@ -566,16 +533,12 @@ export default function Home() {
             Tap. Talk. <span className="italic text-red-500">Handled.</span>
           </h2>
           <p className="mt-4 text-base text-stone-500">
-            {APP_PRICE}, one time. Apple Watch and iPhone. Works with Muse. Open source.
+            {APP_PRICE}, one time. Apple Watch and iPhone. Works with Muse. No accounts.
           </p>
           <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
             <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className={primaryButton}>
               <AppleLogo />
               Get Ramble
-            </a>
-            <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className={secondaryButton}>
-              <GitHubLogo />
-              View on GitHub
             </a>
           </div>
         </div>

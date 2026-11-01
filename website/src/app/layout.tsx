@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Header from "../components/header";
-import { BASE_PATH, GITHUB_URL, SITE_URL } from "../lib/site";
+import { BASE_PATH, SITE_URL } from "../lib/site";
 import "./globals.css";
 
 const TITLE = "Ramble: Record on your watch. Your agent handles it.";
 const DESCRIPTION =
-  "Tap your Apple Watch and say it: remind me to book the dentist, add oat milk to the list. Your iPhone transcribes it and Muse takes care of it. On-device transcription, no accounts, open source.";
+  "Tap your Apple Watch and say it: remind me to book the dentist, add oat milk to the list. Your iPhone transcribes it and Muse takes care of it. On-device transcription, no accounts, transcripts deleted on delivery.";
 const SHORT_DESCRIPTION =
   "Tap your Apple Watch and talk. Your iPhone transcribes it and Muse takes care of it.";
 
@@ -70,14 +70,6 @@ export default function RootLayout({
               <Link href="/terms" className="hover:text-stone-900 transition-colors">
                 Terms
               </Link>
-              <a
-                href={GITHUB_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-stone-900 transition-colors"
-              >
-                GitHub
-              </a>
             </nav>
           </div>
         </footer>

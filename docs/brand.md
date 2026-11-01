@@ -8,7 +8,7 @@ Tap your Apple Watch, talk, and put your arm down. Your iPhone transcribes it, a
 
 It's asynchronous on purpose. Agents pull on a schedule, so a few minutes between talking and the agent acting is normal and fine.
 
-Open source. No accounts. Transcripts pass through the relay and are deleted on delivery. They don't live there.
+Temporary by design. No accounts. Transcripts pass through the relay and are deleted on delivery. They don't live there.
 
 ## Positioning
 
@@ -22,7 +22,7 @@ Ramble is the capture layer for the agent era. People who have a personal agent 
 
 2. **Agent forwarding with zero setup.** In the app, tap Connect agent and Ramble shows a short pairing code (like `K7QX-MP4D`, single-use, expires in 10 minutes). Tell your agent "I downloaded Ramble, connect it" and paste the code. That's the whole setup. No API keys to copy, no URLs to configure. Today that agent is Muse. More agents later.
 
-3. **Private by design.** No accounts. Audio never leaves your phone for the relay. Transcripts pass through the relay and are deleted the moment your agent acknowledges them, or after 24 hours (PLACEHOLDER) if it never does. Credentials are stored only as hashes. Open source, and the relay can be self-hosted.
+3. **Temporary by design.** No accounts. Audio never goes to the relay, and on-device Apple Speech touches no server at all. Transcripts pass through the relay and are deleted the moment your agent acknowledges them. That's the normal path. Anything your agent never picks up is deleted after a hard maximum of 30 days (PLACEHOLDER: 30 or 60 days, Justin to confirm). The window is that long so a transcript isn't lost if your agent has trouble picking it up for a while. Credentials are stored only as hashes. We say exactly what is stored, where, and for how long.
 
 4. **Accurate transcription.** Apple Speech on-device by default, free and touching no server. Optional cloud models for better accuracy in noise, with accents, or when talking fast: Groq Whisper v3 Turbo, Whisper Large v3, Deepgram Nova-3, OpenAI GPT-Transcribe.
 
@@ -36,7 +36,7 @@ Ramble is the capture layer for the agent era. People who have a personal agent 
 
 - **Automation builders** — Developers and tinkerers who pipe voice into their own stack. The webhook turns Ramble into a voice input for workflows, databases, and custom backends.
 
-All three value privacy and transparency. Open source isn't a footnote. It's why they trust the app.
+All three value clarity. They trust the app because it says plainly what it keeps, where, and for how long, and then deletes it.
 
 ## Tagline (drafts, not locked)
 
@@ -51,7 +51,7 @@ The tagline should convey: (1) the watch, (2) your agent, (3) you don't have to 
 - **Calm and direct.** Short sentences. No hype, no startup language, no "AI-powered" selling points.
 - **Honest.** Promise reliability, not transformation. Say what the app does, not what it could hypothetically become.
 - **Technical when appropriate.** The audience includes developers and tinkerers. Don't dumb things down, but don't gatekeep either.
-- **No fear-based privacy marketing.** Don't scare people about other apps. Just state what Ramble does: open source, no accounts, transcripts deleted on delivery. Verify it yourself.
+- **No fear-based privacy marketing.** Don't scare people about other apps. Just state what Ramble does: no accounts, transcripts deleted on delivery, a stated maximum for anything never picked up. Be precise about what is stored, where, and for how long.
 
 ## Visual identity
 
@@ -89,7 +89,7 @@ iOS asset names are kebab-case (`brand-red`, `onboarding-bg`, etc.); SwiftUI acc
 "Every transcript can POST to a webhook. Signed requests, automatic retries, full API docs."
 
 ### For the privacy-conscious
-"No accounts. Your audio stays on your phone. Transcripts pass through the relay and are deleted as soon as your agent picks them up, or after 24 hours if it doesn't. Open source, and you can run your own relay. Read the code."
+"No accounts. Audio never goes to the relay. Transcripts wait there only until your agent picks them up, then they're deleted. Anything never picked up is deleted after 30 days at most (PLACEHOLDER), so nothing is lost if your agent has trouble checking in for a while."
 
 ## App Store link
 
@@ -103,8 +103,8 @@ Lives in [`docs/app-store.md`](app-store.md).
 
 1. **Nothing ever gets lost** — Offline-first, persistent queues on watch and phone, clear status at all times: recorded, transcribed, sent, delivered. If someone records a thought on a hike, it reaches their agent when they're back in range. Core promise.
 2. **Capture over organization** — Messy input beats no input. Your agent handles the structure.
-3. **No accounts, no audio, transcripts held only until delivery** — The relay identifies inboxes, not people. It never receives audio. It keeps transcript text only until your agent acknowledges it, with a hard retention limit as a backstop. We may collect anonymous usage counts, never content. Open source proves it.
-4. **Pluggable, not opinionated** — Users choose their transcription model, their agent, and their webhook. Self-host if you want. Don't lock anyone in.
+3. **No accounts, no audio, transcripts held only until delivery** — The relay identifies inboxes, not people. It never receives audio. It keeps transcript text only until your agent acknowledges it, with a hard maximum (30 days, PLACEHOLDER) as a backstop. We may collect anonymous usage counts, never content. The promise is a deletion policy stated precisely.
+4. **Pluggable, not opinionated** — Users choose their transcription model, their agent, and their webhook. Don't lock anyone in.
 5. **Ship and iterate** — Don't overbuild. Use it, notice what's missing, add that.
 
 ## What Ramble is NOT
@@ -119,6 +119,7 @@ Lives in [`docs/app-store.md`](app-store.md).
 - Don't say "revolutionary", "game-changing", or "seamless"
 - Don't compare directly to Voice Memos or other apps
 - Don't say "no servers" or "no data on our servers" — the relay is a server. Say what it holds and when it deletes it.
+- Don't say "open source", "read the code", or "verify it yourself", and don't mention self-hosting. Development is private. The privacy story is temporary retention, stated precisely.
 - Don't promise real-time. Agents pull on a schedule; minutes of delay is normal.
 - Don't promise MCP, ChatGPT, Claude, or Grok connections, or end-to-end encryption, until they ship. Muse is the agent that connects today. "More agents later" is the most to say, with no dates.
 - Don't headline "works with any agent"

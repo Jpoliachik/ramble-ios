@@ -26,7 +26,6 @@ const sectionsByPage: Record<DocsPage, Section[]> = {
     { id: "api-errors", label: "Errors", indent: true },
     { id: "api-app", label: "App-facing endpoints", indent: true },
     { id: "storage", label: "What the relay stores" },
-    { id: "self-host", label: "Self-host" },
   ],
   webhooks: [
     { id: "step-1", label: "1. Add a destination" },

@@ -4,7 +4,6 @@ import { CodeBlock, InlineCode } from "@/components/code-block";
 import DocsSidebar from "@/components/docs-sidebar";
 import CopyLlmButton from "@/components/copy-llm-button";
 import {
-  GITHUB_URL,
   PAIR_CODE_EXAMPLE,
   PAIR_CODE_TTL,
   PULL_CADENCE,
@@ -17,8 +16,6 @@ export const metadata: Metadata = {
   description:
     "Pair Ramble with Muse. Record on your watch, and the transcript waits in a relay inbox until your agent picks it up and acknowledges it.",
 };
-
-const RELAY_README_URL = `${GITHUB_URL}/blob/main/relay/README.md`;
 
 const AGENT_INSTRUCTIONS = `Ramble connection
 Relay: ${RELAY_URL}
@@ -127,7 +124,8 @@ export default function AgentDocs() {
               <p>
                 Your agent checks the inbox on a schedule, does what you asked, and acknowledges each transcript. The
                 acknowledgment deletes it from the relay right away. Anything not picked up is deleted after{" "}
-                <strong>{RETENTION}</strong>.
+                <strong>{RETENTION}</strong>{" "}at most. The window is that long so a transcript isn&apos;t lost if
+                your agent has trouble checking in for a while.
               </p>
               <p>
                 This is asynchronous on purpose. Your agent checks about every {PULL_CADENCE}, so expect a short wait between
@@ -208,8 +206,9 @@ export default function AgentDocs() {
             <section className="space-y-4">
               <SectionHeader id="api">How the connection works</SectionHeader>
               <p>
-                The relay is a small open-source Cloudflare Worker. These are the three calls an agent makes. They&apos;re
-                documented here so you can see exactly what happens, and for anyone running their own relay.
+                The relay is a small Cloudflare Worker, running alongside Ramble&apos;s transcription proxy. These are
+                the three calls an agent makes. They&apos;re
+                documented here so you can see exactly what happens.
               </p>
               <p>
                 All bodies are JSON. Errors are <InlineCode>{`{"error": "..."}`}</InlineCode>{" "}with a 4xx or 5xx
@@ -233,12 +232,12 @@ export default function AgentDocs() {
   "token": "rmba_…",
   "connection_id": "con_…",
   "agent_type": "muse",
-  "retention_seconds": 86400
+  "unacked_retention_seconds": 2592000
 }`}
               </CodeBlock>
               <p>
-                <InlineCode>retention_seconds</InlineCode>{" "}is how long an unacknowledged transcript waits before
-                it&apos;s deleted. Store <InlineCode>token</InlineCode>{" "}as a secret.
+                <InlineCode>unacked_retention_seconds</InlineCode>{" "}is how long a transcript your agent never
+                acknowledges waits before it&apos;s deleted ({RETENTION}). Store <InlineCode>token</InlineCode>{" "}as a secret.
               </p>
 
               <SubHeader id="api-pull">Pull new transcripts</SubHeader>
@@ -256,7 +255,7 @@ export default function AgentDocs() {
       "created_at": "2026-11-01T19:00:00Z",
       "duration": 8.2,
       "transcription": "Remind me to book the dentist.",
-      "expires_at": "2026-11-02T19:00:05Z"
+      "expires_at": "2026-12-01T19:00:05Z"
     }
   ],
   "next_since": 41,
@@ -287,9 +286,10 @@ export default function AgentDocs() {
   -H "Content-Type: application/json" \\
   -d '{"ids": [41]}'`}
               </CodeBlock>
-              <CodeBlock language="json">{`{"deleted": 1}`}</CodeBlock>
+              <CodeBlock language="json">{`{"acknowledged": 1}`}</CodeBlock>
               <p>
-                Deletes those items now. Up to 500 ids per call. Ack only after the item is durably handled. An
+                Deletes the text of those items now. A text-free pickup receipt (recording id and pickup time) stays
+                for 24 hours so the app can show &ldquo;Picked up by Muse.&rdquo; Up to 500 ids per call. Ack only after the item is durably handled. An
                 unacknowledged item comes back on the next pull until it expires.
               </p>
 
@@ -328,7 +328,7 @@ export default function AgentDocs() {
                   [<InlineCode key="e">POST /inboxes</InlineCode>, "App Attest", "Creates the inbox. Returns its secret once."],
                   [
                     <InlineCode key="e">POST /inbox</InlineCode>,
-                    "App Attest + inbox secret",
+                    "Inbox secret",
                     "Uploads one transcript and queues a copy per connected agent. Idempotent on recording_id.",
                   ],
                   [<InlineCode key="e">DELETE /inbox</InlineCode>, "Inbox secret", "Delete everything now. Empties every queue."],
@@ -347,12 +347,18 @@ export default function AgentDocs() {
                     "Inbox secret",
                     "Disconnect. Revokes the token and deletes its queue.",
                   ],
+                  [
+                    <InlineCode key="e">GET /receipts</InlineCode>,
+                    "Inbox secret",
+                    "Lists pickups from the last 24 hours (recording id, agent, pickup time) so the app can show \u201cPicked up by Muse.\u201d No text.",
+                  ],
                 ]}
               />
               <p>
-                App Attest proves uploads come from a real copy of Ramble on a real Apple device. Disconnect and Delete
-                everything need only the inbox secret, so they keep working even if attestation is having a bad day. An
-                inbox can have up to 10 connected agents.
+                App Attest is checked once, when the app creates its inbox. That proves the inbox belongs to a real copy
+                of Ramble on a real Apple device. Everything after that, including uploads, Disconnect, and Delete
+                everything, needs only the inbox secret, so delivery and the kill switches keep working even if
+                attestation is having a bad day. An inbox can have up to 10 connected agents.
               </p>
             </section>
 
@@ -377,7 +383,12 @@ export default function AgentDocs() {
                   [
                     "Queued transcript",
                     "Recording id, recorded-at time, duration, text, expiry. One copy per connected agent.",
-                    `The agent acks it, you disconnect or tap Delete everything, or ${RETENTION} pass`,
+                    `Text: when the agent acks it, you disconnect, you tap Delete everything, or ${RETENTION} pass unclaimed`,
+                  ],
+                  [
+                    "Pickup receipt",
+                    "The same row after ack, with the text removed: recording id, pickup time",
+                    "24 hours after pickup",
                   ],
                 ]}
               />
@@ -386,41 +397,8 @@ export default function AgentDocs() {
                 record counts and ids, never transcript text. We identify inboxes, not people.
               </p>
               <p>
-                Transcripts pass through the relay and are deleted on delivery. They don&apos;t live there.
-              </p>
-            </section>
-
-            {/* Self-host */}
-            <section className="space-y-4">
-              <SectionHeader id="self-host">Self-host</SectionHeader>
-              <p>
-                The relay is open source. You can run your own on Cloudflare: a Worker plus a D1 database. The free
-                tier is enough for personal use.
-              </p>
-              <CodeBlock language="bash">
-                {`cd relay && npm ci
-cp wrangler.example.toml wrangler.toml   # set account_id
-npx wrangler d1 create ramble-relay       # paste the id into wrangler.toml
-npx wrangler d1 migrations apply ramble-relay --remote
-npx wrangler kv namespace create ATTEST_KV
-npx wrangler deploy`}
-              </CodeBlock>
-              <p>
-                Set <InlineCode>RETENTION_SECONDS</InlineCode>{" "}in <InlineCode>wrangler.toml</InlineCode>{" "}to change
-                how long unacknowledged transcripts wait (default 86400, 24 hours). App Attest only works from a real
-                device running a copy of Ramble whose bundle ID matches.
-              </p>
-              <p>
-                Full steps, local development, and tests are in the{" "}
-                <a
-                  href={RELAY_README_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-red-600 underline-offset-2 hover:underline"
-                >
-                  relay README on GitHub
-                </a>
-                .
+                Transcripts pass through the relay and are deleted on delivery. They don&apos;t live there. The pickup
+                receipt holds no text. It only lets the app show that your agent got it.
               </p>
             </section>
 

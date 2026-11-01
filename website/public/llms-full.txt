@@ -2,9 +2,9 @@
 
 Record on your Apple Watch. Your agent handles it.
 
-Ramble is an open-source watch app with an iPhone companion. You tap the watch and talk; the iPhone transcribes the recording and forwards the transcript to your personal agent, which picks it up on a schedule and handles it. The agent doesn't need to reply. No accounts.
+Ramble is a watch app with an iPhone companion. You tap the watch and talk; the iPhone transcribes the recording and forwards the transcript to your personal agent, which picks it up on a schedule and handles it. The agent doesn't need to reply. No accounts.
 
-This document covers the agent connection (Ramble Relay), its API, what it stores, self-hosting, and the webhook API.
+This document covers the agent connection (Ramble Relay), its API, what it stores, and the webhook API.
 
 Placeholders: values marked (PLACEHOLDER) are proposed and not final. The hosted relay's hostname is not decided yet; examples use `https://<relay-host>`. It will be listed at https://goodloop.dev/ramble/docs at launch.
 
@@ -15,14 +15,14 @@ Placeholders: values marked (PLACEHOLDER) are proposed and not final. The hosted
 ```
 Watch ──► iPhone (transcribe) ──POST /inbox──► relay ──GET /inbox──► agent
                                                  ▲                      │
-                                                 └──POST /inbox/ack─────┘ (deleted)
+                                                 └──POST /inbox/ack─────┘ (text deleted)
 ```
 
 1. The iPhone transcribes each recording. Apple Speech on-device is the default and touches no server. Optional cloud models (Groq Whisper v3 Turbo, Whisper Large v3, Deepgram Nova-3, OpenAI GPT-Transcribe) are available by subscription.
-2. Ramble uploads the transcript text to the Ramble Relay, a small open-source Cloudflare Worker. Audio never reaches the relay.
+2. Ramble uploads the transcript text to the Ramble Relay, a small Cloudflare Worker (running alongside the transcription proxy) that holds transcripts temporarily. Audio never reaches the relay.
 3. The relay queues one copy per connected agent.
-4. The agent pulls on a schedule (suggested every 15 minutes, PLACEHOLDER), handles each transcript, and acknowledges it. Acknowledging deletes it immediately.
-5. Anything unacknowledged is deleted after 24 hours (PLACEHOLDER; the relay's default, configurable per deployment).
+4. The agent pulls on a schedule (suggested every 15 minutes, PLACEHOLDER), handles each transcript, and acknowledges it. Acknowledging deletes the text immediately. A text-free pickup receipt (recording id, pickup time) stays 24 hours so the app can show "Picked up by Muse".
+5. Anything never acknowledged is deleted after 30 days at most (PLACEHOLDER: 30 or 60 days, not final). The window is long so a transcript isn't lost if the agent has trouble picking it up for a while.
 
 This is asynchronous. A few minutes between recording and action is expected. Recordings queue on the watch and phone while offline and go out when the phone reconnects.
 
@@ -70,10 +70,10 @@ Content-Type: application/json
 ```
 
 ```json
-{"token": "rmba_…", "connection_id": "con_…", "agent_type": "muse", "retention_seconds": 86400}
+{"token": "rmba_…", "connection_id": "con_…", "agent_type": "muse", "unacked_retention_seconds": 2592000}
 ```
 
-`retention_seconds` is how long an unacknowledged transcript waits before deletion.
+`unacked_retention_seconds` is how long a transcript the agent never acknowledges waits before deletion (2592000 = 30 days, PLACEHOLDER).
 
 ### GET /inbox?since=<id>&limit=<n>
 
@@ -91,7 +91,7 @@ Authorization: Bearer rmba_…
       "created_at": "2026-11-01T19:00:00Z",
       "duration": 8.2,
       "transcription": "Remind me to book the dentist.",
-      "expires_at": "2026-11-02T19:00:05Z"
+      "expires_at": "2026-12-01T19:00:05Z"
     }
   ],
   "next_since": 41,
@@ -114,10 +114,10 @@ Content-Type: application/json
 ```
 
 ```json
-{"deleted": 1}
+{"acknowledged": 1}
 ```
 
-Deletes those items now. Up to 500 ids per call.
+Deletes the text of those items now; a text-free pickup receipt stays 24 hours. Up to 500 ids per call.
 
 ### Errors
 
@@ -133,13 +133,14 @@ Used only by the Ramble app. Agent tokens can't call these, and the app's inbox 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
 | POST | /inboxes | App Attest | Create the inbox; returns `inbox_id` and `inbox_secret` (`rmbi_…`) once |
-| POST | /inbox | App Attest + inbox secret | Upload `{"recording_id", "created_at", "duration", "transcription"}`; queues one copy per agent; idempotent on `recording_id` |
+| POST | /inbox | inbox secret | Upload `{"recording_id", "created_at", "duration", "transcription"}`; queues one copy per agent; idempotent on `recording_id` |
 | DELETE | /inbox[?connection_id=] | inbox secret | Delete everything now (or one agent's queue) |
 | POST | /pair/code | inbox secret | Issue a pairing code for `agent_type` (`muse`, `chatgpt`, `grok`, `claude`, `other`); cancels the previous code |
 | GET | /connections | inbox secret | List connections with created, last-pull, and pending counts |
 | DELETE | /connections/:id | inbox secret | Disconnect: revoke the token and delete its queue |
+| GET | /receipts | inbox secret | `{"receipts": [{"recording_id", "connection_id", "agent_type", "picked_up_at"}]}` — pickups from the last 24 hours, no text |
 
-An inbox can have up to 10 connected agents. Also: `GET /health` → `{"status": "ok"}`; `POST /attest/challenge` and `POST /attest` for App Attest registration.
+App Attest is checked once, when the app creates its inbox (`POST /inboxes`). Everything after that, including uploads, Disconnect, and Delete everything, needs only the inbox secret. An inbox can have up to 10 connected agents. Also: `GET /health` → `{"status": "ok"}`; `POST /attest/challenge` and `POST /attest` for App Attest registration.
 
 ## What the relay stores
 
@@ -150,22 +151,10 @@ This is the whole list:
 | Inbox | random id, hash of the app's inbox secret, created time | — |
 | Pairing code | hash of the code, inbox id, agent type, expiry | used, replaced, or 10 minutes pass |
 | Connection | random id, inbox id, agent type, hash of the agent's token, created and last-pull times | the user taps Disconnect |
-| Queued transcript | recording id, recorded-at time, duration, text, expiry — one copy per connected agent | the agent acks it, the user disconnects or taps Delete everything, or 24 hours (PLACEHOLDER) pass |
+| Queued transcript | recording id, recorded-at time, duration, text, expiry — one copy per connected agent | text: when the agent acks it, the user disconnects or taps Delete everything, or 30 days (PLACEHOLDER) pass unclaimed |
+| Pickup receipt | the same row after ack, with the text removed: recording id, pickup time | 24 hours after pickup |
 
 No accounts, emails, names, IP addresses, or audio. Credentials are stored only as SHA-256 hashes. Logs record counts and ids, never transcript text. We identify inboxes, not people. Transcripts pass through the relay and are deleted on delivery; they don't live there.
-
-## Self-host
-
-The relay is open source and can run on your own Cloudflare account (Worker + D1; the free tier is enough for personal use). Summary:
-
-1. `cd relay && npm ci`
-2. `cp wrangler.example.toml wrangler.toml` and set `account_id`.
-3. `npx wrangler d1 create ramble-relay` (paste the id into wrangler.toml), then `npx wrangler d1 migrations apply ramble-relay --remote`.
-4. `npx wrangler kv namespace create ATTEST_KV` (or reuse the transcription proxy's).
-5. Optionally set `RETENTION_SECONDS` (default 86400).
-6. `npx wrangler deploy`
-
-Full instructions: https://github.com/Jpoliachik/ramble-ios/blob/main/relay/README.md
 
 # Part 2: Webhook API
 
@@ -329,7 +318,6 @@ Webhooks fire after transcription completes — not after recording. Transcripti
 - Watch app with an iPhone companion. Record on the watch; the phone transcribes and delivers.
 - One-time purchase: $2.99 (PLACEHOLDER). Includes on-device transcription, the agent connection (relay), and webhooks.
 - Optional cloud transcription: $3.99/month (PLACEHOLDER), cancel anytime in iOS Settings. Everything else keeps working without it. The transcription proxy is stateless and stores no audio or transcripts.
-- No accounts. Transcripts pass through the relay and are deleted on delivery.
-- Open source: https://github.com/Jpoliachik/ramble-ios
+- No accounts. Transcripts pass through the relay and are deleted on delivery, or after 30 days (PLACEHOLDER) at most if never picked up. Audio never goes to the relay.
 - Website: https://goodloop.dev/ramble
 - Docs: https://goodloop.dev/ramble/docs (agent) and https://goodloop.dev/ramble/docs/webhooks (webhooks)

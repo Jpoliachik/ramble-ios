@@ -29,7 +29,7 @@ npm run dev      # Dev server at localhost:3000/ramble
 | Route | File | Description |
 |-------|------|-------------|
 | `/` | `src/app/page.tsx` | Landing page — hero, value props, how-it-works, pricing |
-| `/docs` | `src/app/docs/page.tsx` | Connect your agent: pairing, Muse, relay API, what the relay stores, self-host |
+| `/docs` | `src/app/docs/page.tsx` | Connect your agent: pairing, Muse, relay API, what the relay stores |
 | `/docs/webhooks` | `src/app/docs/webhooks/page.tsx` | Webhook API docs (developer-targeted) |
 | `/privacy` | `src/app/privacy/page.tsx` | Privacy policy |
 | `/terms` | `src/app/terms/page.tsx` | Terms of use |

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { APP_PRICE, CLOUD_PRICE, GITHUB_URL, RETENTION } from "@/lib/site";
+import { APP_PRICE, APP_STORE_URL, CLOUD_PRICE, RETENTION } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Terms of Use",
@@ -96,7 +96,8 @@ export default function TermsOfUse() {
             <h2 className={h2}>Ramble Relay</h2>
             <p className="mt-2">
               The relay is provided on a best-effort basis. Transcripts that
-              your agent has not acknowledged are deleted after {RETENTION}.
+              your agent has not acknowledged are deleted after {RETENTION} at
+              most.
               Your agent must pull them within that window. A transcript deleted
               this way is still on your iPhone, but it will not be delivered to
               the agent again.
@@ -151,26 +152,6 @@ export default function TermsOfUse() {
           </section>
 
           <section>
-            <h2 className={h2}>Open source</h2>
-            <p className="mt-2">
-              Ramble&apos;s source code, including the relay and the
-              transcription proxy, is available under an open source license on{" "}
-              <a
-                href={GITHUB_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={link}
-              >
-                GitHub
-              </a>
-              . The open source license governs use of the source code. These
-              Terms govern your use of the App as distributed on the App Store
-              and of the hosted services it connects to. If you run your own
-              relay or proxy, you are responsible for it.
-            </p>
-          </section>
-
-          <section>
             <h2 className={h2}>Disclaimer of warranties</h2>
             <p className="mt-2">
               The App and its hosted services are provided &quot;as is&quot;
@@ -202,14 +183,14 @@ export default function TermsOfUse() {
           <section>
             <h2 className={h2}>Contact</h2>
             <p className="mt-2">
-              Questions about these terms? Open an issue on{" "}
+              Questions about these terms? Use the support link on{" "}
               <a
-                href={`${GITHUB_URL}/issues`}
+                href={APP_STORE_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={link}
               >
-                GitHub
+                Ramble&apos;s App Store page
               </a>
               .
             </p>

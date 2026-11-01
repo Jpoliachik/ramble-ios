@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { GITHUB_URL, PAIR_CODE_TTL, RETENTION } from "@/lib/site";
+import { APP_STORE_URL, PAIR_CODE_TTL, RETENTION } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
@@ -36,7 +36,8 @@ export default function PrivacyPolicy() {
               on your iPhone and Apple Watch. Audio never goes to Ramble&apos;s
               relay. When you connect an agent, the transcript text passes
               through the relay and is deleted as soon as your agent picks it
-              up, or after {RETENTION} if it never does. We collect anonymous
+              up. If your agent never picks it up, it is deleted after{" "}
+              {RETENTION} at most. We collect anonymous
               usage counts for cloud transcription, never content.
             </p>
           </section>
@@ -87,9 +88,10 @@ export default function PrivacyPolicy() {
           <section>
             <h2 className={h2}>Ramble Relay</h2>
             <p className="mt-2">
-              The relay is how transcripts reach your agent. It is a small,
-              open-source Cloudflare Worker. It is used only if you connect an
-              agent.
+              The relay is how transcripts reach your agent. It is a small
+              Cloudflare Worker that holds transcripts temporarily. It runs
+              alongside the transcription proxy. It is used
+              only if you connect an agent.
             </p>
             <p className="mt-2">
               <span className="font-medium text-stone-900">
@@ -113,8 +115,13 @@ export default function PrivacyPolicy() {
               </span>{" "}
               Your agent pulls new transcripts on a schedule and acknowledges
               each one after handling it. Acknowledging deletes it from the
-              relay immediately. Anything not acknowledged is deleted after{" "}
-              {RETENTION}.
+              relay immediately. That is the normal path. Anything never
+              acknowledged is deleted after {RETENTION} at most. The window is
+              that long so a transcript is not lost if your agent has trouble
+              picking it up for a while. After your agent picks a transcript
+              up, the relay keeps a pickup receipt with no text (the
+              recording&apos;s id and the pickup time) for 24 hours, so the app
+              can show that your agent got it.
             </p>
 
             <p className="mt-4">This is everything the relay stores:</p>
@@ -153,16 +160,24 @@ export default function PrivacyPolicy() {
                     </td>
                     <td className="py-2">You tap Disconnect</td>
                   </tr>
-                  <tr>
+                  <tr className="border-b border-stone-100">
                     <td className="py-2 pr-3">Queued transcript</td>
                     <td className="py-2 pr-3">
                       Recording id, recorded-at time, duration, text, expiry.
                       One copy per connected agent.
                     </td>
                     <td className="py-2">
-                      The agent acknowledges it, you disconnect or tap Delete
-                      everything, or {RETENTION} pass
+                      Text: when the agent acknowledges it, you disconnect or
+                      tap Delete everything, or {RETENTION} pass unclaimed
                     </td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 pr-3">Pickup receipt</td>
+                    <td className="py-2 pr-3">
+                      The same row after acknowledgment, with the text removed:
+                      recording id, pickup time
+                    </td>
+                    <td className="py-2">24 hours after pickup</td>
                   </tr>
                 </tbody>
               </table>
@@ -178,8 +193,8 @@ export default function PrivacyPolicy() {
               </li>
               <li>Logs record counts and ids, never transcript text.</li>
               <li>
-                Creating an inbox and uploading are verified with Apple App
-                Attest.
+                Creating an inbox is verified with Apple App Attest. After that,
+                the app uses only its inbox secret.
               </li>
             </ul>
             <p className="mt-2">We identify inboxes, not people.</p>
@@ -274,8 +289,8 @@ export default function PrivacyPolicy() {
             <h2 className={h2}>Apple App Attest</h2>
             <p className="mt-2">
               Ramble uses Apple&apos;s App Attest service to verify that
-              requests to the transcription proxy and the relay come from a
-              legitimate copy of the app on a real Apple device. This process
+              transcription requests, and the creation of your relay inbox,
+              come from a legitimate copy of the app on a real Apple device. This process
               does not collect or transmit personal information.
             </p>
           </section>
@@ -291,33 +306,6 @@ export default function PrivacyPolicy() {
           </section>
 
           <section>
-            <h2 className={h2}>Open source and self-hosting</h2>
-            <p className="mt-2">
-              Ramble, the transcription proxy, and the relay are open source.
-              You can check exactly what each one does by reading the{" "}
-              <a
-                href={GITHUB_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={link}
-              >
-                source code
-              </a>
-              . The relay can also be self-hosted on your own Cloudflare
-              account; instructions are in the{" "}
-              <a
-                href={`${GITHUB_URL}/tree/main/relay`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={link}
-              >
-                relay README
-              </a>
-              .
-            </p>
-          </section>
-
-          <section>
             <h2 className={h2}>Changes to this policy</h2>
             <p className="mt-2">
               If this policy changes, the updated version will be posted here
@@ -329,14 +317,14 @@ export default function PrivacyPolicy() {
           <section>
             <h2 className={h2}>Contact</h2>
             <p className="mt-2">
-              Questions about this policy? Open an issue on{" "}
+              Questions about this policy? Use the support link on{" "}
               <a
-                href={`${GITHUB_URL}/issues`}
+                href={APP_STORE_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={link}
               >
-                GitHub
+                Ramble&apos;s App Store page
               </a>
               .
             </p>

@@ -5,7 +5,6 @@
 export const BASE_PATH = "/ramble";
 export const SITE_URL = "https://goodloop.dev/ramble";
 export const APP_STORE_URL = "https://apps.apple.com/app/id6761857751";
-export const GITHUB_URL = "https://github.com/Jpoliachik/ramble-ios";
 
 // PLACEHOLDER: one-time app price. Justin said "a couple dollars"; no number is locked.
 export const APP_PRICE = "$2.99";
@@ -13,8 +12,8 @@ export const APP_PRICE = "$2.99";
 // PLACEHOLDER: cloud transcription subscription. Today's price, kept until Justin decides.
 export const CLOUD_PRICE = "$3.99/month";
 
-// PLACEHOLDER: relay retention backstop for unacknowledged transcripts. 24h is proposed, not locked.
-export const RETENTION = "24 hours";
+// PLACEHOLDER: hard maximum for transcripts an agent never picks up. Justin is choosing 30 or 60 days.
+export const RETENTION = "30 days";
 
 // PLACEHOLDER: relay hostname is undecided. Do not replace with a real domain without Justin.
 export const RELAY_URL = "https://<relay-host>";
