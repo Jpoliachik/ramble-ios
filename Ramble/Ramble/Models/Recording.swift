@@ -27,6 +27,13 @@ struct Recording: Identifiable, Codable, Hashable {
     var status: RecordingStatus
     var transcription: String?
     var webhookStatus: WebhookStatus?
+    /// Delivery to the Ramble Relay, tracked separately from webhooks.
+    /// `.delivered` means the relay accepted it and queued it for every
+    /// connected agent.
+    var relayStatus: WebhookStatus?
+    /// When a connected agent acknowledged this transcript on the relay (and
+    /// the relay deleted the text). Learned from `GET /receipts`.
+    var agentPickedUpAt: Date?
     var lastError: String?
     var activityLog: [ActivityEntry]
     var cloudTranscriptionCount: Int
@@ -39,6 +46,7 @@ struct Recording: Identifiable, Codable, Hashable {
         status: RecordingStatus = .recorded,
         transcription: String? = nil,
         webhookStatus: WebhookStatus? = nil,
+        relayStatus: WebhookStatus? = nil,
         lastError: String? = nil,
         activityLog: [ActivityEntry] = [],
         cloudTranscriptionCount: Int = 0
@@ -50,6 +58,7 @@ struct Recording: Identifiable, Codable, Hashable {
         self.status = status
         self.transcription = transcription
         self.webhookStatus = webhookStatus
+        self.relayStatus = relayStatus
         self.lastError = lastError
         self.activityLog = activityLog
         self.cloudTranscriptionCount = cloudTranscriptionCount
@@ -64,6 +73,8 @@ struct Recording: Identifiable, Codable, Hashable {
         audioFileName = try container.decode(String.self, forKey: .audioFileName)
         transcription = try container.decodeIfPresent(String.self, forKey: .transcription)
         webhookStatus = try container.decodeIfPresent(WebhookStatus.self, forKey: .webhookStatus)
+        relayStatus = try container.decodeIfPresent(WebhookStatus.self, forKey: .relayStatus)
+        agentPickedUpAt = try container.decodeIfPresent(Date.self, forKey: .agentPickedUpAt)
 
         // New status field, or migrate from old transcriptionStatus/status values
         if let statusString = try? container.decode(String.self, forKey: .status) {
@@ -96,6 +107,21 @@ struct Recording: Identifiable, Codable, Hashable {
         cloudTranscriptionCount = try container.decodeIfPresent(Int.self, forKey: .cloudTranscriptionCount) ?? 0
     }
 
+    /// Delivery across every destination (webhook and relay), worst state
+    /// first: anything in flight shows as in flight, then any failure.
+    var deliveryStatus: WebhookStatus? {
+        let statuses = [webhookStatus, relayStatus].compactMap { $0 }
+        if statuses.contains(.sending) { return .sending }
+        if statuses.contains(.pending) { return .pending }
+        if statuses.contains(.failed) { return .failed }
+        return statuses.isEmpty ? nil : .delivered
+    }
+
+    /// The relay has it but no agent has picked it up yet.
+    var isWaitingForAgent: Bool {
+        relayStatus == .delivered && agentPickedUpAt == nil
+    }
+
     var audioFileURL: URL {
         StorageService.audioDirectory.appendingPathComponent(audioFileName)
     }
@@ -108,7 +134,7 @@ struct Recording: Identifiable, Codable, Hashable {
     private enum CodingKeys: String, CodingKey {
         case id, createdAt, duration, audioFileName
         case status
-        case transcription, webhookStatus, lastError, activityLog, cloudTranscriptionCount
+        case transcription, webhookStatus, relayStatus, agentPickedUpAt, lastError, activityLog, cloudTranscriptionCount
         // Legacy keys for migration
         case transcriptionStatus
         case lastTranscriptionError
@@ -123,6 +149,8 @@ struct Recording: Identifiable, Codable, Hashable {
         try container.encode(status, forKey: .status)
         try container.encodeIfPresent(transcription, forKey: .transcription)
         try container.encodeIfPresent(webhookStatus, forKey: .webhookStatus)
+        try container.encodeIfPresent(relayStatus, forKey: .relayStatus)
+        try container.encodeIfPresent(agentPickedUpAt, forKey: .agentPickedUpAt)
         try container.encodeIfPresent(lastError, forKey: .lastError)
         if !activityLog.isEmpty {
             try container.encode(activityLog, forKey: .activityLog)

@@ -3,11 +3,18 @@
 //  watch Watch App
 //
 
+import Combine
 import SwiftUI
 
 struct WatchRecordingsListView: View {
     @StateObject private var history = WatchRecordingHistory.shared
     @StateObject private var syncQueue = WatchSyncQueue.shared
+    @StateObject private var connectivity = WatchConnectivityService.shared
+
+    /// Jobs not currently handed to WatchConnectivity, i.e. ones a manual retry would send.
+    private var hasIdleJobs: Bool {
+        syncQueue.jobs.contains { !connectivity.inFlightIDs.contains($0.id) }
+    }
 
     var body: some View {
         Group {
@@ -21,64 +28,60 @@ struct WatchRecordingsListView: View {
                         .foregroundStyle(.secondary)
                 }
             } else {
-                List(history.entries) { entry in
-                    WatchRecordingRow(
-                        entry: entry,
-                        isPending: syncQueue.jobs.contains(where: { $0.id == entry.id })
-                    )
+                List {
+                    Section {
+                        ForEach(history.entries) { entry in
+                            WatchRecordingRow(entry: entry, state: state(for: entry))
+                        }
+                    } footer: {
+                        if !syncQueue.jobs.isEmpty {
+                            Text("Recordings stay on your watch until your iPhone has them.")
+                        }
+                    }
+
+                    if hasIdleJobs {
+                        Button("Try again") {
+                            connectivity.retryPendingTransfers()
+                        }
+                        .foregroundStyle(Color.brandRed)
+                    }
                 }
             }
         }
-        .navigationTitle("Recordings")
+        .navigationTitle("Recent")
+    }
+
+    private func state(for entry: WatchRecordingHistoryEntry) -> WatchRecordingState {
+        WatchRecordingState.resolve(
+            entry: entry,
+            job: syncQueue.jobs.first { $0.id == entry.id },
+            isInFlight: connectivity.inFlightIDs.contains(entry.id),
+            isPhoneReachable: connectivity.isPhoneReachable
+        )
     }
 }
 
 struct WatchRecordingRow: View {
     let entry: WatchRecordingHistoryEntry
-    let isPending: Bool
+    let state: WatchRecordingState
 
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
                 Text(entry.createdAt, format: .dateTime.month(.abbreviated).day().hour().minute())
                     .font(.caption)
                     .fontWeight(.medium)
-                Text(formatDuration(entry.duration))
+                Spacer()
+                Text(WatchFormat.duration(entry.duration))
                     .font(.caption2)
+                    .monospacedDigit()
                     .foregroundStyle(.secondary)
             }
-            Spacer()
-            syncIndicator
+            Label(state.label, systemImage: state.symbol)
+                .font(.caption2)
+                .foregroundStyle(state.tint)
         }
-    }
-
-    @ViewBuilder
-    private var syncIndicator: some View {
-        if entry.syncedAt != nil {
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(.green)
-                .font(.body)
-        } else if isPending {
-            Image(systemName: "arrow.up.circle")
-                .foregroundStyle(.orange)
-                .font(.body)
-        } else {
-            Image(systemName: "exclamationmark.circle")
-                .foregroundStyle(.red)
-                .font(.body)
-        }
-    }
-
-    private func formatDuration(_ duration: TimeInterval) -> String {
-        let totalSeconds = Int(duration)
-        let hours = totalSeconds / 3600
-        let minutes = (totalSeconds % 3600) / 60
-        let seconds = totalSeconds % 60
-
-        if hours > 0 {
-            return String(format: "%d:%02d:%02d", hours, minutes, seconds)
-        }
-        return String(format: "%d:%02d", minutes, seconds)
+        .accessibilityElement(children: .combine)
     }
 }
 

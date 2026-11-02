@@ -63,3 +63,6 @@ Ramble/Ramble/Secrets.swift
 
 # Claude Code
 .claude/
+
+# Local wrangler config with a D1 binding for relay development
+proxy/wrangler.local.toml

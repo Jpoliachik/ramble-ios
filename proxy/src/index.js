@@ -1,5 +1,6 @@
 import { handleAttestChallenge, handleAttest, verifyAssertionForRequest } from './attest.js';
 import { writeTranscriptionEvent } from './analytics.js';
+import { handleRelayRequest, isRelayPath, purgeExpired } from './relay.js';
 import {
   base64ToArrayBuffer,
   base64UrlDecode,
@@ -80,6 +81,14 @@ const APPLE_ROOT_CA_G3_FINGERPRINT =
   '63343abfb89a6a03ebbe1e8feda1be2f7f3fbc2a5391d024a45d7bc2c34d3a8c';
 
 export default {
+  // Relay expiry backstop. Reads already hide expired transcripts; this only
+  // reclaims space, so a late or missing cron never exposes anything.
+  async scheduled(_event, env) {
+    if (!env.DB) return;
+    const result = await purgeExpired(env.DB, Date.now());
+    console.log(`[relay] expired entries=${result.entries} pair_codes=${result.pairCodes}`);
+  },
+
   async fetch(request, env) {
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: corsHeaders() });
@@ -102,6 +111,10 @@ export default {
         return json({ error: result.error }, result.status);
       }
       return json({ status: 'ok' });
+    }
+
+    if (isRelayPath(url.pathname)) {
+      return handleRelayRequest(request, env);
     }
 
     if (url.pathname === '/health') {

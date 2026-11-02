@@ -4,6 +4,8 @@ This is the production proxy that Ramble uses for cloud transcription. It's a st
 
 The code is in this repo so you can verify exactly what it does.
 
+The same Worker also serves the **Ramble Relay**, which holds transcripts until your agent picks them up and then deletes them. The relay has its own routes and its own small database, described in [RELAY.md](RELAY.md). Transcription never touches it.
+
 ## How It Works
 
 1. App sends audio to `POST /transcribe`
@@ -11,7 +13,7 @@ The code is in this repo so you can verify exactly what it does.
 3. Audio is forwarded to the selected transcription provider
 4. Provider returns text, proxy passes it back to the app
 
-That's it. No logging of audio or transcripts. No database. No user accounts.
+That's it. Transcription keeps no audio or transcripts, no database, and no user accounts.
 
 ## Supported Models
 
@@ -55,6 +57,7 @@ Response is `{"text": "..."}`, or `{"error": "..."}` with a 4xx/5xx status.
 | `POST` | `/attest/challenge` | Issue a challenge for App Attest registration |
 | `POST` | `/attest` | Register a device via App Attest |
 | `GET` | `/health` | Health check |
+| | `/inboxes`, `/inbox`, `/inbox/ack`, `/pair/*`, `/connections` | Relay — see [RELAY.md](RELAY.md) |
 
 ## Authentication
 

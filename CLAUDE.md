@@ -87,7 +87,7 @@ Ramble/
 ├── watch Watch App/   # watchOS companion
 └── Ramble.xcodeproj/
 website/               # Marketing site (Next.js static export)
-proxy/                 # Cloudflare Worker transcription proxy
+proxy/                 # Cloudflare Worker: transcription proxy + agent relay (RELAY.md)
 ```
 
 ### Data Flow
