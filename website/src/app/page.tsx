@@ -6,7 +6,6 @@ import {
   APP_PRICE,
   APP_STORE_URL,
   BASE_PATH,
-  CLOUD_PRICE,
   PAIR_CODE_EXAMPLE,
   PAIR_CODE_TTL,
   PULL_CADENCE,
@@ -77,17 +76,10 @@ const privacyPoints = [
   },
 ];
 
-const cloudModels = [
-  { name: "Whisper v3 Turbo", provider: "Groq", note: "Fast and accurate. The default." },
-  { name: "Whisper Large v3", provider: "Groq", note: "Best for accents and multilingual audio." },
-  { name: "Nova-3", provider: "Deepgram", note: "Strong English accuracy, smart formatting." },
-  { name: "GPT-Transcribe", provider: "OpenAI", note: "Highest accuracy on noisy real-world audio." },
-];
-
 const included = [
   "Apple Watch and iPhone apps",
-  "On-device transcription with Apple Speech",
-  "Delivery to your agent through Ramble Relay",
+  "On-device transcription",
+  "Delivery to your agent",
   "Webhooks to your own endpoint",
 ];
 
@@ -153,7 +145,6 @@ const faqs: { q: string; a: ReactNode }[] = [
 ];
 
 
-const [cloudAmount, cloudPeriod] = CLOUD_PRICE.split("/");
 
 export default function Home() {
   return (
@@ -334,99 +325,29 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Transcription */}
+      {/* Pricing */}
       <section className="border-t border-stone-200 bg-stone-50">
         <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
-          <SectionHeading eyebrow="Transcription" sub="Apple Speech runs on your iPhone and is included. Cloud models are optional.">
-            On your phone by default
-          </SectionHeading>
-          <div className="mx-auto mt-12 max-w-3xl overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-stone-200/80">
-            <div className="flex items-center justify-between gap-4 border-b border-stone-200 bg-sage-50 px-5 py-4">
-              <div>
-                <p className="text-sm font-semibold text-stone-900">Apple Speech</p>
-                <p className="text-sm text-stone-500">On-device. Audio never leaves your phone.</p>
-              </div>
-              <span className="shrink-0 rounded-full bg-sage-100 px-3 py-1 text-xs font-medium text-sage-700">
-                Included
-              </span>
-            </div>
-            <div className="px-5 py-4">
-              <p className="text-sm font-semibold text-stone-900">Cloud models</p>
-              <p className="text-sm text-stone-500">
-                More accurate with accents, jargon, or background noise. {CLOUD_PRICE}.
-              </p>
-            </div>
-            <details className="group border-t border-stone-200">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-3 text-sm font-medium text-stone-700 transition-colors hover:text-stone-900">
-                See cloud models
-                <span aria-hidden="true" className="text-stone-500 transition-transform group-open:rotate-45">
-                  +
-                </span>
-              </summary>
-              <ul className="divide-y divide-stone-200 border-t border-stone-200">
-                {cloudModels.map((m) => (
-                  <li
-                    key={m.name}
-                    className="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <p className="text-sm font-semibold text-stone-900">
-                      {m.name} <span className="font-normal text-stone-500">· {m.provider}</span>
-                    </p>
-                    <p className="text-sm text-stone-500">{m.note}</p>
-                  </li>
-                ))}
-              </ul>
-            </details>
-            <div className="border-t border-stone-200 px-5 py-3 text-xs text-stone-500">
-              Custom vocabulary, filler-word removal, and a language hint are in Settings.
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing */}
-      <section className="border-t border-stone-200">
-        <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
           <SectionHeading eyebrow="Pricing">Pay once</SectionHeading>
-          <div className="mx-auto mt-12 grid max-w-3xl gap-6 sm:grid-cols-2">
-            <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-stone-200/80">
-              <p className="text-sm font-semibold text-stone-900">Ramble</p>
-              <p className="mt-2 font-serif text-4xl font-semibold text-stone-900">
-                {APP_PRICE}
-                <span className="ml-2 font-sans text-sm font-normal text-stone-500">one time</span>
-              </p>
-              <ul className="mt-6 space-y-2.5">
-                {included.map((item) => (
-                  <li key={item} className="flex gap-2.5 text-sm text-stone-600">
-                    <span aria-hidden="true" className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-stone-400" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="rounded-2xl border border-stone-200 p-6">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-semibold text-stone-900">Cloud transcription</p>
-                <span className="rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-medium text-stone-600">
-                  Optional
-                </span>
-              </div>
-              <p className="mt-2 font-serif text-4xl font-semibold text-stone-900">
-                {cloudAmount}
-                {cloudPeriod && (
-                  <span className="ml-1 font-sans text-sm font-normal text-stone-500">/{cloudPeriod}</span>
-                )}
-              </p>
-              <p className="mt-6 text-sm leading-relaxed text-stone-500">
-                For better accuracy. Cancel any time and everything else keeps working.
-              </p>
-            </div>
+          <div className="mx-auto mt-12 max-w-md rounded-2xl bg-white p-6 shadow-sm ring-1 ring-stone-200/80">
+            <p className="font-serif text-4xl font-semibold text-stone-900">
+              {APP_PRICE}
+              <span className="ml-2 font-sans text-sm font-normal text-stone-500">one time. No subscription.</span>
+            </p>
+            <ul className="mt-6 space-y-2.5">
+              {included.map((item) => (
+                <li key={item} className="flex gap-2.5 text-sm text-stone-600">
+                  <span aria-hidden="true" className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-stone-400" />
+                  {item}
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       </section>
 
       {/* Privacy */}
-      <section className="border-t border-stone-200 bg-stone-50">
+      <section className="border-t border-stone-200">
         <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
           <SectionHeading eyebrow="Privacy" sub="Ramble keeps your words only as long as it takes to get them to your agent.">
             Your thoughts don&apos;t stick around
@@ -443,8 +364,7 @@ export default function Home() {
             ))}
           </div>
           <p className="mx-auto mt-12 max-w-3xl text-center text-sm leading-relaxed text-stone-500">
-            Disconnect any time and anything still waiting is deleted. With cloud transcription on, audio goes to the
-            model you pick and isn&apos;t stored.{" "}
+            Disconnect any time and anything still waiting is deleted.{" "}
             <Link href="/privacy" className={inlineLink}>
               Full privacy policy
             </Link>
@@ -454,7 +374,7 @@ export default function Home() {
       </section>
 
       {/* FAQ */}
-      <section className="border-t border-stone-200">
+      <section className="border-t border-stone-200 bg-stone-50">
         <div className="mx-auto max-w-3xl px-6 py-20 sm:py-28">
           <SectionHeading eyebrow="FAQ">Questions</SectionHeading>
           <div className="mt-12 divide-y divide-stone-200 border-t border-b border-stone-200">
@@ -474,7 +394,7 @@ export default function Home() {
       </section>
 
       {/* Final CTA */}
-      <section className="border-t border-stone-200 bg-stone-50">
+      <section className="border-t border-stone-200">
         <div className="mx-auto max-w-5xl px-6 py-20 text-center sm:py-24">
           <h2 className="font-serif text-3xl font-semibold tracking-tight text-stone-900 sm:text-4xl">
             Get it off your mind.

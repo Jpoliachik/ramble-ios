@@ -18,23 +18,23 @@ Relay: ${RELAY_URL}
 2. Every ${PULL_CADENCE}, GET /inbox with the header
    Authorization: Bearer <token>
 3. For each item, do what I asked in "transcription".
-4. POST {"ids": [...]} to /inbox/ack with the ids you handled.
+4. POST {"ids": [...]} to /inbox/ack with the ids you handled. If "has_more" is true, pull again.
 5. If a request returns 401, I disconnected you. Stop checking and tell me.`;
 
 const API_EXAMPLE = `POST /pair/exchange
 {"code": "${PAIR_CODE_EXAMPLE}"}
-→ {"token": "rmba_…", "connection_id": "con_…"}
+→ {"token": "rmba_…"}
 
 GET /inbox
 Authorization: Bearer rmba_…
 → {"items": [{"id": 41, "recording_id": "6F1C…", "created_at": "2026-11-01T19:00:00Z",
               "duration": 8.2, "transcription": "Remind me to book the dentist."}],
-   "next_since": 41, "has_more": false}
+   "has_more": false}
 
 POST /inbox/ack
 Authorization: Bearer rmba_…
 {"ids": [41]}
-→ {"acknowledged": 1}`;
+→ {"deleted": 1}`;
 
 function SectionHeader({ id, children }: { id: string; children: React.ReactNode }) {
   return (
@@ -91,9 +91,9 @@ export default function AgentDocs() {
             <section className="space-y-4">
               <SectionHeader id="api">API</SectionHeader>
               <p>
-                Three JSON calls. Pulls return the oldest items first; pass <InlineCode>since</InlineCode> with{" "}
-                <InlineCode>next_since</InlineCode> to page through a backlog. Acking deletes the text. Anything never
-                acked is deleted after {RETENTION}. The relay&apos;s address will be listed here at launch.
+                Three JSON calls. A pull returns up to 50 items, oldest first. Acking deletes them; if{" "}
+                <InlineCode>has_more</InlineCode> is true, pull again. Anything never acked is deleted after{" "}
+                {RETENTION}. The relay&apos;s address will be listed here at launch.
               </p>
               <CodeBlock>{API_EXAMPLE}</CodeBlock>
               <p>

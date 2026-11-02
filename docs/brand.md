@@ -32,7 +32,7 @@ Ramble is the capture layer for the agent era. People who have a personal agent 
 
 - **Agent owners (primary)** — People who already use a personal agent and want a watch that talks to it. They don't want another inbox to check. They want to say the thing and know it landed.
 
-- **Transcription enthusiasts** — People who care about accuracy and want the best speech-to-text models as they ship. They'll pay for cloud transcription because clean transcripts matter to them.
+- **Transcription enthusiasts** — People who care about accuracy and want the best speech-to-text models as they ship.
 
 - **Automation builders** — Developers and tinkerers who pipe voice into their own stack. The webhook turns Ramble into a voice input for workflows, databases, and custom backends.
 

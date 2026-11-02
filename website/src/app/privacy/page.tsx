@@ -37,8 +37,7 @@ export default function PrivacyPolicy() {
               relay. When you connect an agent, the transcript text passes
               through the relay and is deleted as soon as your agent picks it
               up. If your agent never picks it up, it is deleted after{" "}
-              {RETENTION} at most. We collect anonymous
-              usage counts for cloud transcription, never content.
+              {RETENTION} at most.
             </p>
           </section>
 
@@ -64,7 +63,7 @@ export default function PrivacyPolicy() {
           <section>
             <h2 className={h2}>Cloud transcription proxy</h2>
             <p className="mt-2">
-              If you subscribe to cloud transcription, your audio is sent
+              If you turn on cloud transcription, your audio is sent
               through a stateless Cloudflare Worker proxy to the provider you
               select (Groq, Deepgram, or OpenAI), and the transcript is returned
               to your phone. The proxy:
@@ -118,10 +117,7 @@ export default function PrivacyPolicy() {
               relay immediately. That is the normal path. Anything never
               acknowledged is deleted after {RETENTION} at most. The window is
               that long so a transcript is not lost if your agent has trouble
-              picking it up for a while. After your agent picks a transcript
-              up, the relay keeps a pickup receipt with no text (the
-              recording&apos;s id and the pickup time) for 24 hours, so the app
-              can show that your agent got it.
+              picking it up for a while.
             </p>
 
             <p className="mt-4">This is everything the relay stores:</p>
@@ -146,7 +142,7 @@ export default function PrivacyPolicy() {
                   <tr className="border-b border-stone-100">
                     <td className="py-2 pr-3">Pairing code</td>
                     <td className="py-2 pr-3">
-                      Hash of the code, inbox id, agent type, expiry
+                      Hash of the code, inbox id, expiry
                     </td>
                     <td className="py-2">
                       Used, replaced, or {PAIR_CODE_TTL} pass
@@ -155,29 +151,21 @@ export default function PrivacyPolicy() {
                   <tr className="border-b border-stone-100">
                     <td className="py-2 pr-3">Connection</td>
                     <td className="py-2 pr-3">
-                      Random id, inbox id, agent type, hash of the agent&apos;s
-                      token, created and last-pull times
+                      Random id, inbox id, hash of the agent&apos;s token,
+                      created and last-pull times
                     </td>
                     <td className="py-2">You tap Disconnect</td>
                   </tr>
-                  <tr className="border-b border-stone-100">
-                    <td className="py-2 pr-3">Queued transcript</td>
+                  <tr>
+                    <td className="py-2 pr-3">Transcript</td>
                     <td className="py-2 pr-3">
                       Recording id, recorded-at time, duration, text, expiry.
                       One copy per connected agent.
                     </td>
                     <td className="py-2">
-                      Text: when the agent acknowledges it, you disconnect or
-                      tap Delete everything, or {RETENTION} pass unclaimed
+                      The agent acknowledges it, you disconnect or tap Delete
+                      everything, or {RETENTION} pass
                     </td>
-                  </tr>
-                  <tr>
-                    <td className="py-2 pr-3">Pickup receipt</td>
-                    <td className="py-2 pr-3">
-                      The same row after acknowledgment, with the text removed:
-                      recording id, pickup time
-                    </td>
-                    <td className="py-2">24 hours after pickup</td>
                   </tr>
                 </tbody>
               </table>
@@ -298,10 +286,8 @@ export default function PrivacyPolicy() {
           <section>
             <h2 className={h2}>Purchases</h2>
             <p className="mt-2">
-              The app purchase and the cloud transcription subscription are
-              handled by Apple through the App Store. Ramble does not receive
-              your name, email, or payment details. The app checks your
-              subscription status with StoreKit on your device.
+              The app purchase is handled by Apple through the App Store.
+              Ramble does not receive your name, email, or payment details.
             </p>
           </section>
 
