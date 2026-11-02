@@ -14,8 +14,11 @@ export const SITE_URL =
     : "http://localhost:3000");
 export const APP_STORE_URL = "https://apps.apple.com/app/id6761857751";
 
-// One-time app price. No subscriptions (Justin, Nov 2 2026).
+// One-time app price (Justin, Nov 2 2026).
 export const APP_PRICE = "$4.99";
+
+// Optional cloud transcription upgrade. Nobody has to upgrade; everything works without it.
+export const CLOUD_PRICE = "$2.99/month";
 
 // PLACEHOLDER: hard maximum for transcripts an agent never picks up. Justin is choosing 30 or 60 days.
 export const RETENTION = "30 days";

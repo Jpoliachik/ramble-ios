@@ -5,6 +5,7 @@ import HeroFlow from "../components/hero-flow";
 import {
   APP_PRICE,
   APP_STORE_URL,
+  CLOUD_PRICE,
   BASE_PATH,
   PAIR_CODE_EXAMPLE,
   PAIR_CODE_TTL,
@@ -332,7 +333,7 @@ export default function Home() {
           <div className="mx-auto mt-12 max-w-md rounded-2xl bg-white p-6 shadow-sm ring-1 ring-stone-200/80">
             <p className="font-serif text-4xl font-semibold text-stone-900">
               {APP_PRICE}
-              <span className="ml-2 font-sans text-sm font-normal text-stone-500">one time. No subscription.</span>
+              <span className="ml-2 font-sans text-sm font-normal text-stone-500">one time</span>
             </p>
             <ul className="mt-6 space-y-2.5">
               {included.map((item) => (
@@ -342,6 +343,10 @@ export default function Home() {
                 </li>
               ))}
             </ul>
+            <p className="mt-6 border-t border-stone-200 pt-4 text-sm leading-relaxed text-stone-500">
+              Optional upgrade: cloud transcription for {CLOUD_PRICE}, for sharper transcripts with accents, jargon,
+              or noise. You never need it. Everything above works without it, and you can cancel any time.
+            </p>
           </div>
         </div>
       </section>

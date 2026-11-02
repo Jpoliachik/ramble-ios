@@ -1,6 +1,6 @@
 # Ramble — App Store copy (draft)
 
-Draft copy for the watch-to-agent release. Price: $4.99, one time, no subscriptions. Placeholders: the 30-day retention (30 or 60) and the website URLs (Ramble's own domain isn't chosen yet).
+Draft copy for the watch-to-agent release. Price: $4.99 one time, plus an optional $2.99/month cloud transcription upgrade. Placeholders: the 30-day retention (30 or 60) and the website URLs (Ramble's own domain isn't chosen yet).
 
 ## Subtitle (30 max)
 
@@ -37,12 +37,12 @@ PRIVACY
 - Disconnect any time.
 
 TRANSCRIPTION
-Apple Speech transcribes on your iPhone.
+Apple Speech transcribes on your iPhone. An optional upgrade adds cloud transcription for sharper results with accents, jargon, or noise. You never need it.
 
 WEBHOOKS
 Ramble can also send each transcript to any HTTPS endpoint.
 
-Ramble is a one-time purchase. No subscriptions. Requires an Apple Watch paired with an iPhone to record on the watch.
+Ramble is a one-time purchase. Requires an Apple Watch paired with an iPhone to record on the watch.
 ```
 
 ## What's New

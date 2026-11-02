@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { APP_PRICE, APP_STORE_URL, RETENTION } from "@/lib/site";
+import { APP_PRICE, APP_STORE_URL, CLOUD_PRICE, RETENTION } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Terms of Use",
@@ -54,15 +54,23 @@ export default function TermsOfUse() {
               <li>Webhook delivery of transcripts to URLs you configure</li>
               <li>
                 Optional cloud transcription via third-party providers
+                (requires a subscription)
               </li>
             </ul>
           </section>
 
           <section>
-            <h2 className={h2}>Purchase</h2>
+            <h2 className={h2}>Purchase and subscription</h2>
             <p className="mt-2">
               Ramble is a one-time purchase of {APP_PRICE} through Apple&apos;s
-              App Store. There are no subscriptions.
+              App Store.
+            </p>
+            <p className="mt-2">
+              Cloud transcription is an optional subscription at{" "}
+              {CLOUD_PRICE}, billed through Apple&apos;s App Store. It
+              auto-renews unless cancelled at least 24 hours before the end of
+              the current period. Cancel any time in your Apple ID settings;
+              everything else in the App keeps working.
             </p>
             <p className="mt-2">
               Refunds are handled by Apple under its App Store policies.

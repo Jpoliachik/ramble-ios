@@ -286,8 +286,9 @@ export default function PrivacyPolicy() {
           <section>
             <h2 className={h2}>Purchases</h2>
             <p className="mt-2">
-              The app purchase is handled by Apple through the App Store.
-              Ramble does not receive your name, email, or payment details.
+              The app purchase and the optional cloud transcription
+              subscription are handled by Apple through the App Store. Ramble
+              does not receive your name, email, or payment details.
             </p>
           </section>
 
