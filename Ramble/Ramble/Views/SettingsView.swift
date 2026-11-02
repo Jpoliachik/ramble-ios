@@ -154,7 +154,7 @@ struct SettingsView: View {
                 SettingsSubsectionLabel("Cloud · premium")
             } else {
                 SettingsSubsectionLabel(title: "Cloud · premium") {
-                    Text("$3.99 / month")
+                    Text("$2.99 / month")
                         .font(.system(size: 13))
                         .foregroundStyle(Color.obInkFaint)
                 }
