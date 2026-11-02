@@ -1,16 +1,43 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
-const sections = [
-  { id: "step-1", label: "1. Enable the webhook" },
-  { id: "step-2", label: "2. Connect a destination" },
-  { id: "platforms", label: "Automation platforms", indent: true },
-  { id: "custom", label: "Build your own endpoint", indent: true },
-  { id: "step-3", label: "3. Test it" },
+type Section = { id: string; label: string; indent?: boolean };
+
+export type DocsPage = "agent" | "webhooks";
+
+const pages: { key: DocsPage; href: string; label: string }[] = [
+  { key: "agent", href: "/docs", label: "Connect your agent" },
+  { key: "webhooks", href: "/docs/webhooks", label: "Webhooks" },
 ];
 
-export default function DocsSidebar() {
+const sectionsByPage: Record<DocsPage, Section[]> = {
+  agent: [
+    { id: "overview", label: "Overview" },
+    { id: "pairing", label: "Pairing" },
+    { id: "disconnect", label: "Disconnect", indent: true },
+    { id: "muse", label: "Connect Muse" },
+    { id: "agent-instructions", label: "Instructions for the agent" },
+    { id: "api", label: "How the connection works" },
+    { id: "api-exchange", label: "POST /pair/exchange", indent: true },
+    { id: "api-pull", label: "GET /inbox", indent: true },
+    { id: "api-ack", label: "POST /inbox/ack", indent: true },
+    { id: "api-errors", label: "Errors", indent: true },
+    { id: "api-app", label: "App-facing endpoints", indent: true },
+    { id: "storage", label: "What the relay stores" },
+  ],
+  webhooks: [
+    { id: "step-1", label: "1. Add a destination" },
+    { id: "step-2", label: "2. Connect a destination" },
+    { id: "platforms", label: "Automation platforms", indent: true },
+    { id: "custom", label: "Build your own endpoint", indent: true },
+    { id: "step-3", label: "3. Test it" },
+  ],
+};
+
+export default function DocsSidebar({ page }: { page: DocsPage }) {
+  const sections = sectionsByPage[page];
   const [activeId, setActiveId] = useState<string>("");
 
   useEffect(() => {
@@ -31,12 +58,27 @@ export default function DocsSidebar() {
     }
 
     return () => observer.disconnect();
-  }, []);
+  }, [sections]);
 
   return (
     <nav className="hidden lg:block">
-      <div className="sticky top-8 text-sm">
-        <p className="font-semibold text-stone-900">On this page</p>
+      <div className="sticky top-20 text-sm">
+        <p className="font-semibold text-stone-900">Docs</p>
+        <div className="mt-3 space-y-0.5">
+          {pages.map((p) => (
+            <Link
+              key={p.key}
+              href={p.href}
+              className={`block py-1 transition-colors ${
+                p.key === page ? "text-red-600 font-medium" : "text-stone-500 hover:text-stone-900"
+              }`}
+            >
+              {p.label}
+            </Link>
+          ))}
+        </div>
+
+        <p className="mt-8 font-semibold text-stone-900">On this page</p>
         <div className="mt-3 space-y-0.5">
           {sections.map((section) => (
             <a
@@ -47,7 +89,7 @@ export default function DocsSidebar() {
               } ${
                 activeId === section.id
                   ? "text-stone-900 font-medium"
-                  : "text-stone-400 hover:text-stone-900"
+                  : "text-stone-500 hover:text-stone-900"
               }`}
             >
               {section.label}
