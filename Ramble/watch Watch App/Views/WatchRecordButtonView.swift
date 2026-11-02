@@ -30,7 +30,7 @@ struct WatchRecordButtonView: View {
             ZStack {
                 // Border ring
                 Circle()
-                    .stroke(Color.brandRed, lineWidth: 4)
+                    .stroke(Color.brandAmber, lineWidth: 4)
                     .frame(width: buttonSize, height: buttonSize)
 
                 if isRecording {
@@ -38,7 +38,7 @@ struct WatchRecordButtonView: View {
                     HStack(spacing: barSpacing) {
                         ForEach(0..<3, id: \.self) { index in
                             RoundedRectangle(cornerRadius: barCornerRadius)
-                                .fill(Color.brandRed)
+                                .fill(Color.brandAmber)
                                 .frame(width: barWidth, height: barHeight(for: index))
                         }
                     }
@@ -46,7 +46,7 @@ struct WatchRecordButtonView: View {
                 } else {
                     // Filled circle
                     Circle()
-                        .fill(Color.brandRed)
+                        .fill(Color.brandAmber)
                         .frame(width: buttonSize - 16, height: buttonSize - 16)
                 }
             }

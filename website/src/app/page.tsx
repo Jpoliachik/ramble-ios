@@ -17,7 +17,7 @@ const primaryButton =
   "inline-flex items-center gap-2 rounded-full bg-stone-900 px-6 py-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-stone-800";
 const secondaryButton =
   "inline-flex items-center gap-2 rounded-full border border-stone-300 px-6 py-3 text-sm font-medium text-stone-700 transition-colors hover:border-stone-400 hover:bg-stone-100";
-const inlineLink = "text-red-600 underline-offset-2 hover:underline";
+const inlineLink = "text-brand-text underline-offset-2 hover:underline";
 const stepBadge =
   "flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-stone-900 font-serif text-sm font-semibold text-white";
 
@@ -180,7 +180,7 @@ export default function Home() {
             <h1 className="hero-enter-title font-serif text-4xl font-semibold tracking-tight text-stone-900 sm:text-5xl lg:text-[2.9rem] lg:leading-[1.1]">
               Ramble into your watch.
               <br />
-              <span className="italic text-red-500">Your agent handles it.</span>
+              <span className="italic text-brand-text">Your agent handles it.</span>
             </h1>
             <p className="hero-enter-subtitle mt-6 max-w-xl text-base leading-relaxed text-stone-500 sm:text-lg lg:text-xl">
               Got a thought? Tap your watch and say it. Ramble writes it down and hands it to Muse, so you can stop
@@ -233,7 +233,7 @@ export default function Home() {
                 <div className="relative">
                   <span
                     aria-hidden="true"
-                    className="absolute -left-[5px] top-[36%] h-9 w-[6px] rounded-l-sm bg-red-500/80"
+                    className="absolute -left-[5px] top-[36%] h-9 w-[6px] rounded-l-sm bg-brand/80"
                   />
                   <span
                     aria-hidden="true"

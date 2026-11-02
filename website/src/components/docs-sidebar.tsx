@@ -70,7 +70,7 @@ export default function DocsSidebar({ page }: { page: DocsPage }) {
               key={p.key}
               href={p.href}
               className={`block py-1 transition-colors ${
-                p.key === page ? "text-red-600 font-medium" : "text-stone-500 hover:text-stone-900"
+                p.key === page ? "text-brand-text font-medium" : "text-stone-500 hover:text-stone-900"
               }`}
             >
               {p.label}

@@ -83,7 +83,7 @@ struct WatchMainView: View {
                 Text(WatchFormat.duration(recordingManager.currentDuration))
                     .font(.system(size: 28, weight: .bold, design: .serif))
                     .monospacedDigit()
-                    .foregroundStyle(Color.brandRed)
+                    .foregroundStyle(Color.brandAmber)
                     .contentTransition(.numericText())
 
                 if recordingManager.currentDuration >= 30 * 60 {

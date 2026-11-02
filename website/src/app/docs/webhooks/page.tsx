@@ -67,7 +67,7 @@ export default function WebhookDocs() {
             Every time you finish a recording, Ramble POSTs the transcript to each destination you&apos;ve added — an
             automation platform, an AI agent, your own backend, or all of them at once. Three steps to set it up.
             Webhooks work alongside the{" "}
-            <Link href="/docs" className="text-red-600 underline-offset-2 hover:underline">
+            <Link href="/docs" className="text-brand-text underline-offset-2 hover:underline">
               agent connection
             </Link>
             ; use either or both.

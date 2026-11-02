@@ -78,7 +78,7 @@ struct RecordingListView: View {
                             .padding(.horizontal, 8)
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(Color.brandRed)
+                    .tint(Color.brandAmber)
                     .controlSize(.large)
                 }
             }

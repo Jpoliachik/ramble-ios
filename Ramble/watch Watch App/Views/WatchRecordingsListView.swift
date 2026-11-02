@@ -43,7 +43,7 @@ struct WatchRecordingsListView: View {
                         Button("Try again") {
                             connectivity.retryPendingTransfers()
                         }
-                        .foregroundStyle(Color.brandRed)
+                        .foregroundStyle(Color.brandAmber)
                     }
                 }
             }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-// A thought (the red dot) leaves the Ramble mark, arcs over, and drops into an
+// A thought (the amber dot) leaves the Ramble mark, arcs over, and drops into an
 // open box labelled with your agent. Toss it in, stop thinking about it.
 export default function HeroFlow() {
   const [animate, setAnimate] = useState(false);
@@ -22,7 +22,7 @@ export default function HeroFlow() {
           <rect x="53" y="34" width="10" height="32" rx="5" fill="currentColor" className="text-stone-800" />
           <rect x="66" y="26" width="10" height="48" rx="5" fill="currentColor" className="text-stone-800" />
           <rect x="79" y="34" width="10" height="32" rx="5" fill="currentColor" className="text-stone-800" />
-          <circle cx="36" cy="50" r="22" fill="#D7263D" className={animate ? "hf-launch" : ""} />
+          <circle cx="36" cy="50" r="22" fill="#D97706" className={animate ? "hf-launch" : ""} />
         </svg>
       </div>
 
@@ -43,7 +43,7 @@ export default function HeroFlow() {
           className="text-stone-400"
         />
         {/* the thought */}
-        {animate && <circle r="5" fill="#D7263D" className="hf-toss" />}
+        {animate && <circle r="5" fill="#D97706" className="hf-toss" />}
         {/* open box */}
         <g className={animate ? "hf-box" : ""}>
           <path

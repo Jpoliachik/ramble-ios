@@ -408,10 +408,10 @@ struct SettingsView: View {
                 HStack(spacing: 12) {
                     Image(systemName: "trash")
                         .font(.system(size: 16))
-                        .foregroundStyle(Color.brandRed)
+                        .foregroundStyle(Color.brandAmber)
                         .frame(width: 22)
                     Text("Delete all data")
-                        .foregroundStyle(Color.brandRed)
+                        .foregroundStyle(Color.brandAmber)
                     Spacer()
                 }
             }
@@ -643,7 +643,7 @@ struct InfoBlock: View {
         HStack(alignment: .top, spacing: 14) {
             Image(systemName: icon)
                 .font(.title3)
-                .foregroundStyle(Color.brandRed)
+                .foregroundStyle(Color.brandAmber)
                 .frame(width: 28)
 
             VStack(alignment: .leading, spacing: 4) {
@@ -927,7 +927,7 @@ struct LanguagePickerView: View {
                         Spacer()
                         if selection == language {
                             Image(systemName: "checkmark")
-                                .foregroundStyle(Color.brandRed)
+                                .foregroundStyle(Color.brandAmber)
                         }
                     }
                 }

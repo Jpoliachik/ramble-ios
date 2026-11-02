@@ -54,7 +54,7 @@ struct ConnectAgentView: View {
                         Section {
                             Label(errorMessage, systemImage: "exclamationmark.triangle")
                                 .font(.subheadline)
-                                .foregroundStyle(Color.brandRed)
+                                .foregroundStyle(Color.brandAmber)
                         }
                     }
                 }
@@ -132,7 +132,7 @@ struct ConnectAgentView: View {
                         connectionToDisconnect = connection
                     }
                     .font(.subheadline)
-                    .foregroundStyle(Color.brandRed)
+                    .foregroundStyle(Color.brandAmber)
                     .buttonStyle(.borderless)
                 }
             }
@@ -228,7 +228,7 @@ struct ConnectAgentView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(Color.brandRed)
+                .tint(Color.brandAmber)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
@@ -334,7 +334,7 @@ struct ConnectAgentView: View {
                         Text("Delete everything waiting now")
                         Spacer()
                     }
-                    .foregroundStyle(Color.brandRed)
+                    .foregroundStyle(Color.brandAmber)
                 }
                 .disabled(isDeletingQueued)
 
@@ -551,7 +551,7 @@ private struct PairCodeCountdown: View {
             } else {
                 Text("Expired. Get a new code to try again.")
                     .font(.subheadline)
-                    .foregroundStyle(Color.brandRed)
+                    .foregroundStyle(Color.brandAmber)
             }
         }
     }

@@ -36,7 +36,7 @@ struct SubscriptionView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { dismiss() }
-                        .foregroundStyle(Color.brandRed)
+                        .foregroundStyle(Color.brandAmber)
                 }
             }
         }
@@ -127,7 +127,7 @@ struct SubscriptionView: View {
                     Task { await subscriptionService.restore() }
                 }
                 .font(.system(size: 14))
-                .foregroundStyle(Color.brandRed)
+                .foregroundStyle(Color.brandAmber)
 
                 if let error = errorMessage {
                     Text(error)
@@ -152,7 +152,7 @@ struct SubscriptionView: View {
                 Link("Privacy Policy", destination: SubscriptionLinks.privacy)
             }
             .font(.system(size: 12))
-            .foregroundStyle(Color.brandRed)
+            .foregroundStyle(Color.brandAmber)
         }
     }
 

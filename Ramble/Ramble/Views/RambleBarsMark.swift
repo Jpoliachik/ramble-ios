@@ -78,7 +78,7 @@ struct RambleBarsMark: View {
                     .position(x: bar3CenterX, y: centerY)
 
                 Circle()
-                    .fill(Color.brandRed)
+                    .fill(Color.brandAmber)
                     .frame(width: circleSize, height: circleSize)
                     .scaleEffect(Self.circlePulse.scale(at: progress), anchor: .center)
                     .scaleEffect(circleAppear, anchor: .center)

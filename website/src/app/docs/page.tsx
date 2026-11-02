@@ -100,7 +100,7 @@ export default function AgentDocs() {
           </div>
 
           <h1 className="mt-8 font-serif text-3xl font-semibold tracking-tight text-stone-900 sm:text-4xl">
-            Connect your <span className="italic text-red-500">agent</span>
+            Connect your <span className="italic text-brand-text">agent</span>
           </h1>
           <p className="mt-4 text-lg leading-relaxed text-stone-500">
             Record on your watch. Your agent handles it. Pairing takes one short code, and after that every transcript
@@ -272,7 +272,7 @@ export default function AgentDocs() {
               <p>
                 <InlineCode>created_at</InlineCode>{" "}is when you recorded. <InlineCode>duration</InlineCode>{" "}is in
                 seconds. Field names match the{" "}
-                <Link href="/docs/webhooks" className="text-red-600 underline-offset-2 hover:underline">
+                <Link href="/docs/webhooks" className="text-brand-text underline-offset-2 hover:underline">
                   webhook payload
                 </Link>
                 .
@@ -404,7 +404,7 @@ export default function AgentDocs() {
 
             <p className="border-t border-stone-200 pt-8 text-stone-500">
               Prefer to send transcripts to your own server or an automation platform? See{" "}
-              <Link href="/docs/webhooks" className="text-red-600 underline-offset-2 hover:underline">
+              <Link href="/docs/webhooks" className="text-brand-text underline-offset-2 hover:underline">
                 Webhooks
               </Link>
               .

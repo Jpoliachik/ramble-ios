@@ -16,9 +16,9 @@ enum TranscriptionModelLogo {
 /// shift width when toggling between selected (checkmark) and locked (lock).
 ///
 /// Selection is communicated by:
-///   • a soft brand-red tint behind the row (clipped by the surrounding card)
-///   • a brand-red checkmark on the trailing edge
-///   • a brand-red title color
+///   • a soft brand-amber tint behind the row (clipped by the surrounding card)
+///   • a brand-amber checkmark on the trailing edge
+///   • a brand-amber title color
 ///
 /// We intentionally don't draw a stroked border for selection — Form/List
 /// cells render their own shape geometry that overlay borders can't reliably
@@ -42,7 +42,7 @@ struct TranscriptionModelRow: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title)
                         .font(.system(size: 17, weight: isSelected ? .semibold : .regular))
-                        .foregroundStyle(isSelected ? Color.brandRed : Color.obInk)
+                        .foregroundStyle(isSelected ? Color.brandAmber : Color.obInk)
 
                     Text(subtitle)
                         .font(.system(size: 13))
@@ -57,7 +57,7 @@ struct TranscriptionModelRow: View {
             }
             .padding(.vertical, 12)
             .padding(.horizontal, 16)
-            .background(isSelected ? Color.brandRedSoft : Color.clear)
+            .background(isSelected ? Color.brandAmberSoft : Color.clear)
             .animation(.easeInOut(duration: 0.2), value: isSelected)
             .contentShape(Rectangle())
         }
@@ -70,13 +70,13 @@ struct TranscriptionModelRow: View {
         case .system(let name):
             Image(systemName: name)
                 .font(.system(size: 18, weight: .regular))
-                .foregroundStyle(isSelected ? Color.brandRed : Color.obInk)
+                .foregroundStyle(isSelected ? Color.brandAmber : Color.obInk)
         case .asset(let name):
             Image(name)
                 .renderingMode(.template)
                 .resizable()
                 .scaledToFit()
-                .foregroundStyle(isSelected ? Color.brandRed : Color.obInk)
+                .foregroundStyle(isSelected ? Color.brandAmber : Color.obInk)
         }
     }
 
@@ -85,7 +85,7 @@ struct TranscriptionModelRow: View {
         if isSelected {
             Image(systemName: "checkmark")
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Color.brandRed)
+                .foregroundStyle(Color.brandAmber)
         } else if isLocked {
             Image(systemName: "lock.fill")
                 .font(.system(size: 13))
