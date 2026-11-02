@@ -1,18 +1,14 @@
 # Ramble
 
-> Record on your Apple Watch. Your agent handles it. Ramble is a watch app (with an iPhone companion) that transcribes what you say and forwards the transcript to your personal agent, which picks it up on a schedule. No accounts.
+> Ramble into your Apple Watch. Your agent handles it. Tap the watch and talk; the iPhone transcribes it and passes the text to your agent, which picks it up on a schedule. No accounts.
 
-Tap the watch and talk. The iPhone transcribes the recording (Apple Speech on-device by default; optional cloud models by subscription). Ramble uploads the transcript text, never audio, to the Ramble Relay, a small Cloudflare Worker that holds transcripts temporarily. The relay keeps one queued copy per connected agent. The agent pulls on a schedule (suggested every 15 minutes), handles each transcript, and acknowledges it, which deletes it from the relay. Anything never acknowledged is deleted after 30 days at most (PLACEHOLDER: 30 or 60 days, not final); the window is long so a transcript isn't lost if the agent has trouble picking it up for a while. On-device Apple Speech touches no server. This is asynchronous; a few minutes of latency is expected.
+Pairing: in Ramble on iPhone, Settings → Connect agent gives a single-use code. Tell your agent "I downloaded Ramble, connect it" and paste the code. The agent then pulls new transcripts and acknowledges them, which deletes them. Anything never picked up is deleted after 30 days. Audio never goes to the relay.
 
-Muse is the supported agent today. More agents later.
-
-Pairing: iPhone Settings → Connect agent → Muse. Ramble shows a single-use code like K7QX-MP4D (8 characters, expires in 10 minutes). The user tells the agent "I downloaded Ramble, connect it" and pastes the code. The agent exchanges it once for a long-lived token (rmba_…) scoped to that inbox, read + ack only. Disconnect in the app revokes the token and deletes its queue.
-
-Ramble can also POST each transcript to any HTTPS endpoint (webhooks), alongside or instead of the agent connection.
+Ramble can also send each transcript to any HTTPS endpoint (webhooks).
 
 ## Docs
 
-- [Full reference](/llms-full.txt): Agent connection, the relay API (pair, pull, ack), what the relay stores, and the complete webhook API.
+- [Full reference](/llms-full.txt): Agent connection, the relay API, and the webhook API.
 - [Connect your agent](/docs): Pairing, the agent loop, and the relay API.
 - [Webhooks](/docs/webhooks): Payload format, signature verification, retries, automation platforms.
 

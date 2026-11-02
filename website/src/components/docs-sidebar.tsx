@@ -14,18 +14,9 @@ const pages: { key: DocsPage; href: string; label: string }[] = [
 
 const sectionsByPage: Record<DocsPage, Section[]> = {
   agent: [
-    { id: "overview", label: "Overview" },
     { id: "pairing", label: "Pairing" },
-    { id: "disconnect", label: "Disconnect", indent: true },
-    { id: "muse", label: "Connect Muse" },
     { id: "agent-instructions", label: "Instructions for the agent" },
-    { id: "api", label: "How the connection works" },
-    { id: "api-exchange", label: "POST /pair/exchange", indent: true },
-    { id: "api-pull", label: "GET /inbox", indent: true },
-    { id: "api-ack", label: "POST /inbox/ack", indent: true },
-    { id: "api-errors", label: "Errors", indent: true },
-    { id: "api-app", label: "App-facing endpoints", indent: true },
-    { id: "storage", label: "What the relay stores" },
+    { id: "api", label: "API" },
   ],
   webhooks: [
     { id: "step-1", label: "1. Add a destination" },

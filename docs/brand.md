@@ -20,7 +20,7 @@ Ramble is the capture layer for the agent era. People who have a personal agent 
 
 1. **Watch-first capture.** The Apple Watch is the identity, not a side feature. Tap, talk, done. No phone out, no screen to read.
 
-2. **Agent forwarding with zero setup.** In the app, tap Connect agent and Ramble shows a short pairing code (like `K7QX-MP4D`, single-use, expires in 10 minutes). Tell your agent "I downloaded Ramble, connect it" and paste the code. That's the whole setup. No API keys to copy, no URLs to configure. Today that agent is Muse. More agents later.
+2. **Agent forwarding with zero setup.** In the app, tap Connect agent and Ramble shows a short pairing code (like `K7QX-MP4D`, single-use, expires in 10 minutes). Tell your agent "I downloaded Ramble, connect it" and paste the code. That's the whole setup. No API keys to copy, no URLs to configure.
 
 3. **Temporary by design.** No accounts. Audio never goes to the relay, and on-device Apple Speech touches no server at all. Transcripts pass through the relay and are deleted the moment your agent acknowledges them. That's the normal path. Anything your agent never picks up is deleted after a hard maximum of 30 days (PLACEHOLDER: 30 or 60 days, Justin to confirm). The window is that long so a transcript isn't lost if your agent has trouble picking it up for a while. Credentials are stored only as hashes. We say exactly what is stored, where, and for how long.
 
@@ -30,7 +30,7 @@ Ramble is the capture layer for the agent era. People who have a personal agent 
 
 ## Who it's for
 
-- **Agent owners (primary)** — People who already use a personal agent and want a watch that talks to it. They don't want another inbox to check. They want to say the thing and know it landed. Today that means Muse users. People using other agents (ChatGPT, Claude, Grok and so on) are the broader audience we're building toward, but those connections are not shipped. Strategy, not a claim.
+- **Agent owners (primary)** — People who already use a personal agent and want a watch that talks to it. They don't want another inbox to check. They want to say the thing and know it landed.
 
 - **Transcription enthusiasts** — People who care about accuracy and want the best speech-to-text models as they ship. They'll pay for cloud transcription because clean transcripts matter to them.
 
@@ -121,6 +121,6 @@ Lives in [`docs/app-store.md`](app-store.md).
 - Don't say "no servers" or "no data on our servers" — the relay is a server. Say what it holds and when it deletes it.
 - Don't say "open source", "read the code", or "verify it yourself", and don't mention self-hosting. Development is private. The privacy story is temporary retention, stated precisely.
 - Don't promise real-time. Agents pull on a schedule; minutes of delay is normal.
-- Don't promise MCP, ChatGPT, Claude, or Grok connections, or end-to-end encryption, until they ship. Muse is the agent that connects today. "More agents later" is the most to say, with no dates.
+- Don't promise MCP, ChatGPT, Claude, or Grok connections, or end-to-end encryption, until they ship.
 - Don't headline "works with any agent"
 - Don't promise features that aren't shipped
