@@ -83,8 +83,7 @@ struct MainView: View {
                             transcribingCount: viewModel.pendingCount,
                             sendingCount: viewModel.sendingCount,
                             waitingCount: waitingCount,
-                            failedCount: viewModel.needsAttentionCount,
-                            agentName: relay.primaryAgentName
+                            failedCount: viewModel.needsAttentionCount
                         )
                         .transition(.opacity)
                     }
@@ -169,7 +168,7 @@ struct MainView: View {
             triggerOnboardingToastIfNeeded()
         }
         .task {
-            // Fills the "waiting for Muse" count; harmless when nothing is connected.
+            // Fills the "waiting for your agent" count; harmless when nothing is connected.
             _ = try? await relay.refreshConnections()
         }
         .onChange(of: scenePhase) { _, phase in

@@ -54,9 +54,7 @@ struct RecordingRowView: View {
         guard recording.status == .completed else { return nil }
         switch recording.deliveryStatus {
         case .none:
-            return RelayService.shared.hasConnectedAgents ? "Not sent" : "Not sent · connect Muse"
-        case .delivered where recording.isWaitingForAgent:
-            return "Waiting for \(RelayService.shared.primaryAgentName)"
+            return RelayService.shared.hasConnectedAgents ? "Not sent" : "Not sent · connect your agent"
         default:
             return nil
         }
@@ -93,16 +91,9 @@ struct RecordingRowView: View {
                     .foregroundStyle(.orange)
                     .font(.subheadline)
             case .delivered:
-                if recording.isWaitingForAgent {
-                    // The relay holds it; the agent hasn't picked it up yet.
-                    Image(systemName: "clock")
-                        .foregroundStyle(.blue)
-                        .font(.subheadline)
-                } else {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                        .font(.subheadline)
-                }
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                    .font(.subheadline)
             case .none:
                 Image(systemName: "tray")
                     .foregroundStyle(.secondary)

@@ -56,7 +56,7 @@ struct RecordingListView: View {
             VStack(spacing: 28) {
                 RambleBarsMark(size: 72)
 
-                Text("Record on your watch. It shows up here, then goes to Muse.")
+                Text("Record on your watch. It shows up here, then goes to your agent.")
                     .font(.system(size: 18, design: .serif).weight(.medium))
                     .tracking(-0.5)
                     .foregroundStyle(Color.obInk)
@@ -73,7 +73,7 @@ struct RecordingListView: View {
                         HapticService.buttonTap()
                         showConnectAgent = true
                     } label: {
-                        Text("Connect Muse")
+                        Text("Connect your agent")
                             .font(.body.weight(.semibold))
                             .padding(.horizontal, 8)
                     }
@@ -97,7 +97,7 @@ struct RecordingListView: View {
         .animation(.easeInOut(duration: 0.4), value: isRecording)
         .animation(.easeInOut(duration: 0.6), value: showLockHint)
         .sheet(isPresented: $showConnectAgent) {
-            ConnectAgentView(startPairingWith: .muse)
+            ConnectAgentView()
         }
         .onChange(of: isRecording) { _, newValue in
             lockHintTask?.cancel()

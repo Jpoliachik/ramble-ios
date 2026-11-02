@@ -7,11 +7,9 @@ account_id = "YOUR_CLOUDFLARE_ACCOUNT_ID"
 enabled = true
 
 [vars]
-# Relay retention (seconds). Text is deleted the moment the agent acks it.
-# Transcripts never picked up are deleted after 30 days, so an agent outage
-# loses nothing. A text-free pickup receipt lives 24 hours for the phone.
-UNACKED_RETENTION_SECONDS = "2592000"
-RECEIPT_RETENTION_SECONDS = "86400"
+# Relay: transcripts are deleted when the agent acks them, or after this many
+# seconds if never picked up (30 days).
+RETENTION_SECONDS = "2592000"
 APPLE_BUNDLE_ID = "dev.goodloop.Ramble"
 PREMIUM_PRODUCT_ID = "dev.goodloop.ramble.premium.monthly2"
 
