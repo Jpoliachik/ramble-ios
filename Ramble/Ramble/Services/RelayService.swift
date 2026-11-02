@@ -12,6 +12,7 @@
 //    it only hands out short pairing codes the agent exchanges for one.
 //
 
+import Combine
 import Foundation
 
 enum RelayAgent: String, CaseIterable, Identifiable, Codable {
