@@ -5,9 +5,6 @@ on:
     branches: [main]
     paths:
       - 'proxy/**'
-  pull_request:
-    paths:
-      - 'proxy/**'
   workflow_dispatch:
 
 jobs:
@@ -28,9 +25,8 @@ jobs:
       - run: npm test
 
   deploy:
-    # A red test run must not reach production. Pull requests stop at `test`.
+    # A red test run must not reach production. PR checks live in ci.yml.
     needs: test
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     defaults:
       run:
