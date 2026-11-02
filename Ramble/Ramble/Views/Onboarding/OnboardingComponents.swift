@@ -189,7 +189,7 @@ struct OnboardingBody: View {
     }
 }
 
-// MARK: - Wordmark (red dot + italic serif)
+// MARK: - Wordmark (amber dot + italic serif)
 
 struct OnboardingWordmark: View {
     let size: CGFloat

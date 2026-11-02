@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 // A thought (the amber dot) leaves the Ramble mark, arcs over, and drops into an
-// open box labelled with your agent. Toss it in, stop thinking about it.
+// open box: your agent's inbox. Toss it in, stop thinking about it.
 export default function HeroFlow() {
   const [animate, setAnimate] = useState(false);
 
@@ -56,14 +56,6 @@ export default function HeroFlow() {
             fill="white"
           />
           <path d="M100 44 H148" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-stone-800" />
-          <text
-            x="124"
-            y="64"
-            textAnchor="middle"
-            className="fill-stone-600 font-sans text-[10px] font-medium"
-          >
-            Muse
-          </text>
         </g>
       </svg>
 

@@ -50,7 +50,7 @@ const steps = [
   },
   {
     title: "Your agent takes it",
-    body: `Muse picks it up within about ${PULL_CADENCE} and deals with it. You don't have to.`,
+    body: `Your agent picks it up within about ${PULL_CADENCE} and deals with it. You don't have to.`,
   },
 ];
 
@@ -93,12 +93,8 @@ const included = [
 
 const faqs: { q: string; a: ReactNode }[] = [
   {
-    q: "Why not just talk to Muse directly?",
+    q: "Why not just talk to my agent directly?",
     a: "You can, if your phone is out. Ramble is for when it isn't: on a walk, in the car, between meetings. One tap, say it, done.",
-  },
-  {
-    q: "What if I stop using Muse?",
-    a: "Disconnect it in one tap. Webhooks can still send every transcript to a URL you choose.",
   },
   {
     q: "Does my agent reply on my watch?",
@@ -107,10 +103,6 @@ const faqs: { q: string; a: ReactNode }[] = [
   {
     q: "How fast does it get to my agent?",
     a: `Usually within ${PULL_CADENCE}. Transcription takes seconds; your agent checks for new ones on a schedule.`,
-  },
-  {
-    q: "Which agents can I connect?",
-    a: "Muse today. More agents later. Webhooks work with anything that accepts an HTTPS request.",
   },
   {
     q: "What does the relay store?",
@@ -147,10 +139,6 @@ const faqs: { q: string; a: ReactNode }[] = [
     a: "Nothing gets lost. Recordings wait on your watch and iPhone and go out when you're back online.",
   },
   {
-    q: "How do I cancel cloud transcription?",
-    a: "Like any iOS subscription: Settings → your name → Subscriptions → Ramble → Cancel. On-device transcription, your agent connection, and webhooks keep working.",
-  },
-  {
     q: "What if it doesn't work for me?",
     a: (
       <>
@@ -183,8 +171,8 @@ export default function Home() {
               <span className="italic text-brand-text">Your agent handles it.</span>
             </h1>
             <p className="hero-enter-subtitle mt-6 max-w-xl text-base leading-relaxed text-stone-500 sm:text-lg lg:text-xl">
-              Got a thought? Tap your watch and say it. Ramble writes it down and hands it to Muse, so you can stop
-              holding onto it.
+              Got a thought? Tap your watch and say it. Ramble writes it down and hands it to your agent, so you can
+              stop holding onto it.
             </p>
             <div className="hero-enter-buttons mt-10 flex flex-col items-center gap-3 lg:items-start">
               <div className="flex flex-col items-center gap-4 sm:flex-row">
@@ -197,7 +185,7 @@ export default function Home() {
                   <span aria-hidden="true">&darr;</span>
                 </a>
               </div>
-              <p className="text-sm text-stone-500">{APP_PRICE}, once. Works with Muse.</p>
+              <p className="text-sm text-stone-500">{APP_PRICE}, once.</p>
             </div>
           </div>
 
@@ -278,7 +266,7 @@ export default function Home() {
       <section id="connect" className="scroll-mt-20 border-t border-stone-200">
         <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
           <SectionHeading eyebrow="Setup" sub="Takes about a minute.">
-            Connect Muse
+            Connect your agent
           </SectionHeading>
 
           <div className="mt-14 grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] lg:gap-16">
@@ -288,16 +276,16 @@ export default function Home() {
                 <div>
                   <h3 className="text-sm font-semibold text-stone-900">Get a pairing code</h3>
                   <p className="mt-1 text-sm leading-relaxed text-stone-500">
-                    On your iPhone, open Ramble → Settings → Connect agent → Muse. You&apos;ll get a short code.
+                    On your iPhone, open Ramble → Settings → Connect agent. You&apos;ll get a short code.
                   </p>
                 </div>
               </li>
               <li className="flex gap-4">
                 <span className={stepBadge}>2</span>
                 <div>
-                  <h3 className="text-sm font-semibold text-stone-900">Tell Muse</h3>
+                  <h3 className="text-sm font-semibold text-stone-900">Tell your agent</h3>
                   <p className="mt-1 text-sm leading-relaxed text-stone-500">
-                    Say &ldquo;I downloaded Ramble, connect it&rdquo; and paste the code. Muse can only pick up your
+                    Say &ldquo;I downloaded Ramble, connect it&rdquo; and paste the code. It can only pick up your
                     transcripts, nothing else.
                   </p>
                 </div>
@@ -321,7 +309,7 @@ export default function Home() {
               </p>
               <p className="mt-2 text-xs text-stone-500">Single use. Expires in {PAIR_CODE_TTL}.</p>
               <div className="mt-6 border-t border-stone-200 pt-6">
-                <p className="text-xs font-medium uppercase tracking-[0.18em] text-stone-500">Chat with Muse</p>
+                <p className="text-xs font-medium uppercase tracking-[0.18em] text-stone-500">Chat with your agent</p>
                 <div className="mt-3 flex flex-col gap-2">
                   <p className="max-w-[90%] self-end rounded-2xl rounded-br-md bg-stone-900 px-4 py-2.5 text-sm text-white">
                     I downloaded Ramble, connect it.{" "}
@@ -335,28 +323,14 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="mt-14 grid gap-4 sm:grid-cols-2">
-            <div className="rounded-xl border border-stone-200 p-5">
-              <h3 className="text-sm font-semibold text-stone-900">More agents later</h3>
-              <p className="mt-1 text-sm leading-relaxed text-stone-500">
-                Muse is the only one for now. Curious how it works under the hood?{" "}
-                <Link href="/docs" className={inlineLink}>
-                  Read the docs
-                </Link>
-                .
-              </p>
-            </div>
-            <div className="rounded-xl border border-stone-200 p-5">
-              <h3 className="text-sm font-semibold text-stone-900">Have your own endpoint?</h3>
-              <p className="mt-1 text-sm leading-relaxed text-stone-500">
+          <p className="mt-14 text-center text-sm text-stone-500">
+            Have your own endpoint?
                 Ramble can also send each transcript to any HTTPS URL.{" "}
                 <Link href="/docs/webhooks" className={inlineLink}>
                   Webhook docs
                 </Link>
                 .
-              </p>
-            </div>
-          </div>
+          </p>
         </div>
       </section>
 
@@ -429,9 +403,6 @@ export default function Home() {
                   </li>
                 ))}
               </ul>
-              <p className="mt-6 border-t border-stone-200 pt-4 text-sm text-stone-500">
-                What you need: an Apple Watch paired with an iPhone, and Muse.
-              </p>
             </div>
             <div className="rounded-2xl border border-stone-200 p-6">
               <div className="flex items-center justify-between gap-3">
