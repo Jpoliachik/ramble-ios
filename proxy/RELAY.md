@@ -74,15 +74,16 @@ To test: record "Test, remind me to water the plants" on the watch. Settings sho
 
 Until the D1 binding exists, relay routes answer `503` and transcription works as before. A cron every 15 minutes deletes expired rows.
 
-For the simulator, `npx wrangler secret put DEV_BYPASS_TOKEN` and set the same value as the server bypass key in the app's debug sheet (tap the version number in Settings). It's sent as `X-Dev-Bypass`. The debug sheet also has a relay URL override.
+App Attest can't run in the simulator. For simulator testing, run the relay locally (below) with `DEV_BYPASS_TOKEN` in `.dev.vars`, and enter the same value as the server bypass key in the app's debug sheet (tap the version number in Settings), where you can also point the relay URL at `wrangler dev`. The key is sent as `X-Dev-Bypass`.
+
+If `DEV_BYPASS_TOKEN` is set on the deployed Worker, anyone holding it skips App Attest for both `/inboxes` and `/transcribe`. Leave it unset in production, or make it long and random and never share it.
 
 ### Local
 
 ```bash
-cp wrangler.toml wrangler.local.toml          # uncomment the D1 block; any id works locally
 echo 'DEV_BYPASS_TOKEN="dev"' > .dev.vars
-npx wrangler d1 migrations apply ramble-relay --local -c wrangler.local.toml
-npx wrangler dev -c wrangler.local.toml
+npx wrangler d1 migrations apply ramble-relay --local
+npx wrangler dev                               # uses a local copy of the database
 ```
 
 ## Tests

@@ -1,8 +1,9 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { AudioLines, Bot, Clock, Trash2, UserX } from "lucide-react";
+import { AudioLines, Bot, Trash2, UserX } from "lucide-react";
 import HeroFlow from "../components/hero-flow";
 import CopyTextButton from "../components/copy-text-button";
+import PopIn from "../components/pop-in";
 import {
   APP_PRICE,
   APP_STORE_URL,
@@ -44,15 +45,15 @@ function SectionHeading({ eyebrow, children, sub }: { eyebrow: string; children:
 const steps = [
   {
     title: "Say it",
-    body: "Tap your watch and talk. An idea, a to-do, a note on something you're working on. Messy is fine.",
+    body: "Tap your watch and talk. Messy is fine.",
   },
   {
     title: "Let it go",
-    body: "No reply to wait for. Offline? It waits on your watch and goes out when you reconnect.",
+    body: "No reply to wait for. Works offline, too.",
   },
   {
     title: "Come back later",
-    body: "Your agent picks it up and gets to work. Check in whenever you're ready.",
+    body: "Your agent picks it up and gets to work.",
   },
 ];
 
@@ -60,29 +61,24 @@ const privacyPoints = [
   {
     Icon: AudioLines,
     title: "Audio stays on your phone",
-    body: "Only the text is sent on. With Apple Speech, transcription happens on your iPhone too.",
+    body: "Your agent gets the transcript, never the recording.",
   },
   {
     Icon: Trash2,
     title: "Deleted once delivered",
-    body: "Ramble holds the text until your agent picks it up. Then it's deleted.",
+    body: `Gone as soon as your agent picks it up, or after ${RETENTION} if it never does.`,
   },
   {
     Icon: UserX,
     title: "No accounts",
     body: "No email, no name, no login.",
   },
-  {
-    Icon: Clock,
-    title: `${RETENTION} at most`,
-    body: `If your agent never picks something up, it's deleted after ${RETENTION}. Long enough to ride out an agent hiccup.`,
-  },
 ];
 
 const included = [
   "Apple Watch and iPhone apps",
   "On-device transcription",
-  "Delivery to your agent",
+  "Reliable delivery to your agent, with automatic retries",
   "Webhooks to your own endpoint",
 ];
 
@@ -268,11 +264,13 @@ export default function Home() {
               <span className="text-xs font-medium text-stone-500">Agent</span>
             </div>
             <div className="mt-5 flex flex-col text-sm">
-              <p className="max-w-[90%] self-end rounded-2xl rounded-br-md bg-brand-text px-4 py-2.5 text-white">
-                {SETUP_MESSAGE}
-                <br />
-                <span className="whitespace-nowrap underline underline-offset-2">{SITE_HOST}/docs</span>
-              </p>
+              <PopIn className="max-w-[90%] self-end">
+                <p className="rounded-2xl rounded-br-md bg-brand-text px-4 py-2.5 text-white">
+                  {SETUP_MESSAGE}
+                  <br />
+                  <span className="whitespace-nowrap underline underline-offset-2">{SITE_HOST}/docs</span>
+                </p>
+              </PopIn>
             </div>
           </div>
           <div className="mt-4 flex justify-center">
@@ -293,8 +291,7 @@ export default function Home() {
       {/* Pricing */}
       <section className="border-t border-stone-200 bg-stone-50">
         <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
-          <SectionHeading eyebrow="Pricing">Pay once</SectionHeading>
-          <div className="mx-auto mt-12 max-w-md rounded-2xl bg-white p-6 shadow-sm ring-1 ring-stone-200/80">
+          <div className="mx-auto max-w-md rounded-2xl bg-white p-6 shadow-sm ring-1 ring-stone-200/80">
             <p className="font-serif text-4xl font-semibold text-stone-900">
               {APP_PRICE}
               <span className="ml-2 font-sans text-sm font-normal text-stone-500">one time</span>
@@ -309,7 +306,7 @@ export default function Home() {
             </ul>
             <p className="mt-6 border-t border-stone-200 pt-4 text-sm leading-relaxed text-stone-500">
               Optional upgrade: cloud transcription for {CLOUD_PRICE}, for sharper transcripts with accents, jargon,
-              or noise. You never need it. Everything above works without it, and you can cancel any time.
+              or noise. Everything above works without it, and you can cancel any time.
             </p>
           </div>
         </div>
@@ -318,10 +315,8 @@ export default function Home() {
       {/* Privacy */}
       <section className="border-t border-stone-200">
         <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
-          <SectionHeading eyebrow="Privacy" sub="Ramble keeps your words only as long as it takes to get them to your agent.">
-            Your thoughts don&apos;t stick around
-          </SectionHeading>
-          <div className="mt-14 grid gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8">
+          <SectionHeading eyebrow="Privacy">Your thoughts don&apos;t stick around</SectionHeading>
+          <div className="mt-14 grid gap-10 sm:grid-cols-3 sm:gap-8">
             {privacyPoints.map(({ Icon, title, body }) => (
               <div key={title} className="flex flex-col items-center text-center sm:items-start sm:text-left">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sage-100 text-sage-600">
@@ -333,7 +328,6 @@ export default function Home() {
             ))}
           </div>
           <p className="mx-auto mt-12 max-w-3xl text-center text-sm leading-relaxed text-stone-500">
-            Disconnect any time and anything still waiting is deleted.{" "}
             <Link href="/privacy" className={inlineLink}>
               Full privacy policy
             </Link>
@@ -369,7 +363,7 @@ export default function Home() {
             Get it off your mind.
           </h2>
           <p className="mt-4 text-base text-stone-500">
-            Leave the phone. Keep the thought. {APP_PRICE}, once.
+            Leave the phone. Keep the thought.
           </p>
           <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
             <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className={primaryButton}>
