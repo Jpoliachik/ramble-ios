@@ -37,7 +37,7 @@ PRIVACY
 - Disconnect any time.
 
 TRANSCRIPTION
-Apple Speech transcribes on your iPhone. An optional upgrade adds cloud transcription for sharper results with accents, jargon, or noise. You never need it.
+Apple Speech transcribes on your iPhone. An optional upgrade adds cloud transcription for sharper results with accents, jargon, or noise.
 
 WEBHOOKS
 Ramble can also send each transcript to any HTTPS endpoint.

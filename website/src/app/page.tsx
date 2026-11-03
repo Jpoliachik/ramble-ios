@@ -82,7 +82,7 @@ const privacyPoints = [
 const included = [
   "Apple Watch and iPhone apps",
   "On-device transcription",
-  "Delivery to your agent",
+  "Reliable delivery to your agent, with automatic retries",
   "Webhooks to your own endpoint",
 ];
 
@@ -309,7 +309,7 @@ export default function Home() {
             </ul>
             <p className="mt-6 border-t border-stone-200 pt-4 text-sm leading-relaxed text-stone-500">
               Optional upgrade: cloud transcription for {CLOUD_PRICE}, for sharper transcripts with accents, jargon,
-              or noise. You never need it. Everything above works without it, and you can cancel any time.
+              or noise. Everything above works without it, and you can cancel any time.
             </p>
           </div>
         </div>
