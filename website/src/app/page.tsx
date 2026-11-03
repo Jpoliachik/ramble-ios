@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { AudioLines, Bot, Clock, Trash2, UserX } from "lucide-react";
 import HeroFlow from "../components/hero-flow";
+import CopyTextButton from "../components/copy-text-button";
 import {
   APP_PRICE,
   APP_STORE_URL,
@@ -12,6 +13,7 @@ import {
 } from "../lib/site";
 
 const SITE_HOST = SITE_URL.replace(/^https?:\/\//, "");
+const SETUP_MESSAGE = "I just downloaded Ramble. Help me set it up!";
 
 const primaryButton =
   "inline-flex items-center gap-2 rounded-full bg-stone-900 px-6 py-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-stone-800";
@@ -267,9 +269,14 @@ export default function Home() {
             </div>
             <div className="mt-5 flex flex-col text-sm">
               <p className="max-w-[90%] self-end rounded-2xl rounded-br-md bg-[#d97706] px-4 py-2.5 text-white">
-                Help me connect Ramble. <span className="whitespace-nowrap underline underline-offset-2">{SITE_HOST}/docs</span>
+                {SETUP_MESSAGE}
+                <br />
+                <span className="whitespace-nowrap underline underline-offset-2">{SITE_HOST}/docs</span>
               </p>
             </div>
+          </div>
+          <div className="mt-4 flex justify-center">
+            <CopyTextButton text={`${SETUP_MESSAGE}\n${SITE_URL}/docs`} label="Copy message" />
           </div>
 
           <p className="mt-14 text-center text-sm text-stone-500">
