@@ -16,25 +16,51 @@ import { Bot, Check, Mic } from "lucide-react";
 
 type Thought = { said: string; item: string; tag: string };
 
+// Example thoughts. They play in a shuffled order, one per loop, and reshuffle
+// after every pass. The first one is also the still frame for reduced motion.
 const thoughts: Thought[] = [
   { said: "Add oat milk to my to-do list.", item: "Oat milk", tag: "To-do" },
   { said: "Remind me to call Sam after lunch.", item: "Call Sam", tag: "1:00 PM" },
   { said: "Idea: walking meetings on Fridays.", item: "Walking meetings", tag: "Ideas" },
+  { said: "Book a haircut for next week.", item: "Haircut", tag: "Next week" },
+  { said: "What was that podcast Maya mentioned?", item: "Maya's podcast", tag: "Look up" },
+  { said: "Draft a thank-you note to Alex.", item: "Note to Alex", tag: "Draft" },
+  { said: "Move my 3pm to tomorrow.", item: "Move 3pm", tag: "Calendar" },
+  { said: "Pick up dry cleaning on the way home.", item: "Dry cleaning", tag: "Errand" },
+  { said: "Pay the water bill.", item: "Water bill", tag: "Bills" },
+  { said: "Ask Priya about the Lisbon trip.", item: "Lisbon trip", tag: "Ask Priya" },
 ];
 
-// Beats of one loop, in ms from the start of the loop.
-const BEATS = [
-  0, //    0 idle: watch in focus, record button
-  400, //  1 recording: tap, waveform, the words appear
-  2700, // 2 sent: check on the watch, the thought leaves
-  3500, // 3 the watch is back to idle. You're done.
-  3600, // 4 the phone transcribes (phone in focus)
-  4200, // 5 the text heads to the agent
-  4750, // 6 it lands with your agent (agent in focus)
-  5300, // 7 handled
-];
-const LOOP_MS = 7400;
-const TYPE_MS = 52;
+function shuffled(avoidFirst?: number): number[] {
+  const order = thoughts.map((_, i) => i);
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  // Don't play the same thought twice in a row across a reshuffle.
+  if (order[0] === avoidFirst) [order[0], order[1]] = [order[1], order[0]];
+  return order;
+}
+
+const TYPE_MS = 38;
+
+// Beats of one loop, in ms from the start of the loop. Recording lasts as long
+// as the words take to type out.
+//   0 idle: watch in focus, record button
+//   1 recording: tap, waveform, the words appear
+//   2 sent: check on the watch, the thought leaves
+//   3 the watch is back to idle. You're done.
+//   4 the phone relays it (a quick blip)
+//   5 the text heads to the agent
+//   6 it lands with your agent (agent in focus)
+//   7 handled
+// The next loop starts while the agent row is still settling, so there's no
+// visible restart.
+function beatsFor(said: string) {
+  const sentAt = 250 + said.length * TYPE_MS + 250;
+  const beats = [0, 250, sentAt, sentAt + 600, sentAt + 620, sentAt + 820, sentAt + 1240, sentAt + 1600];
+  return { beats, loopMs: sentAt + 2500 };
+}
 
 // Motion paths in stage coordinates.
 const PATH_TO_PHONE = "M184 274 C 238 274, 250 128, 304 128";
@@ -59,13 +85,12 @@ const VISIBLE = 3;
 export default function HeroMotion() {
   const [beat, setBeat] = useState(0);
   const [cycle, setCycle] = useState(0);
+  const [thought, setThought] = useState<Thought>(thoughts[0]);
   const [typed, setTyped] = useState(0);
   const [reduced, setReduced] = useState(false);
   const [phoneRows, setPhoneRows] = useState<PhoneRow[]>(initialPhone);
   const [agentRows, setAgentRows] = useState<AgentRow[]>(initialAgent);
   const cycleRef = useRef(0);
-
-  const thought = thoughts[cycle % thoughts.length];
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -79,13 +104,18 @@ export default function HeroMotion() {
   useEffect(() => {
     if (reduced) return;
     const timers: ReturnType<typeof setTimeout>[] = [];
+    let order = shuffled();
     const runLoop = () => {
       const c = cycleRef.current;
-      const t = thoughts[c % thoughts.length];
+      const pos = c % thoughts.length;
+      if (pos === 0 && c > 0) order = shuffled(order[order.length - 1]);
+      const t = thoughts[order[pos]];
+      const { beats, loopMs } = beatsFor(t.said);
       setCycle(c);
+      setThought(t);
       setBeat(0);
       setTyped(0);
-      BEATS.forEach((at, i) => {
+      beats.forEach((at, i) => {
         if (i === 0) return;
         timers.push(
           setTimeout(() => {
@@ -104,10 +134,10 @@ export default function HeroMotion() {
         setTimeout(() => {
           cycleRef.current = c + 1;
           runLoop();
-        }, LOOP_MS),
+        }, loopMs),
       );
     };
-    const start = setTimeout(runLoop, 700);
+    const start = setTimeout(runLoop, 500);
     return () => {
       clearTimeout(start);
       timers.forEach(clearTimeout);
@@ -135,7 +165,6 @@ export default function HeroMotion() {
   const sent = b === 2;
   const bubbleVisible = reduced || (b >= 1 && b <= 2);
   const focus = reduced ? "none" : b <= 3 ? "watch" : b <= 5 ? "phone" : "agent";
-  const transcribingKey = !reduced && b === 4 ? cycle : null;
   const agentGlow = b === 6 || b === 7;
 
   return (
@@ -242,8 +271,8 @@ export default function HeroMotion() {
           className="hm-focus absolute left-[304px] top-[16px] w-[104px]"
           style={{
             transformOrigin: "30% 88%",
-            transform: `scale(${focus === "phone" ? 1.1 : 0.94})`,
-            opacity: focus === "phone" ? 1 : 0.82,
+            transform: `scale(${focus === "phone" ? 1.0 : 0.94})`,
+            opacity: focus === "phone" ? 1 : 0.85,
           }}
         >
           <div
@@ -258,33 +287,21 @@ export default function HeroMotion() {
                 Ramble
               </p>
               <div className="relative mt-[6px]" style={{ height: PHONE_ROW_H * VISIBLE }}>
-                {shownPhone.map((row, i) => {
-                  const pending = row.key === transcribingKey;
-                  return (
-                    <div
-                      key={row.key}
-                      className="hm-row absolute inset-x-0"
-                      style={{ top: i * PHONE_ROW_H, opacity: i >= VISIBLE ? 0 : 1 }}
-                    >
-                      <div className="hm-row-in h-[37px] rounded-[7px] bg-stone-100 px-[6px] py-[5px]">
-                        {pending ? (
-                          <div className="space-y-[3px] py-[1px]">
-                            <span className="hm-shimmer block h-[4px] w-full rounded-full" />
-                            <span className="hm-shimmer block h-[4px] w-2/3 rounded-full" />
-                          </div>
-                        ) : (
-                          <p className="line-clamp-2 text-[7.5px] leading-[1.3] text-stone-800">{row.said}</p>
-                        )}
-                        <p className="mt-[2px] flex items-center gap-[3px] text-[6.5px] font-medium text-stone-500">
-                          <span
-                            className={`inline-block h-[4px] w-[4px] rounded-full ${pending ? "bg-stone-300" : "bg-brand"}`}
-                          />
-                          {pending ? "Transcribing" : "Sent to agent"}
-                        </p>
-                      </div>
+                {shownPhone.map((row, i) => (
+                  <div
+                    key={row.key}
+                    className="hm-row absolute inset-x-0"
+                    style={{ top: i * PHONE_ROW_H, opacity: i >= VISIBLE ? 0 : 1 }}
+                  >
+                    <div className="hm-row-in h-[37px] rounded-[7px] bg-stone-100 px-[6px] py-[5px]">
+                      <p className="line-clamp-2 text-[7.5px] leading-[1.3] text-stone-800">{row.said}</p>
+                      <p className="mt-[2px] flex items-center gap-[3px] text-[6.5px] font-medium text-stone-500">
+                        <span className="inline-block h-[4px] w-[4px] rounded-full bg-brand" />
+                        Sent to agent
+                      </p>
                     </div>
-                  );
-                })}
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -339,10 +356,10 @@ export default function HeroMotion() {
         </div>
 
         {/* The thought, travelling */}
-        {!reduced && b === 2 && (
+        {!reduced && b >= 2 && b <= 4 && (
           <span key={`a-${cycle}`} className="hm-packet hm-packet-a" style={{ offsetPath: `path("${PATH_TO_PHONE}")` }} />
         )}
-        {!reduced && b === 5 && (
+        {!reduced && b >= 5 && b <= 6 && (
           <span key={`b-${cycle}`} className="hm-packet hm-packet-b" style={{ offsetPath: `path("${PATH_TO_AGENT}")` }} />
         )}
       </div>
@@ -396,10 +413,10 @@ export default function HeroMotion() {
           z-index: 20;
         }
         :global(.hm-packet-a) {
-          animation: hm-travel 850ms cubic-bezier(0.55, 0, 0.35, 1) 100ms both;
+          animation: hm-travel 620ms cubic-bezier(0.55, 0, 0.35, 1) 60ms both;
         }
         :global(.hm-packet-b) {
-          animation: hm-travel 480ms cubic-bezier(0.5, 0, 0.4, 1) 40ms both;
+          animation: hm-travel 420ms cubic-bezier(0.5, 0, 0.4, 1) both;
         }
         @keyframes hm-travel {
           0% {
