@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { AudioLines, Bot, Clock, Trash2, UserX } from "lucide-react";
+import { AudioLines, Bot, Trash2, UserX } from "lucide-react";
 import HeroFlow from "../components/hero-flow";
 import CopyTextButton from "../components/copy-text-button";
 import {
@@ -60,22 +60,17 @@ const privacyPoints = [
   {
     Icon: AudioLines,
     title: "Audio stays on your phone",
-    body: "Only the text is sent on. With Apple Speech, transcription happens on your iPhone too.",
+    body: "Only the text is sent on.",
   },
   {
     Icon: Trash2,
     title: "Deleted once delivered",
-    body: "Ramble holds the text until your agent picks it up. Then it's deleted.",
+    body: `Gone as soon as your agent picks it up, or after ${RETENTION} if it never does.`,
   },
   {
     Icon: UserX,
     title: "No accounts",
     body: "No email, no name, no login.",
-  },
-  {
-    Icon: Clock,
-    title: `${RETENTION} at most`,
-    body: `If your agent never picks something up, it's deleted after ${RETENTION}. Long enough to ride out an agent hiccup.`,
   },
 ];
 
@@ -317,10 +312,8 @@ export default function Home() {
       {/* Privacy */}
       <section className="border-t border-stone-200">
         <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
-          <SectionHeading eyebrow="Privacy" sub="Ramble keeps your words only as long as it takes to get them to your agent.">
-            Your thoughts don&apos;t stick around
-          </SectionHeading>
-          <div className="mt-14 grid gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8">
+          <SectionHeading eyebrow="Privacy">Your thoughts don&apos;t stick around</SectionHeading>
+          <div className="mt-14 grid gap-10 sm:grid-cols-3 sm:gap-8">
             {privacyPoints.map(({ Icon, title, body }) => (
               <div key={title} className="flex flex-col items-center text-center sm:items-start sm:text-left">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sage-100 text-sage-600">
@@ -332,7 +325,6 @@ export default function Home() {
             ))}
           </div>
           <p className="mx-auto mt-12 max-w-3xl text-center text-sm leading-relaxed text-stone-500">
-            Disconnect any time and anything still waiting is deleted.{" "}
             <Link href="/privacy" className={inlineLink}>
               Full privacy policy
             </Link>
