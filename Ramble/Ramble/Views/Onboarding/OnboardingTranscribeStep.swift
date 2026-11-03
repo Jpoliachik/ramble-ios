@@ -41,7 +41,7 @@ struct OnboardingTranscribeStep: View {
 
                     OnboardingSectionHeader(
                         title: "Cloud · premium",
-                        trailing: subscriptionService.isPremium ? nil : "$3.99 / month"
+                        trailing: subscriptionService.isPremium ? nil : "$2.99 / month"
                     )
                     cloudRows
 

@@ -12,7 +12,11 @@ struct WatchSyncJob: Codable, Identifiable {
     let createdAt: Date
     let duration: TimeInterval
     var retryCount: Int = 0
-    var lastAttemptAt: Date?
+
+    var fileURL: URL {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent(audioFileName)
+    }
 }
 
 @MainActor
@@ -61,43 +65,19 @@ final class WatchSyncQueue: ObservableObject {
         WatchRecordingHistory.shared.markSynced(id: jobId)
     }
 
+    /// Never gives up and never deletes the audio: the watch may hold the only
+    /// copy. Retries are spaced out by WatchConnectivityService.
     func markFailed(jobId: UUID) {
         guard let idx = jobs.firstIndex(where: { $0.id == jobId }) else { return }
         jobs[idx].retryCount += 1
-        jobs[idx].lastAttemptAt = Date()
-
-        // Never give up and never delete the audio here: the watch may hold the
-        // only copy. Retries are spaced out by WatchConnectivityService.
-
         saveQueue()
     }
 
-    /// Returns all jobs that should be retried now
-    func jobsNeedingRetry() -> [WatchSyncJob] {
-        let documentsDir = FileManager.default.urls(
-            for: .documentDirectory, in: .userDomainMask
-        )[0]
-        return jobs.filter { job in
-            // Only retry if the audio file still exists
-            let fileURL = documentsDir.appendingPathComponent(job.audioFileName)
-            return FileManager.default.fileExists(atPath: fileURL.path)
-        }
-    }
-
-    /// Remove jobs whose audio files no longer exist on disk (cleanup)
+    /// Drop jobs whose audio file no longer exists on disk.
     func pruneOrphanedJobs() {
-        let documentsDir = FileManager.default.urls(
-            for: .documentDirectory, in: .userDomainMask
-        )[0]
-        jobs.removeAll { job in
-            let fileURL = documentsDir.appendingPathComponent(job.audioFileName)
-            let exists = FileManager.default.fileExists(atPath: fileURL.path)
-            if !exists {
-                print("WatchSyncQueue: pruning orphaned job \(job.id) — file missing")
-            }
-            return !exists
-        }
-        saveQueue()
+        let before = jobs.count
+        jobs.removeAll { !FileManager.default.fileExists(atPath: $0.fileURL.path) }
+        if jobs.count != before { saveQueue() }
     }
 
     // MARK: - Persistence

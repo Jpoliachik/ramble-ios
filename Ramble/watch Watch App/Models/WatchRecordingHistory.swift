@@ -6,32 +6,12 @@
 import Combine
 import Foundation
 
-/// What the phone has reported about a recording after it arrived.
-///
-/// The phone does not send these yet. Until it does, every recording the
-/// phone has confirmed reads as `.received` ("Sent to iPhone"). Unknown raw
-/// values decode as `.received` so a newer phone can't break the history file.
-enum WatchPhoneStatus: String, Codable {
-    case received
-    case transcribing
-    case transcribed
-    case delivered
-    case failed
-
-    init(from decoder: Decoder) throws {
-        let raw = try decoder.singleValueContainer().decode(String.self)
-        self = WatchPhoneStatus(rawValue: raw) ?? .received
-    }
-}
-
 struct WatchRecordingHistoryEntry: Codable, Identifiable {
     let id: UUID
     let createdAt: Date
     let duration: TimeInterval
     /// Set when WatchConnectivity confirms the file reached the phone.
     var syncedAt: Date?
-    /// Set only when the phone reports progress. nil means "sent, nothing more known".
-    var phoneStatus: WatchPhoneStatus?
 }
 
 @MainActor
@@ -72,17 +52,6 @@ final class WatchRecordingHistory: ObservableObject {
     func markSynced(id: UUID) {
         guard let idx = entries.firstIndex(where: { $0.id == id }) else { return }
         entries[idx].syncedAt = Date()
-        save()
-    }
-
-    /// Record a status reported by the phone. Not called yet; ready for a
-    /// phone→watch status message. A phone report also implies the file arrived.
-    func updatePhoneStatus(id: UUID, status: WatchPhoneStatus) {
-        guard let idx = entries.firstIndex(where: { $0.id == id }) else { return }
-        if entries[idx].syncedAt == nil {
-            entries[idx].syncedAt = Date()
-        }
-        entries[idx].phoneStatus = status
         save()
     }
 

@@ -21,16 +21,16 @@ enum Constants {
         /// transcription (proxy/), so it shares that host and its App Attest
         /// state. Until the Worker's D1 database is set up, relay calls get a
         /// 503 and the Connect screen shows that error.
-        static let hostedBaseURL = URL(string: "https://ramble-transcription-proxy.jpoliachik.workers.dev")
+        static let hostedBaseURL = URL(string: "https://ramble-transcription-proxy.jpoliachik.workers.dev")!
 
-        /// UserDefaults key for the developer override above.
+        /// UserDefaults key for a developer override (Debug sheet).
         static let baseURLOverrideKey = "relayBaseURLOverride"
 
-        /// What the hosted relay's UNACKED_RETENTION_SECONDS is set to, in
-        /// days. Shown in the privacy copy; keep in sync with proxy/wrangler.toml.
+        /// What the relay's RETENTION_SECONDS is set to, in days. Shown in the
+        /// privacy copy; keep in sync with proxy/wrangler.toml.
         static let unclaimedRetentionDays = 30
 
-        static var baseURL: URL? {
+        static var baseURL: URL {
             if let override = UserDefaults.standard.string(forKey: baseURLOverrideKey),
                !override.isEmpty,
                let url = URL(string: override) {

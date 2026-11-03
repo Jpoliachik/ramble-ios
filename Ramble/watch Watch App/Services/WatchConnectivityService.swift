@@ -17,7 +17,12 @@ final class WatchConnectivityService: NSObject, ObservableObject {
 
     /// Maps in-flight WCSessionFileTransfer to the job ID so we can update the queue on completion.
     /// Ephemeral — if the app is killed, jobs stay in the persistent queue and retry on next launch.
-    private var activeTransfers: [WCSessionFileTransfer: UUID] = [:]
+    private var activeTransfers: [WCSessionFileTransfer: UUID] = [:] {
+        didSet {
+            let ids = Set(activeTransfers.values)
+            if ids != inFlightIDs { inFlightIDs = ids }
+        }
+    }
 
     private let syncQueue = WatchSyncQueue.shared
     private var retryTask: Task<Void, Never>?
@@ -39,20 +44,15 @@ final class WatchConnectivityService: NSObject, ObservableObject {
     // MARK: - Recording State Sync
 
     func sendRecordingStarted() {
-        let message: [String: Any] = [
+        sendMessage([
             "type": "recordingStarted",
             "device": "watch",
             "startTime": Date().timeIntervalSince1970
-        ]
-        sendMessage(message)
+        ])
     }
 
     func sendRecordingStopped() {
-        let message: [String: Any] = [
-            "type": "recordingStopped",
-            "device": "watch"
-        ]
-        sendMessage(message)
+        sendMessage(["type": "recordingStopped", "device": "watch"])
     }
 
     private func sendMessage(_ message: [String: Any]) {
@@ -67,52 +67,28 @@ final class WatchConnectivityService: NSObject, ObservableObject {
         }
     }
 
-    /// The watch doesn't act on any phone message yet. The phone may still send
-    /// recording-state messages ("recordingStarted", "stopRequest", "stateResponse");
-    /// they are ignored on purpose, so a tap on the watch always records on the watch.
-    private func handleReceivedMessage(_ message: [String: Any]) {
-        guard let type = message["type"] as? String else { return }
-        switch type {
-        default:
-            break
-        }
-    }
-
     // MARK: - File Transfer (via persistent queue)
 
     func transferJob(_ job: WatchSyncJob) {
-        guard WCSession.default.activationState == .activated else {
-            print("WCSession not activated, will retry later")
-            return
-        }
-
-        let documentsDir = FileManager.default.urls(
-            for: .documentDirectory, in: .userDomainMask
-        )[0]
-        let fileURL = documentsDir.appendingPathComponent(job.audioFileName)
-
-        guard FileManager.default.fileExists(atPath: fileURL.path) else {
-            print("Audio file missing for job \(job.id), skipping")
-            return
-        }
+        guard WCSession.default.activationState == .activated,
+              !activeTransfers.values.contains(job.id),
+              FileManager.default.fileExists(atPath: job.fileURL.path)
+        else { return }
 
         let metadata = RecordingMetadata(
             recordingId: job.id.uuidString,
             createdAt: job.createdAt,
             duration: job.duration
         )
-
         guard let metadataData = try? JSONEncoder().encode(metadata),
-              let metadataString = String(data: metadataData, encoding: .utf8) else {
-            return
-        }
+              let metadataString = String(data: metadataData, encoding: .utf8)
+        else { return }
 
         let transfer = WCSession.default.transferFile(
-            fileURL,
+            job.fileURL,
             metadata: ["recording": metadataString]
         )
         activeTransfers[transfer] = job.id
-        refreshTransferState()
     }
 
     func retryPendingTransfers() {
@@ -120,20 +96,6 @@ final class WatchConnectivityService: NSObject, ObservableObject {
 
         // Transfers queued before the app was relaunched are still owned by the
         // system. Track them again instead of sending a duplicate.
-        adoptOutstandingTransfers()
-
-        let pendingJobs = syncQueue.jobsNeedingRetry()
-        guard !pendingJobs.isEmpty else { return }
-
-        print("WatchConnectivityService: retrying \(pendingJobs.count) pending transfer(s)")
-        for job in pendingJobs {
-            // Don't re-send jobs already in-flight
-            guard !activeTransfers.values.contains(job.id) else { continue }
-            transferJob(job)
-        }
-    }
-
-    private func adoptOutstandingTransfers() {
         for transfer in WCSession.default.outstandingFileTransfers {
             // Match by recording ID, not object identity: the system may hand back
             // a different WCSessionFileTransfer instance for the same transfer.
@@ -143,7 +105,10 @@ final class WatchConnectivityService: NSObject, ObservableObject {
             else { continue }
             activeTransfers[transfer] = jobId
         }
-        refreshTransferState()
+
+        for job in syncQueue.jobs {
+            transferJob(job)
+        }
     }
 
     private func recordingId(for transfer: WCSessionFileTransfer) -> UUID? {
@@ -152,11 +117,6 @@ final class WatchConnectivityService: NSObject, ObservableObject {
               let metadata = try? JSONDecoder().decode(RecordingMetadata.self, from: metadataData)
         else { return nil }
         return UUID(uuidString: metadata.recordingId)
-    }
-
-    private func refreshTransferState() {
-        let ids = Set(activeTransfers.values)
-        if ids != inFlightIDs { inFlightIDs = ids }
     }
 
     /// Back off after a failed transfer: 10s, 20s, 40s ... capped at 5 minutes.
@@ -170,11 +130,23 @@ final class WatchConnectivityService: NSObject, ObservableObject {
         }
     }
 
-    private func updateReachability(_ reachable: Bool) {
-        let becameReachable = reachable && !isPhoneReachable
-        isPhoneReachable = reachable
-        if becameReachable {
-            retryPendingTransfers()
+    private func handleTransferFinished(_ fileTransfer: WCSessionFileTransfer, error: Error?) {
+        // Fall back to the metadata for transfers started before a relaunch.
+        guard let jobId = activeTransfers.removeValue(forKey: fileTransfer)
+                ?? recordingId(for: fileTransfer),
+              let job = syncQueue.jobs.first(where: { $0.id == jobId })
+        else { return }
+        // Drop any other handle tracked for the same recording
+        activeTransfers = activeTransfers.filter { $0.value != jobId }
+
+        if let error {
+            print("File transfer failed for job \(jobId): \(error)")
+            syncQueue.markFailed(jobId: jobId)
+            scheduleRetry(attempt: job.retryCount + 1)
+        } else {
+            // The phone has it, so the watch copy can go
+            try? FileManager.default.removeItem(at: job.fileURL)
+            syncQueue.markCompleted(jobId: jobId)
         }
     }
 }
@@ -185,49 +157,34 @@ extension WatchConnectivityService: WCSessionDelegate {
         activationDidCompleteWith activationState: WCSessionActivationState,
         error: Error?
     ) {
-        if let error = error {
+        if let error {
             print("WCSession activation failed: \(error)")
             return
         }
-        print("WCSession activated: \(activationState.rawValue)")
-
-        // Load any pending state from application context
-        if activationState == .activated {
-            let context = session.receivedApplicationContext
-            let reachable = session.isReachable
-            Task { @MainActor in
-                if !context.isEmpty {
-                    self.handleReceivedMessage(context)
-                }
-                self.isPhoneReachable = reachable
-                // Launch-time retries run before activation finishes and are
-                // skipped, so pick up anything still queued now.
-                self.retryPendingTransfers()
-            }
+        guard activationState == .activated else { return }
+        let reachable = session.isReachable
+        Task { @MainActor in
+            self.isPhoneReachable = reachable
+            // Launch-time retries run before activation finishes and are
+            // skipped, so pick up anything still queued now.
+            self.retryPendingTransfers()
         }
     }
 
     nonisolated func sessionReachabilityDidChange(_ session: WCSession) {
         let reachable = session.isReachable
         Task { @MainActor in
-            self.updateReachability(reachable)
+            let becameReachable = reachable && !self.isPhoneReachable
+            self.isPhoneReachable = reachable
+            if becameReachable {
+                self.retryPendingTransfers()
+            }
         }
     }
 
-    nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
-        Task { @MainActor in
-            self.handleReceivedMessage(message)
-        }
-    }
-
-    nonisolated func session(
-        _ session: WCSession,
-        didReceiveApplicationContext applicationContext: [String: Any]
-    ) {
-        Task { @MainActor in
-            self.handleReceivedMessage(applicationContext)
-        }
-    }
+    /// The phone may send recording-state messages. They're ignored on purpose,
+    /// so a tap on the watch always records on the watch.
+    nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {}
 
     nonisolated func session(
         _ session: WCSession,
@@ -235,38 +192,7 @@ extension WatchConnectivityService: WCSessionDelegate {
         error: Error?
     ) {
         Task { @MainActor in
-            // Fall back to the metadata for transfers started before a relaunch.
-            guard let jobId = activeTransfers.removeValue(forKey: fileTransfer)
-                    ?? recordingId(for: fileTransfer),
-                  syncQueue.jobs.contains(where: { $0.id == jobId })
-            else {
-                refreshTransferState()
-                return
-            }
-            // Drop any other handle tracked for the same recording
-            activeTransfers = activeTransfers.filter { $0.value != jobId }
-
-            if let error = error {
-                print("File transfer failed for job \(jobId): \(error)")
-                syncQueue.markFailed(jobId: jobId)
-                let attempts = syncQueue.jobs.first { $0.id == jobId }?.retryCount ?? 1
-                scheduleRetry(attempt: attempts)
-            } else {
-                print("File transfer succeeded for job \(jobId)")
-                // Delete local file after successful transfer
-                let documentsDir = FileManager.default.urls(
-                    for: .documentDirectory, in: .userDomainMask
-                )[0]
-                let job = syncQueue.jobs.first { $0.id == jobId }
-                if let audioFileName = job?.audioFileName {
-                    let fileURL = documentsDir.appendingPathComponent(audioFileName)
-                    try? FileManager.default.removeItem(at: fileURL)
-                }
-
-                syncQueue.markCompleted(jobId: jobId)
-            }
-
-            refreshTransferState()
+            self.handleTransferFinished(fileTransfer, error: error)
         }
     }
 }

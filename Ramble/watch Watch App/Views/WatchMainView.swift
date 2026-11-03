@@ -79,6 +79,7 @@ struct WatchMainView: View {
     @ViewBuilder
     private var statusArea: some View {
         if isRecording {
+<<<<<<< HEAD
             VStack(spacing: 2) {
                 Text(WatchFormat.duration(recordingManager.currentDuration))
                     .font(.system(size: 28, weight: .bold, design: .serif))
@@ -91,6 +92,14 @@ struct WatchMainView: View {
                 }
             }
             .transition(.opacity)
+=======
+            Text(WatchFormat.duration(recordingManager.currentDuration))
+                .font(.system(size: 28, weight: .bold, design: .serif))
+                .monospacedDigit()
+                .foregroundStyle(Color.brandAmber)
+                .contentTransition(.numericText())
+                .transition(.opacity)
+>>>>>>> origin/claude/project-thread-mopb4y
         } else if let startFailureMessage {
             statusLine(startFailureMessage, symbol: "mic.slash", tint: .orange)
                 .transition(.opacity)
@@ -122,24 +131,12 @@ struct WatchMainView: View {
     private var idleSummary: (label: String, symbol: String, tint: Color)? {
         guard let latest = history.entries.first else { return nil }
 
-        let latestState = state(for: latest)
-        let pendingCount = syncQueue.jobs.count
-
-        if pendingCount == 0 || (pendingCount == 1 && latestState.isPending) {
-            return (latestState.label, latestState.symbol, latestState.tint)
+        if syncQueue.jobs.contains(where: { $0.id != latest.id }) {
+            // Waiting is normal; the watch keeps the audio until the phone has it.
+            return ("\(syncQueue.jobs.count) saved on watch", "applewatch", Color.secondary)
         }
-
-        // Waiting and retrying are normal; the watch keeps the audio until the phone has it.
-        return ("\(pendingCount) on watch, will send", "applewatch", Color.secondary)
-    }
-
-    private func state(for entry: WatchRecordingHistoryEntry) -> WatchRecordingState {
-        WatchRecordingState.resolve(
-            entry: entry,
-            job: syncQueue.jobs.first { $0.id == entry.id },
-            isInFlight: connectivity.inFlightIDs.contains(entry.id),
-            isPhoneReachable: connectivity.isPhoneReachable
-        )
+        let state = WatchRecordingState.resolve(latest, syncQueue: syncQueue, connectivity: connectivity)
+        return (state.label, state.symbol, state.tint)
     }
 
     private func statusLine(_ text: String, symbol: String, tint: Color) -> some View {
