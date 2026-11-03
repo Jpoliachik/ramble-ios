@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { AudioLines, Bot, Trash2, UserX } from "lucide-react";
 import HeroFlow from "../components/hero-flow";
 import CopyTextButton from "../components/copy-text-button";
+import PopIn from "../components/pop-in";
 import {
   APP_PRICE,
   APP_STORE_URL,
@@ -60,7 +61,7 @@ const privacyPoints = [
   {
     Icon: AudioLines,
     title: "Audio stays on your phone",
-    body: "Only the text is sent on.",
+    body: "Your agent gets the transcript, never the recording.",
   },
   {
     Icon: Trash2,
@@ -263,11 +264,13 @@ export default function Home() {
               <span className="text-xs font-medium text-stone-500">Agent</span>
             </div>
             <div className="mt-5 flex flex-col text-sm">
-              <p className="max-w-[90%] self-end rounded-2xl rounded-br-md bg-[#b45309] px-4 py-2.5 text-white">
-                {SETUP_MESSAGE}
-                <br />
-                <span className="whitespace-nowrap underline underline-offset-2">{SITE_HOST}/docs</span>
-              </p>
+              <PopIn className="max-w-[90%] self-end">
+                <p className="rounded-2xl rounded-br-md bg-[#b45309] px-4 py-2.5 text-white">
+                  {SETUP_MESSAGE}
+                  <br />
+                  <span className="whitespace-nowrap underline underline-offset-2">{SITE_HOST}/docs</span>
+                </p>
+              </PopIn>
             </div>
           </div>
           <div className="mt-4 flex justify-center">
