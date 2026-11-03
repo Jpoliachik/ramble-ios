@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { AudioLines, Clock, Trash2, UserX } from "lucide-react";
+import { AudioLines, Bot, Clock, Trash2, UserX } from "lucide-react";
 import HeroFlow from "../components/hero-flow";
 import {
   APP_PRICE,
@@ -258,15 +258,15 @@ export default function Home() {
           </SectionHeading>
 
           {/* Chat mockup: setup is just asking your agent */}
-          <div className="mx-auto mt-12 max-w-md rounded-3xl bg-white p-5 shadow-sm ring-1 ring-stone-200/80 sm:p-6">
-            <div className="flex items-center gap-2 border-b border-stone-200 pb-4">
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-stone-100 text-xs font-semibold text-stone-600">
-                AI
+          <div className="mx-auto mt-12 max-w-sm rounded-3xl bg-white px-5 pt-5 pb-6 shadow-sm ring-1 ring-stone-200/80">
+            <div className="flex flex-col items-center gap-1.5">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-stone-100 text-stone-600">
+                <Bot className="h-5 w-5" aria-hidden="true" />
               </span>
-              <span className="text-sm font-medium text-stone-900">Your agent</span>
+              <span className="text-xs font-medium text-stone-500">Agent</span>
             </div>
-            <div className="mt-4 flex flex-col gap-2.5 text-sm">
-              <p className="max-w-[85%] self-end rounded-2xl rounded-br-md bg-stone-900 px-4 py-2.5 text-white">
+            <div className="mt-5 flex flex-col text-sm">
+              <p className="max-w-[90%] self-end rounded-2xl rounded-br-md bg-[#d97706] px-4 py-2.5 text-white">
                 Help me connect Ramble. <span className="whitespace-nowrap underline underline-offset-2">{SITE_HOST}/docs</span>
               </p>
             </div>
