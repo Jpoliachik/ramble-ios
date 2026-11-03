@@ -158,7 +158,7 @@ export default function Home() {
               <HeroFlow />
             </div>
             <h1 className="hero-enter-title font-serif text-[1.9rem] font-semibold leading-[1.15] tracking-tight text-stone-900 min-[400px]:text-4xl sm:text-5xl lg:text-[2.9rem] lg:leading-[1.1]">
-              <span className="block whitespace-nowrap">Ramble to your watch.</span>
+              <span className="block whitespace-nowrap">Talk to your watch.</span>
               <span className="block whitespace-nowrap italic text-red-500">Your agent handles it.</span>
             </h1>
             <p className="hero-enter-subtitle mt-6 max-w-xl text-base leading-relaxed text-stone-500 sm:text-lg lg:text-xl">

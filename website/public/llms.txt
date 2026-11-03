@@ -1,6 +1,6 @@
 # Ramble
 
-> Ramble to your Apple Watch. Your agent handles it. Your watch is all you need: tap it and talk; the iPhone transcribes it and passes the text to your agent, which picks it up on a schedule. No accounts.
+> Talk to your Apple Watch. Your agent handles it. Your watch is all you need: tap it and talk; the iPhone transcribes it and passes the text to your agent, which picks it up on a schedule. No accounts.
 
 Pairing: in Ramble on iPhone, Settings → Connect agent gives a single-use code. Tell your agent "I downloaded Ramble, connect it" and paste the code. The agent then pulls new transcripts and acknowledges them, which deletes them. Anything never picked up is deleted after 30 days. Audio never goes to the relay.
 
