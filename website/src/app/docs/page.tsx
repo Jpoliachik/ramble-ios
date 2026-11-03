@@ -74,7 +74,7 @@ export default function AgentDocs() {
                   Tell your agent &ldquo;I downloaded Ramble, connect it&rdquo; and paste the code (like{" "}
                   <InlineCode>{PAIR_CODE_EXAMPLE}</InlineCode>). It works once and expires in {PAIR_CODE_TTL}.
                 </li>
-                <li>Talk to your watch. Your agent checks about every {PULL_CADENCE}.</li>
+                <li>Talk to your watch. Your agent picks up each one and gets to work.</li>
               </ol>
               <p>
                 Your agent can only pick up your transcripts. Tap Disconnect on the same screen to cut it off; anything

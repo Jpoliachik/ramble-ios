@@ -7,7 +7,6 @@ import {
   APP_STORE_URL,
   CLOUD_PRICE,
   BASE_PATH,
-  PULL_CADENCE,
   RETENTION,
   SITE_URL,
 } from "../lib/site";
@@ -51,7 +50,7 @@ const steps = [
   },
   {
     title: "Come back later",
-    body: `Your agent picks it up within about ${PULL_CADENCE} and gets to work. Check in whenever you're ready.`,
+    body: "Your agent picks it up and gets to work. Check in whenever you're ready.",
   },
 ];
 
@@ -100,7 +99,7 @@ const faqs: { q: string; a: ReactNode }[] = [
   },
   {
     q: "How fast does it get to my agent?",
-    a: `Usually within ${PULL_CADENCE}. Transcription takes seconds; your agent checks for new ones on a schedule.`,
+    a: "Transcription takes seconds. After that it depends on your agent: some pick it up right away, others check in on a schedule.",
   },
   {
     q: "What does the relay store?",
