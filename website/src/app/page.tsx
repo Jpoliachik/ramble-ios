@@ -44,15 +44,15 @@ function SectionHeading({ eyebrow, children, sub }: { eyebrow: string; children:
 const steps = [
   {
     title: "Say it",
-    body: "Tap your watch and talk. An idea, a to-do, a note on something you're working on. Messy is fine.",
+    body: "Tap your watch and talk. Messy is fine.",
   },
   {
     title: "Let it go",
-    body: "No reply to wait for. Offline? It waits on your watch and goes out when you reconnect.",
+    body: "No reply to wait for. Works offline, too.",
   },
   {
     title: "Come back later",
-    body: "Your agent picks it up and gets to work. Check in whenever you're ready.",
+    body: "Your agent picks it up and gets to work.",
   },
 ];
 
