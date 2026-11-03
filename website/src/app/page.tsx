@@ -1,17 +1,17 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { AudioLines, Clock, Trash2, UserX } from "lucide-react";
+import { AudioLines, Bot, Clock, Trash2, UserX } from "lucide-react";
 import HeroFlow from "../components/hero-flow";
 import {
   APP_PRICE,
   APP_STORE_URL,
-  BASE_PATH,
   CLOUD_PRICE,
-  PAIR_CODE_EXAMPLE,
-  PAIR_CODE_TTL,
-  PULL_CADENCE,
+  BASE_PATH,
   RETENTION,
+  SITE_URL,
 } from "../lib/site";
+
+const SITE_HOST = SITE_URL.replace(/^https?:\/\//, "");
 
 const primaryButton =
   "inline-flex items-center gap-2 rounded-full bg-stone-900 px-6 py-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-stone-800";
@@ -42,15 +42,15 @@ function SectionHeading({ eyebrow, children, sub }: { eyebrow: string; children:
 const steps = [
   {
     title: "Say it",
-    body: "Tap your watch and talk. A to-do, an idea, something to look up later. Messy is fine.",
+    body: "Tap your watch and talk. An idea, a to-do, a note on something you're working on. Messy is fine.",
   },
   {
-    title: "Ramble writes it down",
-    body: "Your iPhone turns it into text. The audio stays on your phone.",
+    title: "Let it go",
+    body: "No reply to wait for. Offline? It waits on your watch and goes out when you reconnect.",
   },
   {
-    title: "Your agent takes it",
-    body: `Your agent picks it up within about ${PULL_CADENCE} and deals with it. You don't have to.`,
+    title: "Come back later",
+    body: "Your agent picks it up and gets to work. Check in whenever you're ready.",
   },
 ];
 
@@ -77,32 +77,29 @@ const privacyPoints = [
   },
 ];
 
-const cloudModels = [
-  { name: "Whisper v3 Turbo", provider: "Groq", note: "Fast and accurate. The default." },
-  { name: "Whisper Large v3", provider: "Groq", note: "Best for accents and multilingual audio." },
-  { name: "Nova-3", provider: "Deepgram", note: "Strong English accuracy, smart formatting." },
-  { name: "GPT-Transcribe", provider: "OpenAI", note: "Highest accuracy on noisy real-world audio." },
-];
-
 const included = [
   "Apple Watch and iPhone apps",
-  "On-device transcription with Apple Speech",
-  "Delivery to your agent through Ramble Relay",
+  "On-device transcription",
+  "Delivery to your agent",
   "Webhooks to your own endpoint",
 ];
 
 const faqs: { q: string; a: ReactNode }[] = [
   {
+    q: "Do I need my phone with me?",
+    a: "No. Your watch records on its own, even with no connection. Recordings sync to your iPhone when you're back in range, and go to your agent from there.",
+  },
+  {
     q: "Why not just talk to my agent directly?",
-    a: "You can, if your phone is out. Ramble is for when it isn't: on a walk, in the car, between meetings. One tap, say it, done.",
+    a: "Then you're on your phone, waiting for a reply. With Ramble you say it and keep going. Your agent works on it while you get on with your day.",
   },
   {
     q: "Does my agent reply on my watch?",
-    a: "No. You say it and move on. Your agent handles it on its own time, and you can check in with it later.",
+    a: "No, and that's the point. Nothing pulls you back in. You check in with your agent when you're ready.",
   },
   {
     q: "How fast does it get to my agent?",
-    a: `Usually within ${PULL_CADENCE}. Transcription takes seconds; your agent checks for new ones on a schedule.`,
+    a: "Transcription takes seconds. After that it depends on your agent: some pick it up right away, others check in on a schedule.",
   },
   {
     q: "What does the relay store?",
@@ -131,14 +128,6 @@ const faqs: { q: string; a: ReactNode }[] = [
     ),
   },
   {
-    q: "Do I need my phone nearby?",
-    a: "Not to record. The watch records on its own and syncs to your iPhone when it's back in range.",
-  },
-  {
-    q: "What if I'm offline?",
-    a: "Nothing gets lost. Recordings wait on your watch and iPhone and go out when you're back online.",
-  },
-  {
     q: "What if it doesn't work for me?",
     a: (
       <>
@@ -153,7 +142,6 @@ const faqs: { q: string; a: ReactNode }[] = [
 ];
 
 
-const [cloudAmount, cloudPeriod] = CLOUD_PRICE.split("/");
 
 export default function Home() {
   return (
@@ -165,14 +153,13 @@ export default function Home() {
             <div className="hero-enter-logo">
               <HeroFlow />
             </div>
-            <h1 className="hero-enter-title font-serif text-4xl font-semibold tracking-tight text-stone-900 sm:text-5xl lg:text-[2.9rem] lg:leading-[1.1]">
-              Ramble into your watch.
-              <br />
-              <span className="italic text-brand-text">Your agent handles it.</span>
+            <h1 className="hero-enter-title font-serif text-[1.9rem] font-semibold leading-[1.15] tracking-tight text-stone-900 min-[400px]:text-4xl sm:text-5xl lg:text-[2.9rem] lg:leading-[1.1]">
+              <span className="block whitespace-nowrap">Talk to your watch.</span>
+              <span className="block whitespace-nowrap italic text-brand-text">Your agent handles it.</span>
             </h1>
             <p className="hero-enter-subtitle mt-6 max-w-xl text-base leading-relaxed text-stone-500 sm:text-lg lg:text-xl">
-              Got a thought? Tap your watch and say it. Ramble writes it down and hands it to your agent, so you can
-              stop holding onto it.
+              <span className="block">Stay in the moment, capture the thought.</span>
+              <span className="block">Ramble gets it to your agent.</span>
             </p>
             <div className="hero-enter-buttons mt-10 flex flex-col items-center gap-3 lg:items-start">
               <div className="flex flex-col items-center gap-4 sm:flex-row">
@@ -185,7 +172,6 @@ export default function Home() {
                   <span aria-hidden="true">&darr;</span>
                 </a>
               </div>
-              <p className="text-sm text-stone-500">{APP_PRICE}, once.</p>
             </div>
           </div>
 
@@ -249,7 +235,9 @@ export default function Home() {
       {/* How it works */}
       <section id="how" className="scroll-mt-20 border-t border-stone-200 bg-stone-50">
         <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
-          <SectionHeading eyebrow="How it works">Say it, then forget about it.</SectionHeading>
+          <SectionHeading eyebrow="How it works" sub="Your watch is all you need. Leave your phone in your pocket, or at home.">
+            Say it and move on.
+          </SectionHeading>
           <ol className="mt-14 grid gap-10 sm:grid-cols-3 sm:gap-8">
             {steps.map((step, i) => (
               <li key={step.title} className="text-left">
@@ -265,61 +253,22 @@ export default function Home() {
       {/* Connect your agent */}
       <section id="connect" className="scroll-mt-20 border-t border-stone-200">
         <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
-          <SectionHeading eyebrow="Setup" sub="Takes about a minute.">
-            Connect your agent
+          <SectionHeading eyebrow="Setup" sub="Ask your agent to set up Ramble. It takes it from there.">
+            One message
           </SectionHeading>
 
-          <div className="mt-14 grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] lg:gap-16">
-            <ol className="space-y-8">
-              <li className="flex gap-4">
-                <span className={stepBadge}>1</span>
-                <div>
-                  <h3 className="text-sm font-semibold text-stone-900">Get a pairing code</h3>
-                  <p className="mt-1 text-sm leading-relaxed text-stone-500">
-                    On your iPhone, open Ramble → Settings → Connect agent. You&apos;ll get a short code.
-                  </p>
-                </div>
-              </li>
-              <li className="flex gap-4">
-                <span className={stepBadge}>2</span>
-                <div>
-                  <h3 className="text-sm font-semibold text-stone-900">Tell your agent</h3>
-                  <p className="mt-1 text-sm leading-relaxed text-stone-500">
-                    Say &ldquo;I downloaded Ramble, connect it&rdquo; and paste the code. It can only pick up your
-                    transcripts, nothing else.
-                  </p>
-                </div>
-              </li>
-              <li className="flex gap-4">
-                <span className={stepBadge}>3</span>
-                <div>
-                  <h3 className="text-sm font-semibold text-stone-900">Start talking</h3>
-                  <p className="mt-1 text-sm leading-relaxed text-stone-500">
-                    That&apos;s it. You can disconnect from the same screen any time.
-                  </p>
-                </div>
-              </li>
-            </ol>
-
-            {/* Pairing illustration */}
-            <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-stone-200/80">
-              <p className="text-xs font-medium uppercase tracking-[0.18em] text-stone-500">Pairing code</p>
-              <p className="mt-3 font-mono text-3xl font-semibold tracking-[0.12em] text-stone-900">
-                {PAIR_CODE_EXAMPLE}
+          {/* Chat mockup: setup is just asking your agent */}
+          <div className="mx-auto mt-12 max-w-sm rounded-3xl bg-white px-5 pt-5 pb-6 shadow-sm ring-1 ring-stone-200/80">
+            <div className="flex flex-col items-center gap-1.5">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-stone-100 text-stone-600">
+                <Bot className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <span className="text-xs font-medium text-stone-500">Agent</span>
+            </div>
+            <div className="mt-5 flex flex-col text-sm">
+              <p className="max-w-[90%] self-end rounded-2xl rounded-br-md bg-brand-text px-4 py-2.5 text-white">
+                Help me connect Ramble. <span className="whitespace-nowrap underline underline-offset-2">{SITE_HOST}/docs</span>
               </p>
-              <p className="mt-2 text-xs text-stone-500">Single use. Expires in {PAIR_CODE_TTL}.</p>
-              <div className="mt-6 border-t border-stone-200 pt-6">
-                <p className="text-xs font-medium uppercase tracking-[0.18em] text-stone-500">Chat with your agent</p>
-                <div className="mt-3 flex flex-col gap-2">
-                  <p className="max-w-[90%] self-end rounded-2xl rounded-br-md bg-stone-900 px-4 py-2.5 text-sm text-white">
-                    I downloaded Ramble, connect it.{" "}
-                    <span className="font-mono whitespace-nowrap">{PAIR_CODE_EXAMPLE}</span>
-                  </p>
-                  <p className="max-w-[90%] self-start rounded-2xl rounded-bl-md bg-stone-100 px-4 py-2.5 text-sm text-stone-900">
-                    Connected. I&apos;ll check for new recordings every {PULL_CADENCE}.
-                  </p>
-                </div>
-              </div>
             </div>
           </div>
 
@@ -334,99 +283,33 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Transcription */}
+      {/* Pricing */}
       <section className="border-t border-stone-200 bg-stone-50">
         <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
-          <SectionHeading eyebrow="Transcription" sub="Apple Speech runs on your iPhone and is included. Cloud models are optional.">
-            On your phone by default
-          </SectionHeading>
-          <div className="mx-auto mt-12 max-w-3xl overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-stone-200/80">
-            <div className="flex items-center justify-between gap-4 border-b border-stone-200 bg-sage-50 px-5 py-4">
-              <div>
-                <p className="text-sm font-semibold text-stone-900">Apple Speech</p>
-                <p className="text-sm text-stone-500">On-device. Audio never leaves your phone.</p>
-              </div>
-              <span className="shrink-0 rounded-full bg-sage-100 px-3 py-1 text-xs font-medium text-sage-700">
-                Included
-              </span>
-            </div>
-            <div className="px-5 py-4">
-              <p className="text-sm font-semibold text-stone-900">Cloud models</p>
-              <p className="text-sm text-stone-500">
-                More accurate with accents, jargon, or background noise. {CLOUD_PRICE}.
-              </p>
-            </div>
-            <details className="group border-t border-stone-200">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-3 text-sm font-medium text-stone-700 transition-colors hover:text-stone-900">
-                See cloud models
-                <span aria-hidden="true" className="text-stone-500 transition-transform group-open:rotate-45">
-                  +
-                </span>
-              </summary>
-              <ul className="divide-y divide-stone-200 border-t border-stone-200">
-                {cloudModels.map((m) => (
-                  <li
-                    key={m.name}
-                    className="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <p className="text-sm font-semibold text-stone-900">
-                      {m.name} <span className="font-normal text-stone-500">· {m.provider}</span>
-                    </p>
-                    <p className="text-sm text-stone-500">{m.note}</p>
-                  </li>
-                ))}
-              </ul>
-            </details>
-            <div className="border-t border-stone-200 px-5 py-3 text-xs text-stone-500">
-              Custom vocabulary, filler-word removal, and a language hint are in Settings.
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing */}
-      <section className="border-t border-stone-200">
-        <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
           <SectionHeading eyebrow="Pricing">Pay once</SectionHeading>
-          <div className="mx-auto mt-12 grid max-w-3xl gap-6 sm:grid-cols-2">
-            <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-stone-200/80">
-              <p className="text-sm font-semibold text-stone-900">Ramble</p>
-              <p className="mt-2 font-serif text-4xl font-semibold text-stone-900">
-                {APP_PRICE}
-                <span className="ml-2 font-sans text-sm font-normal text-stone-500">one time</span>
-              </p>
-              <ul className="mt-6 space-y-2.5">
-                {included.map((item) => (
-                  <li key={item} className="flex gap-2.5 text-sm text-stone-600">
-                    <span aria-hidden="true" className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-stone-400" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="rounded-2xl border border-stone-200 p-6">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-semibold text-stone-900">Cloud transcription</p>
-                <span className="rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-medium text-stone-600">
-                  Optional
-                </span>
-              </div>
-              <p className="mt-2 font-serif text-4xl font-semibold text-stone-900">
-                {cloudAmount}
-                {cloudPeriod && (
-                  <span className="ml-1 font-sans text-sm font-normal text-stone-500">/{cloudPeriod}</span>
-                )}
-              </p>
-              <p className="mt-6 text-sm leading-relaxed text-stone-500">
-                For better accuracy. Cancel any time and everything else keeps working.
-              </p>
-            </div>
+          <div className="mx-auto mt-12 max-w-md rounded-2xl bg-white p-6 shadow-sm ring-1 ring-stone-200/80">
+            <p className="font-serif text-4xl font-semibold text-stone-900">
+              {APP_PRICE}
+              <span className="ml-2 font-sans text-sm font-normal text-stone-500">one time</span>
+            </p>
+            <ul className="mt-6 space-y-2.5">
+              {included.map((item) => (
+                <li key={item} className="flex gap-2.5 text-sm text-stone-600">
+                  <span aria-hidden="true" className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-stone-400" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-6 border-t border-stone-200 pt-4 text-sm leading-relaxed text-stone-500">
+              Optional upgrade: cloud transcription for {CLOUD_PRICE}, for sharper transcripts with accents, jargon,
+              or noise. You never need it. Everything above works without it, and you can cancel any time.
+            </p>
           </div>
         </div>
       </section>
 
       {/* Privacy */}
-      <section className="border-t border-stone-200 bg-stone-50">
+      <section className="border-t border-stone-200">
         <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
           <SectionHeading eyebrow="Privacy" sub="Ramble keeps your words only as long as it takes to get them to your agent.">
             Your thoughts don&apos;t stick around
@@ -443,8 +326,7 @@ export default function Home() {
             ))}
           </div>
           <p className="mx-auto mt-12 max-w-3xl text-center text-sm leading-relaxed text-stone-500">
-            Disconnect any time and anything still waiting is deleted. With cloud transcription on, audio goes to the
-            model you pick and isn&apos;t stored.{" "}
+            Disconnect any time and anything still waiting is deleted.{" "}
             <Link href="/privacy" className={inlineLink}>
               Full privacy policy
             </Link>
@@ -454,7 +336,7 @@ export default function Home() {
       </section>
 
       {/* FAQ */}
-      <section className="border-t border-stone-200">
+      <section className="border-t border-stone-200 bg-stone-50">
         <div className="mx-auto max-w-3xl px-6 py-20 sm:py-28">
           <SectionHeading eyebrow="FAQ">Questions</SectionHeading>
           <div className="mt-12 divide-y divide-stone-200 border-t border-b border-stone-200">
@@ -474,13 +356,13 @@ export default function Home() {
       </section>
 
       {/* Final CTA */}
-      <section className="border-t border-stone-200 bg-stone-50">
+      <section className="border-t border-stone-200">
         <div className="mx-auto max-w-5xl px-6 py-20 text-center sm:py-24">
           <h2 className="font-serif text-3xl font-semibold tracking-tight text-stone-900 sm:text-4xl">
             Get it off your mind.
           </h2>
           <p className="mt-4 text-base text-stone-500">
-            {APP_PRICE}, once. For Apple Watch and iPhone.
+            Leave the phone. Keep the thought. {APP_PRICE}, once.
           </p>
           <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
             <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className={primaryButton}>

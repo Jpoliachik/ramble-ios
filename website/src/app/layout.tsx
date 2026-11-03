@@ -6,9 +6,9 @@ import "./globals.css";
 
 const TITLE = "Ramble: Talk to your watch. Your agent handles it.";
 const DESCRIPTION =
-  "Got a thought? Tap your Apple Watch and say it. Ramble writes it down and hands it to your agent, so you can stop holding onto it. Transcripts are deleted once delivered.";
+  "Stay in the moment. Capture a thought on your Apple Watch, leave your phone behind, and your agent handles it. Works offline. Transcripts are deleted once delivered.";
 const SHORT_DESCRIPTION =
-  "Tap your Apple Watch and say it. Ramble hands it to your agent.";
+  "Stay in the moment. Capture the thought on your watch. Your agent handles it.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
