@@ -79,27 +79,12 @@ struct WatchMainView: View {
     @ViewBuilder
     private var statusArea: some View {
         if isRecording {
-<<<<<<< HEAD
-            VStack(spacing: 2) {
-                Text(WatchFormat.duration(recordingManager.currentDuration))
-                    .font(.system(size: 28, weight: .bold, design: .serif))
-                    .monospacedDigit()
-                    .foregroundStyle(Color.brandAmber)
-                    .contentTransition(.numericText())
-
-                if recordingManager.currentDuration >= 30 * 60 {
-                    statusLine("Long recording", symbol: "clock", tint: .orange)
-                }
-            }
-            .transition(.opacity)
-=======
             Text(WatchFormat.duration(recordingManager.currentDuration))
                 .font(.system(size: 28, weight: .bold, design: .serif))
                 .monospacedDigit()
                 .foregroundStyle(Color.brandAmber)
                 .contentTransition(.numericText())
                 .transition(.opacity)
->>>>>>> origin/claude/project-thread-mopb4y
         } else if let startFailureMessage {
             statusLine(startFailureMessage, symbol: "mic.slash", tint: .orange)
                 .transition(.opacity)
