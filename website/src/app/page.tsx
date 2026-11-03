@@ -293,8 +293,7 @@ export default function Home() {
       {/* Pricing */}
       <section className="border-t border-stone-200 bg-stone-50">
         <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
-          <SectionHeading eyebrow="Pricing">Pay once</SectionHeading>
-          <div className="mx-auto mt-12 max-w-md rounded-2xl bg-white p-6 shadow-sm ring-1 ring-stone-200/80">
+          <div className="mx-auto max-w-md rounded-2xl bg-white p-6 shadow-sm ring-1 ring-stone-200/80">
             <p className="font-serif text-4xl font-semibold text-stone-900">
               {APP_PRICE}
               <span className="ml-2 font-sans text-sm font-normal text-stone-500">one time</span>
