@@ -2,10 +2,10 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { AudioLines, Clock, Trash2, UserX } from "lucide-react";
 import HeroFlow from "../components/hero-flow";
+import HeroMotion from "../components/hero-motion";
 import {
   APP_PRICE,
   APP_STORE_URL,
-  BASE_PATH,
   CLOUD_PRICE,
   PAIR_CODE_EXAMPLE,
   PAIR_CODE_TTL,
@@ -189,59 +189,9 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Device showcase: Watch primary in front, iPhone behind. The Watch overlaps only the phone's frame edge. */}
+          {/* Motion graphic: watch → phone → your agent */}
           <div className="hero-enter-devices relative mx-auto lg:mx-0">
-            <div className="relative w-[306px] sm:w-[376px] lg:w-[426px]">
-              {/* iPhone 17 Pro frame, secondary */}
-              <div className="relative ml-auto w-[140px] opacity-90 sm:w-[170px] lg:w-[190px]">
-                <span
-                  aria-hidden="true"
-                  className="absolute -left-[3px] top-[18%] h-8 w-[4px] rounded-l-sm bg-stone-700"
-                />
-                <span
-                  aria-hidden="true"
-                  className="absolute -right-[3px] top-[14%] h-6 w-[4px] rounded-r-sm bg-stone-700"
-                />
-                <span
-                  aria-hidden="true"
-                  className="absolute -right-[3px] top-[26%] h-10 w-[4px] rounded-r-sm bg-stone-700"
-                />
-                <div className="rounded-[2.1rem] bg-stone-900 p-[7px] shadow-[0_24px_48px_-16px_rgba(26,25,23,0.3)] ring-1 ring-black/5">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={`${BASE_PATH}/screenshot-home-light.png`}
-                    alt="Ramble on iPhone showing the recordings list"
-                    className="block w-full rounded-[1.7rem]"
-                  />
-                </div>
-              </div>
-
-              {/* Apple Watch Ultra frame, primary */}
-              <div className="absolute left-0 top-1/2 z-10 w-[170px] -translate-y-1/2 sm:w-[210px] lg:w-[240px]">
-                <div className="relative">
-                  <span
-                    aria-hidden="true"
-                    className="absolute -left-[5px] top-[36%] h-9 w-[6px] rounded-l-sm bg-brand/80"
-                  />
-                  <span
-                    aria-hidden="true"
-                    className="absolute -right-[7px] top-[22%] h-8 w-[8px] rounded-r-md bg-stone-700"
-                  />
-                  <span
-                    aria-hidden="true"
-                    className="absolute -right-[5px] top-[44%] h-10 w-[6px] rounded-r-sm bg-stone-700"
-                  />
-                  <div className="rounded-[3rem] bg-stone-900 p-[9px] shadow-[0_30px_60px_-12px_rgba(26,25,23,0.45)] ring-1 ring-black/5">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={`${BASE_PATH}/screenshot-watch-recording2.png`}
-                      alt="Ramble recording on Apple Watch Ultra"
-                      className="block w-full rounded-[2.5rem]"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
+            <HeroMotion />
           </div>
         </div>
       </section>
