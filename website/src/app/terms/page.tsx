@@ -63,16 +63,14 @@ export default function TermsOfUse() {
             <h2 className={h2}>Purchase and subscription</h2>
             <p className="mt-2">
               Ramble is a one-time purchase of {APP_PRICE} through Apple&apos;s
-              App Store. The purchase includes on-device transcription, the
-              relay, and webhooks.
+              App Store.
             </p>
             <p className="mt-2">
-              Cloud transcription is optional and requires a paid subscription
-              at {CLOUD_PRICE}, billed through Apple&apos;s App Store. The
-              subscription auto-renews unless cancelled at least 24 hours
-              before the end of the current billing period. You can manage or
-              cancel it in your Apple ID settings. If you cancel, everything
-              else in the App keeps working.
+              Cloud transcription is an optional subscription at{" "}
+              {CLOUD_PRICE}, billed through Apple&apos;s App Store. It
+              auto-renews unless cancelled at least 24 hours before the end of
+              the current period. Cancel any time in your Apple ID settings;
+              everything else in the App keeps working.
             </p>
             <p className="mt-2">
               Refunds are handled by Apple under its App Store policies.
@@ -134,10 +132,6 @@ export default function TermsOfUse() {
             <ul className="mt-2 list-disc pl-5 space-y-1">
               <li>
                 Use the App in violation of any applicable laws or regulations
-              </li>
-              <li>
-                Attempt to circumvent the subscription requirement for cloud
-                transcription
               </li>
               <li>
                 Use the cloud transcription proxy or the hosted relay for

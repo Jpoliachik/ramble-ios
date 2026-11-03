@@ -1,6 +1,6 @@
 # Ramble — App Store copy (draft)
 
-Draft copy for the watch-to-agent release. Placeholders: the price tier (set in App Store Connect), the 30-day retention (30 or 60), and the website URLs (Ramble's own domain isn't chosen yet).
+Draft copy for the watch-to-agent release. Price: $4.99 one time, plus an optional $2.99/month cloud transcription upgrade. Placeholders: the 30-day retention (30 or 60) and the website URLs (Ramble's own domain isn't chosen yet).
 
 ## Subtitle (30 max)
 
@@ -11,7 +11,7 @@ Talk to your watch. Done.
 ## Promotional text (170 max)
 
 ```
-Got a thought? Tap your Apple Watch and say it. Ramble writes it down and hands it to your agent, so you can stop holding onto it.
+Stay in the moment. Capture the thought on your Apple Watch and leave your phone behind. Your agent handles it, and you come back to it later.
 ```
 
 ## Keywords (100 max)
@@ -23,9 +23,9 @@ wrist,todo,voice,dictation,transcribe,speech to text,reminder,assistant,memo,not
 ## Description
 
 ```
-Got a thought? Tap your Apple Watch and say it. Ramble writes it down and hands it to your agent, so you can stop holding onto it.
+Stay in the moment. Capture the thought on your Apple Watch and leave your phone behind. Your agent handles it, and you come back to it later.
 
-A to-do, an idea, something to look up later. Messy is fine. Your agent picks it up within a few minutes and deals with it. No phone out, no reply to wait for.
+An idea, a to-do, a note on something you're working on. Messy is fine. There's no reply to wait for: say it and move on. No connection? It waits on your watch and goes out when you reconnect.
 
 SETUP
 In Settings, tap Connect agent to get a short code. Tell your agent "I downloaded Ramble, connect it" and paste the code. That's it.
@@ -37,7 +37,7 @@ PRIVACY
 - Disconnect any time.
 
 TRANSCRIPTION
-Apple Speech runs on your iPhone and is included. An optional subscription adds cloud models (Groq, Deepgram, OpenAI) for better accuracy with accents, jargon, or noise.
+Apple Speech transcribes on your iPhone. An optional upgrade adds cloud transcription for sharper results with accents, jargon, or noise.
 
 WEBHOOKS
 Ramble can also send each transcript to any HTTPS endpoint.

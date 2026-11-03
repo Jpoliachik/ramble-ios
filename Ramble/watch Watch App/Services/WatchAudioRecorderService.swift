@@ -102,10 +102,6 @@ final class WatchAudioRecorderService: NSObject, ObservableObject {
     private static func normalizeAudioLevel(_ dB: Float) -> Float {
         max(0, min(1, (dB + 50) / 50))
     }
-
-    func deleteLocalFile(at url: URL) {
-        try? FileManager.default.removeItem(at: url)
-    }
 }
 
 extension WatchAudioRecorderService: AVAudioRecorderDelegate {

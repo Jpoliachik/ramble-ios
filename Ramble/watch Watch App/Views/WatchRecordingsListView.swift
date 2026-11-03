@@ -11,11 +11,6 @@ struct WatchRecordingsListView: View {
     @StateObject private var syncQueue = WatchSyncQueue.shared
     @StateObject private var connectivity = WatchConnectivityService.shared
 
-    /// Jobs not currently handed to WatchConnectivity, i.e. ones a manual retry would send.
-    private var hasIdleJobs: Bool {
-        syncQueue.jobs.contains { !connectivity.inFlightIDs.contains($0.id) }
-    }
-
     var body: some View {
         Group {
             if history.entries.isEmpty {
@@ -31,33 +26,20 @@ struct WatchRecordingsListView: View {
                 List {
                     Section {
                         ForEach(history.entries) { entry in
-                            WatchRecordingRow(entry: entry, state: state(for: entry))
+                            WatchRecordingRow(
+                                entry: entry,
+                                state: .resolve(entry, syncQueue: syncQueue, connectivity: connectivity)
+                            )
                         }
                     } footer: {
                         if !syncQueue.jobs.isEmpty {
                             Text("Recordings stay on your watch until your iPhone has them.")
                         }
                     }
-
-                    if hasIdleJobs {
-                        Button("Try again") {
-                            connectivity.retryPendingTransfers()
-                        }
-                        .foregroundStyle(Color.brandAmber)
-                    }
                 }
             }
         }
         .navigationTitle("Recent")
-    }
-
-    private func state(for entry: WatchRecordingHistoryEntry) -> WatchRecordingState {
-        WatchRecordingState.resolve(
-            entry: entry,
-            job: syncQueue.jobs.first { $0.id == entry.id },
-            isInFlight: connectivity.inFlightIDs.contains(entry.id),
-            isPhoneReachable: connectivity.isPhoneReachable
-        )
     }
 }
 

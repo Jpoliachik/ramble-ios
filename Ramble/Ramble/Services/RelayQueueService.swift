@@ -135,12 +135,21 @@ final class RelayQueueService: ObservableObject {
 
         do {
             let queued = try await relay.upload(recording: recording, transcription: text)
+            guard queued > 0 else {
+                // Every agent was disconnected (maybe from another screen), so
+                // nothing is waiting anywhere. Don't call it sent.
+                updateRecording(job.recordingId) {
+                    $0.relayStatus = nil
+                    $0.activityLog.append(ActivityEntry("Not sent — no agent is connected"))
+                }
+                removeJob(job)
+                _ = try? await relay.refreshConnections()
+                return
+            }
             updateRecording(job.recordingId) {
                 $0.relayStatus = .delivered
                 $0.activityLog.append(ActivityEntry(
-                    queued > 1
-                        ? "Waiting for \(queued) agents to pick it up"
-                        : "Waiting for Muse to pick it up",
+                    "Sent to the relay for \(queued) agent\(queued == 1 ? "" : "s")",
                     httpStatus: 200
                 ))
             }

@@ -10,9 +10,19 @@ It's asynchronous on purpose. Agents pull on a schedule, so a few minutes betwee
 
 Temporary by design. No accounts. Transcripts pass through the relay and are deleted on delivery. They don't live there.
 
+## Core idea
+
+Ramble is a mindfulness app as much as a capture app. It's about getting off your phone.
+
+- **Stay in the moment.** Capture a thought in seconds and get back to what you were doing.
+- **Your watch is enough.** The phone can stay in your pocket, in another room, or at home.
+- **Send it and let it go.** No reply to wait for. You know it will get there.
+- **Your agent does the work.** It picks up the thought and acts on it. You come back to it when you're ready.
+- **Works offline.** Thoughts wait on the watch and sync when you're back in range.
+
 ## Positioning
 
-**Record on your watch. Your agent handles it.**
+**Talk to your watch. Your agent handles it.**
 
 Ramble is the capture layer for the agent era. People who have a personal agent still need a way to hand it things in the moment: on a walk, in the car, between meetings. Ramble is that hand-off. It feeds agents. It doesn't compete with note apps or assistants, and it doesn't try to be one.
 
@@ -32,7 +42,7 @@ Ramble is the capture layer for the agent era. People who have a personal agent 
 
 - **Agent owners (primary)** — People who already use a personal agent and want a watch that talks to it. They don't want another inbox to check. They want to say the thing and know it landed.
 
-- **Transcription enthusiasts** — People who care about accuracy and want the best speech-to-text models as they ship. They'll pay for cloud transcription because clean transcripts matter to them.
+- **Transcription enthusiasts** — People who care about accuracy and want the best speech-to-text models as they ship.
 
 - **Automation builders** — Developers and tinkerers who pipe voice into their own stack. The webhook turns Ramble into a voice input for workflows, databases, and custom backends.
 

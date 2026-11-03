@@ -13,7 +13,6 @@ struct SyncStatusBannerView: View {
     let sendingCount: Int
     let waitingCount: Int
     let failedCount: Int
-    var agentName: String = "Muse"
 
     static func isVisible(transcribing: Int, sending: Int, waiting: Int, failed: Int) -> Bool {
         transcribing + sending + waiting + failed > 0
@@ -23,7 +22,7 @@ struct SyncStatusBannerView: View {
         var parts: [String] = []
         if transcribingCount > 0 { parts.append("\(transcribingCount) transcribing") }
         if sendingCount > 0 { parts.append("\(sendingCount) sending") }
-        if waitingCount > 0 { parts.append("\(waitingCount) waiting for \(agentName)") }
+        if waitingCount > 0 { parts.append("\(waitingCount) waiting for your agent") }
         if failedCount > 0 { parts.append("\(failedCount) failed") }
         return parts
     }
