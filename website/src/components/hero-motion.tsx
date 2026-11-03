@@ -8,6 +8,10 @@ import { Bot, Check, Mic } from "lucide-react";
   phone, and lands with your agent. Everything is drawn in HTML/CSS on a fixed
   440×440 stage that is scaled down at smaller breakpoints, so it sits on the
   page background with nothing to match.
+
+  The loop never resets. Each thought pushes a new row onto the phone and the
+  agent, older rows slide down and fade out, and focus (size) moves from the
+  watch to the phone to the agent and back.
 */
 
 type Thought = { said: string; item: string; tag: string };
@@ -20,33 +24,45 @@ const thoughts: Thought[] = [
 
 // Beats of one loop, in ms from the start of the loop.
 const BEATS = [
-  0, //    0 idle: watch shows the record button
-  600, //  1 recording: tap, waveform, the words appear
-  3100, // 2 sent: check on the watch, the thought leaves
-  4000, // 3 the watch is back to idle. You're done.
-  4100, // 4 the phone transcribes
-  4700, // 5 the text heads to the agent
-  5300, // 6 it lands with your agent
-  5900, // 7 handled
+  0, //    0 idle: watch in focus, record button
+  400, //  1 recording: tap, waveform, the words appear
+  2700, // 2 sent: check on the watch, the thought leaves
+  3500, // 3 the watch is back to idle. You're done.
+  3600, // 4 the phone transcribes (phone in focus)
+  4200, // 5 the text heads to the agent
+  4750, // 6 it lands with your agent (agent in focus)
+  5300, // 7 handled
 ];
-const LOOP_MS = 8600;
+const LOOP_MS = 7400;
 const TYPE_MS = 52;
 
 // Motion paths in stage coordinates.
-const PATH_TO_PHONE = "M184 262 C 238 262, 246 140, 302 140";
-const PATH_TO_AGENT = "M352 246 C 352 262, 340 270, 330 292";
+const PATH_TO_PHONE = "M184 274 C 238 274, 250 128, 304 128";
+const PATH_TO_AGENT = "M352 232 C 352 250, 328 246, 325 262";
 
-type AgentItem = { key: number; item: string; tag: string; done: boolean };
+type PhoneRow = { key: number; said: string };
+type AgentRow = { key: number; item: string; tag: string; done: boolean };
+
+const initialPhone: PhoneRow[] = [
+  { key: -1, said: "Book a table for two on Friday." },
+  { key: -2, said: "Look into standing desks." },
+];
+const initialAgent: AgentRow[] = [
+  { key: -1, item: "Table for two", tag: "Friday", done: true },
+  { key: -2, item: "Standing desks", tag: "Research", done: true },
+];
+
+const PHONE_ROW_H = 42;
+const AGENT_ROW_H = 25;
+const VISIBLE = 3;
 
 export default function HeroMotion() {
   const [beat, setBeat] = useState(0);
   const [cycle, setCycle] = useState(0);
   const [typed, setTyped] = useState(0);
   const [reduced, setReduced] = useState(false);
-  const [items, setItems] = useState<AgentItem[]>([
-    { key: -1, item: "Dentist", tag: "Thursday", done: true },
-  ]);
-  const [phoneItems, setPhoneItems] = useState<{ key: number; said: string }[]>([]);
+  const [phoneRows, setPhoneRows] = useState<PhoneRow[]>(initialPhone);
+  const [agentRows, setAgentRows] = useState<AgentRow[]>(initialAgent);
   const cycleRef = useRef(0);
 
   const thought = thoughts[cycle % thoughts.length];
@@ -66,6 +82,7 @@ export default function HeroMotion() {
     const runLoop = () => {
       const c = cycleRef.current;
       const t = thoughts[c % thoughts.length];
+      setCycle(c);
       setBeat(0);
       setTyped(0);
       BEATS.forEach((at, i) => {
@@ -73,27 +90,24 @@ export default function HeroMotion() {
         timers.push(
           setTimeout(() => {
             setBeat(i);
-            if (i === 4) {
-              setPhoneItems((prev) => [{ key: c, said: t.said }, ...prev].slice(0, 4));
-            }
-            if (i === 6) {
-              setItems((prev) => [{ key: c, item: t.item, tag: t.tag, done: false }, ...prev].slice(0, 3));
-            }
-            if (i === 7) {
-              setItems((prev) => prev.map((it) => (it.key === c ? { ...it, done: true } : it)));
-            }
+            // Keep one extra row so the oldest can fade out instead of vanishing.
+            if (i === 4) setPhoneRows((prev) => [{ key: c, said: t.said }, ...prev].slice(0, VISIBLE + 1));
+            if (i === 6)
+              setAgentRows((prev) =>
+                [{ key: c, item: t.item, tag: t.tag, done: false }, ...prev].slice(0, VISIBLE + 1),
+              );
+            if (i === 7) setAgentRows((prev) => prev.map((r) => (r.key === c ? { ...r, done: true } : r)));
           }, at),
         );
       });
       timers.push(
         setTimeout(() => {
           cycleRef.current = c + 1;
-          setCycle(c + 1);
           runLoop();
         }, LOOP_MS),
       );
     };
-    const start = setTimeout(runLoop, 900);
+    const start = setTimeout(runLoop, 700);
     return () => {
       clearTimeout(start);
       timers.forEach(clearTimeout);
@@ -111,20 +125,17 @@ export default function HeroMotion() {
 
   // Reduced motion: one calm, finished frame.
   const b = reduced ? 3 : beat;
-  const shownItems = reduced
-    ? [
-        { key: 0, item: thoughts[0].item, tag: thoughts[0].tag, done: true },
-        { key: -1, item: "Dentist", tag: "Thursday", done: true },
-      ]
-    : items;
+  const shownPhone = reduced ? [{ key: 0, said: thoughts[0].said }, ...initialPhone] : phoneRows;
+  const shownAgent = reduced
+    ? [{ key: 0, item: thoughts[0].item, tag: thoughts[0].tag, done: true }, ...initialAgent]
+    : agentRows;
   const words = reduced ? thoughts[0].said : thought.said.slice(0, typed);
-  const shownPhoneItems = reduced ? [{ key: 0, said: thoughts[0].said }] : phoneItems;
 
   const recording = b === 1;
   const sent = b === 2;
   const bubbleVisible = reduced || (b >= 1 && b <= 2);
-  const phoneActive = b >= 4 && b <= 5;
-  const transcribing = !reduced && b === 4;
+  const focus = reduced ? "none" : b <= 3 ? "watch" : b <= 5 ? "phone" : "agent";
+  const transcribingKey = !reduced && b === 4 ? cycle : null;
   const agentGlow = b === 6 || b === 7;
 
   return (
@@ -142,7 +153,7 @@ export default function HeroMotion() {
 
         {/* What you say */}
         <div
-          className={`absolute left-[4px] top-[70px] w-[236px] transition-all duration-500 ease-out ${
+          className={`absolute left-[4px] top-[74px] w-[236px] transition-all duration-500 ease-out ${
             bubbleVisible ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
           }`}
         >
@@ -160,7 +171,10 @@ export default function HeroMotion() {
         </div>
 
         {/* Apple Watch */}
-        <div className="absolute left-[6px] top-[168px] z-10 w-[178px]">
+        <div
+          className="hm-focus absolute left-[6px] top-[168px] z-10 w-[178px]"
+          style={{ transformOrigin: "100% 50%", transform: `scale(${focus === "watch" || focus === "none" ? 1 : 0.88})` }}
+        >
           <div className="relative">
             <span aria-hidden="true" className="absolute -left-[5px] top-[34%] h-8 w-[6px] rounded-l-sm bg-brand/85" />
             <span aria-hidden="true" className="absolute -right-[7px] top-[22%] h-7 w-[8px] rounded-r-md bg-stone-700" />
@@ -225,13 +239,16 @@ export default function HeroMotion() {
 
         {/* iPhone: secondary, does the work in the background */}
         <div
-          className={`absolute left-[302px] top-[30px] w-[104px] transition-opacity duration-500 ${
-            phoneActive ? "opacity-100" : "opacity-80"
-          }`}
+          className="hm-focus absolute left-[304px] top-[16px] w-[104px]"
+          style={{
+            transformOrigin: "30% 88%",
+            transform: `scale(${focus === "phone" ? 1.1 : 0.94})`,
+            opacity: focus === "phone" ? 1 : 0.82,
+          }}
         >
           <div
             className={`rounded-[22px] bg-stone-900 p-[4px] shadow-[0_18px_36px_-14px_rgba(26,25,23,0.35)] ring-1 ring-black/5 transition-shadow duration-500 ${
-              phoneActive ? "hm-phone-glow" : ""
+              focus === "phone" ? "hm-phone-glow" : ""
             }`}
           >
             <div className="relative h-[208px] overflow-hidden rounded-[18px] bg-white px-[8px] pt-[8px]">
@@ -240,69 +257,85 @@ export default function HeroMotion() {
                 <span className="mr-[3px] inline-block h-[5px] w-[5px] rounded-full bg-brand align-middle" />
                 Ramble
               </p>
-              <div className="mt-[6px] space-y-[5px]">
-                {shownPhoneItems.map((row, i) => {
-                  const pending = transcribing && i === 0;
+              <div className="relative mt-[6px]" style={{ height: PHONE_ROW_H * VISIBLE }}>
+                {shownPhone.map((row, i) => {
+                  const pending = row.key === transcribingKey;
                   return (
-                    <div key={row.key} className="hm-item rounded-[7px] bg-stone-100 px-[6px] py-[5px]">
-                      {pending ? (
-                        <div className="space-y-[3px] py-[1px]">
-                          <span className="hm-shimmer block h-[4px] w-full rounded-full" />
-                          <span className="hm-shimmer block h-[4px] w-2/3 rounded-full" />
-                        </div>
-                      ) : (
-                        <p className="text-[7.5px] leading-[1.3] text-stone-800">{row.said}</p>
-                      )}
-                      <p className="mt-[3px] flex items-center gap-[3px] text-[6.5px] font-medium text-stone-500">
-                        <span className={`inline-block h-[4px] w-[4px] rounded-full ${pending ? "bg-stone-300" : "bg-brand"}`} />
-                        {pending ? "Transcribing" : "Sent to agent"}
-                      </p>
+                    <div
+                      key={row.key}
+                      className="hm-row absolute inset-x-0"
+                      style={{ top: i * PHONE_ROW_H, opacity: i >= VISIBLE ? 0 : 1 }}
+                    >
+                      <div className="hm-row-in h-[37px] rounded-[7px] bg-stone-100 px-[6px] py-[5px]">
+                        {pending ? (
+                          <div className="space-y-[3px] py-[1px]">
+                            <span className="hm-shimmer block h-[4px] w-full rounded-full" />
+                            <span className="hm-shimmer block h-[4px] w-2/3 rounded-full" />
+                          </div>
+                        ) : (
+                          <p className="line-clamp-2 text-[7.5px] leading-[1.3] text-stone-800">{row.said}</p>
+                        )}
+                        <p className="mt-[2px] flex items-center gap-[3px] text-[6.5px] font-medium text-stone-500">
+                          <span
+                            className={`inline-block h-[4px] w-[4px] rounded-full ${pending ? "bg-stone-300" : "bg-brand"}`}
+                          />
+                          {pending ? "Transcribing" : "Sent to agent"}
+                        </p>
+                      </div>
                     </div>
                   );
                 })}
-                {[0, 1, 2].slice(0, Math.max(0, 3 - shownPhoneItems.length)).map((i) => (
-                  <div key={`s-${i}`} className="space-y-[3px] rounded-[7px] bg-stone-100 px-[6px] py-[6px]">
-                    <span className="block h-[4px] w-full rounded-full bg-stone-200" />
-                    <span className="block h-[4px] w-1/2 rounded-full bg-stone-200" />
-                  </div>
-                ))}
               </div>
             </div>
           </div>
         </div>
 
-        {/* Your agent */}
+        {/* Your agent: a big icon heads the card */}
         <div
-          className={`absolute left-[218px] top-[292px] w-[214px] rounded-2xl bg-white p-3 shadow-sm ring-1 transition-shadow duration-500 ${
-            agentGlow ? "ring-brand/40 hm-agent-glow" : "ring-stone-200/80"
-          }`}
+          className="hm-focus absolute left-[214px] top-[290px] z-10 w-[222px]"
+          style={{ transformOrigin: "50% 0%", transform: `scale(${focus === "agent" ? 1.06 : 0.95})` }}
         >
-          <div className="flex items-center gap-2">
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand/10">
-              <Bot className="h-4 w-4 text-brand-text" strokeWidth={2.25} aria-hidden="true" />
+          <div
+            className={`relative rounded-2xl bg-white px-3 pb-3 pt-[34px] shadow-sm ring-1 transition-shadow duration-500 ${
+              agentGlow ? "ring-brand/40 hm-agent-glow" : "ring-stone-200/80"
+            }`}
+          >
+            <span
+              className={`absolute -top-[28px] left-1/2 flex h-[56px] w-[56px] -translate-x-1/2 items-center justify-center rounded-full bg-white shadow-sm ring-1 transition-shadow duration-500 ${
+                agentGlow ? "ring-brand/40 hm-agent-glow" : "ring-stone-200/80"
+              }`}
+            >
+              <span className="flex h-[46px] w-[46px] items-center justify-center rounded-full bg-brand/10">
+                <Bot className="h-[26px] w-[26px] text-brand-text" strokeWidth={2} aria-hidden="true" />
+              </span>
             </span>
-            <span className="text-[13px] font-medium text-stone-800">Your agent</span>
-          </div>
-          <ul className="mt-2.5 space-y-1.5">
-            {shownItems.map((it, i) => (
-              <li
-                key={it.key}
-                className={`hm-item flex items-center gap-2 ${i === 2 ? "opacity-40" : ""}`}
-              >
-                <span
-                  className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full transition-colors duration-300 ${
-                    it.done ? "bg-brand" : "ring-[1.5px] ring-inset ring-stone-300"
-                  }`}
+            <p className="text-center text-[13px] font-medium text-stone-800">Agent</p>
+            <ul className="relative mt-2" style={{ height: AGENT_ROW_H * VISIBLE }}>
+              {shownAgent.map((it, i) => (
+                <li
+                  key={it.key}
+                  className="hm-row absolute inset-x-0"
+                  style={{ top: i * AGENT_ROW_H, opacity: i >= VISIBLE ? 0 : 1 }}
                 >
-                  {it.done && <Check className="hm-check h-2.5 w-2.5 text-white" strokeWidth={3.5} aria-hidden="true" />}
-                </span>
-                <span className="truncate text-[12.5px] text-stone-700">{it.item}</span>
-                <span className="ml-auto shrink-0 rounded-full bg-stone-100 px-2 py-[1px] text-[10.5px] text-stone-500">
-                  {it.tag}
-                </span>
-              </li>
-            ))}
-          </ul>
+                  <div className="hm-row-in flex h-[20px] items-center gap-2">
+                    <span
+                      className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full transition-colors duration-300 ${
+                        it.done ? "bg-brand" : "ring-[1.5px] ring-inset ring-stone-300"
+                      }`}
+                    >
+                      {it.done && (
+                        <Check className="hm-check h-2.5 w-2.5 text-white" strokeWidth={3.5} aria-hidden="true" />
+                      )}
+                    </span>
+                    <span className="truncate text-[12.5px] text-stone-700">{it.item}</span>
+                    <span className="ml-auto shrink-0 rounded-full bg-stone-100 px-2 py-[1px] text-[10.5px] text-stone-500">
+                      {it.tag}
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
 
         {/* The thought, travelling */}
@@ -329,6 +362,26 @@ export default function HeroMotion() {
           }
         }
 
+        :global(.hm-focus) {
+          transition:
+            transform 900ms cubic-bezier(0.22, 1, 0.36, 1),
+            opacity 700ms ease;
+        }
+        :global(.hm-row) {
+          transition:
+            top 600ms cubic-bezier(0.22, 1, 0.36, 1),
+            opacity 450ms ease;
+        }
+        :global(.hm-row-in) {
+          animation: hm-row-in 500ms cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+        @keyframes hm-row-in {
+          from {
+            opacity: 0;
+            transform: translateY(-8px) scale(0.97);
+          }
+        }
+
         :global(.hm-packet) {
           position: absolute;
           left: 0;
@@ -343,10 +396,10 @@ export default function HeroMotion() {
           z-index: 20;
         }
         :global(.hm-packet-a) {
-          animation: hm-travel 850ms cubic-bezier(0.55, 0, 0.35, 1) 150ms both;
+          animation: hm-travel 850ms cubic-bezier(0.55, 0, 0.35, 1) 100ms both;
         }
         :global(.hm-packet-b) {
-          animation: hm-travel 520ms cubic-bezier(0.5, 0, 0.4, 1) 40ms both;
+          animation: hm-travel 480ms cubic-bezier(0.5, 0, 0.4, 1) 40ms both;
         }
         @keyframes hm-travel {
           0% {
@@ -424,15 +477,6 @@ export default function HeroMotion() {
           box-shadow: 0 0 0 5px rgba(217, 119, 6, 0.12), 0 1px 2px rgba(0, 0, 0, 0.04);
         }
 
-        :global(.hm-item) {
-          animation: hm-item-in 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-        }
-        @keyframes hm-item-in {
-          from {
-            opacity: 0;
-            transform: translateY(-6px);
-          }
-        }
         :global(.hm-check) {
           animation: hm-pop 300ms cubic-bezier(0.3, 1.6, 0.5, 1) both;
         }
@@ -443,10 +487,14 @@ export default function HeroMotion() {
         }
 
         @media (prefers-reduced-motion: reduce) {
-          :global(.hm-item),
+          :global(.hm-row-in),
           :global(.hm-check),
           :global(.hm-shimmer) {
             animation: none;
+          }
+          :global(.hm-focus),
+          :global(.hm-row) {
+            transition: none;
           }
         }
       `}</style>
