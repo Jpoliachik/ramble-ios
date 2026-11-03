@@ -360,7 +360,7 @@ export default function Home() {
             Get it off your mind.
           </h2>
           <p className="mt-4 text-base text-stone-500">
-            Leave the phone. Keep the thought. {APP_PRICE}, once.
+            Leave the phone. Keep the thought.
           </p>
           <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
             <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className={primaryButton}>
