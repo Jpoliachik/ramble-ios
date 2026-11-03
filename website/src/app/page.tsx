@@ -11,7 +11,10 @@ import {
   PAIR_CODE_TTL,
   PULL_CADENCE,
   RETENTION,
+  SITE_URL,
 } from "../lib/site";
+
+const SITE_HOST = SITE_URL.replace(/^https?:\/\//, "");
 
 const primaryButton =
   "inline-flex items-center gap-2 rounded-full bg-stone-900 px-6 py-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-stone-800";
@@ -253,63 +256,37 @@ export default function Home() {
       {/* Connect your agent */}
       <section id="connect" className="scroll-mt-20 border-t border-stone-200">
         <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
-          <SectionHeading eyebrow="Setup" sub="Takes about a minute.">
-            Connect your agent
+          <SectionHeading eyebrow="Setup" sub="Ask your agent to set up Ramble. It takes it from there.">
+            One message
           </SectionHeading>
 
-          <div className="mt-14 grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] lg:gap-16">
-            <ol className="space-y-8">
-              <li className="flex gap-4">
-                <span className={stepBadge}>1</span>
-                <div>
-                  <h3 className="text-sm font-semibold text-stone-900">Get a pairing code</h3>
-                  <p className="mt-1 text-sm leading-relaxed text-stone-500">
-                    On your iPhone, open Ramble → Settings → Connect agent. You&apos;ll get a short code.
-                  </p>
-                </div>
-              </li>
-              <li className="flex gap-4">
-                <span className={stepBadge}>2</span>
-                <div>
-                  <h3 className="text-sm font-semibold text-stone-900">Tell your agent</h3>
-                  <p className="mt-1 text-sm leading-relaxed text-stone-500">
-                    Say &ldquo;I downloaded Ramble, connect it&rdquo; and paste the code. It can only pick up your
-                    transcripts, nothing else.
-                  </p>
-                </div>
-              </li>
-              <li className="flex gap-4">
-                <span className={stepBadge}>3</span>
-                <div>
-                  <h3 className="text-sm font-semibold text-stone-900">Start talking</h3>
-                  <p className="mt-1 text-sm leading-relaxed text-stone-500">
-                    Raise your wrist and say what&apos;s on your mind. Disconnect from the same screen any time.
-                  </p>
-                </div>
-              </li>
-            </ol>
-
-            {/* Pairing illustration */}
-            <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-stone-200/80">
-              <p className="text-xs font-medium uppercase tracking-[0.18em] text-stone-500">Pairing code</p>
-              <p className="mt-3 font-mono text-3xl font-semibold tracking-[0.12em] text-stone-900">
+          {/* Chat mockup: setup is just asking your agent */}
+          <div className="mx-auto mt-12 max-w-md rounded-3xl bg-white p-5 shadow-sm ring-1 ring-stone-200/80 sm:p-6">
+            <div className="flex items-center gap-2 border-b border-stone-200 pb-4">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-stone-100 text-xs font-semibold text-stone-600">
+                AI
+              </span>
+              <span className="text-sm font-medium text-stone-900">Your agent</span>
+            </div>
+            <div className="mt-4 flex flex-col gap-2.5 text-sm">
+              <p className="max-w-[85%] self-end rounded-2xl rounded-br-md bg-stone-900 px-4 py-2.5 text-white">
+                Set up Ramble for me. <span className="whitespace-nowrap underline underline-offset-2">{SITE_HOST}/docs</span>
+              </p>
+              <p className="max-w-[85%] self-start rounded-2xl rounded-bl-md bg-stone-100 px-4 py-2.5 text-stone-900">
+                On it. Open Ramble, tap Connect agent, and send me the code.
+              </p>
+              <p className="max-w-[85%] self-end rounded-2xl rounded-br-md bg-stone-900 px-4 py-2.5 font-mono text-white">
                 {PAIR_CODE_EXAMPLE}
               </p>
-              <p className="mt-2 text-xs text-stone-500">Single use. Expires in {PAIR_CODE_TTL}.</p>
-              <div className="mt-6 border-t border-stone-200 pt-6">
-                <p className="text-xs font-medium uppercase tracking-[0.18em] text-stone-500">Chat with your agent</p>
-                <div className="mt-3 flex flex-col gap-2">
-                  <p className="max-w-[90%] self-end rounded-2xl rounded-br-md bg-stone-900 px-4 py-2.5 text-sm text-white">
-                    I downloaded Ramble, connect it.{" "}
-                    <span className="font-mono whitespace-nowrap">{PAIR_CODE_EXAMPLE}</span>
-                  </p>
-                  <p className="max-w-[90%] self-start rounded-2xl rounded-bl-md bg-stone-100 px-4 py-2.5 text-sm text-stone-900">
-                    Connected. I&apos;ll check for new recordings every {PULL_CADENCE}.
-                  </p>
-                </div>
-              </div>
+              <p className="max-w-[85%] self-start rounded-2xl rounded-bl-md bg-stone-100 px-4 py-2.5 text-stone-900">
+                Connected. Anything you tell your watch comes to me now.
+              </p>
             </div>
           </div>
+          <p className="mx-auto mt-6 max-w-md text-center text-xs leading-relaxed text-stone-500">
+            The code works once and expires in {PAIR_CODE_TTL}. Your agent can only pick up your transcripts. Disconnect
+            any time from the same screen.
+          </p>
 
           <p className="mt-14 text-center text-sm text-stone-500">
             Have your own endpoint?
