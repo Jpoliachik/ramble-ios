@@ -9,12 +9,12 @@ private enum SettingsLinks {
     static let privacy = URL(string: "https://goodloop.dev/ramble/privacy")!
     static let terms = URL(string: "https://goodloop.dev/ramble/terms")!
     static let docs = URL(string: "https://goodloop.dev/ramble/docs")!
-    static let github = URL(string: "https://github.com/Jpoliachik/ramble-ios")!
 }
 
 struct SettingsView: View {
     @StateObject private var viewModel = SettingsViewModel()
     @ObservedObject private var subscriptionService = SubscriptionService.shared
+    @ObservedObject private var relay = RelayService.shared
     @Environment(\.dismiss) private var dismiss
     @State private var showDeleteConfirmation = false
     @State private var showExportShare = false
@@ -24,14 +24,16 @@ struct SettingsView: View {
     @State private var exportURL: URL?
     @State private var versionTapCount = 0
     @State private var showDebugSheet = false
+    @State private var showConnectAgent = false
 
     var body: some View {
         NavigationView {
             Form {
+                agentSection
+                webhookSection
                 freeTranscriptionSection
                 cloudTranscriptionSection
                 cloudTuningSection
-                webhookSection
                 appearanceSection
                 statsSection
                 exportSection
@@ -67,6 +69,13 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showDestinationEdit) {
                 WebhookDestinationEditSheet(viewModel: viewModel)
+            }
+            .sheet(isPresented: $showConnectAgent) {
+                ConnectAgentView()
+            }
+            .task {
+                guard relay.hasInbox else { return }
+                try? await relay.refreshConnections()
             }
         }
     }
@@ -145,13 +154,13 @@ struct SettingsView: View {
                 SettingsSubsectionLabel("Cloud · premium")
             } else {
                 SettingsSubsectionLabel(title: "Cloud · premium") {
-                    Text("$3.99 / month")
+                    Text("$2.99 / month")
                         .font(.system(size: 13))
                         .foregroundStyle(Color.obInkFaint)
                 }
             }
         } footer: {
-            Text("Cloud transcription routes through our open-source proxy. No audio or text is stored on our servers.")
+            Text("Cloud transcription sends audio through our proxy to the provider. The proxy doesn't keep the audio or the text.")
         }
     }
 
@@ -202,10 +211,60 @@ struct SettingsView: View {
         .opacity(isCloud ? 1 : 0.5)
     }
 
+    private var agentSection: some View {
+        Section {
+            if !relay.connections.isEmpty {
+                BrandCard {
+                    ForEach(Array(relay.connections.enumerated()), id: \.element.id) { index, connection in
+                        Button {
+                            showConnectAgent = true
+                        } label: {
+                            HStack(spacing: 12) {
+                                AgentConnectionRow(connection: connection)
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(Color.obInkFaint)
+                            }
+                            .padding(.vertical, 12)
+                            .padding(.horizontal, 16)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+
+                        if index < relay.connections.count - 1 {
+                            BrandRowDivider(leadingInset: 16)
+                        }
+                    }
+                }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                .listRowSeparator(.hidden)
+            }
+
+            BrandPlusActionCard(title: relay.connections.isEmpty ? "Connect your agent" : "Connect another agent") {
+                showConnectAgent = true
+            }
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+            .listRowSeparator(.hidden)
+        } header: {
+            VStack(alignment: .leading, spacing: 14) {
+                SettingsGroupTitle(
+                    title: "Destinations",
+                    subtitle: "Record on your watch. Your agent handles it."
+                )
+                if !relay.connections.isEmpty {
+                    SettingsSubsectionLabel("Connected")
+                }
+            }
+            .textCase(.none)
+        }
+    }
+
     private var webhookSection: some View {
         Section {
             if viewModel.webhookURL.isEmpty {
-                BrandPlusActionCard(title: "Add a destination") {
+                BrandPlusActionCard(title: "Add a webhook") {
                     showDestinationEdit = true
                 }
                 .listRowBackground(Color.clear)
@@ -231,25 +290,17 @@ struct SettingsView: View {
                 }
             }
         } header: {
-            VStack(alignment: .leading, spacing: 14) {
-                SettingsGroupTitle(
-                    title: "Send via Webhook",
-                    subtitle: "Pipe transcripts to any URL."
-                ) {
-                    Button {
-                        showWebhookInfo = true
-                    } label: {
-                        Image(systemName: "info.circle")
-                            .font(.title3)
-                    }
+            // Part of Destinations, under the agent connections above.
+            SettingsSubsectionLabel(title: "Webhook") {
+                Button {
+                    showWebhookInfo = true
+                } label: {
+                    Image(systemName: "info.circle")
+                        .font(.subheadline)
                 }
-                SendVisual(endpointText: SendVisual.endpointText(for: viewModel.webhookURL))
-                    .padding(.bottom, 4)
-                SettingsSubsectionLabel("Destination")
             }
-            .textCase(.none)
         } footer: {
-            Text("Create automations, send to an AI agent — anywhere that accepts an HTTPS POST. Make sure this is a trusted URL.")
+            Text("Pipe transcripts to any URL that accepts an HTTPS POST. Make sure it's one you trust.")
         }
     }
 
@@ -436,24 +487,9 @@ struct TranscriptionInfoSheet: View {
                     InfoBlock(
                         icon: "lock.shield",
                         title: "Cloud models are private too",
-                        text: "Cloud transcription routes through our open-source proxy. No audio or text is stored on our servers — your audio goes to the provider and the transcript comes back. That's it."
+                        text: "Cloud transcription sends your audio through our proxy to the provider, and the transcript comes back. The proxy doesn't keep the audio or the text."
                     )
 
-                    InfoBlock(
-                        icon: "eye",
-                        title: "Don't take our word for it",
-                        text: "Ramble is fully open source. Check the code on GitHub — no accounts, no user data stored. Your audio and transcriptions never touch our servers."
-                    )
-
-                    Link(destination: SettingsLinks.github) {
-                        HStack {
-                            Spacer()
-                            Label("View Source on GitHub", systemImage: "chevron.left.forwardslash.chevron.right")
-                            Spacer()
-                        }
-                        .padding(.vertical, 12)
-                    }
-                    .buttonStyle(.bordered)
                 }
                 .padding()
             }
@@ -494,19 +530,19 @@ struct PrivacyInfoSheet: View {
                     InfoBlock(
                         icon: "cloud",
                         title: "Cloud transcription is opt-in",
-                        text: "If you choose a cloud model, audio is sent through our open-source proxy to the provider, transcribed, and the text comes back. We don't store the audio or the transcript."
+                        text: "If you choose a cloud model, audio is sent through our proxy to the provider, transcribed, and the text comes back. The proxy doesn't keep the audio or the transcript."
                     )
 
                     InfoBlock(
                         icon: "paperplane",
                         title: "Webhooks go where you point them",
-                        text: "If you configure a webhook, transcripts are POSTed to a URL you control. That's the only place transcripts ever leave your device — and only when you set it up."
+                        text: "If you configure a webhook, transcripts are POSTed straight from your phone to a URL you control. Nothing is kept on our side."
                     )
 
                     InfoBlock(
-                        icon: "chevron.left.forwardslash.chevron.right",
-                        title: "Open source",
-                        text: "Ramble is open source. Read the code, audit the proxy, run your own. No accounts, no analytics."
+                        icon: "tray.and.arrow.up",
+                        title: "Your agent's inbox is temporary",
+                        text: "When you connect an agent, transcripts wait on the Ramble relay until it picks them up. The text is deleted the moment it does. Anything never picked up is deleted after \(Constants.Relay.unclaimedRetentionDays) days. Audio never goes there. No accounts."
                     )
 
                     Link(destination: SettingsLinks.privacy) {
@@ -610,6 +646,7 @@ struct DebugSheet: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var viewModel: SettingsViewModel
     @State private var attestStatus = ""
+    @AppStorage(Constants.Relay.baseURLOverrideKey) private var relayBaseURLOverride = ""
     @State private var isReattesting = false
 
     var body: some View {
@@ -630,6 +667,28 @@ struct DebugSheet: View {
                             .buttonStyle(.plain)
                         }
                     }
+                }
+
+                Section {
+                    HStack {
+                        TextField("https://relay.example.com", text: $relayBaseURLOverride)
+                            .keyboardType(.URL)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                        if !relayBaseURLOverride.isEmpty {
+                            Button {
+                                relayBaseURLOverride = ""
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                } header: {
+                    Text("Relay")
+                } footer: {
+                    Text("Point at a `wrangler dev` relay, e.g. http://localhost:8787. Leave empty for the built-in relay. The server bypass key above is sent as the relay's X-Dev-Bypass header.")
                 }
 
                 Section("App Attest") {
@@ -763,7 +822,7 @@ struct WebhookDestinationEditSheet: View {
 
 // MARK: - Settings header components
 
-/// Serif group title — top-level grouping label (Transcribe, Send via Webhook).
+/// Serif group title — top-level grouping label (Destinations, Transcribe).
 /// Mirrors the onboarding headline aesthetic at a smaller size, with an
 /// optional friendly subtitle below.
 private struct SettingsGroupTitle<Trailing: View>: View {

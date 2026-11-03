@@ -89,7 +89,7 @@ struct SubscriptionView: View {
             BrandFeatureRow(
                 icon: "lock.shield",
                 title: "Still private",
-                subtitle: "Audio routes through our open-source proxy. Nothing stored."
+                subtitle: "Audio goes through our proxy to the provider. The proxy keeps nothing."
             )
         }
     }
@@ -104,6 +104,12 @@ struct SubscriptionView: View {
             Text("per month")
                 .font(.system(size: 14))
                 .foregroundStyle(Color.obInkSoft)
+
+            Text("Optional. On-device transcription is always included.")
+                .font(.system(size: 13))
+                .foregroundStyle(Color.obInkFaint)
+                .multilineTextAlignment(.center)
+                .padding(.top, 8)
         }
     }
 
@@ -159,7 +165,7 @@ struct SubscriptionView: View {
     // MARK: - Helpers
 
     private var displayPrice: String {
-        subscriptionService.product?.displayPrice ?? "$3.99"
+        subscriptionService.product?.displayPrice ?? "$2.99"
     }
 
     // MARK: - Actions

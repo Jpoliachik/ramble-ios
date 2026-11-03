@@ -53,10 +53,15 @@ final class StorageService {
         NotificationCenter.default.post(name: Self.recordingsDidChangeNotification, object: nil)
     }
 
-    func addRecording(_ recording: Recording) {
+    /// Returns false if a recording with this id already exists.
+    @discardableResult
+    func addRecording(_ recording: Recording) -> Bool {
         var recordings = loadRecordings()
+        // The watch can resend a recording after a relaunch; one copy is enough.
+        guard !recordings.contains(where: { $0.id == recording.id }) else { return false }
         recordings.insert(recording, at: 0)
         saveRecordings(recordings)
+        return true
     }
 
     func updateRecording(_ recording: Recording) {

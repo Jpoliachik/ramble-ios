@@ -60,6 +60,7 @@ struct RambleApp: App {
                 ) { _ in
                     TranscriptionQueueService.shared.resumePendingJobs()
                     WebhookQueueService.shared.resumePendingJobs()
+                    RelayQueueService.shared.resumePendingJobs()
                 }
         }
     }

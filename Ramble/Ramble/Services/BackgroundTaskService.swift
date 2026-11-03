@@ -50,11 +50,13 @@ final class BackgroundTaskService {
         Task { @MainActor in
             let transcriptionQueue = TranscriptionQueueService.shared
             let webhookQueue = WebhookQueueService.shared
+            let relayQueue = RelayQueueService.shared
 
             transcriptionQueue.resumePendingJobs()
             webhookQueue.resumePendingJobs()
+            relayQueue.resumePendingJobs()
 
-            while transcriptionQueue.hasActiveWork || webhookQueue.hasActiveWork {
+            while transcriptionQueue.hasActiveWork || webhookQueue.hasActiveWork || relayQueue.hasActiveWork {
                 let remaining = UIApplication.shared.backgroundTimeRemaining
                 if remaining < 5 {
                     print("[Background] Running low on time (\(String(format: "%.0f", remaining))s), stopping")
@@ -95,12 +97,14 @@ final class BackgroundTaskService {
         let workTask = Task { @MainActor in
             let transcriptionQueue = TranscriptionQueueService.shared
             let webhookQueue = WebhookQueueService.shared
+            let relayQueue = RelayQueueService.shared
 
             transcriptionQueue.resumePendingJobs()
             webhookQueue.resumePendingJobs()
+            relayQueue.resumePendingJobs()
 
             let deadline = Date().addingTimeInterval(25)
-            while (transcriptionQueue.hasActiveWork || webhookQueue.hasActiveWork) && Date() < deadline {
+            while (transcriptionQueue.hasActiveWork || webhookQueue.hasActiveWork || relayQueue.hasActiveWork) && Date() < deadline {
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
             }
         }
