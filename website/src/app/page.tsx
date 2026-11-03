@@ -173,7 +173,6 @@ export default function Home() {
                   <span aria-hidden="true">&darr;</span>
                 </a>
               </div>
-              <p className="text-sm text-stone-500">{APP_PRICE}, once.</p>
             </div>
           </div>
 
