@@ -6,7 +6,7 @@
   --color-stone-200: #e7e4df;
   --color-stone-300: #d5d0c8;
   --color-stone-400: #a8a197;
-  --color-stone-500: #7c7568;
+  --color-stone-500: #6b6457;
   --color-stone-600: #57524a;
   --color-stone-700: #3d3a34;
   --color-stone-800: #2a2825;
@@ -27,6 +27,7 @@
   --color-cream-warm: #f9f5ed;
 
   --color-red-500: #d7263d;
+  --color-red-600: #c01f33;
 
   --font-sans: "SF Pro Display", "SF Pro", -apple-system, BlinkMacSystemFont,
     system-ui, "Segoe UI", Roboto, sans-serif;
@@ -34,6 +35,12 @@
     "Book Antiqua", Palatino, Georgia, serif;
   --font-mono: "SF Mono", ui-monospace, SFMono-Regular, "Cascadia Code",
     Menlo, monospace;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
 }
 
 body {

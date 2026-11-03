@@ -9,33 +9,36 @@ Marketing site for Ramble. Next.js with Tailwind CSS, statically exported.
 ```bash
 npm install
 npm run build    # Static export to out/
-npm run dev      # Dev server at localhost:3000/ramble
+npm run dev      # Dev server at localhost:3000
 ```
 
 ## Deployment
 
-- Hosted at `goodloop.dev/ramble` (separate repo)
-- `basePath: "/ramble"` is set in `next.config.ts` — all routes and assets are prefixed
-- `output: "export"` produces a plain `out/` folder of static HTML/CSS/JS
-- Copy the contents of `out/` into the goodloop.dev repo at the path serving `/ramble/`
-- No server runtime needed
+- Hosted on Vercel (its own project, root directory `website`). Every PR that touches `website/` gets a preview deployment; `vercel.json` skips builds for commits that don't.
+- Served from the root of Ramble's own domain (not chosen yet). There is no `basePath`.
+- `SITE_URL` in `src/lib/site.ts` comes from `NEXT_PUBLIC_SITE_URL`, falling back to Vercel's production URL. Set `NEXT_PUBLIC_SITE_URL` in Vercel once the domain exists.
+- `output: "export"` still produces a plain static `out/` folder.
 
 ## Image paths
 
-`next/image` with `unoptimized: true` does not prepend `basePath` in the static HTML output. Use plain `<img>` tags with the `BASE_PATH` constant (defined in each page file) for any images in `public/`. Example: `src={\`${BASE_PATH}/ramble-icon-light.png\`}`.
+Use plain `<img>` tags with `BASE_PATH` from `src/lib/site.ts` (currently empty) for images in `public/`, e.g. `src={`${BASE_PATH}/ramble-icon-light.png`}`, so a future basePath change stays one line.
 
 ## Pages
 
 | Route | File | Description |
 |-------|------|-------------|
 | `/` | `src/app/page.tsx` | Landing page — hero, value props, how-it-works, pricing |
-| `/docs` | `src/app/docs/page.tsx` | Webhook API docs (developer-targeted) |
+| `/docs` | `src/app/docs/page.tsx` | Connect your agent: pairing, Muse, relay API, what the relay stores |
+| `/docs/webhooks` | `src/app/docs/webhooks/page.tsx` | Webhook API docs (developer-targeted) |
 | `/privacy` | `src/app/privacy/page.tsx` | Privacy policy |
 | `/terms` | `src/app/terms/page.tsx` | Terms of use |
 
 ## Shared components
 
-- `src/components/code-block.tsx` — Client component with copy-to-clipboard button, used in docs page
+- `src/components/code-block.tsx` — Client component with copy-to-clipboard button, used in docs pages
+- `src/components/docs-sidebar.tsx` — Docs page switcher + "On this page" nav; pass `page="agent"` or `page="webhooks"`
+- `src/lib/site.ts` — Shared constants (prices, retention, relay URL, pairing code). Several are placeholders
+- `public/llms.txt` / `public/llms-full.txt` — Agent-readable summary and full reference; keep in sync with the docs pages
 - Footer is in `src/app/layout.tsx` (shared across all pages)
 
 ## Style

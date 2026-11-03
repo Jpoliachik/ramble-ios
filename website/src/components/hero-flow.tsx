@@ -1,18 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BrainCircuit, Zap, Code, Workflow, GitBranch } from "lucide-react";
+import { Bot, Circle, Sparkles, Zap } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 const destinations: { label: string; Icon: LucideIcon }[] = [
-  { label: "Your Agent", Icon: BrainCircuit },
-  { label: "Zapier", Icon: Zap },
-  { label: "Your API", Icon: Code },
-  { label: "Make", Icon: Workflow },
-  { label: "n8n", Icon: GitBranch },
+  { label: "Your agent", Icon: Bot },
+  { label: "Muse", Icon: Sparkles },
+  { label: "Grok Bot", Icon: Zap },
+  { label: "Dot", Icon: Circle },
 ];
 
 const SLIDE_MS = 350;
+const longestLabel = destinations.reduce((a, d) => (d.label.length > a.length ? d.label : a), "");
 
 export default function HeroFlow() {
   const [animate, setAnimate] = useState(false);
@@ -41,7 +41,7 @@ export default function HeroFlow() {
   const Prev = prevIndex !== null ? destinations[prevIndex] : null;
 
   return (
-    <div className="mb-8 flex items-center gap-3 sm:gap-4" aria-label="Ramble sends transcripts to your destination of choice">
+    <div className="mb-8 flex items-center gap-3 sm:gap-4" aria-label="Ramble sends what you say to your agent">
       {/* Left tile: Ramble app icon */}
       <div className="flex h-16 w-16 sm:h-20 sm:w-20 shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-stone-200/80">
         <svg
@@ -76,7 +76,7 @@ export default function HeroFlow() {
       </div>
 
       {/* Arrow with traveling dot */}
-      <div className="relative flex h-3 w-10 sm:w-16 shrink-0 items-center text-stone-400">
+      <div className="relative flex h-3 w-10 sm:w-16 shrink-0 items-center text-stone-500">
         <div className="h-[1.5px] w-full rounded-full bg-current" />
         <svg
           className="absolute -right-[2px] top-1/2 -translate-y-1/2"
@@ -95,38 +95,33 @@ export default function HeroFlow() {
         )}
       </div>
 
-      {/* Right tile: cycling destination */}
+      {/* Right tile: cycling destination. The tile itself clips the slide, and an
+          invisible copy of the longest label sets its width, so nothing is cut off mid-transition. */}
       <div
-        className={`flex shrink-0 items-center rounded-2xl bg-white px-3 py-2.5 sm:px-4 sm:py-3 shadow-sm ring-1 ring-stone-200/80 ${animate ? "hf-tile-flash" : ""}`}
+        className={`relative shrink-0 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-stone-200/80 ${animate ? "hf-tile-flash" : ""}`}
       >
-        <div className="relative h-5 sm:h-6 w-[5.75rem] sm:w-[6.5rem] overflow-hidden">
-          {/* Outgoing label */}
-          {Prev && (
-            <div
-              key={`prev-${prevIndex}`}
-              className="hf-slide-out absolute inset-0 flex items-center gap-2"
-              aria-hidden="true"
-            >
-              <Prev.Icon className="h-4 w-4 shrink-0 text-red-500" strokeWidth={2.25} />
-              <span className="whitespace-nowrap text-xs sm:text-sm font-medium text-stone-700">
-                {Prev.label}
-              </span>
-            </div>
-          )}
-          {/* Incoming / current label */}
-          <div
-            key={`curr-${index}`}
-            className={`absolute inset-0 flex items-center gap-2 ${Prev ? "hf-slide-in" : ""}`}
-          >
-            <Current.Icon className="h-4 w-4 shrink-0 text-red-500" strokeWidth={2.25} aria-hidden="true" />
-            <span className="whitespace-nowrap text-xs sm:text-sm font-medium text-stone-700">
-              {Current.label}
-            </span>
-          </div>
+        <div className="invisible flex items-center gap-2 px-3 py-2.5 sm:px-4 sm:py-3" aria-hidden="true">
+          <span className="h-4 w-4 shrink-0" />
+          <span className="whitespace-nowrap text-xs font-medium sm:text-sm">{longestLabel}</span>
         </div>
-        <span className="sr-only">
-          Send to your agent, Zapier, your API, Make, or n8n.
-        </span>
+        {Prev && (
+          <div
+            key={`prev-${prevIndex}`}
+            className="hf-slide-out absolute inset-0 flex items-center gap-2 px-3 sm:px-4"
+            aria-hidden="true"
+          >
+            <Prev.Icon className="h-4 w-4 shrink-0 text-red-500" strokeWidth={2.25} />
+            <span className="whitespace-nowrap text-xs font-medium text-stone-700 sm:text-sm">{Prev.label}</span>
+          </div>
+        )}
+        <div
+          key={`curr-${index}`}
+          className={`absolute inset-0 flex items-center gap-2 px-3 sm:px-4 ${Prev ? "hf-slide-in" : ""}`}
+        >
+          <Current.Icon className="h-4 w-4 shrink-0 text-red-500" strokeWidth={2.25} aria-hidden="true" />
+          <span className="whitespace-nowrap text-xs font-medium text-stone-700 sm:text-sm">{Current.label}</span>
+        </div>
+        <span className="sr-only">Sends what you say to your agent, like Muse, Grok Bot, or Dot.</span>
       </div>
 
       <style jsx>{`

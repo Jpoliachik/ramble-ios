@@ -1,40 +1,41 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Header from "../components/header";
+import { BASE_PATH, SITE_URL } from "../lib/site";
 import "./globals.css";
 
-const BASE_PATH = "/ramble";
-const SITE_URL = "https://goodloop.dev/ramble";
+const TITLE = "Ramble: Talk to your watch. Your agent handles it.";
+const DESCRIPTION =
+  "Stay in the moment. Capture a thought on your Apple Watch, leave your phone behind, and your agent handles it. Works offline. Transcripts are deleted once delivered.";
+const SHORT_DESCRIPTION =
+  "Stay in the moment. Capture the thought on your watch. Your agent handles it.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Ramble — Voice that goes somewhere",
+    default: TITLE,
     template: "%s — Ramble",
   },
-  description:
-    "Record on the go. Get accurate transcripts. Pipe them into your agent, workflow, or automation. Open source, private by design, no accounts.",
+  description: DESCRIPTION,
   openGraph: {
     type: "website",
     siteName: "Ramble",
-    title: "Ramble — Voice that goes somewhere",
-    description:
-      "Record on the go. Get accurate transcripts. Pipe them into your agent, workflow, or automation.",
+    title: TITLE,
+    description: SHORT_DESCRIPTION,
     url: SITE_URL,
     images: [
       {
         url: `${SITE_URL}/og-image.png`,
         width: 1200,
         height: 630,
-        alt: "Ramble — Voice that goes somewhere",
+        alt: "Ramble",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Ramble — Voice that goes somewhere",
-    description:
-      "Record on the go. Get accurate transcripts. Pipe them into your agent, workflow, or automation.",
+    title: TITLE,
+    description: SHORT_DESCRIPTION,
     images: [`${SITE_URL}/og-image.png`],
   },
 };
@@ -45,7 +46,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full antialiased">
+    <html lang="en" className="h-full antialiased" data-scroll-behavior="smooth">
       <body className="min-h-full flex flex-col bg-cream text-stone-900">
         <Header />
         {children}
@@ -57,30 +58,17 @@ export default function RootLayout({
               <span>Ramble</span>
             </div>
             <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-stone-500">
-              <a
-                href="https://apps.apple.com/app/id6761857751"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-stone-900 transition-colors"
-              >
-                App Store
-              </a>
-              <a
-                href="https://github.com/Jpoliachik/ramble-ios"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-stone-900 transition-colors"
-              >
-                GitHub
-              </a>
               <Link href="/docs" className="hover:text-stone-900 transition-colors">
                 Docs
               </Link>
+              <Link href="/docs/webhooks" className="hover:text-stone-900 transition-colors">
+                Webhooks
+              </Link>
               <Link href="/privacy" className="hover:text-stone-900 transition-colors">
-                Privacy Policy
+                Privacy
               </Link>
               <Link href="/terms" className="hover:text-stone-900 transition-colors">
-                Terms of Use
+                Terms
               </Link>
             </nav>
           </div>

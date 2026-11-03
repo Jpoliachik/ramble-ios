@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { APP_PRICE, APP_STORE_URL, CLOUD_PRICE, RETENTION } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Terms of Use",
   description: "Ramble terms of use. Simple terms for a simple app.",
 };
+
+const link = "underline hover:text-stone-900";
+const h2 = "text-base font-semibold text-stone-900";
 
 export default function TermsOfUse() {
   return (
@@ -12,22 +16,20 @@ export default function TermsOfUse() {
       <article className="mx-auto max-w-2xl px-6 py-16 sm:py-24">
         <Link
           href="/"
-          className="text-sm text-stone-400 hover:text-stone-600 transition-colors"
+          className="text-sm text-stone-500 hover:text-stone-900 transition-colors"
         >
           &larr; Back to Ramble
         </Link>
         <h1 className="mt-8 text-3xl font-semibold tracking-tight text-stone-900">
           Terms of Use
         </h1>
-        <p className="mt-2 text-sm text-stone-400">
-          Last updated: April 9, 2026
+        <p className="mt-2 text-sm text-stone-500">
+          Last updated: November 1, 2026
         </p>
 
         <div className="mt-10 space-y-8 text-sm leading-relaxed text-stone-600">
           <section>
-            <h2 className="text-base font-semibold text-stone-900">
-              Acceptance of terms
-            </h2>
+            <h2 className={h2}>Acceptance of terms</h2>
             <p className="mt-2">
               By downloading, installing, or using Ramble (&quot;the App&quot;),
               you agree to these Terms of Use. If you do not agree, do not use
@@ -36,69 +38,86 @@ export default function TermsOfUse() {
           </section>
 
           <section>
-            <h2 className="text-base font-semibold text-stone-900">
-              What Ramble provides
-            </h2>
+            <h2 className={h2}>What Ramble provides</h2>
             <p className="mt-2">
-              Ramble is a voice recording and transcription app for iPhone and
-              Apple Watch. It provides:
+              Ramble is an Apple Watch and iPhone app that records what you say,
+              transcribes it, and forwards the transcript to your agent. It
+              provides:
             </p>
             <ul className="mt-2 list-disc pl-5 space-y-1">
-              <li>Audio recording with local storage on your device</li>
+              <li>Audio recording with local storage on your devices</li>
+              <li>On-device transcription via Apple Speech</li>
               <li>
-                On-device transcription via Apple Speech (free, included)
+                Ramble Relay, which holds transcripts until an agent you have
+                connected picks them up
               </li>
+              <li>Webhook delivery of transcripts to URLs you configure</li>
               <li>
-                Cloud transcription via third-party providers (requires
-                subscription)
-              </li>
-              <li>
-                Webhook delivery of transcriptions to URLs you configure
+                Optional cloud transcription via third-party providers
+                (requires a subscription)
               </li>
             </ul>
           </section>
 
           <section>
-            <h2 className="text-base font-semibold text-stone-900">
-              Subscription
-            </h2>
+            <h2 className={h2}>Purchase and subscription</h2>
             <p className="mt-2">
-              Cloud transcription requires a paid subscription at $3.99/month,
-              billed through Apple&apos;s App Store. The subscription
-              auto-renews unless cancelled at least 24 hours before the end of
-              the current billing period. You can manage or cancel your
-              subscription in your Apple ID settings.
+              Ramble is a one-time purchase of {APP_PRICE} through Apple&apos;s
+              App Store.
             </p>
             <p className="mt-2">
-              On-device transcription (Apple Speech) and webhook delivery are
-              free and do not require a subscription.
+              Cloud transcription is an optional subscription at{" "}
+              {CLOUD_PRICE}, billed through Apple&apos;s App Store. It
+              auto-renews unless cancelled at least 24 hours before the end of
+              the current period. Cancel any time in your Apple ID settings;
+              everything else in the App keeps working.
+            </p>
+            <p className="mt-2">
+              Refunds are handled by Apple under its App Store policies.
             </p>
           </section>
 
           <section>
-            <h2 className="text-base font-semibold text-stone-900">
-              Your data
-            </h2>
+            <h2 className={h2}>Your data</h2>
             <p className="mt-2">
-              You own your data. Ramble stores recordings and transcriptions
-              locally on your device. We do not have access to your content. See
-              our{" "}
-              <Link href="/privacy" className="underline hover:text-stone-900">
+              You own your recordings and transcripts. They are stored on your
+              devices. Transcripts you send to an agent pass through the relay
+              and are deleted on delivery. See our{" "}
+              <Link href="/privacy" className={link}>
                 Privacy Policy
               </Link>{" "}
-              for details.
+              for exactly what is stored and for how long.
             </p>
           </section>
 
           <section>
-            <h2 className="text-base font-semibold text-stone-900">
-              Webhooks and third-party services
-            </h2>
+            <h2 className={h2}>Ramble Relay</h2>
             <p className="mt-2">
-              If you configure a webhook, Ramble will send transcription data to
-              the URL you provide. You are responsible for the security and
-              handling of data at your webhook endpoint. Ramble is not
-              responsible for any third-party service you connect to.
+              The relay is provided on a best-effort basis. Transcripts that
+              your agent has not acknowledged are deleted after {RETENTION} at
+              most.
+              Your agent must pull them within that window. A transcript deleted
+              this way is still on your iPhone, but it will not be delivered to
+              the agent again.
+            </p>
+            <p className="mt-2">
+              When you connect an agent, you authorize it to read and
+              acknowledge the transcripts sent to your inbox. You are
+              responsible for choosing which agents to connect and for what
+              they do with your transcripts. You can revoke an agent at any
+              time with Disconnect, and delete everything queued for your
+              agents with Delete everything now.
+            </p>
+          </section>
+
+          <section>
+            <h2 className={h2}>Agents, webhooks, and third-party services</h2>
+            <p className="mt-2">
+              Agents you connect and webhooks you configure are operated by
+              you or by third parties. You are responsible for the security and
+              handling of data once it reaches them. Ramble is not responsible
+              for any third-party service you connect to, and your use of an
+              agent is subject to its provider&apos;s terms.
             </p>
             <p className="mt-2">
               Cloud transcription is provided by third-party services (Groq,
@@ -108,21 +127,16 @@ export default function TermsOfUse() {
           </section>
 
           <section>
-            <h2 className="text-base font-semibold text-stone-900">
-              Acceptable use
-            </h2>
+            <h2 className={h2}>Acceptable use</h2>
             <p className="mt-2">You agree not to:</p>
             <ul className="mt-2 list-disc pl-5 space-y-1">
               <li>
                 Use the App in violation of any applicable laws or regulations
               </li>
               <li>
-                Attempt to circumvent the subscription requirement for cloud
-                transcription
-              </li>
-              <li>
-                Use the cloud transcription proxy for purposes other than
-                Ramble&apos;s intended functionality
+                Use the cloud transcription proxy or the hosted relay for
+                purposes other than Ramble&apos;s intended functionality, or
+                interfere with their operation
               </li>
               <li>
                 Record others without their knowledge or consent where required
@@ -132,51 +146,27 @@ export default function TermsOfUse() {
           </section>
 
           <section>
-            <h2 className="text-base font-semibold text-stone-900">
-              Open source
-            </h2>
+            <h2 className={h2}>Disclaimer of warranties</h2>
             <p className="mt-2">
-              Ramble&apos;s source code is available under an open source
-              license on{" "}
-              <a
-                href="https://github.com/Jpoliachik/ramble-ios"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline hover:text-stone-900"
-              >
-                GitHub
-              </a>
-              . The open source license governs use of the source code. These
-              Terms govern your use of the App as distributed on the App Store.
+              The App and its hosted services are provided &quot;as is&quot;
+              without warranties of any kind, express or implied. We do not
+              guarantee uninterrupted service, transcription accuracy, or
+              delivery to your agent or webhook.
             </p>
           </section>
 
           <section>
-            <h2 className="text-base font-semibold text-stone-900">
-              Disclaimer of warranties
-            </h2>
-            <p className="mt-2">
-              The App is provided &quot;as is&quot; without warranties of any
-              kind, express or implied. We do not guarantee uninterrupted
-              service, transcription accuracy, or webhook delivery reliability.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-base font-semibold text-stone-900">
-              Limitation of liability
-            </h2>
+            <h2 className={h2}>Limitation of liability</h2>
             <p className="mt-2">
               To the maximum extent permitted by law, the developer of Ramble
               shall not be liable for any indirect, incidental, special, or
-              consequential damages arising from your use of the App.
+              consequential damages arising from your use of the App, including
+              actions taken by agents or services you connect.
             </p>
           </section>
 
           <section>
-            <h2 className="text-base font-semibold text-stone-900">
-              Changes to these terms
-            </h2>
+            <h2 className={h2}>Changes to these terms</h2>
             <p className="mt-2">
               These terms may be updated from time to time. The updated version
               will be posted here with a new date. Continued use of the App
@@ -185,16 +175,16 @@ export default function TermsOfUse() {
           </section>
 
           <section>
-            <h2 className="text-base font-semibold text-stone-900">Contact</h2>
+            <h2 className={h2}>Contact</h2>
             <p className="mt-2">
-              Questions about these terms? Open an issue on{" "}
+              Questions about these terms? Use the support link on{" "}
               <a
-                href="https://github.com/Jpoliachik/ramble-ios/issues"
+                href={APP_STORE_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="underline hover:text-stone-900"
+                className={link}
               >
-                GitHub
+                Ramble&apos;s App Store page
               </a>
               .
             </p>
