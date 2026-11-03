@@ -7,8 +7,6 @@ import {
   APP_STORE_URL,
   CLOUD_PRICE,
   BASE_PATH,
-  PAIR_CODE_EXAMPLE,
-  PAIR_CODE_TTL,
   PULL_CADENCE,
   RETENTION,
   SITE_URL,
@@ -270,23 +268,10 @@ export default function Home() {
             </div>
             <div className="mt-4 flex flex-col gap-2.5 text-sm">
               <p className="max-w-[85%] self-end rounded-2xl rounded-br-md bg-stone-900 px-4 py-2.5 text-white">
-                Set up Ramble for me. <span className="whitespace-nowrap underline underline-offset-2">{SITE_HOST}/docs</span>
-              </p>
-              <p className="max-w-[85%] self-start rounded-2xl rounded-bl-md bg-stone-100 px-4 py-2.5 text-stone-900">
-                On it. Open Ramble, tap Connect agent, and send me the code.
-              </p>
-              <p className="max-w-[85%] self-end rounded-2xl rounded-br-md bg-stone-900 px-4 py-2.5 font-mono text-white">
-                {PAIR_CODE_EXAMPLE}
-              </p>
-              <p className="max-w-[85%] self-start rounded-2xl rounded-bl-md bg-stone-100 px-4 py-2.5 text-stone-900">
-                Connected. Anything you tell your watch comes to me now.
+                Help me connect Ramble. <span className="whitespace-nowrap underline underline-offset-2">{SITE_HOST}/docs</span>
               </p>
             </div>
           </div>
-          <p className="mx-auto mt-6 max-w-md text-center text-xs leading-relaxed text-stone-500">
-            The code works once and expires in {PAIR_CODE_TTL}. Your agent can only pick up your transcripts. Disconnect
-            any time from the same screen.
-          </p>
 
           <p className="mt-14 text-center text-sm text-stone-500">
             Have your own endpoint?
