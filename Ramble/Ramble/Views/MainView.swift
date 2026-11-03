@@ -6,6 +6,8 @@ import SwiftUI
 
 struct MainView: View {
     @StateObject private var viewModel = RecordingViewModel()
+    @ObservedObject private var relay = RelayService.shared
+    @Environment(\.scenePhase) private var scenePhase
     @State private var showSettings = false
     @State private var scrollOffset: CGFloat = 0
     @State private var showOnboardingToast = false
@@ -20,6 +22,21 @@ struct MainView: View {
         min(max(scrollOffset / scrollThreshold, 0), 1)
     }
 
+    /// Transcripts the relay is holding for the agent. Comes from the relay's
+    /// own count, since the phone never hears when the agent picks one up.
+    private var waitingCount: Int {
+        relay.connections.map(\.pending).max() ?? 0
+    }
+
+    private var showSyncBanner: Bool {
+        SyncStatusBannerView.isVisible(
+            transcribing: viewModel.pendingCount,
+            sending: viewModel.sendingCount,
+            waiting: waitingCount,
+            failed: viewModel.needsAttentionCount
+        )
+    }
+
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottom) {
@@ -30,8 +47,8 @@ struct MainView: View {
                     isRecording: viewModel.isRecording,
                     scrollOffset: $scrollOffset
                 )
-                .contentMargins(.top, 48, for: .scrollContent)
-                .contentMargins(.bottom, 120, for: .scrollContent)
+                .contentMargins(.top, showSyncBanner ? 100 : 48, for: .scrollContent)
+                .contentMargins(.bottom, viewModel.isRecording ? 200 : 96, for: .scrollContent)
 
                 // Top bar — floats over list, slides apart and fades on scroll
                 VStack {
@@ -60,8 +77,20 @@ struct MainView: View {
                     .padding(.bottom, 4)
                     .allowsHitTesting(scrollProgress < 0.5)
                     .animation(.easeOut(duration: 0.15), value: scrollProgress)
+
+                    if showSyncBanner {
+                        SyncStatusBannerView(
+                            transcribingCount: viewModel.pendingCount,
+                            sendingCount: viewModel.sendingCount,
+                            waitingCount: waitingCount,
+                            failedCount: viewModel.needsAttentionCount
+                        )
+                        .transition(.opacity)
+                    }
+
                     Spacer()
                 }
+                .animation(.easeInOut(duration: 0.2), value: showSyncBanner)
 
                 // Floating bottom controls
                 RecordingControlsView(
@@ -78,7 +107,7 @@ struct MainView: View {
                         viewModel.cancelRecording()
                     }
                 )
-                .padding(.top, 80)
+                .padding(.top, viewModel.isRecording ? 80 : 24)
                 .padding(.bottom, 16)
                 .frame(maxWidth: .infinity)
                 .background(alignment: .top) {
@@ -137,6 +166,14 @@ struct MainView: View {
         }
         .onAppear {
             triggerOnboardingToastIfNeeded()
+        }
+        .task {
+            // Fills the "waiting for your agent" count; harmless when nothing is connected.
+            _ = try? await relay.refreshConnections()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task { _ = try? await relay.refreshConnections() }
         }
         .onChange(of: shouldShowOnboardingToast) { _, newValue in
             // Catches the in-session case: MainView is already mounted when the

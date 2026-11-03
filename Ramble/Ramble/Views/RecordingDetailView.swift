@@ -17,6 +17,8 @@ struct RecordingDetailView: View {
     @State private var isTranscriptExpanded = false
     @State private var transcriptFullHeight: CGFloat = 0
     @State private var transcriptLimitedHeight: CGFloat = 0
+    @State private var showConnectAgent = false
+    @ObservedObject private var relay = RelayService.shared
 
     private var isTranscriptTruncated: Bool {
         transcriptFullHeight > transcriptLimitedHeight + 1
@@ -77,6 +79,9 @@ struct RecordingDetailView: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: showCopied)
+        .sheet(isPresented: $showConnectAgent) {
+            ConnectAgentView()
+        }
         .onAppear { refreshRecording() }
         .onReceive(NotificationCenter.default.publisher(for: StorageService.recordingsDidChangeNotification)) { _ in
             refreshRecording()
@@ -127,16 +132,19 @@ struct RecordingDetailView: View {
                 ProgressView().scaleEffect(0.7)
                 Text("Transcribing")
             case .completed:
-                switch recording.webhookStatus {
+                switch recording.deliveryStatus {
                 case .pending, .sending:
                     ProgressView().scaleEffect(0.7)
-                    Text("Sending webhook")
+                    Text("Sending")
                 case .failed:
                     Image(systemName: "exclamationmark.triangle.fill")
-                    Text("Webhook failed")
-                case .delivered, .none:
+                    Text(recording.relayStatus == .failed ? "Agent delivery failed" : "Webhook failed")
+                case .delivered:
                     Image(systemName: "checkmark.circle.fill")
-                    Text("Completed")
+                    Text("Sent")
+                case .none:
+                    Image(systemName: "tray")
+                    Text("Not sent")
                 }
             case .failed:
                 Image(systemName: "exclamationmark.circle.fill")
@@ -156,10 +164,11 @@ struct RecordingDetailView: View {
         case .recorded: return recording.lastError != nil ? .orange : .secondary
         case .transcribing: return .blue
         case .completed:
-            switch recording.webhookStatus {
+            switch recording.deliveryStatus {
             case .sending, .pending: return .blue
             case .failed: return .orange
-            case .delivered, .none: return .green
+            case .delivered: return .green
+            case .none: return .secondary
             }
         case .failed: return .red
         }
@@ -357,6 +366,23 @@ struct RecordingDetailView: View {
             if recording.webhookStatus != nil && SettingsService.shared.load().isWebhookConfigured {
                 webhookActionRow(for: recording)
             }
+
+            if relay.hasConnectedAgents {
+                if recording.relayStatus != nil || recording.status == .completed {
+                    relayActionRow(for: recording)
+                }
+            } else if recording.status == .completed && recording.deliveryStatus == nil {
+                Button {
+                    HapticService.buttonTap()
+                    showConnectAgent = true
+                } label: {
+                    Label("Connect your agent", systemImage: "link")
+                }
+            }
+        } footer: {
+            if recording.status == .completed && recording.deliveryStatus == nil && !relay.hasConnectedAgents {
+                Text("This transcript is only on your phone. Connect your agent to send it there.")
+            }
         }
     }
 
@@ -384,6 +410,35 @@ struct RecordingDetailView: View {
                 }
             } label: {
                 Label("Resend Webhook", systemImage: "paperplane")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func relayActionRow(for recording: Recording) -> some View {
+        let inFlight = recording.relayStatus == .sending || recording.relayStatus == .pending
+
+        if inFlight {
+            HStack(spacing: 10) {
+                ProgressView().controlSize(.small)
+                Text("Sending to agent…")
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+            .accessibilityElement(children: .combine)
+        } else {
+            Button {
+                HapticService.buttonTap()
+                RelayQueueService.shared.resend(recordingId: recording.id)
+                Task {
+                    try? await Task.sleep(nanoseconds: 500_000_000)
+                    refreshRecording()
+                }
+            } label: {
+                Label(
+                    recording.relayStatus == nil ? "Send to Agent" : "Send to Agent Again",
+                    systemImage: "arrow.up.circle"
+                )
             }
         }
     }

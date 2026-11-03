@@ -26,8 +26,8 @@ These are free features from existing providers (no extra API calls or cost):
 ### Release plan
 
 - Open source the repo on GitHub
-- Free app on App Store (Apple Speech on-device transcription + webhook — costs nothing to run)
-- $3.99/month subscription unlocks cloud transcription models via Cloudflare Worker proxy
+- Paid app on App Store, $4.99 one-time (Apple Speech on-device transcription, agent relay, webhook)
+- Optional $2.99/month subscription unlocks cloud transcription models via Cloudflare Worker proxy
 - Marketing website on Vercel, moving to Ramble's own domain (source in `website/`, static export)
 - **App Store URL:** https://apps.apple.com/app/id6761857751 (Apple ID: 6761857751)
 
@@ -87,7 +87,7 @@ Ramble/
 ├── watch Watch App/   # watchOS companion
 └── Ramble.xcodeproj/
 website/               # Marketing site (Next.js static export)
-proxy/                 # Cloudflare Worker transcription proxy
+proxy/                 # Cloudflare Worker: transcription proxy + agent relay (RELAY.md)
 ```
 
 ### Data Flow
@@ -150,5 +150,5 @@ Apple App Attest implemented. Client-side attestation via `DCAppAttestService` p
 
 - **Transcript browsing UX for v1:** Just scroll the list. No search, no tags, no folders.
 - **Watch complication:** Not in v1.
-- **Pricing:** Free app + $3.99/month subscription for cloud transcription. On-device Apple Speech and webhook are free.
+- **Pricing:** $4.99 one-time app purchase. Optional $2.99/month subscription for cloud transcription. On-device Apple Speech, the relay, and webhooks need no subscription.
 - **Platform:** Apple only (iPhone + Apple Watch). No Android, no web.

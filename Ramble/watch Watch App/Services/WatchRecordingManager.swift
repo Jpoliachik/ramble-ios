@@ -30,12 +30,43 @@ final class WatchRecordingManager: ObservableObject {
         audioRecorder.$audioLevel.assign(to: &$audioLevel)
     }
 
-    func startRecording() {
+    private var isStarting = false
+
+    /// True when the user has turned the microphone off for Ramble.
+    var isMicrophoneDenied: Bool {
+        AVAudioApplication.shared.recordPermission == .denied
+    }
+
+    /// Returns false if recording could not start (e.g. no microphone access).
+    /// Asks for microphone access first if it hasn't been asked yet.
+    @discardableResult
+    func startRecording() async -> Bool {
+        guard !isRecording, !isStarting else { return isRecording }
+        isStarting = true
+        defer { isStarting = false }
+
+        guard await Self.hasMicrophoneAccess() else { return false }
+
         do {
             _ = try audioRecorder.startRecording()
             connectivity.sendRecordingStarted()
+            return true
         } catch {
             print("Failed to start recording: \(error)")
+            return false
+        }
+    }
+
+    private static func hasMicrophoneAccess() async -> Bool {
+        switch AVAudioApplication.shared.recordPermission {
+        case .granted:
+            return true
+        case .denied:
+            return false
+        case .undetermined:
+            return await AVAudioApplication.requestRecordPermission()
+        @unknown default:
+            return true
         }
     }
 
@@ -45,9 +76,10 @@ final class WatchRecordingManager: ObservableObject {
 
         // Add to persistent queue FIRST, then attempt transfer
         let audioFileName = result.url.lastPathComponent
+        // createdAt is when the recording started, matching the phone's own recordings
         let job = syncQueue.addJob(
             audioFileName: audioFileName,
-            createdAt: Date(),
+            createdAt: Date().addingTimeInterval(-result.duration),
             duration: result.duration
         )
 

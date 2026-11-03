@@ -5,21 +5,57 @@
 
 import AppIntents
 
+/// Starting stays silent: a spoken reply would land in the recording.
+/// A haptic confirms the start instead. Failures are spoken, since nothing is recording.
+nonisolated enum WatchRecordingIntentError: Error, CustomLocalizedStringResourceConvertible {
+    case microphoneDenied
+    case couldNotStart
+
+    var localizedStringResource: LocalizedStringResource {
+        switch self {
+        case .microphoneDenied:
+            return "Allow microphone in Settings."
+        case .couldNotStart:
+            return "Couldn't start recording."
+        }
+    }
+}
+
+@MainActor
+private func startRecordingFromIntent() async throws {
+    let manager = WatchRecordingManager.shared
+    guard await manager.startRecording() else {
+        WatchHapticService.failure()
+        throw manager.isMicrophoneDenied
+            ? WatchRecordingIntentError.microphoneDenied
+            : WatchRecordingIntentError.couldNotStart
+    }
+    WatchHapticService.recordStart()
+}
+
+@MainActor
+private func stopRecordingFromIntent() {
+    WatchHapticService.recordStop()
+    WatchRecordingManager.shared.stopRecordingAndTransfer()
+}
+
 struct WatchStartRecordingIntent: AppIntent {
     static var title: LocalizedStringResource = "Start a Ramble"
-    static var description: IntentDescription = "Start recording a voice journal entry"
+    static var description: IntentDescription = "Start recording on your watch"
     static var openAppWhenRun = true
 
     @MainActor
-    func perform() async throws -> some IntentResult & ProvidesDialog {
-        WatchRecordingManager.shared.startRecording()
-        return .result(dialog: "Recording started.")
+    func perform() async throws -> some IntentResult {
+        if !WatchRecordingManager.shared.isRecording {
+            try await startRecordingFromIntent()
+        }
+        return .result()
     }
 }
 
 struct WatchStopRecordingIntent: AppIntent {
     static var title: LocalizedStringResource = "Stop my Ramble"
-    static var description: IntentDescription = "Stop the current recording and save it"
+    static var description: IntentDescription = "Stop the current recording and send it to your iPhone"
     static var openAppWhenRun = true
 
     @MainActor
@@ -27,25 +63,24 @@ struct WatchStopRecordingIntent: AppIntent {
         guard WatchRecordingManager.shared.isRecording else {
             return .result(dialog: "No recording in progress.")
         }
-        WatchRecordingManager.shared.stopRecordingAndTransfer()
-        return .result(dialog: "Recording saved.")
+        stopRecordingFromIntent()
+        return .result(dialog: "Saved.")
     }
 }
 
+/// Silent both ways so the start path never speaks. The haptic tells you which way it went.
 struct WatchToggleRecordingIntent: AppIntent {
     static var title: LocalizedStringResource = "Ramble"
-    static var description: IntentDescription = "Start or stop a voice journal recording"
+    static var description: IntentDescription = "Start or stop a recording"
     static var openAppWhenRun = true
 
     @MainActor
-    func perform() async throws -> some IntentResult & ProvidesDialog {
-        let manager = WatchRecordingManager.shared
-        if manager.isRecording {
-            manager.stopRecordingAndTransfer()
-            return .result(dialog: "Recording saved.")
+    func perform() async throws -> some IntentResult {
+        if WatchRecordingManager.shared.isRecording {
+            stopRecordingFromIntent()
         } else {
-            manager.startRecording()
-            return .result(dialog: "Recording started.")
+            try await startRecordingFromIntent()
         }
+        return .result()
     }
 }

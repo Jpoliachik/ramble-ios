@@ -10,14 +10,14 @@ struct WatchRecordButtonView: View {
     var audioLevel: Float = 0
     let action: () -> Void
 
-    private let buttonSize: CGFloat = 80
+    private let buttonSize: CGFloat = 88
 
     // Bar configuration
     private let barWidth: CGFloat = 10
     private let barSpacing: CGFloat = 6
     private let barCornerRadius: CGFloat = 5
     private let minBarHeight: CGFloat = 10
-    private let maxBarHeight: CGFloat = 36
+    private let maxBarHeight: CGFloat = 38
     private let barScales: [CGFloat] = [0.7, 1.0, 0.8]
 
     private func barHeight(for index: Int) -> CGFloat {
@@ -30,7 +30,7 @@ struct WatchRecordButtonView: View {
             ZStack {
                 // Border ring
                 Circle()
-                    .stroke(Color.red, lineWidth: 4)
+                    .stroke(Color.brandRed, lineWidth: 4)
                     .frame(width: buttonSize, height: buttonSize)
 
                 if isRecording {
@@ -38,7 +38,7 @@ struct WatchRecordButtonView: View {
                     HStack(spacing: barSpacing) {
                         ForEach(0..<3, id: \.self) { index in
                             RoundedRectangle(cornerRadius: barCornerRadius)
-                                .fill(Color.red)
+                                .fill(Color.brandRed)
                                 .frame(width: barWidth, height: barHeight(for: index))
                         }
                     }
@@ -46,13 +46,16 @@ struct WatchRecordButtonView: View {
                 } else {
                     // Filled circle
                     Circle()
-                        .fill(Color.red)
+                        .fill(Color.brandRed)
                         .frame(width: buttonSize - 16, height: buttonSize - 16)
                 }
             }
+            .contentShape(Circle())
         }
         .buttonStyle(.plain)
+        .handGestureShortcut(.primaryAction)
         .animation(.easeInOut(duration: 0.3), value: isRecording)
+        .accessibilityLabel(isRecording ? "Stop recording" : "Record")
     }
 }
 

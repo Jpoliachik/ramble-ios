@@ -3,11 +3,12 @@ name: CI
 # One gate for every pull request. Each area only runs when its files change,
 # and the final `CI passed` job sums them up, so branch protection needs to
 # require just that one check.
+#
+# The iOS + watchOS app builds on Xcode Cloud (PR builds and TestFlight on
+# main), not here, because macOS runners cost extra on a private repo.
 
 on:
   pull_request:
-    # ready_for_review lets the Mac build run once a draft is marked ready.
-    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
   workflow_dispatch:
@@ -25,7 +26,6 @@ jobs:
     name: Detect changes
     runs-on: ubuntu-latest
     outputs:
-      app: ${{ steps.filter.outputs.app }}
       website: ${{ steps.filter.outputs.website }}
       proxy: ${{ steps.filter.outputs.proxy }}
     steps:
@@ -34,9 +34,6 @@ jobs:
         id: filter
         with:
           filters: |
-            app:
-              - 'Ramble/**'
-              - '.github/workflows/ci.yml'
             website:
               - 'website/**'
               - '.github/workflows/ci.yml'
@@ -82,41 +79,10 @@ jobs:
       - run: npx tsc --noEmit
       - run: npm run build
 
-  app:
-    name: iOS + watchOS build
-    needs: changes
-    # macOS minutes bill at 10x on private repos, so skip draft PRs and
-    # anything that doesn't touch the app.
-    if: needs.changes.outputs.app == 'true' && github.event.pull_request.draft != true
-    runs-on: macos-26
-    timeout-minutes: 30
-    env:
-      PROJECT: Ramble/Ramble.xcodeproj
-      # CI only compiles for the simulator, so no signing identity is needed.
-      SIGNING: CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=
-    steps:
-      - uses: actions/checkout@v5
-      - name: Show Xcode
-        run: xcodebuild -version
-      - name: Build iOS app
-        run: |
-          set -o pipefail
-          xcodebuild build \
-            -project "$PROJECT" -scheme Ramble \
-            -destination 'generic/platform=iOS Simulator' \
-            -derivedDataPath build $SIGNING | xcbeautify --renderer github-actions
-      - name: Build watch app
-        run: |
-          set -o pipefail
-          xcodebuild build \
-            -project "$PROJECT" -scheme "watch Watch App" \
-            -destination 'generic/platform=watchOS Simulator' \
-            -derivedDataPath build $SIGNING | xcbeautify --renderer github-actions
-
   ci-passed:
     name: CI passed
     if: always()
-    needs: [changes, proxy, website, app]
+    needs: [changes, proxy, website]
     runs-on: ubuntu-latest
     steps:
       - name: Fail if any check failed or was cancelled

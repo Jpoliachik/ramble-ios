@@ -41,11 +41,11 @@ struct OnboardingTranscribeStep: View {
 
                     OnboardingSectionHeader(
                         title: "Cloud · premium",
-                        trailing: subscriptionService.isPremium ? nil : "$3.99 / month"
+                        trailing: subscriptionService.isPremium ? nil : "$2.99 / month"
                     )
                     cloudRows
 
-                    Text("Cloud transcription routes through our open-source proxy. No audio or text is stored on our servers.")
+                    Text("Cloud transcription sends audio through our proxy to the provider. The proxy doesn't keep the audio or the text.")
                         .font(.system(size: 13))
                         .foregroundStyle(Color.obInkFaint)
                         .lineSpacing(2)

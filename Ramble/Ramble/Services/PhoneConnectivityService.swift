@@ -182,7 +182,7 @@ extension PhoneConnectivityService: WCSessionDelegate {
             )
 
             Task { @MainActor in
-                storageService.addRecording(recording)
+                guard storageService.addRecording(recording) else { return }
                 TranscriptionQueueService.shared.enqueue(recordingId: recording.id)
             }
 
