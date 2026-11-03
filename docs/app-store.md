@@ -11,7 +11,7 @@ Talk to your watch. Done.
 ## Promotional text (170 max)
 
 ```
-Got a thought? Tap your Apple Watch and say it. Ramble writes it down and hands it to your agent, so you can stop holding onto it.
+Your Apple Watch is all you need. Say the thought, then get back to what you were doing. Your agent handles it. No phone, no app, no waiting for a reply.
 ```
 
 ## Keywords (100 max)
@@ -23,7 +23,7 @@ wrist,todo,voice,dictation,transcribe,speech to text,reminder,assistant,memo,not
 ## Description
 
 ```
-Got a thought? Tap your Apple Watch and say it. Ramble writes it down and hands it to your agent, so you can stop holding onto it.
+Your Apple Watch is all you need. Say the thought, then get back to what you were doing. Your agent handles it. No phone, no app, no waiting for a reply.
 
 A to-do, an idea, something to look up later. Messy is fine. Your agent picks it up within a few minutes and deals with it. No phone out, no reply to wait for.
 

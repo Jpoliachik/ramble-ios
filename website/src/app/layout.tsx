@@ -6,7 +6,7 @@ import "./globals.css";
 
 const TITLE = "Ramble: Talk to your watch. Your agent handles it.";
 const DESCRIPTION =
-  "Got a thought? Tap your Apple Watch and say it. Ramble writes it down and hands it to your agent, so you can stop holding onto it. Transcripts are deleted once delivered.";
+  "Your Apple Watch is all you need. Say the thought, get back to what you were doing, and your agent handles it. Transcripts are deleted once delivered.";
 const SHORT_DESCRIPTION =
   "Tap your Apple Watch and say it. Ramble hands it to your agent.";
 

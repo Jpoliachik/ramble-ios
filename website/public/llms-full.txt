@@ -1,6 +1,6 @@
 # Ramble — Complete Reference
 
-Ramble into your Apple Watch. Your agent handles it.
+Ramble to your Apple Watch. Your agent handles it.
 
 Tap the watch and talk. The iPhone transcribes it and passes the text to your agent, which picks it up on a schedule and deals with it. No accounts. Audio never leaves the phone for the relay.
 

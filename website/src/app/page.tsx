@@ -157,14 +157,13 @@ export default function Home() {
             <div className="hero-enter-logo">
               <HeroFlow />
             </div>
-            <h1 className="hero-enter-title font-serif text-4xl font-semibold tracking-tight text-stone-900 sm:text-5xl lg:text-[2.9rem] lg:leading-[1.1]">
-              Ramble into your watch.
-              <br />
-              <span className="italic text-red-500">Your agent handles it.</span>
+            <h1 className="hero-enter-title font-serif text-[1.9rem] font-semibold leading-[1.15] tracking-tight text-stone-900 min-[400px]:text-4xl sm:text-5xl lg:text-[2.9rem] lg:leading-[1.1]">
+              <span className="block whitespace-nowrap">Ramble to your watch.</span>
+              <span className="block whitespace-nowrap italic text-red-500">Your agent handles it.</span>
             </h1>
             <p className="hero-enter-subtitle mt-6 max-w-xl text-base leading-relaxed text-stone-500 sm:text-lg lg:text-xl">
-              Got a thought? Tap your watch and say it. Ramble writes it down and hands it to your agent, so you can
-              stop holding onto it.
+              Your watch is all you need. Say the thought, then get back to what you were doing. No phone, no app, no
+              waiting for a reply.
             </p>
             <div className="hero-enter-buttons mt-10 flex flex-col items-center gap-3 lg:items-start">
               <div className="flex flex-col items-center gap-4 sm:flex-row">
