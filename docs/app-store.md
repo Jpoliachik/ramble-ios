@@ -11,7 +11,7 @@ Talk to your watch. Done.
 ## Promotional text (170 max)
 
 ```
-Your Apple Watch is all you need. Say the thought, then get back to what you were doing. Your agent handles it. No phone, no app, no waiting for a reply.
+Stay in the moment. Capture the thought on your Apple Watch and leave your phone behind. Your agent handles it, and you come back to it later.
 ```
 
 ## Keywords (100 max)
@@ -23,9 +23,9 @@ wrist,todo,voice,dictation,transcribe,speech to text,reminder,assistant,memo,not
 ## Description
 
 ```
-Your Apple Watch is all you need. Say the thought, then get back to what you were doing. Your agent handles it. No phone, no app, no waiting for a reply.
+Stay in the moment. Capture the thought on your Apple Watch and leave your phone behind. Your agent handles it, and you come back to it later.
 
-A to-do, an idea, something to look up later. Messy is fine. Your agent picks it up within a few minutes and deals with it. No phone out, no reply to wait for.
+An idea, a to-do, a note on something you're working on. Messy is fine. There's no reply to wait for: say it and move on. No connection? It waits on your watch and goes out when you reconnect.
 
 SETUP
 In Settings, tap Connect agent to get a short code. Tell your agent "I downloaded Ramble, connect it" and paste the code. That's it.

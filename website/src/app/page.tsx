@@ -42,15 +42,15 @@ function SectionHeading({ eyebrow, children, sub }: { eyebrow: string; children:
 const steps = [
   {
     title: "Say it",
-    body: "Tap your watch and talk. A to-do, an idea, something to look up later. Messy is fine.",
+    body: "Tap your watch and talk. An idea, a to-do, a note on something you're working on. Messy is fine.",
   },
   {
-    title: "Ramble writes it down",
-    body: "Your iPhone turns it into text. The audio stays on your phone.",
+    title: "Let it go",
+    body: "No reply to wait for. Offline? It waits on your watch and goes out when you reconnect.",
   },
   {
-    title: "Your agent takes it",
-    body: `Your agent picks it up within about ${PULL_CADENCE} and deals with it. You don't have to.`,
+    title: "Come back later",
+    body: `Your agent picks it up within about ${PULL_CADENCE} and gets to work. Check in whenever you're ready.`,
   },
 ];
 
@@ -86,12 +86,16 @@ const included = [
 
 const faqs: { q: string; a: ReactNode }[] = [
   {
+    q: "Do I need my phone with me?",
+    a: "No. Your watch records on its own, even with no connection. Recordings sync to your iPhone when you're back in range, and go to your agent from there.",
+  },
+  {
     q: "Why not just talk to my agent directly?",
-    a: "You can, if your phone is out. Ramble is for when it isn't: on a walk, in the car, between meetings. One tap, say it, done.",
+    a: "Then you're on your phone, waiting for a reply. With Ramble you say it and keep going. Your agent works on it while you get on with your day.",
   },
   {
     q: "Does my agent reply on my watch?",
-    a: "No. You say it and move on. Your agent handles it on its own time, and you can check in with it later.",
+    a: "No, and that's the point. Nothing pulls you back in. You check in with your agent when you're ready.",
   },
   {
     q: "How fast does it get to my agent?",
@@ -122,14 +126,6 @@ const faqs: { q: string; a: ReactNode }[] = [
         .
       </>
     ),
-  },
-  {
-    q: "Do I need my phone nearby?",
-    a: "Not to record. The watch records on its own and syncs to your iPhone when it's back in range.",
-  },
-  {
-    q: "What if I'm offline?",
-    a: "Nothing gets lost. Recordings wait on your watch and iPhone and go out when you're back online.",
   },
   {
     q: "What if it doesn't work for me?",
@@ -239,7 +235,9 @@ export default function Home() {
       {/* How it works */}
       <section id="how" className="scroll-mt-20 border-t border-stone-200 bg-stone-50">
         <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
-          <SectionHeading eyebrow="How it works">Say it, then forget about it.</SectionHeading>
+          <SectionHeading eyebrow="How it works" sub="Your watch is all you need. Leave your phone in your pocket, or at home.">
+            Say it and move on.
+          </SectionHeading>
           <ol className="mt-14 grid gap-10 sm:grid-cols-3 sm:gap-8">
             {steps.map((step, i) => (
               <li key={step.title} className="text-left">
@@ -285,7 +283,7 @@ export default function Home() {
                 <div>
                   <h3 className="text-sm font-semibold text-stone-900">Start talking</h3>
                   <p className="mt-1 text-sm leading-relaxed text-stone-500">
-                    That&apos;s it. You can disconnect from the same screen any time.
+                    Raise your wrist and say what&apos;s on your mind. Disconnect from the same screen any time.
                   </p>
                 </div>
               </li>
@@ -403,7 +401,7 @@ export default function Home() {
             Get it off your mind.
           </h2>
           <p className="mt-4 text-base text-stone-500">
-            {APP_PRICE}, once. For Apple Watch and iPhone.
+            Leave the phone. Keep the thought. {APP_PRICE}, once.
           </p>
           <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
             <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className={primaryButton}>
