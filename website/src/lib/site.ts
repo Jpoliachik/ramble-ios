@@ -23,12 +23,10 @@ export const CLOUD_PRICE = "$2.99/month";
 // PLACEHOLDER: hard maximum for transcripts an agent never picks up. Justin is choosing 30 or 60 days.
 export const RETENTION = "30 days";
 
-// PLACEHOLDER: relay hostname is undecided. Do not replace with a real domain without Justin.
-export const RELAY_URL = "https://<relay-host>";
+// The relay runs in the transcription proxy Worker, at its workers.dev host
+// (same value as Constants.Relay.hostedBaseURL in the app).
+export const RELAY_URL = "https://ramble-transcription-proxy.jpoliachik.workers.dev";
 
 // Pairing code defaults from the relay (PR #32). Proposed, not locked.
 export const PAIR_CODE_EXAMPLE = "K7QX-MP4D";
 export const PAIR_CODE_TTL = "10 minutes";
-
-// Suggested agent pull cadence. Proposed, not locked.
-export const PULL_CADENCE = "15 minutes";

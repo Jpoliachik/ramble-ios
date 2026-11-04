@@ -3,7 +3,7 @@ import Link from "next/link";
 import { CodeBlock, InlineCode } from "@/components/code-block";
 import DocsSidebar from "@/components/docs-sidebar";
 import CopyLlmButton from "@/components/copy-llm-button";
-import { PAIR_CODE_EXAMPLE, PAIR_CODE_TTL, PULL_CADENCE, RELAY_URL, RETENTION } from "@/lib/site";
+import { PAIR_CODE_EXAMPLE, PAIR_CODE_TTL, RELAY_URL, RETENTION } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Connect your agent",
@@ -15,8 +15,10 @@ Relay: ${RELAY_URL}
 
 1. When I say "I downloaded Ramble, connect it" and give you a code like ${PAIR_CODE_EXAMPLE},
    POST {"code": "<the code>"} to /pair/exchange. Save the returned "token" as a secret.
-2. Every ${PULL_CADENCE}, GET /inbox with the header
+2. GET /inbox with the header
    Authorization: Bearer <token>
+   Check as often as you can, using whatever way of running recurring work suits you
+   best. It's a tiny request that usually returns an empty list, so frequent checks are fine.
 3. For each item, do what I asked in "transcription".
 4. POST {"ids": [...]} to /inbox/ack with the ids you handled. If "has_more" is true, pull again.
 5. If a request returns 401, I disconnected you. Stop checking and tell me.`;
@@ -93,7 +95,7 @@ export default function AgentDocs() {
               <p>
                 Three JSON calls. A pull returns up to 50 items, oldest first. Acking deletes them; if{" "}
                 <InlineCode>has_more</InlineCode> is true, pull again. Anything never acked is deleted after{" "}
-                {RETENTION}. The relay&apos;s address will be listed here at launch.
+                {RETENTION}. Every path is relative to <InlineCode>{RELAY_URL}</InlineCode>.
               </p>
               <CodeBlock>{API_EXAMPLE}</CodeBlock>
               <p>

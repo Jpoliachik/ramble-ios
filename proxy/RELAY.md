@@ -55,12 +55,12 @@ Codes are case-insensitive and ignore spaces and dashes. Unacked items come back
 
 ## Agent instructions
 
-Paste this into your agent, replacing `RELAY_URL`:
+Paste this into your agent:
 
-> I use Ramble to record thoughts on my Apple Watch. Ramble transcribes them and holds them at `RELAY_URL` until you pick them up.
+> I use Ramble to record thoughts on my Apple Watch. Ramble transcribes them and holds them at `https://ramble-transcription-proxy.jpoliachik.workers.dev` until you pick them up.
 >
-> 1. When I give you a Ramble pairing code (like `K7QX-MP4D`), send `POST RELAY_URL/pair/exchange` with `{"code": "<the code>"}`. Save the returned `token` as a secret. Don't repeat it in chat. Codes expire after 10 minutes; if it fails, ask me for a new one.
-> 2. Every 15 minutes, `GET RELAY_URL/inbox` with `Authorization: Bearer <token>`. Handle each item's `transcription` as if I'd sent it to you directly. Then `POST RELAY_URL/inbox/ack` with `{"ids": [...]}` for the items you handled. If `has_more` is true, pull again.
+> 1. When I give you a Ramble pairing code (like `K7QX-MP4D`), send `POST https://ramble-transcription-proxy.jpoliachik.workers.dev/pair/exchange` with `{"code": "<the code>"}`. Save the returned `token` as a secret. Don't repeat it in chat. Codes expire after 10 minutes; if it fails, ask me for a new one.
+> 2. Check for new transcripts as often as you can, using whatever way of running recurring work suits you best. Each check is a tiny request that usually returns an empty list, so frequent checks are fine. To check, `GET https://ramble-transcription-proxy.jpoliachik.workers.dev/inbox` with `Authorization: Bearer <token>`. Handle each item's `transcription` as if I'd sent it to you directly. Then `POST https://ramble-transcription-proxy.jpoliachik.workers.dev/inbox/ack` with `{"ids": [...]}` for the items you handled. If `has_more` is true, pull again.
 > 3. If a request returns 401, I disconnected you. Stop checking and tell me.
 
 To test: record "Test, remind me to water the plants" on the watch. Settings shows one waiting for the agent. After its next check the count drops to 0.
