@@ -55,7 +55,7 @@ struct WatchStartRecordingIntent: AppIntent {
 
 struct WatchStopRecordingIntent: AppIntent {
     static var title: LocalizedStringResource = "Stop my Ramble"
-    static var description: IntentDescription = "Stop the current recording and send it to your iPhone"
+    static var description: IntentDescription = "Stop the current recording and send it"
     static var openAppWhenRun = true
 
     @MainActor
