@@ -100,10 +100,14 @@ final class AppAttestService {
                 keyId, clientDataHash: clientDataHash
             )
             return (keyId: keyId, assertion: assertion)
-        } catch {
-            // Key may have been invalidated (e.g. after iOS restore).
-            // Reset state so a fresh attestation happens on the next attempt.
+        } catch let error as DCError where error.code == .invalidKey || error.code == .invalidInput {
+            // The key is gone or unusable (e.g. restored onto a new device,
+            // app reinstall). Drop state so the next attempt re-attests.
             resetState()
+            return nil
+        } catch {
+            // Transient failure (network, system busy, locked-keychain edge
+            // cases). Leave attestation state intact so the retry can reuse it.
             return nil
         }
     }
