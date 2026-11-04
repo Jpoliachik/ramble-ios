@@ -70,7 +70,11 @@ export default function WebhookDocs() {
             <Link href="/docs" className="text-brand-text underline-offset-2 hover:underline">
               agent connection
             </Link>
-            ; use either or both.
+            ; use either or both.{" "}
+            <Link href="/docs#relay-or-webhook" className="text-brand-text underline-offset-2 hover:underline">
+              Which one fits
+            </Link>
+            .
           </p>
 
           <div className="mt-14 space-y-16 text-sm leading-relaxed text-stone-600">

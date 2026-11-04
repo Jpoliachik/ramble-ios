@@ -71,15 +71,12 @@ On `workers.dev`, Cloudflare's Browser Integrity Check runs before the Worker an
 
 ## Agent instructions
 
-Paste this into your agent:
+The agent-facing instructions live on the website, at https://ramble.watch/docs (and `website/public/llms-full.txt` for agents that read plain text). The app's "Copy message" points agents there. Keep them in sync with this API. The essentials:
 
-> I use Ramble to record thoughts on my Apple Watch. Ramble transcribes them and holds them at `https://ramble-transcription-proxy.jpoliachik.workers.dev` until you pick them up.
->
-> 1. When I give you a Ramble pairing code (like `K7QX-MP4D`), send `POST https://ramble-transcription-proxy.jpoliachik.workers.dev/pair/exchange` with `{"code": "<the code>"}`. Save the returned `token` as a secret. Don't repeat it in chat. Codes expire after 10 minutes; if it returns 400, ask me for a new one.
-> 2. Check for new transcripts as often as you can, using whatever way of running recurring work suits you best. Each check is a tiny request that usually returns an empty list, so frequent checks are fine. To check, `GET https://ramble-transcription-proxy.jpoliachik.workers.dev/inbox` with `Authorization: Bearer <token>`. Handle each item's `transcription` as if I'd sent it to you directly. Then `POST https://ramble-transcription-proxy.jpoliachik.workers.dev/inbox/ack` with `{"ids": [...]}` for the items you handled. If `has_more` is true, pull again.
-> 3. If a request returns 401, I disconnected you. Stop checking and tell me.
->
-> Send a User-Agent header on every request (any name, like `my-agent/1.0`). Retry timeouts, dropped connections, and 5xx errors after 2, 5, then 15 seconds; every call is safe to retry, including the code exchange.
+- **Separate checking from acting.** Empty checks drive the cost. A cheap watcher (script, hook, scheduled fetch) checks every few minutes and wakes the agent only when `items` isn't empty. If a platform can only schedule full agent runs, hourly or daily is fine.
+- **`created_at` is the only timestamp**: when recording started. Relative times are read from it, and if the moment has passed, the item is overdue.
+- **Only 401 means stop.** 403, 5xx and timeouts are transient. Every call is safe to retry.
+- **Set a User-Agent** (see below).
 
 To test: record "Test, remind me to water the plants" on the watch. Settings shows one waiting for the agent. After its next check the count drops to 0.
 

@@ -16,8 +16,12 @@ const sectionsByPage: Record<DocsPage, Section[]> = {
   agent: [
     { id: "pairing", label: "Pairing" },
     { id: "agent-instructions", label: "Instructions for the agent" },
+    { id: "checking", label: "Checking cheaply" },
     { id: "api", label: "API" },
+    { id: "connections", label: "Tokens and connections" },
     { id: "requests", label: "Making requests" },
+    { id: "relay-or-webhook", label: "Relay or webhook" },
+    { id: "platforms", label: "Platform notes" },
   ],
   webhooks: [
     { id: "step-1", label: "1. Add a destination" },

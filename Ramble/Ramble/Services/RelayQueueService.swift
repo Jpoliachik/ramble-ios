@@ -9,7 +9,7 @@
 //  Retries are more patient than webhooks. A webhook is the user's own
 //  endpoint and three tries tells them it's broken; the relay is the core
 //  delivery path, so transient failures (offline, attestation hiccup, 5xx)
-//  keep retrying with backoff for about a day before giving up.
+//  keep retrying with backoff for about 8 hours (12 tries) before giving up.
 //
 
 import Combine
