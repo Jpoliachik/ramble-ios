@@ -142,10 +142,13 @@ export default function PrivacyPolicy() {
                   <tr className="border-b border-stone-100">
                     <td className="py-2 pr-3">Pairing code</td>
                     <td className="py-2 pr-3">
-                      Hash of the code, inbox id, expiry
+                      Hash of the code, inbox id, expiry. Once your agent
+                      uses it, the agent&apos;s new token, until the agent
+                      first checks in
                     </td>
                     <td className="py-2">
-                      Used, replaced, or {PAIR_CODE_TTL} pass
+                      Your agent first checks in, replaced, or {PAIR_CODE_TTL}{" "}
+                      pass
                     </td>
                   </tr>
                   <tr className="border-b border-stone-100">
@@ -159,7 +162,7 @@ export default function PrivacyPolicy() {
                   <tr>
                     <td className="py-2 pr-3">Transcript</td>
                     <td className="py-2 pr-3">
-                      Recording id, recorded-at time, duration, text, expiry.
+                      Recording id, recorded-at time, received time, duration, text, expiry.
                       One copy per connected agent.
                     </td>
                     <td className="py-2">
@@ -177,7 +180,9 @@ export default function PrivacyPolicy() {
               </li>
               <li>
                 Credentials (the inbox secret, pairing codes, and agent tokens)
-                are stored only as SHA-256 hashes.
+                are stored only as SHA-256 hashes. The one exception: a new
+                agent token is kept for at most {PAIR_CODE_TTL}, until your
+                agent first checks in, so a retried connection still works.
               </li>
               <li>Logs record counts and ids, never transcript text.</li>
               <li>

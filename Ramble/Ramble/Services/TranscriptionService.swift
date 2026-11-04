@@ -20,6 +20,24 @@ enum TranscriptionError: Error, LocalizedError {
     case proxyError(statusCode: Int, message: String)
     case networkError(Error)
 
+    /// The phone couldn't reach the network at all, as opposed to the server
+    /// answering with an error. Retrying later will work once it's back online.
+    var isOffline: Bool {
+        guard case .networkError(let error) = self else { return false }
+        let offlineCodes: Set<Int> = [
+            NSURLErrorNotConnectedToInternet,
+            NSURLErrorNetworkConnectionLost,
+            NSURLErrorTimedOut,
+            NSURLErrorCannotFindHost,
+            NSURLErrorCannotConnectToHost,
+            NSURLErrorDNSLookupFailed,
+            NSURLErrorDataNotAllowed,
+            NSURLErrorInternationalRoamingOff,
+        ]
+        let nsError = error as NSError
+        return nsError.domain == NSURLErrorDomain && offlineCodes.contains(nsError.code)
+    }
+
     var errorDescription: String? {
         switch self {
         case .audioFileNotFound:

@@ -117,11 +117,20 @@ final class RelayService: ObservableObject {
         return try decoder.decode(DeletedCount.self, from: data).deleted
     }
 
+    private static let localTimestamp: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.timeZone = .current
+        return formatter
+    }()
+
     /// Returns how many agents it was queued for.
     func upload(recording: Recording, transcription: String) async throws -> Int {
         let body = try JSONSerialization.data(withJSONObject: [
             "recording_id": recording.id.uuidString,
-            "created_at": ISO8601DateFormatter().string(from: recording.createdAt),
+            // When recording started, in the phone's local offset (like
+            // 2026-11-01T07:59:00-05:00), so the agent can read "tomorrow at 9"
+            // in the user's own time.
+            "created_at": Self.localTimestamp.string(from: recording.createdAt),
             "duration": recording.duration,
             "transcription": transcription,
         ])

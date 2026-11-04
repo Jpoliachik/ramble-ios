@@ -53,7 +53,7 @@ export async function handleRelayRequest(request, env, deps = {}) {
       case 'POST /pair/exchange': return await exchangePairCode(request, ctx);
       case 'GET /inbox': return await pull(request, ctx);
       case 'POST /inbox/ack': return await ack(request, ctx);
-      default: return json({ error: 'Not found' }, 404);
+      default: return wrongMethod(pathname);
     }
   } catch (err) {
     // Never log request bodies: they hold transcript text.
@@ -96,10 +96,10 @@ async function upload(request, ctx) {
         ctx.db
           .prepare(
             `INSERT OR IGNORE INTO entries
-               (connection_id, recording_id, recorded_at, duration, text, expires_at)
-             VALUES (?, ?, ?, ?, ?, ?)`,
+               (connection_id, recording_id, recorded_at, duration, text, expires_at, received_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
           )
-          .bind(c.id, item.recordingId, item.createdAt, item.duration, item.text, expiresAt),
+          .bind(c.id, item.recordingId, item.createdAt, item.duration, item.text, expiresAt, ctx.now),
       ),
     );
   }
@@ -174,26 +174,49 @@ async function disconnect(request, connectionId, ctx) {
 
 // --- Agent -------------------------------------------------------------------
 
-/** No auth: the single-use code is the credential. */
+/**
+ * No auth: the code is the credential. It makes one connection. Retrying the
+ * same code returns the same token until the agent first pulls with it (or
+ * the code expires), so a lost response never strands the agent.
+ */
 async function exchangePairCode(request, ctx) {
-  const body = await readJSON(request);
-  if (typeof body?.code !== 'string') return json({ error: 'Missing "code"' }, 400);
+  const code = (await readJSON(request))?.code;
+  if (typeof code !== 'string' || !code.trim()) {
+    return json({ error: 'Send JSON like {"code": "K7QX-MP4D"} with the code from the Ramble app' }, 400);
+  }
+  const codeHash = await sha256Hex(normalizePairCode(code));
 
-  // Delete-and-return makes the code single-use even under concurrent tries.
-  const pairing = await ctx.db
-    .prepare('DELETE FROM pair_codes WHERE code_hash = ? RETURNING inbox_id, expires_at')
-    .bind(await sha256Hex(normalizePairCode(body.code)))
+  // Claim the code. The conditional update makes only one exchange win, even
+  // under concurrent tries; the others fall through to the replay below.
+  const token = `rmba_${randomToken(32)}`;
+  const connectionId = `con_${randomToken(12)}`;
+  const claimed = await ctx.db
+    .prepare(
+      `UPDATE pair_codes SET token = ?, connection_id = ?
+        WHERE code_hash = ? AND token IS NULL AND expires_at > ?
+        RETURNING inbox_id`,
+    )
+    .bind(token, connectionId, codeHash, ctx.now)
     .first();
-  if (!pairing || pairing.expires_at <= ctx.now) {
-    return json({ error: 'Invalid or expired pairing code' }, 400);
+  if (claimed) {
+    await ctx.db
+      .prepare('INSERT INTO connections (id, inbox_id, token_hash, created_at) VALUES (?, ?, ?, ?)')
+      .bind(connectionId, claimed.inbox_id, await sha256Hex(token), ctx.now)
+      .run();
+    return json({ token }, 201);
   }
 
-  const token = `rmba_${randomToken(32)}`;
-  await ctx.db
-    .prepare('INSERT INTO connections (id, inbox_id, token_hash, created_at) VALUES (?, ?, ?, ?)')
-    .bind(`con_${randomToken(12)}`, pairing.inbox_id, await sha256Hex(token), ctx.now)
-    .run();
-  return json({ token }, 201);
+  // Already claimed: hand back the same token while it's still unused.
+  const replay = await ctx.db
+    .prepare(
+      `SELECT p.token FROM pair_codes p JOIN connections c ON c.id = p.connection_id
+        WHERE p.code_hash = ? AND p.expires_at > ? AND c.last_pull_at IS NULL`,
+    )
+    .bind(codeHash, ctx.now)
+    .first();
+  if (replay?.token) return json({ token: replay.token }, 200);
+
+  return json({ error: 'Invalid or expired pairing code. Ask the user for a new one in the Ramble app.' }, 400);
 }
 
 /** Oldest first, up to PULL_LIMIT. Ack what you handled, then pull again. */
@@ -204,18 +227,22 @@ async function pull(request, ctx) {
   const [{ results }] = await ctx.db.batch([
     ctx.db
       .prepare(
-        `SELECT id, recording_id, recorded_at, duration, text FROM entries
+        `SELECT id, recording_id, recorded_at, received_at, duration, text FROM entries
           WHERE connection_id = ? AND expires_at > ? ORDER BY id LIMIT ?`,
       )
       .bind(connection.id, ctx.now, PULL_LIMIT + 1),
     ctx.db.prepare('UPDATE connections SET last_pull_at = ? WHERE id = ?').bind(ctx.now, connection.id),
+    // The agent has its token, so the pairing code's copy can go.
+    ctx.db.prepare('DELETE FROM pair_codes WHERE connection_id = ?').bind(connection.id),
   ]);
 
   return json({
     items: results.slice(0, PULL_LIMIT).map((row) => ({
       id: row.id,
       recording_id: row.recording_id,
+      // As the phone sent it: recording start, with the phone's UTC offset.
       created_at: row.recorded_at,
+      received_at: row.received_at ? iso(row.received_at) : null,
       duration: row.duration,
       transcription: row.text,
     })),
@@ -280,8 +307,9 @@ async function authAgent(request, ctx) {
   return ctx.db.prepare('SELECT id FROM connections WHERE token_hash = ?').bind(await sha256Hex(token)).first();
 }
 
+/** Lenient: "Bearer <t>", "bearer <t>", or the bare token all work. */
 function bearer(request, prefix) {
-  const value = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/, '').trim();
+  const value = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
   return value.startsWith(prefix) ? value : null;
 }
 
@@ -352,5 +380,20 @@ function json(data, status = 200) {
 }
 
 function unauthorized() {
-  return json({ error: 'Invalid or revoked credentials' }, 401);
+  return json({ error: 'Invalid or revoked credentials. Send "Authorization: Bearer <token>".' }, 401);
+}
+
+const METHODS = {
+  '/inboxes': 'POST',
+  '/inbox': 'GET (agent pull), POST or DELETE (app)',
+  '/inbox/ack': 'POST',
+  '/pair/code': 'POST',
+  '/pair/exchange': 'POST',
+  '/connections': 'GET',
+};
+
+/** Every relay path exists; only the method was wrong. Say which one fits. */
+function wrongMethod(pathname) {
+  const allowed = METHODS[pathname] ?? 'DELETE';
+  return json({ error: `Wrong method for ${pathname}. Use ${allowed}. Docs: https://ramble.watch/docs` }, 405);
 }

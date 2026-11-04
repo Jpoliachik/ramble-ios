@@ -121,6 +121,11 @@ export default {
       return json({ status: 'ok' });
     }
 
+    // Agents often probe the base URL first. Point them at the docs.
+    if (url.pathname === '/' && request.method === 'GET') {
+      return json({ service: 'Ramble relay', docs: 'https://ramble.watch/docs', llms: 'https://ramble.watch/llms-full.txt' });
+    }
+
     if (url.pathname === '/analytics' && request.method === 'GET') {
       return handleAnalytics(request, env);
     }
