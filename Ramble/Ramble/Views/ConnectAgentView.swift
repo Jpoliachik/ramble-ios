@@ -167,7 +167,7 @@ struct ConnectAgentView: View {
     // MARK: - Actions
 
     private func message(for code: RelayPairCode) -> String {
-        "I downloaded Ramble, connect it. My pairing code is \(code.code)."
+        "I downloaded Ramble, connect it. My pairing code is \(code.code). Instructions: https://ramble.watch/docs"
     }
 
     private func requestCode() {

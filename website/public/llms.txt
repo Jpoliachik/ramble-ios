@@ -10,13 +10,13 @@ Ramble can also send each transcript to any HTTPS endpoint (webhooks).
 
 ## Docs
 
-- [Full reference](/llms-full.txt): Agent connection, the relay API, and the webhook API.
-- [Connect your agent](/docs): Pairing, the agent loop, and the relay API.
-- [Webhooks](/docs/webhooks): Payload format, signature verification, retries, automation platforms.
+- [Full reference](https://ramble.watch/llms-full.txt): Agent connection, the relay API, and the webhook API.
+- [Connect your agent](https://ramble.watch/docs): Pairing, the agent loop, and the relay API.
+- [Webhooks](https://ramble.watch/docs/webhooks): Payload format, signature verification, retries, automation platforms.
 
 ## Links
 
-- [Website](/)
-- [Privacy Policy](/privacy)
-- [Terms of Use](/terms)
+- [Website](https://ramble.watch)
+- [Privacy Policy](https://ramble.watch/privacy)
+- [Terms of Use](https://ramble.watch/terms)
 - [App Store](https://apps.apple.com/app/id6761857751)

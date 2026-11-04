@@ -6,9 +6,9 @@
 import SwiftUI
 
 private enum SettingsLinks {
-    static let privacy = URL(string: "https://goodloop.dev/ramble/privacy")!
-    static let terms = URL(string: "https://goodloop.dev/ramble/terms")!
-    static let docs = URL(string: "https://goodloop.dev/ramble/docs")!
+    static let privacy = URL(string: "https://ramble.watch/privacy")!
+    static let terms = URL(string: "https://ramble.watch/terms")!
+    static let docs = URL(string: "https://ramble.watch/docs")!
 }
 
 struct SettingsView: View {
