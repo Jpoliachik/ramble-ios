@@ -61,7 +61,9 @@ struct ConnectAgentView: View {
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(role: .close) { dismiss() }
+                    // Button(role: .close) is iOS 26-only; the iOS target is
+                    // 18.6, so use a plain button to keep the build compiling.
+                    Button("Close") { dismiss() }
                 }
             }
             .task { await loadConnections() }
