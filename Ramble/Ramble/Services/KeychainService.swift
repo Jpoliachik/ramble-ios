@@ -46,10 +46,10 @@ enum KeychainService {
             kSecAttrService as String: service,
             kSecAttrAccount as String: key
         ]
-        // Readable after first unlock post-boot so background tasks (e.g.
-        // overnight watch sync) can generate App Attest assertions while the
-        // device is locked. The default is `WhenUnlocked`, which blocks reads
-        // while the device is locked and causes silent attestation failures.
+        // Readable after first unlock post-boot so background work (e.g. a
+        // watch recording reaching a locked phone) can read the relay inbox
+        // secret and App Attest key. The default is `WhenUnlocked`, which
+        // blocks reads while the device is locked.
         let attributes: [String: Any] = [
             kSecValueData as String: data,
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
@@ -62,6 +62,34 @@ enum KeychainService {
             newItem[kSecValueData as String] = data
             newItem[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
             SecItemAdd(newItem as CFDictionary, nil)
+        }
+    }
+
+    // MARK: - Migration
+
+    private static let accessibilityMigratedKey = "keychainAccessibilityMigrated"
+
+    /// Older installs wrote every item with the default `WhenUnlocked`
+    /// accessibility, so a watch recording that reached a locked phone couldn't
+    /// read the relay inbox secret or App Attest key and was silently skipped.
+    /// This moves all of Ramble's items to `AfterFirstUnlockThisDeviceOnly` in
+    /// one update. The update fails while the phone is locked, so the flag is
+    /// only set on success and the next launch or foreground tries again.
+    static func migrateAccessibilityIfNeeded() {
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: accessibilityMigratedKey) else { return }
+
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service
+        ]
+        let attributes: [String: Any] = [
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        ]
+
+        let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+        if status == errSecSuccess || status == errSecItemNotFound {
+            defaults.set(true, forKey: accessibilityMigratedKey)
         }
     }
 }

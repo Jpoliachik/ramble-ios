@@ -14,7 +14,7 @@ struct RambleApp: App {
 
     init() {
         BackgroundTaskService.shared.registerBackgroundTasks()
-        AppAttestService.shared.migrateKeychainAccessibilityIfNeeded()
+        KeychainService.migrateAccessibilityIfNeeded()
         _ = PhoneConnectivityService.shared
         HapticService.prepare()
 
@@ -59,6 +59,8 @@ struct RambleApp: App {
                         for: UIApplication.willEnterForegroundNotification
                     )
                 ) { _ in
+                    // Retries if the launch happened while the phone was locked.
+                    KeychainService.migrateAccessibilityIfNeeded()
                     TranscriptionQueueService.shared.resumePendingJobs()
                     WebhookQueueService.shared.resumePendingJobs()
                     RelayQueueService.shared.resumePendingJobs()
