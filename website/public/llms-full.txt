@@ -208,5 +208,5 @@ Webhooks fire after transcription completes — not after recording. Transcripti
 - One-time purchase: $4.99. Includes on-device transcription, the agent connection, and webhooks.
 - Optional upgrade: cloud transcription for $2.99/month. Never required; cancel any time and everything else keeps working.
 - No accounts. Transcripts pass through the relay and are deleted on delivery, or after 30 days (PLACEHOLDER) at most if never picked up. Audio never goes to the relay.
-- Website: Ramble's own domain (not yet chosen)
-- Docs: /docs (agent) and /docs/webhooks (webhooks) on the website
+- Website: https://ramble.watch
+- Docs: https://ramble.watch/docs (agent) and https://ramble.watch/docs/webhooks (webhooks)

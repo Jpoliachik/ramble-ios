@@ -15,8 +15,7 @@ npm run dev      # Dev server at localhost:3000
 ## Deployment
 
 - Hosted on Vercel (its own project, root directory `website`). Every PR that touches `website/` gets a preview deployment; `vercel.json` skips builds for commits that don't.
-- Served from the root of Ramble's own domain (not chosen yet). There is no `basePath`.
-- `SITE_URL` in `src/lib/site.ts` comes from `NEXT_PUBLIC_SITE_URL`, falling back to Vercel's production URL. Set `NEXT_PUBLIC_SITE_URL` in Vercel once the domain exists.
+- Served from the root of Ramble's own domain, https://ramble.watch (`SITE_URL` in `src/lib/site.ts`). There is no `basePath`.
 - `output: "export"` still produces a plain static `out/` folder.
 
 ## Image paths

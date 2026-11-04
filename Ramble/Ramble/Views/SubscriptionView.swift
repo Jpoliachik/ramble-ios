@@ -8,7 +8,7 @@ import SwiftUI
 
 private enum SubscriptionLinks {
     static let appleEULA = URL(string: "https://apple.com/legal/internet-services/itunes/dev/stdeula/")!
-    static let privacy = URL(string: "https://goodloop.dev/ramble/privacy")!
+    static let privacy = URL(string: "https://ramble.watch/privacy")!
     static let manage = URL(string: "https://apps.apple.com/account/subscriptions")!
 }
 

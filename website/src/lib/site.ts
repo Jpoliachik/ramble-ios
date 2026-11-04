@@ -5,13 +5,9 @@
 // The site is served from the root of its own domain (no basePath).
 export const BASE_PATH = "";
 
-// PLACEHOLDER: Ramble's own domain isn't bought yet. Until NEXT_PUBLIC_SITE_URL
-// is set in Vercel, this falls back to the Vercel production URL for the build.
-export const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ??
-  (process.env.VERCEL_PROJECT_PRODUCTION_URL
-    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-    : "http://localhost:3000");
+// Ramble's own domain. Canonical URLs, OG tags, the sitemap and the setup
+// message all use it, including on preview deployments.
+export const SITE_URL = "https://ramble.watch";
 export const APP_STORE_URL = "https://apps.apple.com/app/id6761857751";
 
 // One-time app price (Justin, Nov 2 2026).
