@@ -15,14 +15,18 @@ struct RambleApp: App {
     init() {
         BackgroundTaskService.shared.registerBackgroundTasks()
         Self.migrateKeychainIfUnlocked()
-        // Registered here, not on a view, so it also fires when a locked
-        // launch stays in the background (no scene) and the phone unlocks.
+        // Registered here, not on a view, so it also fires when Ramble is
+        // running in the background (no scene) and the phone unlocks. Work
+        // that waited for the Keychain picks up from here.
         NotificationCenter.default.addObserver(
             forName: UIApplication.protectedDataDidBecomeAvailableNotification,
             object: nil,
             queue: .main
         ) { _ in
-            MainActor.assumeIsolated { Self.migrateKeychainIfUnlocked() }
+            MainActor.assumeIsolated {
+                Self.migrateKeychainIfUnlocked()
+                BackgroundTaskService.shared.beginImmediateBackgroundProcessing()
+            }
         }
         _ = PhoneConnectivityService.shared
         HapticService.prepare()

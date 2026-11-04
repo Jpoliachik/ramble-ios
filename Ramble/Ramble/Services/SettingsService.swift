@@ -18,6 +18,13 @@ final class SettingsService {
 
     private init() {}
 
+    /// False while the phone is locked and the webhook secret or device id
+    /// can't be read. Work that signs or identifies requests waits for unlock.
+    var secretsAvailable: Bool {
+        KeychainService.lookup(forKey: Self.webhookSecretKey) != .locked
+            && KeychainService.lookup(forKey: Self.deviceIdKey) != .locked
+    }
+
     func load() -> Settings {
         var settings: Settings
         if let data = try? Data(contentsOf: settingsFile),
@@ -29,20 +36,29 @@ final class SettingsService {
 
         // Keychain is the source of truth for webhookSecret and deviceId.
         // On first launch these won't exist yet, so we seed from the generated defaults.
+        // While the phone is locked they can't be read, and the values
+        // returned here are throwaway placeholders: check `secretsAvailable`
+        // before using them.
         var needsSave = false
 
-        if let keychainSecret = KeychainService.string(forKey: Self.webhookSecretKey) {
+        switch KeychainService.lookup(forKey: Self.webhookSecretKey) {
+        case .found(let keychainSecret):
             settings.webhookSecret = keychainSecret
-        } else {
+        case .notFound:
             KeychainService.setString(settings.webhookSecret, forKey: Self.webhookSecretKey)
             needsSave = true
+        case .locked:
+            break
         }
 
-        if let keychainDeviceId = KeychainService.string(forKey: Self.deviceIdKey) {
+        switch KeychainService.lookup(forKey: Self.deviceIdKey) {
+        case .found(let keychainDeviceId):
             settings.deviceId = keychainDeviceId
-        } else {
+        case .notFound:
             KeychainService.setString(settings.deviceId, forKey: Self.deviceIdKey)
             needsSave = true
+        case .locked:
+            break
         }
 
         if needsSave {

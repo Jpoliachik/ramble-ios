@@ -17,7 +17,16 @@ enum KeychainService {
     /// fails with `invalidKey` and is re-attested.
     private static let accessibility = kSecAttrAccessibleAfterFirstUnlock
 
-    static func string(forKey key: String) -> String? {
+    enum Lookup: Equatable {
+        case found(String)
+        case notFound
+        /// The item exists but the phone is locked (before the first unlock
+        /// after a reboot, or an item not yet migrated off `WhenUnlocked`).
+        /// Callers must wait, not treat it as missing and regenerate it.
+        case locked
+    }
+
+    static func lookup(forKey key: String) -> Lookup {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -29,12 +38,20 @@ enum KeychainService {
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
 
+        if status == errSecInteractionNotAllowed { return .locked }
         guard status == errSecSuccess,
               let data = result as? Data,
               let string = String(data: data, encoding: .utf8) else {
-            return nil
+            return .notFound
         }
-        return string
+        return .found(string)
+    }
+
+    /// The stored value, or nil when it's missing or the phone is locked.
+    /// Use `lookup(forKey:)` when those two cases need different handling.
+    static func string(forKey key: String) -> String? {
+        if case .found(let value) = lookup(forKey: key) { return value }
+        return nil
     }
 
     static func delete(forKey key: String) {

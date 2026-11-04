@@ -170,6 +170,9 @@ struct MainView: View {
         .task {
             // Fills the "waiting for your agent" count; harmless when nothing is connected.
             _ = try? await relay.refreshConnections()
+            // Now that the connection dates are fresh, pick up any recording
+            // that was skipped while the phone was locked.
+            RelayQueueService.shared.resumePendingJobs()
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }

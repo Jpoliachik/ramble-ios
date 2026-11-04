@@ -25,6 +25,8 @@ struct RelayConnection: Decodable, Identifiable, Hashable {
 
 enum RelayError: LocalizedError {
     case attestationUnavailable
+    /// The inbox secret can't be read until the phone is unlocked.
+    case deviceLocked
     case unauthorized
     case server(status: Int, message: String?)
     case network(String)
@@ -32,6 +34,7 @@ enum RelayError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .attestationUnavailable: return "Couldn't verify this device with Apple. Try again in a moment."
+        case .deviceLocked: return "Waiting for this iPhone to be unlocked."
         case .unauthorized: return "The relay didn't recognize this phone. Try again."
         case .server(let status, let message): return message ?? "The relay returned an error (\(status))."
         case .network(let detail): return detail
@@ -41,7 +44,7 @@ enum RelayError: LocalizedError {
     /// Worth retrying later without any change on the user's side.
     var isTransient: Bool {
         switch self {
-        case .network, .attestationUnavailable: return true
+        case .network, .attestationUnavailable, .deviceLocked: return true
         case .server(let status, _): return status >= 500 || status == 429
         case .unauthorized: return false
         }
@@ -54,6 +57,7 @@ final class RelayService: ObservableObject {
 
     private static let inboxSecretKey = "relayInboxSecret"
     private static let connectionCountKey = "relayConnectionCount"
+    private static let connectedSinceKey = "relayConnectedSince"
 
     @Published private(set) var connections: [RelayConnection] = []
 
@@ -75,12 +79,22 @@ final class RelayService: ObservableObject {
 
     private init() {}
 
-    var hasInbox: Bool { KeychainService.string(forKey: Self.inboxSecretKey) != nil }
+    /// The inbox secret exists but can't be read until the phone is unlocked.
+    var isWaitingForUnlock: Bool { KeychainService.lookup(forKey: Self.inboxSecretKey) == .locked }
+
+    /// True while the phone is locked too: the secret is there, just unreadable.
+    var hasInbox: Bool { KeychainService.lookup(forKey: Self.inboxSecretKey) != .notFound }
 
     /// Whether new transcripts should go to the relay. Cached so the upload
-    /// queue can decide without a network call.
+    /// queue can decide without a network call, and readable while locked.
     var hasConnectedAgents: Bool {
         hasInbox && UserDefaults.standard.integer(forKey: Self.connectionCountKey) > 0
+    }
+
+    /// When the longest-connected agent was paired, cached from the last
+    /// connections refresh. Recordings made since then should reach an agent.
+    var connectedSince: Date? {
+        UserDefaults.standard.object(forKey: Self.connectedSinceKey) as? Date
     }
 
     // MARK: - Calls
@@ -142,7 +156,13 @@ final class RelayService: ObservableObject {
 
     /// App Attest is checked only here, once per install.
     private func ensureInbox() async throws -> String {
-        if let secret = KeychainService.string(forKey: Self.inboxSecretKey) { return secret }
+        switch KeychainService.lookup(forKey: Self.inboxSecretKey) {
+        case .found(let secret): return secret
+        // Never mint a new inbox here: the real one would be orphaned along
+        // with every agent paired to it.
+        case .locked: throw RelayError.deviceLocked
+        case .notFound: break
+        }
 
         var headers: [String: String] = [:]
         if let bypass = UserDefaults.standard.string(forKey: SubscriptionService.devOverrideUserDefaultsKey),
@@ -171,6 +191,7 @@ final class RelayService: ObservableObject {
     private func setConnections(_ list: [RelayConnection]) {
         connections = list
         UserDefaults.standard.set(list.count, forKey: Self.connectionCountKey)
+        UserDefaults.standard.set(list.map(\.createdAt).min(), forKey: Self.connectedSinceKey)
     }
 
     // MARK: - Transport
