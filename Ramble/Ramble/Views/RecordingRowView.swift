@@ -91,7 +91,8 @@ struct RecordingRowView: View {
                     .foregroundStyle(.orange)
                     .font(.subheadline)
             case .delivered:
-                Image(systemName: "checkmark.circle.fill")
+                // Outline until the agent has it, filled once it's picked up.
+                Image(systemName: recording.isWaitingForAgent ? "checkmark.circle" : "checkmark.circle.fill")
                     .foregroundStyle(.green)
                     .font(.subheadline)
             case .none:

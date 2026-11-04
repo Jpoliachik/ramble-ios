@@ -652,10 +652,23 @@ struct DebugSheet: View {
     @State private var attestStatus = ""
     @AppStorage(Constants.Relay.baseURLOverrideKey) private var relayBaseURLOverride = ""
     @State private var isReattesting = false
+    @State private var fastDeliveryAlerts = DeliveryMonitor.isFastMode
 
     var body: some View {
         NavigationView {
             Form {
+                Section {
+                    Toggle("Fast stuck-note alerts", isOn: $fastDeliveryAlerts)
+                        .onChange(of: fastDeliveryAlerts) { _, enabled in
+                            DeliveryMonitor.isFastMode = enabled
+                            DeliveryMonitor.shared.evaluate()
+                        }
+                } header: {
+                    Text("Delivery alerts")
+                } footer: {
+                    Text("Thresholds drop from hours to seconds (30s stuck on phone, 5s needs you, 60s not picked up, 60s on the watch) and the cooldown to a minute. Also sent to the watch.")
+                }
+
                 Section("Developer Override") {
                     HStack {
                         TextField("Server bypass key", text: $viewModel.devOverrideKey)

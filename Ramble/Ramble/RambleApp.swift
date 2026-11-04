@@ -29,6 +29,7 @@ struct RambleApp: App {
             }
         }
         _ = PhoneConnectivityService.shared
+        DeliveryMonitor.shared.start()
         HapticService.prepare()
 
         // Proactively download the speech model so transcription works immediately
@@ -66,6 +67,9 @@ struct RambleApp: App {
                     BackgroundTaskService.shared.beginImmediateBackgroundProcessing()
                     // Also schedule deferred BGProcessingTask as fallback
                     BackgroundTaskService.shared.scheduleSyncTask()
+                    // Hand any stuck-note alerts to the system now, in case
+                    // Ramble doesn't run again for a while.
+                    DeliveryMonitor.shared.evaluate()
                 }
                 .onReceive(
                     NotificationCenter.default.publisher(
@@ -75,6 +79,15 @@ struct RambleApp: App {
                     TranscriptionQueueService.shared.resumePendingJobs()
                     WebhookQueueService.shared.resumePendingJobs()
                     RelayQueueService.shared.resumePendingJobs()
+                }
+                .onReceive(
+                    NotificationCenter.default.publisher(
+                        for: UIApplication.didBecomeActiveNotification
+                    )
+                ) { _ in
+                    // Also covers a cold launch, and asks for notification
+                    // permission once there's a note to protect.
+                    DeliveryMonitor.shared.evaluateSoon()
                 }
         }
     }

@@ -77,6 +77,27 @@ final class PhoneConnectivityService: NSObject, ObservableObject {
         }
     }
 
+    // MARK: - Receipts
+
+    /// Tells the watch this recording is saved here, so it can delete its
+    /// copy. Queued user info reaches the watch even if its app is asleep.
+    func sendReceipt(for recordingId: UUID) {
+        guard WCSession.default.activationState == .activated else { return }
+        WCSession.default.transferUserInfo([
+            "type": "received",
+            "recordingIds": [recordingId.uuidString],
+        ])
+    }
+
+    /// Debug: make the watch's stuck-note alert use seconds instead of hours.
+    func sendAlertFastMode(_ enabled: Bool) {
+        guard WCSession.default.activationState == .activated else { return }
+        WCSession.default.transferUserInfo([
+            "type": "settings",
+            "deliveryAlertsFastMode": enabled,
+        ])
+    }
+
     private func handleReceivedMessage(_ message: [String: Any]) {
         guard let type = message["type"] as? String else { return }
 
@@ -174,15 +195,24 @@ extension PhoneConnectivityService: WCSessionDelegate {
             }
             try FileManager.default.copyItem(at: file.fileURL, to: destinationURL)
 
-            let recording = Recording(
+            var received = Recording(
                 id: UUID(uuidString: metadata.recordingId) ?? UUID(),
                 createdAt: metadata.createdAt,
                 duration: metadata.duration,
                 audioFileName: audioFileName
             )
+            received.receivedAt = Date()
+            let recording = received
 
             Task { @MainActor in
-                guard storageService.addRecording(recording) else { return }
+                let isNew = storageService.addRecording(recording)
+                // Confirm only what's really on disk. Before the first unlock
+                // after a restart, saving fails quietly; no receipt then
+                // means the watch keeps its copy and sends it again later.
+                if storageService.loadRecordings().contains(where: { $0.id == recording.id }) {
+                    self.sendReceipt(for: recording.id)
+                }
+                guard isNew else { return }
                 TranscriptionQueueService.shared.enqueue(recordingId: recording.id)
                 // Often arrives with the phone locked in a pocket and Ramble in
                 // the background. Ask for time to transcribe and send it now,
