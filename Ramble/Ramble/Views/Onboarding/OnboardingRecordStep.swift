@@ -36,7 +36,7 @@ struct OnboardingRecordStep: View {
                         Text("First, ") + Text("let it hear you.").italic()
                     }
 
-                    OnboardingBody(text: "Ramble records from your iPhone or Apple Watch. Audio stays on your device unless you choose to send it.")
+                    OnboardingBody(text: "Ramble records from your Apple Watch, or your iPhone when it's handy. Audio stays on your phone unless you pick a cloud model.")
                 }
                 .padding(.horizontal, 24)
                 .onboardingAppear(delay: 0.2)

@@ -28,10 +28,10 @@ struct OnboardingSendStep: View {
 
                 VStack(spacing: 16) {
                     OnboardingHeadline(size: 32) {
-                        Text("Now, hand it to ") + Text("your agent.").italic()
+                        Text("Now, send it to ") + Text("your agent.").italic()
                     }
 
-                    OnboardingBody(text: "Every transcript goes to your agent to handle later. Connect it once with a short message, then just talk.")
+                    OnboardingBody(text: "Each transcript goes to your agent to handle later. Connect it once with a short message.")
                 }
                 .padding(.horizontal, 24)
                 .onboardingAppear(delay: 0.2)

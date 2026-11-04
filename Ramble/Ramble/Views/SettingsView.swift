@@ -520,9 +520,9 @@ struct PrivacyInfoSheet: View {
                         .foregroundStyle(.secondary)
 
                     InfoBlock(
-                        icon: "iphone",
-                        title: "Recorded on your device",
-                        text: "Recordings are saved locally to your phone. They aren't uploaded anywhere automatically."
+                        icon: "applewatch",
+                        title: "Recorded on your devices",
+                        text: "Recordings from your watch and phone are saved on your phone. Audio isn't uploaded anywhere unless you pick a cloud model."
                     )
 
                     InfoBlock(
@@ -538,15 +538,15 @@ struct PrivacyInfoSheet: View {
                     )
 
                     InfoBlock(
-                        icon: "paperplane",
-                        title: "Webhooks go where you point them",
-                        text: "If you configure a webhook, transcripts are POSTed straight from your phone to a URL you control. Nothing is kept on our side."
-                    )
-
-                    InfoBlock(
                         icon: "tray.and.arrow.up",
                         title: "Your agent's inbox is temporary",
                         text: "When you connect an agent, transcripts wait on the Ramble relay until it picks them up. The text is deleted the moment it does. Anything never picked up is deleted after \(Constants.Relay.unclaimedRetentionDays) days. Audio never goes there. No accounts."
+                    )
+
+                    InfoBlock(
+                        icon: "paperplane",
+                        title: "Webhooks go where you point them",
+                        text: "If you configure a webhook, transcripts are POSTed straight from your phone to a URL you control. Nothing is kept on our side."
                     )
 
                     Link(destination: SettingsLinks.privacy) {
@@ -597,7 +597,7 @@ struct WebhookInfoSheet: View {
                     InfoBlock(
                         icon: "cpu",
                         title: "Connect to anything",
-                        text: "Pipe transcripts into an AI agent, a Zapier workflow, a Notion database, or your own backend. Any HTTPS endpoint that accepts JSON works."
+                        text: "Pipe transcripts into a Zapier workflow, a Notion database, or your own backend. Any HTTPS endpoint that accepts JSON works. To send them to your agent, use Connect your agent instead."
                     )
 
                     Link(destination: SettingsLinks.docs) {

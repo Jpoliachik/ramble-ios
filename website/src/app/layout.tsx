@@ -25,10 +25,10 @@ export const metadata: Metadata = {
     url: SITE_URL,
     images: [
       {
-        url: `${SITE_URL}/og-image.png`,
+        url: `${SITE_URL}/og-image.png?v=2`,
         width: 1200,
         height: 630,
-        alt: "Ramble",
+        alt: "Ramble: Talk to your watch. Your agent handles it.",
       },
     ],
   },
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: TITLE,
     description: SHORT_DESCRIPTION,
-    images: [`${SITE_URL}/og-image.png`],
+    images: [`${SITE_URL}/og-image.png?v=2`],
   },
 };
 

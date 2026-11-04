@@ -27,7 +27,7 @@ struct OnboardingTranscribeStep: View {
                         Text("Voice ") + Text("in").italic() + Text(", words ") + Text("back").italic() + Text(".")
                     }
 
-                    OnboardingBody(text: "Choose your model. Apple Speech is free and on-device. Cloud models are sharper - if accuracy is important.")
+                    OnboardingBody(text: "Pick a model. Apple Speech is free and stays on your phone. Cloud models are sharper when accuracy matters.")
                 }
                 .padding(.horizontal, 24)
                 .onboardingAppear(delay: 0.2)
