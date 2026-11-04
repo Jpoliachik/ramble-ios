@@ -10,6 +10,11 @@ struct OnboardingSendStep: View {
     let onFinish: () -> Void
 
     @StateObject private var viewModel = OnboardingSendViewModel()
+    @ObservedObject private var relay = RelayService.shared
+    @State private var showConnectAgent = false
+
+    private var hasAgent: Bool { !relay.connections.isEmpty }
+    private var canContinue: Bool { hasAgent || viewModel.hasDestination }
 
     var body: some View {
         OnboardingPage {
@@ -23,37 +28,56 @@ struct OnboardingSendStep: View {
 
                 VStack(spacing: 16) {
                     OnboardingHeadline(size: 32) {
-                        Text("Now, make it ") + Text("do something.").italic()
+                        Text("Now, hand it to ") + Text("your agent.").italic()
                     }
 
-                    OnboardingBody(text: "Pipe every transcript straight to your API. Connect to your notes system, an automation platform, AI agent - anywhere.")
+                    OnboardingBody(text: "Every transcript goes to your agent to handle later. Connect it once with a short message, then just talk.")
                 }
                 .padding(.horizontal, 24)
                 .onboardingAppear(delay: 0.2)
 
                 Spacer().frame(height: 24)
 
-                SendVisual(endpointText: SendVisual.endpointText(for: viewModel.destinationURL))
+                SendVisual(endpointText: hasAgent || !viewModel.hasDestination
+                           ? "your agent"
+                           : SendVisual.endpointText(for: viewModel.destinationURL))
                     .padding(.horizontal, 16)
                     .onboardingAppear(delay: 0.3)
 
                 Spacer().frame(height: 20)
 
-                if viewModel.hasDestination {
-                    destinationRow
-                        .padding(.horizontal, 16)
-                        .onboardingAppear(delay: 0.4)
-                } else {
-                    addDestinationCard
-                        .padding(.horizontal, 16)
-                        .onboardingAppear(delay: 0.4)
+                VStack(spacing: 10) {
+                    if hasAgent {
+                        agentConnectedRow
+                    } else {
+                        BrandPlusActionCard(title: "Connect your agent") {
+                            showConnectAgent = true
+                        }
+                    }
+
+                    if viewModel.hasDestination {
+                        destinationRow
+                    } else {
+                        Button {
+                            HapticService.buttonTap()
+                            viewModel.beginAdd()
+                        } label: {
+                            Text("Or send to a webhook")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(Color.obInkSoft)
+                                .padding(.vertical, 8)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
+                .padding(.horizontal, 16)
+                .onboardingAppear(delay: 0.4)
 
                 Spacer(minLength: 24)
             }
         } bottomBar: {
             VStack(spacing: 8) {
-                if viewModel.hasDestination {
+                if canContinue {
                     OnboardingPrimaryButton(title: "Continue") {
                         viewModel.commit()
                         HapticService.success()
@@ -66,7 +90,7 @@ struct OnboardingSendStep: View {
                         onFinish()
                     }
 
-                    Text("You can always add one in Settings.")
+                    Text("You can always connect one in Settings.")
                         .font(.system(size: 13))
                         .foregroundStyle(Color.obInkFaint)
                 }
@@ -81,12 +105,44 @@ struct OnboardingSendStep: View {
                 .presentationContentInteraction(.scrolls)
                 .interactiveDismissDisabled(false)
         }
+        .sheet(isPresented: $showConnectAgent) {
+            ConnectAgentView()
+        }
     }
 
-    private var addDestinationCard: some View {
-        BrandPlusActionCard(title: "Add a destination") {
-            viewModel.beginAdd()
+    // MARK: - Agent row (connected state)
+
+    private var agentConnectedRow: some View {
+        Button {
+            HapticService.buttonTap()
+            showConnectAgent = true
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Color.brandAmber)
+                    .frame(width: 26, height: 26)
+                    .background(Color.brandAmberSoft, in: Circle())
+
+                Text(relay.connections.count > 1 ? "Agents connected" : "Agent connected")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Color.obInk)
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.obInkFaint)
+            }
+            .padding(.vertical, 14)
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 22)
+                    .fill(Color(.secondarySystemGroupedBackground))
+            )
         }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Destination row (set state)

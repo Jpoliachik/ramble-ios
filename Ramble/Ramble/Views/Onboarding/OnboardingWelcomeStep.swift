@@ -24,9 +24,8 @@ struct OnboardingWelcomeStep: View {
                     .onboardingAppear(delay: 0.05)
 
                 OnboardingHeadline(size: 32, alignment: .leading) {
-                    Text("Voice notes ")
-                    + Text("that").italic().foregroundColor(Color.obInkSoft)
-                    + Text(" go somewhere.").italic().foregroundColor(Color.obInkSoft)
+                    Text("Talk to your watch. ")
+                    + Text("Your agent handles it.").italic().foregroundColor(Color.obInkSoft)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .onboardingAppear(delay: 0.2)
