@@ -14,15 +14,17 @@ Tap the watch and talk. The iPhone transcribes it and passes the text to your ag
 
 ## The agent loop
 
+Relay: https://ramble-transcription-proxy.jpoliachik.workers.dev
+
 1. POST {"code": "<code>"} to /pair/exchange. Save the returned "token" as a secret.
-2. Every 15 minutes, GET /inbox with `Authorization: Bearer <token>`.
+2. GET /inbox with `Authorization: Bearer <token>`. Check as often as you can, using whatever way of running recurring work suits you best. It's a tiny request that usually returns an empty list, so frequent checks are fine.
 3. For each item, do what the user asked in "transcription".
 4. POST {"ids": [...]} to /inbox/ack with the ids handled. This deletes them. If has_more is true, pull again.
 5. A 401 means the user disconnected. Stop and tell them.
 
 ## API
 
-The relay hostname isn't final; it will be listed in the docs at launch.
+Relay: https://ramble-transcription-proxy.jpoliachik.workers.dev (every path below is relative to it).
 
 ```
 POST /pair/exchange

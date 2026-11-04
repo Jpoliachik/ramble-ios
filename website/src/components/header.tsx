@@ -30,7 +30,7 @@ export default function Header() {
     >
       <div className="mx-auto max-w-5xl px-6 flex items-center justify-between h-14">
         {/* Logo */}
-        <a href={BASE_PATH} className="flex items-center gap-2.5 group">
+        <Link href="/" className="flex items-center gap-2.5 group">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={`${BASE_PATH}/ramble-icon-light.png`}
@@ -42,7 +42,7 @@ export default function Header() {
           <span className="font-serif font-bold italic text-xl text-stone-900 tracking-tight">
             Ramble
           </span>
-        </a>
+        </Link>
 
         <div className="flex items-center gap-4">
           <Link

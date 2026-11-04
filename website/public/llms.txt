@@ -4,6 +4,8 @@
 
 Pairing: in Ramble on iPhone, Settings → Connect agent gives a single-use code. Tell your agent "I downloaded Ramble, connect it" and paste the code. The agent then pulls new transcripts and acknowledges them, which deletes them. Anything never picked up is deleted after 30 days. Audio never goes to the relay.
 
+Relay: https://ramble-transcription-proxy.jpoliachik.workers.dev
+
 Ramble can also send each transcript to any HTTPS endpoint (webhooks).
 
 ## Docs
