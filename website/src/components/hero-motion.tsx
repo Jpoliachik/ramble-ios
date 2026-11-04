@@ -63,8 +63,13 @@ function beatsFor(said: string) {
   return { beats, loopMs: sentAt + 2300 };
 }
 
-// The one hop, from the watch to the agent, in stage coordinates.
-const PATH_TO_AGENT = "M222 284 C 262 284, 276 210, 309 206";
+// The one hop, from the watch to the agent, in stage coordinates. The hero
+// uses a slightly smaller watch with more room before the agent, so the hop
+// reads as going over the wire; the pinned OG frame keeps the tighter layout.
+const LAYOUT = {
+  spaced: { path: "M204 284 C 252 284, 272 210, 313 206", watchScale: 0.9, agentLeft: 248, agentWidth: 190 },
+  tight: { path: "M222 284 C 262 284, 276 210, 309 206", watchScale: 1, agentLeft: 244, agentWidth: 192 },
+};
 
 type AgentRow = { key: number; item: string; tag: string; done: boolean };
 
@@ -159,6 +164,8 @@ export default function HeroMotion({ size }: { size?: number }) {
   const seconds = Math.min(4, Math.floor((typed * TYPE_MS) / 1000) + 1);
 
   const fixed = size !== undefined;
+  const layout = fixed ? LAYOUT.tight : LAYOUT.spaced;
+  const PATH_TO_AGENT = layout.path;
   const boxStyle = fixed ? { width: size, height: size } : undefined;
   const stageStyle = fixed ? { transform: `scale(${size / 440})` } : undefined;
 
@@ -200,7 +207,10 @@ export default function HeroMotion({ size }: { size?: number }) {
         {/* Apple Watch */}
         <div
           className="hm-focus absolute left-[8px] top-[160px] z-10 w-[212px]"
-          style={{ transformOrigin: "60% 50%", transform: `scale(${agentGlow ? 0.97 : 1})` }}
+          style={{
+            transformOrigin: fixed ? "60% 50%" : "0% 55%",
+            transform: `scale(${layout.watchScale * (agentGlow ? 0.97 : 1)})`,
+          }}
         >
           <div className="relative">
             <span aria-hidden="true" className="absolute -left-[6px] top-[34%] h-10 w-[7px] rounded-l-sm bg-brand/85" />
@@ -273,8 +283,13 @@ export default function HeroMotion({ size }: { size?: number }) {
 
         {/* Your agent: a big icon heads the card */}
         <div
-          className="hm-focus absolute left-[244px] top-[206px] z-10 w-[192px]"
-          style={{ transformOrigin: "50% 0%", transform: `scale(${agentGlow ? 1.05 : 1})` }}
+          className="hm-focus absolute top-[206px] z-10"
+          style={{
+            left: layout.agentLeft,
+            width: layout.agentWidth,
+            transformOrigin: "50% 0%",
+            transform: `scale(${agentGlow ? 1.05 : 1})`,
+          }}
         >
           <div
             className={`relative rounded-2xl bg-white px-3 pb-3 pt-[36px] shadow-sm ring-1 transition-shadow duration-500 ${
