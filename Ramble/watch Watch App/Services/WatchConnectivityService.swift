@@ -173,10 +173,9 @@ final class WatchConnectivityService: NSObject, ObservableObject {
 
     /// For the watchConnectivity background task: give WatchConnectivity
     /// time to deliver receipts that arrived while the app was asleep.
+    /// Touching `shared` activates the session (see init); this only waits.
     func waitForPendingContent() async {
-        if WCSession.isSupported(), WCSession.default.activationState != .activated {
-            WCSession.default.activate()
-        }
+        guard WCSession.isSupported() else { return }
         let deadline = Date().addingTimeInterval(10)
         while Date() < deadline,
               WCSession.default.activationState != .activated || WCSession.default.hasContentPending {
