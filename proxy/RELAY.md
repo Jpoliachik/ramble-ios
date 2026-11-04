@@ -38,6 +38,7 @@ JSON bodies. Errors are `{"error": "..."}`.
 |---|---|---|
 | `POST` | `/inboxes` | App Attest headers → `201 {"inbox_secret"}` |
 | `POST` | `/inbox` | `{"recording_id", "created_at", "duration", "transcription"}` → `{"queued": <agents>}`. Idempotent on `recording_id`. |
+| `POST` | `/inbox/status` | `{"recording_ids": [...]}` → `{"recordings": [{"recording_id", "waiting": <agents>}]}`. Up to 100 ids. `waiting: 0` means every agent acked it (or it expired or its agent was disconnected). The app uses this to show "picked up". |
 | `DELETE` | `/inbox` | → `{"deleted": <n>}` |
 | `POST` | `/pair/code` | → `201 {"code", "expires_at"}`. A new code replaces the old one. |
 | `GET` | `/connections` | → `{"connections": [{"id", "created_at", "last_pull_at", "pending"}]}` |
