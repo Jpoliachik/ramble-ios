@@ -25,6 +25,8 @@ struct SettingsView: View {
     @State private var versionTapCount = 0
     @State private var showDebugSheet = false
     @State private var showConnectAgent = false
+    /// True when the sheet should open on a new code rather than the manage screen.
+    @State private var connectAgentStartsPairing = false
 
     var body: some View {
         NavigationView {
@@ -71,7 +73,7 @@ struct SettingsView: View {
                 WebhookDestinationEditSheet(viewModel: viewModel)
             }
             .sheet(isPresented: $showConnectAgent) {
-                ConnectAgentView()
+                ConnectAgentView(startPairing: connectAgentStartsPairing)
             }
             .task {
                 guard relay.hasInbox else { return }
@@ -217,6 +219,7 @@ struct SettingsView: View {
                 BrandCard {
                     ForEach(Array(relay.connections.enumerated()), id: \.element.id) { index, connection in
                         Button {
+                            connectAgentStartsPairing = false
                             showConnectAgent = true
                         } label: {
                             HStack(spacing: 12) {
@@ -242,6 +245,7 @@ struct SettingsView: View {
             }
 
             BrandPlusActionCard(title: relay.connections.isEmpty ? "Connect your agent" : "Connect another agent") {
+                connectAgentStartsPairing = true
                 showConnectAgent = true
             }
             .listRowBackground(Color.clear)
