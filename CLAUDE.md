@@ -28,7 +28,7 @@ These are free features from existing providers (no extra API calls or cost):
 - Open source the repo on GitHub
 - Paid app on App Store, $4.99 one-time (Apple Speech on-device transcription, agent relay, webhook)
 - Optional $2.99/month subscription unlocks cloud transcription models via Cloudflare Worker proxy
-- Marketing website on Vercel, moving to Ramble's own domain (source in `website/`, static export)
+- Marketing website on Vercel at https://ramble.watch (source in `website/`, static export)
 - **App Store URL:** https://apps.apple.com/app/id6761857751 (Apple ID: 6761857751)
 
 ## Build & Development
@@ -68,7 +68,7 @@ npm run build    # Static export to website/out/
 npm run dev      # Dev server at localhost:3000
 ```
 
-The site is a static export (`output: "export"`) deployed on Vercel from the `website/` root directory, with a preview deployment for every PR that touches it. It is served from the root of Ramble's own domain (not chosen yet), so there is no `basePath`.
+The site is a static export (`output: "export"`) deployed on Vercel from the `website/` root directory, with a preview deployment for every PR that touches it. It is served from the root of Ramble's own domain, https://ramble.watch, so there is no `basePath`.
 
 **Pages:** Landing (`/`), Privacy Policy (`/privacy`), Terms of Use (`/terms`), Connect your agent + relay API (`/docs`), Webhook API Docs (`/docs/webhooks`)
 

@@ -157,7 +157,7 @@ struct WebhookDestinationEditor: View {
 
     private var docsSection: some View {
         Section {
-            Link(destination: URL(string: "https://goodloop.dev/ramble/docs")!) {
+            Link(destination: URL(string: "https://ramble.watch/docs/webhooks")!) {
                 HStack {
                     Label("Webhook setup docs", systemImage: "doc.text")
                     Spacer()

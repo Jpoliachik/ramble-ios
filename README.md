@@ -18,7 +18,7 @@ iPhone + Apple Watch. Open source, private by design, no accounts.
 | `Ramble/`          | iOS app (SwiftUI)                                                                           |
 | `watch Watch App/` | watchOS companion                                                                           |
 | `proxy/`           | Cloudflare Worker transcription proxy                                                       |
-| `website/`         | Marketing site - [goodloop.dev/ramble](https://goodloop.dev/ramble) (Next.js static export) |
+| `website/`         | Marketing site - [ramble.watch](https://ramble.watch) (Next.js static export) |
 
 ## Getting Started
 
