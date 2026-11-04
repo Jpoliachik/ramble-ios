@@ -9,9 +9,10 @@ import { Bot, Check, Mic } from "lucide-react";
   440×440 stage that is scaled down at smaller breakpoints, so it sits on the
   page background with nothing to match.
 
-  The loop never resets. Each thought pushes a new row onto the phone and the
-  agent, older rows slide down and fade out, and focus (size) moves from the
-  watch to the phone to the agent and back.
+  Two steps: the watch (with the phone tucked behind it) sends, the agent
+  receives. The loop never resets. Each thought pushes a new row onto the phone
+  and the agent, older rows slide down and fade out, and focus (size) moves
+  from the watch to the agent and back.
 */
 
 type Thought = { said: string; item: string; tag: string };
@@ -21,7 +22,7 @@ type Thought = { said: string; item: string; tag: string };
 const thoughts: Thought[] = [
   { said: "Add oat milk to my to-do list.", item: "Oat milk", tag: "To-do" },
   { said: "Remind me to call Sam after lunch.", item: "Call Sam", tag: "1:00 PM" },
-  { said: "Idea: walking meetings on Fridays.", item: "Walking meetings", tag: "Ideas" },
+  { said: "Idea: walking meetings on Fridays.", item: "Walking 1:1s", tag: "Ideas" },
   { said: "Book a haircut for next week.", item: "Haircut", tag: "Next week" },
   { said: "What was that podcast Maya mentioned?", item: "Maya's podcast", tag: "Look up" },
   { said: "Draft a thank-you note to Alex.", item: "Note to Alex", tag: "Draft" },
@@ -49,22 +50,22 @@ const TYPE_MS = 38;
 //   0 idle: watch in focus, record button
 //   1 recording: tap, waveform, the words appear
 //   2 sent: check on the watch, the thought leaves
-//   3 the watch is back to idle. You're done.
-//   4 the phone relays it (a quick blip)
-//   5 the text heads to the agent
+//   3 the phone behind the watch relays it (a quick blip, new row)
+//   4 the watch is back to idle. You're done.
+//   5 the thought is on its way
 //   6 it lands with your agent (agent in focus)
 //   7 handled
 // The next loop starts while the agent row is still settling, so there's no
 // visible restart.
 function beatsFor(said: string) {
   const sentAt = 250 + said.length * TYPE_MS + 250;
-  const beats = [0, 250, sentAt, sentAt + 600, sentAt + 620, sentAt + 820, sentAt + 1240, sentAt + 1600];
-  return { beats, loopMs: sentAt + 2500 };
+  const beats = [0, 250, sentAt, sentAt + 150, sentAt + 600, sentAt + 650, sentAt + 850, sentAt + 1200];
+  return { beats, loopMs: sentAt + 2200 };
 }
 
-// Motion paths in stage coordinates.
-const PATH_TO_PHONE = "M184 274 C 238 274, 250 128, 304 128";
-const PATH_TO_AGENT = "M352 232 C 352 250, 328 246, 325 262";
+// The one hop, from the watch (with the phone behind it) to the agent, in
+// stage coordinates.
+const PATH_TO_AGENT = "M184 292 C 226 292, 252 226, 301 224";
 
 type PhoneRow = { key: number; said: string };
 type AgentRow = { key: number; item: string; tag: string; done: boolean };
@@ -75,10 +76,10 @@ const initialPhone: PhoneRow[] = [
 ];
 const initialAgent: AgentRow[] = [
   { key: -1, item: "Table for two", tag: "Friday", done: true },
-  { key: -2, item: "Standing desks", tag: "Research", done: true },
+  { key: -2, item: "Standing desk", tag: "Research", done: true },
 ];
 
-const PHONE_ROW_H = 42;
+const PHONE_ROW_H = 45;
 const AGENT_ROW_H = 25;
 const VISIBLE = 3;
 
@@ -121,7 +122,7 @@ export default function HeroMotion() {
           setTimeout(() => {
             setBeat(i);
             // Keep one extra row so the oldest can fade out instead of vanishing.
-            if (i === 4) setPhoneRows((prev) => [{ key: c, said: t.said }, ...prev].slice(0, VISIBLE + 1));
+            if (i === 3) setPhoneRows((prev) => [{ key: c, said: t.said }, ...prev].slice(0, VISIBLE + 1));
             if (i === 6)
               setAgentRows((prev) =>
                 [{ key: c, item: t.item, tag: t.tag, done: false }, ...prev].slice(0, VISIBLE + 1),
@@ -154,7 +155,7 @@ export default function HeroMotion() {
   }, [beat, reduced, thought.said.length]);
 
   // Reduced motion: one calm, finished frame.
-  const b = reduced ? 3 : beat;
+  const b = reduced ? 4 : beat;
   const shownPhone = reduced ? [{ key: 0, said: thoughts[0].said }, ...initialPhone] : phoneRows;
   const shownAgent = reduced
     ? [{ key: 0, item: thoughts[0].item, tag: thoughts[0].tag, done: true }, ...initialAgent]
@@ -162,10 +163,12 @@ export default function HeroMotion() {
   const words = reduced ? thoughts[0].said : thought.said.slice(0, typed);
 
   const recording = b === 1;
-  const sent = b === 2;
-  const bubbleVisible = reduced || (b >= 1 && b <= 2);
-  const focus = reduced ? "none" : b <= 3 ? "watch" : b <= 5 ? "phone" : "agent";
-  const agentGlow = b === 6 || b === 7;
+  const sent = b === 2 || b === 3;
+  const idle = b === 0 || b >= 4;
+  const bubbleVisible = reduced || (b >= 1 && b <= 3);
+  const agentFocus = !reduced && b >= 6;
+  const phoneGlow = !reduced && b >= 2 && b <= 4;
+  const agentGlow = agentFocus;
 
   return (
     <div
@@ -174,15 +177,14 @@ export default function HeroMotion() {
       className="relative h-[320px] w-[320px] sm:h-[400px] sm:w-[400px] lg:h-[440px] lg:w-[440px]"
     >
       <div className="hm-stage absolute left-0 top-0 h-[440px] w-[440px] origin-top-left">
-        {/* Faint route: watch → phone → agent */}
-        <svg className="absolute inset-0" width="440" height="440" viewBox="0 0 440 440" fill="none" aria-hidden="true">
-          <path d={PATH_TO_PHONE} stroke="#d5d0c8" strokeWidth="1.5" strokeDasharray="2 6" strokeLinecap="round" />
+        {/* Faint route: watch + phone → agent */}
+        <svg className="absolute inset-0 z-[5]" width="440" height="440" viewBox="0 0 440 440" fill="none" aria-hidden="true">
           <path d={PATH_TO_AGENT} stroke="#d5d0c8" strokeWidth="1.5" strokeDasharray="2 6" strokeLinecap="round" />
         </svg>
 
         {/* What you say */}
         <div
-          className={`absolute left-[4px] top-[74px] w-[236px] transition-all duration-500 ease-out ${
+          className={`absolute left-[4px] top-[44px] z-20 w-[236px] transition-all duration-500 ease-out ${
             bubbleVisible ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
           }`}
         >
@@ -201,8 +203,8 @@ export default function HeroMotion() {
 
         {/* Apple Watch */}
         <div
-          className="hm-focus absolute left-[6px] top-[168px] z-10 w-[178px]"
-          style={{ transformOrigin: "100% 50%", transform: `scale(${focus === "watch" || focus === "none" ? 1 : 0.88})` }}
+          className="hm-focus absolute left-[6px] top-[194px] z-10 w-[178px]"
+          style={{ transformOrigin: "60% 50%", transform: `scale(${agentFocus ? 0.94 : 1})` }}
         >
           <div className="relative">
             <span aria-hidden="true" className="absolute -left-[5px] top-[34%] h-8 w-[6px] rounded-l-sm bg-brand/85" />
@@ -218,7 +220,7 @@ export default function HeroMotion() {
                 {/* Idle: the record button */}
                 <div
                   className={`absolute inset-0 flex items-center justify-center transition-all duration-500 ${
-                    b === 0 || b >= 3 ? "scale-100 opacity-100" : "scale-90 opacity-0"
+                    idle ? "scale-100 opacity-100" : "scale-90 opacity-0"
                   }`}
                 >
                   <div className="mt-4 flex h-[84px] w-[84px] items-center justify-center rounded-full bg-brand">
@@ -266,21 +268,17 @@ export default function HeroMotion() {
           </div>
         </div>
 
-        {/* iPhone: secondary, does the work in the background */}
+        {/* iPhone: behind the watch, relays in the background */}
         <div
-          className="hm-focus absolute left-[304px] top-[16px] w-[104px]"
-          style={{
-            transformOrigin: "30% 88%",
-            transform: `scale(${focus === "phone" ? 1.0 : 0.94})`,
-            opacity: focus === "phone" ? 1 : 0.85,
-          }}
+          className="hm-focus absolute left-[104px] top-[120px] w-[106px]"
+          style={{ transformOrigin: "30% 70%", transform: `scale(${agentFocus ? 0.96 : 1})`, opacity: 0.92 }}
         >
           <div
             className={`rounded-[22px] bg-stone-900 p-[4px] shadow-[0_18px_36px_-14px_rgba(26,25,23,0.35)] ring-1 ring-black/5 transition-shadow duration-500 ${
-              focus === "phone" ? "hm-phone-glow" : ""
+              phoneGlow ? "hm-phone-glow" : ""
             }`}
           >
-            <div className="relative h-[208px] overflow-hidden rounded-[18px] bg-white px-[8px] pt-[8px]">
+            <div className="relative h-[226px] overflow-hidden rounded-[18px] bg-white px-[8px] pt-[8px]">
               <span className="mx-auto block h-[7px] w-[30px] rounded-full bg-stone-900" />
               <p className="mt-[8px] font-serif text-[10px] font-semibold italic text-stone-900">
                 <span className="mr-[3px] inline-block h-[5px] w-[5px] rounded-full bg-brand align-middle" />
@@ -293,7 +291,7 @@ export default function HeroMotion() {
                     className="hm-row absolute inset-x-0"
                     style={{ top: i * PHONE_ROW_H, opacity: i >= VISIBLE ? 0 : 1 }}
                   >
-                    <div className="hm-row-in h-[37px] rounded-[7px] bg-stone-100 px-[6px] py-[5px]">
+                    <div className="hm-row-in h-[40px] rounded-[7px] bg-stone-100 px-[6px] py-[5px]">
                       <p className="line-clamp-2 text-[7.5px] leading-[1.3] text-stone-800">{row.said}</p>
                       <p className="mt-[2px] flex items-center gap-[3px] text-[6.5px] font-medium text-stone-500">
                         <span className="inline-block h-[4px] w-[4px] rounded-full bg-brand" />
@@ -309,8 +307,8 @@ export default function HeroMotion() {
 
         {/* Your agent: a big icon heads the card */}
         <div
-          className="hm-focus absolute left-[214px] top-[290px] z-10 w-[222px]"
-          style={{ transformOrigin: "50% 0%", transform: `scale(${focus === "agent" ? 1.06 : 0.95})` }}
+          className="hm-focus absolute left-[224px] top-[224px] z-10 w-[214px]"
+          style={{ transformOrigin: "50% 0%", transform: `scale(${agentFocus ? 1.06 : 0.97})` }}
         >
           <div
             className={`relative rounded-2xl bg-white px-3 pb-3 pt-[34px] shadow-sm ring-1 transition-shadow duration-500 ${
@@ -356,11 +354,8 @@ export default function HeroMotion() {
         </div>
 
         {/* The thought, travelling */}
-        {!reduced && b >= 2 && b <= 4 && (
-          <span key={`a-${cycle}`} className="hm-packet hm-packet-a" style={{ offsetPath: `path("${PATH_TO_PHONE}")` }} />
-        )}
-        {!reduced && b >= 5 && b <= 6 && (
-          <span key={`b-${cycle}`} className="hm-packet hm-packet-b" style={{ offsetPath: `path("${PATH_TO_AGENT}")` }} />
+        {!reduced && b >= 2 && b <= 6 && (
+          <span key={`a-${cycle}`} className="hm-packet hm-packet-a" style={{ offsetPath: `path("${PATH_TO_AGENT}")` }} />
         )}
       </div>
 
@@ -413,10 +408,7 @@ export default function HeroMotion() {
           z-index: 20;
         }
         :global(.hm-packet-a) {
-          animation: hm-travel 620ms cubic-bezier(0.55, 0, 0.35, 1) 60ms both;
-        }
-        :global(.hm-packet-b) {
-          animation: hm-travel 420ms cubic-bezier(0.5, 0, 0.4, 1) both;
+          animation: hm-travel 800ms cubic-bezier(0.55, 0, 0.35, 1) 50ms both;
         }
         @keyframes hm-travel {
           0% {
