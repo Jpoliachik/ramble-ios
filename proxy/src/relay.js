@@ -96,10 +96,10 @@ async function upload(request, ctx) {
         ctx.db
           .prepare(
             `INSERT OR IGNORE INTO entries
-               (connection_id, recording_id, recorded_at, duration, text, expires_at)
-             VALUES (?, ?, ?, ?, ?, ?)`,
+               (connection_id, recording_id, recorded_at, duration, text, expires_at, received_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
           )
-          .bind(c.id, item.recordingId, item.createdAt, item.duration, item.text, expiresAt),
+          .bind(c.id, item.recordingId, item.createdAt, item.duration, item.text, expiresAt, ctx.now),
       ),
     );
   }
@@ -227,7 +227,7 @@ async function pull(request, ctx) {
   const [{ results }] = await ctx.db.batch([
     ctx.db
       .prepare(
-        `SELECT id, recording_id, recorded_at, duration, text FROM entries
+        `SELECT id, recording_id, recorded_at, received_at, duration, text FROM entries
           WHERE connection_id = ? AND expires_at > ? ORDER BY id LIMIT ?`,
       )
       .bind(connection.id, ctx.now, PULL_LIMIT + 1),
@@ -240,7 +240,9 @@ async function pull(request, ctx) {
     items: results.slice(0, PULL_LIMIT).map((row) => ({
       id: row.id,
       recording_id: row.recording_id,
+      // As the phone sent it: recording start, with the phone's UTC offset.
       created_at: row.recorded_at,
+      received_at: row.received_at ? iso(row.received_at) : null,
       duration: row.duration,
       transcription: row.text,
     })),

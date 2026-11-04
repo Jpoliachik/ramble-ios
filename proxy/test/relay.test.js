@@ -83,11 +83,21 @@ describe('the whole loop', () => {
     assert.deepEqual((await upload(secret, 1)).body, { queued: 1 });
     const { items, has_more } = await pull(token);
     assert.equal(has_more, false);
-    assert.deepEqual(items, [{ id: items[0].id, ...recording(1) }]);
+    assert.deepEqual(items, [{ id: items[0].id, ...recording(1), received_at: new Date(T0).toISOString() }]);
 
     assert.deepEqual((await ack(token, [items[0].id])).body, { deleted: 1 });
     assert.equal((await pull(token)).items.length, 0);
     assert.equal(rows('entries'), 0);
+  });
+
+  it('keeps the recording time as sent, offset included, and adds when the relay got it', async () => {
+    const secret = await newInbox();
+    const token = await connect(secret);
+    now = T0 + 3 * 3600 * 1000; // the phone was offline for three hours
+    await call('POST', '/inbox', { auth: secret, body: { ...recording(1), created_at: '2026-11-01T07:59:00-05:00' } });
+    const [item] = (await pull(token)).items;
+    assert.equal(item.created_at, '2026-11-01T07:59:00-05:00');
+    assert.equal(item.received_at, '2026-11-01T15:00:00.000Z');
   });
 
   it('stores credentials only as hashes', async () => {

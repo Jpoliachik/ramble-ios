@@ -8,8 +8,10 @@
 //
 //  Retries are more patient than webhooks. A webhook is the user's own
 //  endpoint and three tries tells them it's broken; the relay is the core
-//  delivery path, so transient failures (offline, attestation hiccup, 5xx)
-//  keep retrying with backoff for about 8 hours (12 tries) before giving up.
+//  delivery path, and Ramble is meant to work with the phone offline for a
+//  day or more. So transient failures (offline, attestation hiccup, 5xx)
+//  retry until delivered: 5s, 30s, 2m, 10m, 30m, then hourly. Only a
+//  permanent error (the relay rejecting the upload itself) stops them.
 //
 
 import Combine
@@ -30,7 +32,9 @@ struct RelayJob: Identifiable, Codable {
         self.nextRetryAt = nil
     }
 
-    static let maxRetries = 12
+    /// Activity log entries for retries stop after this many, so a phone
+    /// that's offline for days doesn't fill the log with "retrying in 1 hour".
+    static let loggedRetries = 5
 
     /// 5s, 30s, 2m, 10m, 30m, then hourly.
     var retryDelaySeconds: TimeInterval {
@@ -128,9 +132,11 @@ final class RelayQueueService: ObservableObject {
         let attempt = job.retryCount + 1
         updateRecording(job.recordingId) {
             $0.relayStatus = .sending
-            $0.activityLog.append(ActivityEntry(
-                attempt == 1 ? "Sending to agent…" : "Sending to agent… (attempt \(attempt))"
-            ))
+            if attempt <= RelayJob.loggedRetries + 1 {
+                $0.activityLog.append(ActivityEntry(
+                    attempt == 1 ? "Sending to agent…" : "Sending to agent… (attempt \(attempt))"
+                ))
+            }
         }
 
         do {
@@ -154,15 +160,18 @@ final class RelayQueueService: ObservableObject {
                 ))
             }
             removeJob(job)
-        } catch let error as RelayError where error.isTransient && attempt < RelayJob.maxRetries {
+        } catch let error as RelayError where error.isTransient {
             var next = job
             next.retryCount = attempt
             next.nextRetryAt = Date().addingTimeInterval(next.retryDelaySeconds)
             updateRecording(job.recordingId) {
                 $0.relayStatus = .pending
-                $0.activityLog.append(ActivityEntry(
-                    "Send to agent failed — \(error.localizedDescription) Retrying in \(Self.describe(next.retryDelaySeconds))."
-                ))
+                if attempt <= RelayJob.loggedRetries {
+                    $0.activityLog.append(ActivityEntry(
+                        "Send to agent failed — \(error.localizedDescription) Retrying in \(Self.describe(next.retryDelaySeconds))."
+                            + (attempt == RelayJob.loggedRetries ? " It keeps trying every hour until it's sent." : "")
+                    ))
+                }
             }
             updateJob(next)
         } catch {

@@ -15,7 +15,7 @@ It runs in the same Cloudflare Worker as the [transcription proxy](README.md), w
 | Inbox | random id, hash of the app's inbox secret, created time | — |
 | Pairing code | hash of the code, inbox id, expiry; once exchanged, the issued token and connection id | the agent's first pull, replaced, or 10 minutes pass |
 | Connection | random id, inbox id, hash of the agent's token, created and last-pull times | you tap Disconnect |
-| Transcript | recording id, recorded-at time, duration, text, expiry (one copy per connected agent) | the agent acks it, you disconnect, you tap Delete everything, or 30 days pass |
+| Transcript | recording id, recorded-at time, received time, duration, text, expiry (one copy per connected agent) | the agent acks it, you disconnect, you tap Delete everything, or 30 days pass |
 
 No accounts, emails, names, IP addresses, or audio. Credentials are stored only as SHA-256 hashes, with one exception: a freshly issued agent token sits next to its pairing code until the agent first pulls with it (at most 10 minutes), so a retried exchange gets the same token back.
 
@@ -48,7 +48,7 @@ JSON bodies. Errors are `{"error": "..."}`.
 | Method | Path | Body → Response |
 |---|---|---|
 | `POST` | `/pair/exchange` | `{"code": "K7QX-MP4D"}`, no auth → `201 {"token"}`. A retry with the same code returns `200` and the same token until the first pull. |
-| `GET` | `/inbox` | → `{"items": [{"id", "recording_id", "created_at", "duration", "transcription"}], "has_more"}`. Oldest first, up to 50. |
+| `GET` | `/inbox` | → `{"items": [{"id", "recording_id", "created_at", "received_at", "duration", "transcription"}], "has_more"}`. Oldest first, up to 50. `created_at` is passed through as the app sent it (recording start, with the phone's UTC offset); `received_at` is the relay's clock, UTC, and `null` for items queued before migration 0003. |
 | `POST` | `/inbox/ack` | `{"ids": [41, 42]}` → `{"deleted": <n>}`. Up to 500 ids. |
 
 Codes are case-insensitive and ignore spaces and dashes. Unacked items come back on every pull, so if `has_more` is true, ack and pull again. A `401` on a pull means the user disconnected. A wrong method gets `405` with the right one in the error.
@@ -74,7 +74,7 @@ On `workers.dev`, Cloudflare's Browser Integrity Check runs before the Worker an
 The agent-facing instructions live on the website, at https://ramble.watch/docs (and `website/public/llms-full.txt` for agents that read plain text). The app's "Copy message" points agents there. Keep them in sync with this API. The essentials:
 
 - **Separate checking from acting.** Empty checks drive the cost. A cheap watcher (script, hook, scheduled fetch) checks every few minutes and wakes the agent only when `items` isn't empty. If a platform can only schedule full agent runs, hourly or daily is fine.
-- **`created_at` is the only timestamp**: when recording started. Relative times are read from it, and if the moment has passed, the item is overdue.
+- **`created_at` is when recording started**, with the phone's UTC offset; `received_at` is when the relay got it. Relative times are read from `created_at`, and if the moment has passed, the item is overdue.
 - **Only 401 means stop.** 403, 5xx and timeouts are transient. Every call is safe to retry.
 - **Set a User-Agent** (see below).
 

@@ -301,19 +301,36 @@ final class TranscriptionQueueService: ObservableObject {
             if case .proxyError(let code, _) = transcriptionError {
                 httpStatus = code
             }
-            await handleTranscriptionFailure(job: job, error: transcriptionError.localizedDescription, httpStatus: httpStatus)
+            await handleTranscriptionFailure(
+                job: job,
+                error: transcriptionError.localizedDescription,
+                httpStatus: httpStatus,
+                offline: transcriptionError.isOffline
+            )
 
         } catch {
             await handleTranscriptionFailure(job: job, error: error.localizedDescription)
         }
     }
 
-    private func handleTranscriptionFailure(job: TranscriptionJob, error: String, httpStatus: Int? = nil) async {
+    /// `offline`: the phone has no connection. That isn't the recording's
+    /// fault, so it never uses up the retry budget: the job keeps waiting at
+    /// the longest backoff until the phone is back online, however long that
+    /// takes, and logs the wait only once.
+    private func handleTranscriptionFailure(
+        job: TranscriptionJob,
+        error: String,
+        httpStatus: Int? = nil,
+        offline: Bool = false
+    ) async {
         var updatedJob = job
-        updatedJob.retryCount += 1
+        updatedJob.retryCount = offline
+            ? min(job.retryCount + 1, TranscriptionJob.maxRetries - 1)
+            : job.retryCount + 1
 
         var recordings = storageService.loadRecordings()
         if let idx = recordings.firstIndex(where: { $0.id == job.recordingId }) {
+            let alreadyWaiting = offline && recordings[idx].lastError == error
             recordings[idx].lastError = error
             if updatedJob.retryCount >= TranscriptionJob.maxRetries {
                 recordings[idx].status = .failed
@@ -326,9 +343,17 @@ final class TranscriptionQueueService: ObservableObject {
                 recordings[idx].status = .recorded
                 let delay = updatedJob.retryDelaySeconds
                 updatedJob.nextRetryAt = Date().addingTimeInterval(delay)
-                recordings[idx].activityLog.append(
-                    ActivityEntry("Transcription failed via \(providerLabel(for: job)) — \(error) (attempt \(updatedJob.retryCount)/\(TranscriptionJob.maxRetries), retry in \(Int(delay))s)", httpStatus: httpStatus)
-                )
+                if offline {
+                    if !alreadyWaiting {
+                        recordings[idx].activityLog.append(
+                            ActivityEntry("Transcription via \(providerLabel(for: job)) is waiting for a connection — \(error)")
+                        )
+                    }
+                } else {
+                    recordings[idx].activityLog.append(
+                        ActivityEntry("Transcription failed via \(providerLabel(for: job)) — \(error) (attempt \(updatedJob.retryCount)/\(TranscriptionJob.maxRetries), retry in \(Int(delay))s)", httpStatus: httpStatus)
+                    )
+                }
                 storageService.saveRecordings(recordings)
                 updateJob(updatedJob)
                 try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))

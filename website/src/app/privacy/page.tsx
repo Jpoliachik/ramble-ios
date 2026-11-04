@@ -162,7 +162,7 @@ export default function PrivacyPolicy() {
                   <tr>
                     <td className="py-2 pr-3">Transcript</td>
                     <td className="py-2 pr-3">
-                      Recording id, recorded-at time, duration, text, expiry.
+                      Recording id, recorded-at time, received time, duration, text, expiry.
                       One copy per connected agent.
                     </td>
                     <td className="py-2">

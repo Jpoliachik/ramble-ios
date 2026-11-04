@@ -30,9 +30,10 @@ Relay: ${RELAY_URL}
    ${RETENTION}), and tell me how often you'll check.
 
 3. Act. For each item, do what I asked in "transcription". "created_at" is when
-   I recorded it, which can be well before you see it (my phone may have been
-   offline). Read relative times like "in an hour" from created_at. If that
-   time has already passed, treat it as overdue and tell me.
+   I started recording, in my local time, which can be hours before you see it
+   (my phone may have been offline). Read relative times like "in an hour" or
+   "tomorrow" from created_at. If that time has already passed, treat it as
+   overdue and tell me.
 
 4. Ack. POST {"ids": [...]} to /inbox/ack with the ids you handled. That deletes
    them. Anything not acked comes back on the next check. If "has_more" is
@@ -51,8 +52,9 @@ const API_EXAMPLE = `POST /pair/exchange
 
 GET /inbox
 Authorization: Bearer rmba_…
-→ {"items": [{"id": 41, "recording_id": "6F1C…", "created_at": "2026-11-01T19:00:00Z",
-              "duration": 8.2, "transcription": "Remind me to book the dentist."}],
+→ {"items": [{"id": 41, "recording_id": "6F1C…", "created_at": "2026-11-01T14:00:00-05:00",
+              "received_at": "2026-11-01T19:00:04.120Z", "duration": 8.2,
+              "transcription": "Remind me to book the dentist."}],
    "has_more": false}
 
 POST /inbox/ack
@@ -228,9 +230,12 @@ export default function AgentDocs() {
               <ul className="list-disc space-y-2 pl-5">
                 <li>
                   <Strong>Timestamps.</Strong> <InlineCode>created_at</InlineCode> is when the user started recording,
-                  in UTC. It is the only timestamp. Delivery can lag by minutes or, if the phone was offline, hours.
-                  Read relative times from <InlineCode>created_at</InlineCode>, and if the moment has passed, treat it
-                  as overdue rather than moving it. <InlineCode>duration</InlineCode> is in seconds.
+                  taken from the watch or phone clock, with the phone&rsquo;s UTC offset (so{" "}
+                  <InlineCode>-05:00</InlineCode> means the user is 5 hours behind UTC).{" "}
+                  <InlineCode>received_at</InlineCode> (UTC) is when the relay got it. The two can be hours apart if the
+                  phone was offline. Read relative times like &ldquo;tomorrow&rdquo; from{" "}
+                  <InlineCode>created_at</InlineCode> in that offset, and if the moment has passed, treat it as overdue
+                  rather than moving it. <InlineCode>duration</InlineCode> is in seconds.
                 </li>
                 <li>
                   <Strong>Acks.</Strong> Up to 500 ids per call. Acking an id that&rsquo;s already gone, or isn&rsquo;t
@@ -305,7 +310,7 @@ export default function AgentDocs() {
               <ul className="list-disc space-y-2 pl-5">
                 <li>
                   <Strong>Relay (this page).</Strong> The agent pulls. If the phone is offline, Ramble keeps retrying
-                  the upload for about 8 hours, and the relay then holds each transcript for up to {RETENTION} until the
+                  the upload until it gets through (hourly once it&rsquo;s been a while), and the relay then holds each transcript for up to {RETENTION} until the
                   agent acks it. If the agent is down for a while, nothing is lost. The agent needs to make outbound
                   HTTPS calls on a schedule.
                 </li>
