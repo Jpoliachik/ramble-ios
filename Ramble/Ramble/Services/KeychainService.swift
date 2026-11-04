@@ -9,6 +9,14 @@ import Security
 enum KeychainService {
     private static let service = "dev.goodloop.ramble"
 
+    /// Readable after the first unlock post-boot, so background work (e.g. a
+    /// watch recording reaching a locked phone) can read the relay inbox
+    /// secret and App Attest key. The default, `WhenUnlocked`, blocks reads
+    /// while the phone is locked. Not `ThisDeviceOnly`, so the inbox secret
+    /// survives a backup restore onto a new phone; a restored App Attest key
+    /// fails with `invalidKey` and is re-attested.
+    private static let accessibility = kSecAttrAccessibleAfterFirstUnlock
+
     static func string(forKey key: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -46,13 +54,9 @@ enum KeychainService {
             kSecAttrService as String: service,
             kSecAttrAccount as String: key
         ]
-        // Readable after first unlock post-boot so background work (e.g. a
-        // watch recording reaching a locked phone) can read the relay inbox
-        // secret and App Attest key. The default is `WhenUnlocked`, which
-        // blocks reads while the device is locked.
         let attributes: [String: Any] = [
             kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            kSecAttrAccessible as String: accessibility
         ]
 
         let updateStatus = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
@@ -60,7 +64,7 @@ enum KeychainService {
         if updateStatus == errSecItemNotFound {
             var newItem = query
             newItem[kSecValueData as String] = data
-            newItem[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            newItem[kSecAttrAccessible as String] = accessibility
             SecItemAdd(newItem as CFDictionary, nil)
         }
     }
@@ -72,9 +76,9 @@ enum KeychainService {
     /// Older installs wrote every item with the default `WhenUnlocked`
     /// accessibility, so a watch recording that reached a locked phone couldn't
     /// read the relay inbox secret or App Attest key and was silently skipped.
-    /// This moves all of Ramble's items to `AfterFirstUnlockThisDeviceOnly` in
-    /// one update. The update fails while the phone is locked, so the flag is
-    /// only set on success and the next launch or foreground tries again.
+    /// This moves all of Ramble's items to `AfterFirstUnlock` in one update.
+    /// Call it only while protected data is available (the phone is unlocked):
+    /// locked items can't be updated, and the flag stops later retries.
     static func migrateAccessibilityIfNeeded() {
         let defaults = UserDefaults.standard
         guard !defaults.bool(forKey: accessibilityMigratedKey) else { return }
@@ -84,7 +88,7 @@ enum KeychainService {
             kSecAttrService as String: service
         ]
         let attributes: [String: Any] = [
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            kSecAttrAccessible as String: accessibility
         ]
 
         let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)

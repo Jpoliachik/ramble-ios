@@ -14,7 +14,16 @@ struct RambleApp: App {
 
     init() {
         BackgroundTaskService.shared.registerBackgroundTasks()
-        KeychainService.migrateAccessibilityIfNeeded()
+        Self.migrateKeychainIfUnlocked()
+        // Registered here, not on a view, so it also fires when a locked
+        // launch stays in the background (no scene) and the phone unlocks.
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.protectedDataDidBecomeAvailableNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            MainActor.assumeIsolated { Self.migrateKeychainIfUnlocked() }
+        }
         _ = PhoneConnectivityService.shared
         HapticService.prepare()
 
@@ -59,12 +68,16 @@ struct RambleApp: App {
                         for: UIApplication.willEnterForegroundNotification
                     )
                 ) { _ in
-                    // Retries if the launch happened while the phone was locked.
-                    KeychainService.migrateAccessibilityIfNeeded()
                     TranscriptionQueueService.shared.resumePendingJobs()
                     WebhookQueueService.shared.resumePendingJobs()
                     RelayQueueService.shared.resumePendingJobs()
                 }
         }
+    }
+
+    /// Keychain items can only be migrated while the phone is unlocked.
+    private static func migrateKeychainIfUnlocked() {
+        guard UIApplication.shared.isProtectedDataAvailable else { return }
+        KeychainService.migrateAccessibilityIfNeeded()
     }
 }

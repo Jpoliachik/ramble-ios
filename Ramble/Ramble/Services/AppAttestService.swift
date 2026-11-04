@@ -100,9 +100,9 @@ final class AppAttestService {
                 keyId, clientDataHash: clientDataHash
             )
             return (keyId: keyId, assertion: assertion)
-        } catch let error as DCError where error.code == .invalidKey {
-            // The key is genuinely gone (e.g. device restore, app reinstall).
-            // Drop state so the next attempt re-attests.
+        } catch let error as DCError where error.code == .invalidKey || error.code == .invalidInput {
+            // The key is gone or unusable (e.g. restored onto a new device,
+            // app reinstall). Drop state so the next attempt re-attests.
             resetState()
             return nil
         } catch {
