@@ -46,7 +46,7 @@ final class RelayQueueService: ObservableObject {
     @Published private(set) var isProcessing = false
 
     var hasActiveWork: Bool {
-        isProcessing || queue.contains { ($0.nextRetryAt ?? .distantPast) <= Date() }
+        isProcessing || (!relay.isWaitingForUnlock && queue.contains { ($0.nextRetryAt ?? .distantPast) <= Date() })
     }
 
     private let storageService = StorageService.shared
@@ -87,10 +87,20 @@ final class RelayQueueService: ObservableObject {
     }
 
     func resumePendingJobs() {
+        var missed: [UUID] = []
         for recording in storageService.loadRecordings() {
-            if let status = recording.relayStatus, status == .pending || status == .sending,
-               !queue.contains(where: { $0.recordingId == recording.id }) {
+            guard !queue.contains(where: { $0.recordingId == recording.id }) else { continue }
+            if let status = recording.relayStatus, status == .pending || status == .sending {
                 queue.append(RelayJob(recordingId: recording.id))
+            } else if isMissed(recording) {
+                queue.append(RelayJob(recordingId: recording.id))
+                missed.append(recording.id)
+            }
+        }
+        for id in missed {
+            updateRecording(id) {
+                $0.relayStatus = .pending
+                $0.activityLog.append(ActivityEntry("Queued for your agent (it was skipped earlier)"))
             }
         }
         // A foreground or background wake is a good moment to retry early.
@@ -99,8 +109,25 @@ final class RelayQueueService: ObservableObject {
         processNextIfNeeded()
     }
 
+    /// A transcribed recording made while an agent was connected that never
+    /// entered the queue. Older builds skipped recordings that reached a
+    /// locked phone, because the Keychain read made it look like no agent was
+    /// connected. Recordings from before the first agent was paired are left
+    /// alone, so connecting an agent never floods it with old thoughts.
+    private func isMissed(_ recording: Recording) -> Bool {
+        guard recording.relayStatus == nil,
+              recording.status == .completed,
+              let text = recording.transcription,
+              !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              relay.hasConnectedAgents,
+              let since = relay.connectedSince else { return false }
+        return recording.createdAt >= since
+    }
+
     func processNextIfNeeded() {
         guard !isProcessing else { return }
+        // Locked phone: jobs stay queued and resume on unlock (see RambleApp).
+        guard !relay.isWaitingForUnlock else { return }
         let now = Date()
         guard let job = queue.first(where: { ($0.nextRetryAt ?? .distantPast) <= now }) else {
             scheduleWake()
@@ -154,6 +181,17 @@ final class RelayQueueService: ObservableObject {
                 ))
             }
             removeJob(job)
+        } catch RelayError.deviceLocked {
+            // Not a failed attempt: nothing was sent. Wait for unlock, which
+            // resumes the queue (see RambleApp), with a slow timer as backup.
+            var next = job
+            next.nextRetryAt = Date().addingTimeInterval(Self.lockedRetryDelay)
+            updateRecording(job.recordingId) {
+                $0.relayStatus = .pending
+                $0.activityLog.append(ActivityEntry("Waiting for this iPhone to be unlocked"))
+            }
+            updateJob(next)
+            BackgroundTaskService.shared.scheduleSyncTask()
         } catch let error as RelayError where error.isTransient && attempt < RelayJob.maxRetries {
             var next = job
             next.retryCount = attempt
@@ -186,6 +224,8 @@ final class RelayQueueService: ObservableObject {
             self?.processNextIfNeeded()
         }
     }
+
+    private static let lockedRetryDelay: TimeInterval = 600
 
     private static func describe(_ seconds: TimeInterval) -> String {
         seconds < 60 ? "\(Int(seconds))s" : seconds < 3600 ? "\(Int(seconds / 60)) min" : "1 hour"

@@ -184,6 +184,11 @@ extension PhoneConnectivityService: WCSessionDelegate {
             Task { @MainActor in
                 guard storageService.addRecording(recording) else { return }
                 TranscriptionQueueService.shared.enqueue(recordingId: recording.id)
+                // Often arrives with the phone locked in a pocket and Ramble in
+                // the background. Ask for time to transcribe and send it now,
+                // and keep a deferred task as a fallback if that runs out.
+                BackgroundTaskService.shared.beginImmediateBackgroundProcessing()
+                BackgroundTaskService.shared.scheduleSyncTask()
             }
 
             print("Received recording from watch: \(metadata.recordingId)")

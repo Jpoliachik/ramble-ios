@@ -13,7 +13,14 @@ final class TranscriptionQueueService: ObservableObject {
     @Published private(set) var isProcessing = false
 
     var hasActiveWork: Bool {
-        isProcessing || !queue.isEmpty
+        isProcessing || (!queue.isEmpty && !isWaitingForUnlock)
+    }
+
+    /// A cloud job is next but the phone is locked, so its device id and App
+    /// Attest key can't be read. On-device jobs don't need the Keychain.
+    private var isWaitingForUnlock: Bool {
+        guard let job = queue.first, job.provider.isCloud else { return false }
+        return !settingsService.secretsAvailable
     }
 
     private let speechAnalyzer = SpeechAnalyzerTranscriptionService()
@@ -48,6 +55,8 @@ final class TranscriptionQueueService: ObservableObject {
 
     func processNextIfNeeded() {
         guard !isProcessing, let job = queue.first else { return }
+        // Resumes when the phone unlocks (see RambleApp).
+        guard !isWaitingForUnlock else { return }
         processJob(job)
     }
 
