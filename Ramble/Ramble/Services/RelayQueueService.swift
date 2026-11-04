@@ -50,7 +50,7 @@ final class RelayQueueService: ObservableObject {
     @Published private(set) var isProcessing = false
 
     var hasActiveWork: Bool {
-        isProcessing || queue.contains { ($0.nextRetryAt ?? .distantPast) <= Date() }
+        isProcessing || (!KeychainService.isLocked && queue.contains { ($0.nextRetryAt ?? .distantPast) <= Date() })
     }
 
     private let storageService = StorageService.shared
@@ -91,10 +91,22 @@ final class RelayQueueService: ObservableObject {
     }
 
     func resumePendingJobs() {
+        // Read once: each is a Keychain or defaults lookup.
+        let missedSince = relay.hasConnectedAgents ? relay.connectedSince : nil
+        var missed: [UUID] = []
         for recording in storageService.loadRecordings() {
-            if let status = recording.relayStatus, status == .pending || status == .sending,
-               !queue.contains(where: { $0.recordingId == recording.id }) {
+            guard !queue.contains(where: { $0.recordingId == recording.id }) else { continue }
+            if let status = recording.relayStatus, status == .pending || status == .sending {
                 queue.append(RelayJob(recordingId: recording.id))
+            } else if let missedSince, isMissed(recording, since: missedSince) {
+                queue.append(RelayJob(recordingId: recording.id))
+                missed.append(recording.id)
+            }
+        }
+        for id in missed {
+            updateRecording(id) {
+                $0.relayStatus = .pending
+                $0.activityLog.append(ActivityEntry("Queued for your agent (it was skipped earlier)"))
             }
         }
         // A foreground or background wake is a good moment to retry early.
@@ -103,8 +115,22 @@ final class RelayQueueService: ObservableObject {
         processNextIfNeeded()
     }
 
+    /// A transcribed recording made while an agent was connected that never
+    /// entered the queue. Older builds skipped recordings that reached a
+    /// locked phone, because the Keychain read made it look like no agent was
+    /// connected. Recordings from before the first agent was paired are left
+    /// alone, so connecting an agent never floods it with old thoughts.
+    private func isMissed(_ recording: Recording, since: Date) -> Bool {
+        recording.createdAt >= since
+            && recording.relayStatus == nil
+            && recording.status == .completed
+            && !(recording.transcription ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     func processNextIfNeeded() {
         guard !isProcessing else { return }
+        // Locked phone: jobs stay queued and resume on unlock (see RambleApp).
+        guard !KeychainService.isLocked else { return }
         let now = Date()
         guard let job = queue.first(where: { ($0.nextRetryAt ?? .distantPast) <= now }) else {
             scheduleWake()
@@ -149,6 +175,7 @@ final class RelayQueueService: ObservableObject {
                     $0.activityLog.append(ActivityEntry("Not sent — no agent is connected"))
                 }
                 removeJob(job)
+                relay.noteNoAgentsConnected()
                 _ = try? await relay.refreshConnections()
                 return
             }
@@ -160,6 +187,17 @@ final class RelayQueueService: ObservableObject {
                 ))
             }
             removeJob(job)
+        } catch RelayError.deviceLocked {
+            // Not a failed attempt: nothing was sent. The queue holds while
+            // locked and resumes on unlock, foreground or the deferred task.
+            var next = job
+            next.nextRetryAt = Date().addingTimeInterval(Self.lockedRetryDelay)
+            updateRecording(job.recordingId) {
+                $0.relayStatus = .pending
+                $0.activityLog.append(ActivityEntry("Waiting for this iPhone to be unlocked"))
+            }
+            updateJob(next)
+            BackgroundTaskService.shared.scheduleSyncTask()
         } catch let error as RelayError where error.isTransient {
             var next = job
             next.retryCount = attempt
@@ -195,6 +233,8 @@ final class RelayQueueService: ObservableObject {
             self?.processNextIfNeeded()
         }
     }
+
+    private static let lockedRetryDelay: TimeInterval = 600
 
     private static func describe(_ seconds: TimeInterval) -> String {
         seconds < 60 ? "\(Int(seconds))s" : seconds < 3600 ? "\(Int(seconds / 60)) min" : "1 hour"

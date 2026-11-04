@@ -35,8 +35,10 @@ final class AppAttestService {
 
     /// Generates an App Attest key if one doesn't already exist. Returns the keyId.
     func generateKeyIfNeeded() async throws -> String {
-        if let existing = keyId {
-            return existing
+        switch KeychainService.lookup(forKey: Self.keyIdKey) {
+        case .found(let existing): return existing
+        case .locked: throw AppAttestError.deviceLocked // don't orphan the real key
+        case .notFound: break
         }
         let newKeyId = try await DCAppAttestService.shared.generateKey()
         KeychainService.setString(newKeyId, forKey: Self.keyIdKey)
@@ -55,7 +57,11 @@ final class AppAttestService {
     /// storage, so attesting with either covers both.
     func attestIfNeeded(server: URL? = nil) async throws {
         guard isSupported else { return }
-        guard !isAttested else { return }
+        switch KeychainService.lookup(forKey: Self.isAttestedKey) {
+        case .found("true"): return
+        case .locked: throw AppAttestError.deviceLocked
+        default: break
+        }
 
         guard let baseURL = server ?? Self.proxyBaseURL(settingsService.load()) else {
             throw AppAttestError.serverNotConfigured
@@ -176,9 +182,12 @@ enum AppAttestError: LocalizedError {
     case serverNotConfigured
     case challengeFailed
     case attestationRejected
+    case deviceLocked
 
     var errorDescription: String? {
         switch self {
+        case .deviceLocked:
+            return "Waiting for this iPhone to be unlocked"
         case .serverNotConfigured:
             return "Transcription server not configured"
         case .challengeFailed:
