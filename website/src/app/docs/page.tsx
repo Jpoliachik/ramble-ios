@@ -3,7 +3,7 @@ import Link from "next/link";
 import { CodeBlock, InlineCode } from "@/components/code-block";
 import DocsSidebar from "@/components/docs-sidebar";
 import CopyLlmButton from "@/components/copy-llm-button";
-import { PAIR_CODE_EXAMPLE, PAIR_CODE_TTL, RELAY_URL, RETENTION } from "@/lib/site";
+import { PAIR_CODE_EXAMPLE, PAIR_CODE_TTL, RELAY_URL, RETENTION, SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Connect your agent",
@@ -21,7 +21,55 @@ Relay: ${RELAY_URL}
    best. It's a tiny request that usually returns an empty list, so frequent checks are fine.
 3. For each item, do what I asked in "transcription".
 4. POST {"ids": [...]} to /inbox/ack with the ids you handled. If "has_more" is true, pull again.
-5. If a request returns 401, I disconnected you. Stop checking and tell me.`;
+5. If a request returns 401, I disconnected you. Stop checking and tell me.
+
+Send a User-Agent header on every request (any name, like my-agent/1.0). Retry
+timeouts, dropped connections, and 5xx errors after 2, 5, then 15 seconds. Every
+call is safe to retry, including the code exchange. Examples: ${SITE_URL}/docs#requests`;
+
+const CURL_EXAMPLE = `RELAY=${RELAY_URL}
+
+# Pair (once)
+curl -sS --retry 3 -X POST "$RELAY/pair/exchange" \\
+  -H "Content-Type: application/json" -d '{"code": "${PAIR_CODE_EXAMPLE}"}'
+
+# Check
+curl -sS --retry 3 "$RELAY/inbox" -H "Authorization: Bearer $TOKEN"
+
+# Ack what you handled
+curl -sS --retry 3 -X POST "$RELAY/inbox/ack" -H "Authorization: Bearer $TOKEN" \\
+  -H "Content-Type: application/json" -d '{"ids": [41]}'`;
+
+const PYTHON_EXAMPLE = `import json, time, urllib.error, urllib.request
+
+RELAY = "${RELAY_URL}"
+
+def call(method, path, body=None, token=None):
+    # Python's default urllib User-Agent is blocked at the network edge. Set your own.
+    headers = {"User-Agent": "my-agent/1.0", "Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    data = json.dumps(body).encode() if body is not None else None
+    for wait in (2, 5, 15, None):
+        try:
+            req = urllib.request.Request(RELAY + path, data=data, headers=headers, method=method)
+            with urllib.request.urlopen(req, timeout=20) as res:
+                return json.load(res)
+        except urllib.error.HTTPError as err:
+            if err.code < 500 or wait is None:
+                raise  # 400: bad or expired code. 401: the user disconnected you.
+        except OSError:  # timeout or dropped connection
+            if wait is None:
+                raise
+        time.sleep(wait)
+
+token = call("POST", "/pair/exchange", {"code": "${PAIR_CODE_EXAMPLE}"})["token"]  # once; save it
+
+inbox = call("GET", "/inbox", token=token)
+for item in inbox["items"]:
+    print(item["transcription"])  # handle it
+if inbox["items"]:
+    call("POST", "/inbox/ack", {"ids": [i["id"] for i in inbox["items"]]}, token=token)`;
 
 const API_EXAMPLE = `POST /pair/exchange
 {"code": "${PAIR_CODE_EXAMPLE}"}
@@ -98,6 +146,31 @@ export default function AgentDocs() {
                 {RETENTION}. Every path is relative to <InlineCode>{RELAY_URL}</InlineCode>.
               </p>
               <CodeBlock>{API_EXAMPLE}</CodeBlock>
+            </section>
+
+            <section className="space-y-4">
+              <SectionHeader id="requests">Making requests</SectionHeader>
+              <ul className="list-disc space-y-2 pl-5">
+                <li>
+                  <strong className="font-medium text-stone-900">Send a User-Agent.</strong> Any name works, like{" "}
+                  <InlineCode>my-agent/1.0</InlineCode>. Python&rsquo;s built-in <InlineCode>urllib</InlineCode> sends
+                  one that the network edge blocks with a 403 (<InlineCode>error code: 1010</InlineCode>). curl,
+                  requests, httpx, and fetch are fine as they are.
+                </li>
+                <li>
+                  <strong className="font-medium text-stone-900">Retry the network, not the answer.</strong> Retry
+                  timeouts, dropped connections, and 5xx errors after 2, 5, then 15 seconds. Every call is safe to
+                  retry: sending the same code again within {PAIR_CODE_TTL} returns the same token, a pull only reads,
+                  and acking twice does nothing.
+                </li>
+                <li>
+                  <strong className="font-medium text-stone-900">Read the error.</strong> Errors are JSON with a
+                  plain <InlineCode>error</InlineCode> message. A 400 on the exchange means the code is wrong or
+                  expired, so ask for a new one. A 401 means the user disconnected you.
+                </li>
+              </ul>
+              <CodeBlock filename="curl">{CURL_EXAMPLE}</CodeBlock>
+              <CodeBlock filename="Python (standard library)">{PYTHON_EXAMPLE}</CodeBlock>
               <p>
                 What the relay stores and for how long is in the{" "}
                 <Link href="/privacy" className="text-brand-text underline-offset-2 hover:underline">

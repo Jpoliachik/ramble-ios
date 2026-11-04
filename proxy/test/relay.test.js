@@ -129,13 +129,63 @@ describe('inbox creation', () => {
 });
 
 describe('pairing', () => {
-  it('codes are single-use', async () => {
+  it('a code makes one connection, and stops working once the agent pulls', async () => {
     const secret = await newInbox();
     const { code, expires_at } = (await call('POST', '/pair/code', { auth: secret })).body;
     assert.match(code, /^[2-9A-Z]{4}-[2-9A-Z]{4}$/);
     assert.equal(expires_at, new Date(T0 + PAIR_CODE_TTL_SECONDS * 1000).toISOString());
-    assert.equal((await call('POST', '/pair/exchange', { body: { code } })).status, 201);
+    const first = await call('POST', '/pair/exchange', { body: { code } });
+    assert.equal(first.status, 201);
+    await pull(first.body.token);
     assert.equal((await call('POST', '/pair/exchange', { body: { code } })).status, 400);
+    assert.equal((await connections(secret)).length, 1);
+    assert.equal(rows('pair_codes'), 0);
+  });
+
+  it('a retried exchange gets the same token when the first response was lost', async () => {
+    const secret = await newInbox();
+    const { code } = (await call('POST', '/pair/code', { auth: secret })).body;
+    const first = await call('POST', '/pair/exchange', { body: { code } });
+    now += 60_000;
+    const retry = await call('POST', '/pair/exchange', { body: { code } });
+    assert.equal(retry.status, 200);
+    assert.equal(retry.body.token, first.body.token);
+    assert.equal((await connections(secret)).length, 1);
+    assert.deepEqual((await pull(retry.body.token)).items, []);
+  });
+
+  it('stops replaying the token when the code expires or the user disconnects', async () => {
+    const secret = await newInbox();
+    const { code } = (await call('POST', '/pair/code', { auth: secret })).body;
+    await call('POST', '/pair/exchange', { body: { code } });
+    now = T0 + PAIR_CODE_TTL_SECONDS * 1000;
+    assert.equal((await call('POST', '/pair/exchange', { body: { code } })).status, 400);
+
+    now = T0;
+    const other = (await call('POST', '/pair/code', { auth: secret })).body.code;
+    await call('POST', '/pair/exchange', { body: { code: other } });
+    const [, second] = await connections(secret);
+    await call('DELETE', `/connections/${second.id}`, { auth: secret });
+    assert.equal((await call('POST', '/pair/exchange', { body: { code: other } })).status, 400);
+  });
+
+  it('is lenient about how the agent sends things', async () => {
+    const secret = await newInbox();
+    const { code } = (await call('POST', '/pair/code', { auth: secret })).body;
+    const res = await handleRelayRequest(
+      new Request('https://relay.test/pair/exchange', { method: 'POST', body: JSON.stringify({ code }) }),
+      env,
+      { now },
+    );
+    assert.equal(res.status, 201);
+    const { token } = await res.json();
+    for (const authorization of [`bearer ${token}`, token, `Bearer  ${token} `]) {
+      const pulled = await call('GET', '/inbox', { headers: { Authorization: authorization } });
+      assert.equal(pulled.status, 200, authorization);
+    }
+    const missing = await call('POST', '/pair/exchange', { body: {} });
+    assert.equal(missing.status, 400);
+    assert.match(missing.body.error, /"code"/);
   });
 
   it('accepts codes pasted with odd spacing and case', async () => {
@@ -342,8 +392,11 @@ describe('helpers and routing', () => {
     for (const p of ['/transcribe', '/health', '/attest', '/receipts', '/inbox/x/y']) assert.ok(!isRelayPath(p), p);
   });
 
-  it('404s unknown methods and 503s without a database', async () => {
-    assert.equal((await call('PUT', '/inbox')).status, 404);
+  it('405s wrong methods with a hint, and 503s without a database', async () => {
+    const wrong = await call('GET', '/pair/exchange');
+    assert.equal(wrong.status, 405);
+    assert.match(wrong.body.error, /Use POST/);
+    assert.equal((await call('PUT', '/inbox')).status, 405);
     env = {};
     assert.equal((await call('GET', '/inbox')).status, 503);
   });

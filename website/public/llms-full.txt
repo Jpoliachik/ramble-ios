@@ -22,6 +22,8 @@ Relay: https://ramble-transcription-proxy.jpoliachik.workers.dev
 4. POST {"ids": [...]} to /inbox/ack with the ids handled. This deletes them. If has_more is true, pull again.
 5. A 401 means the user disconnected. Stop and tell them.
 
+Send a User-Agent header and retry network errors with backoff. See "Making requests" below.
+
 ## API
 
 Relay: https://ramble-transcription-proxy.jpoliachik.workers.dev (every path below is relative to it).
@@ -44,6 +46,56 @@ Authorization: Bearer rmba_…
 ```
 
 Up to 50 items, oldest first. Unacked items come back on every pull; if has_more is true, ack and pull again. Anything never acked is deleted after 30 days. Errors are {"error": "..."} with a 4xx/5xx status.
+
+## Making requests
+
+- Send a User-Agent header on every request. Any name works, like `my-agent/1.0`. Python's built-in urllib sends a default one that the network edge blocks with a 403 ("error code: 1010"). curl, requests, httpx, and fetch are fine as they are.
+- Retry timeouts, dropped connections, and 5xx errors after 2, 5, then 15 seconds. Every call is safe to retry: the same code sent again within 10 minutes returns the same token (until the first pull with it), a pull only reads, and acking twice does nothing.
+- A 400 on /pair/exchange means the code is wrong or expired: ask the user for a new one. A 401 means the user disconnected you. A 405 means the wrong HTTP method; the error says which to use.
+
+curl:
+
+```
+RELAY=https://ramble-transcription-proxy.jpoliachik.workers.dev
+curl -sS --retry 3 -X POST "$RELAY/pair/exchange" -H "Content-Type: application/json" -d '{"code": "K7QX-MP4D"}'
+curl -sS --retry 3 "$RELAY/inbox" -H "Authorization: Bearer $TOKEN"
+curl -sS --retry 3 -X POST "$RELAY/inbox/ack" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"ids": [41]}'
+```
+
+Python, standard library only:
+
+```python
+import json, time, urllib.error, urllib.request
+
+RELAY = "https://ramble-transcription-proxy.jpoliachik.workers.dev"
+
+def call(method, path, body=None, token=None):
+    # Python's default urllib User-Agent is blocked at the network edge. Set your own.
+    headers = {"User-Agent": "my-agent/1.0", "Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    data = json.dumps(body).encode() if body is not None else None
+    for wait in (2, 5, 15, None):
+        try:
+            req = urllib.request.Request(RELAY + path, data=data, headers=headers, method=method)
+            with urllib.request.urlopen(req, timeout=20) as res:
+                return json.load(res)
+        except urllib.error.HTTPError as err:
+            if err.code < 500 or wait is None:
+                raise  # 400: bad or expired code. 401: the user disconnected you.
+        except OSError:  # timeout or dropped connection
+            if wait is None:
+                raise
+        time.sleep(wait)
+
+token = call("POST", "/pair/exchange", {"code": "K7QX-MP4D"})["token"]  # once; save it
+
+inbox = call("GET", "/inbox", token=token)
+for item in inbox["items"]:
+    print(item["transcription"])  # handle it
+if inbox["items"]:
+    call("POST", "/inbox/ack", {"ids": [i["id"] for i in inbox["items"]]}, token=token)
+```
 
 # Part 2: Webhook API
 
