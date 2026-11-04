@@ -68,14 +68,23 @@ final class AppAttestService {
     /// Performs the full attestation flow: generate key, get server challenge,
     /// attest with Apple, register attestation with our server.
     /// Safe to call multiple times; no-ops if already attested or unsupported.
-    func attestIfNeeded() async throws {
+    ///
+    /// `server` defaults to the cloud transcription proxy. The relay passes
+    /// its own URL so on-device (Apple Speech) users, who never talk to the
+    /// proxy, can still attest. The hosted relay and proxy share attestation
+    /// storage, so attesting with either covers both.
+    func attestIfNeeded(server: URL? = nil) async throws {
         guard isSupported else { return }
         guard !isAttested else { return }
+
+        guard let baseURL = server ?? Self.proxyBaseURL(settingsService.load()) else {
+            throw AppAttestError.serverNotConfigured
+        }
 
         let keyId = try await generateKeyIfNeeded()
 
         // 1. Get a one-time challenge from the server
-        let challenge = try await fetchChallenge()
+        let challenge = try await fetchChallenge(baseURL: baseURL)
 
         // 2. Hash the challenge to create clientDataHash
         let challengeData = Data(challenge.utf8)
@@ -88,7 +97,7 @@ final class AppAttestService {
 
         // 4. Send the attestation to our proxy for verification and storage
         try await registerAttestation(
-            keyId: keyId, attestation: attestation, challenge: challenge
+            baseURL: baseURL, keyId: keyId, attestation: attestation, challenge: challenge
         )
 
         // 5. Mark as successfully attested
@@ -133,13 +142,12 @@ final class AppAttestService {
 
     // MARK: - Network Helpers
 
-    private func fetchChallenge() async throws -> String {
-        let settings = settingsService.load()
-        guard let baseURLString = settings.transcriptionProvider.baseURL,
-              let baseURL = URL(string: baseURLString) else {
-            throw AppAttestError.serverNotConfigured
-        }
+    private static func proxyBaseURL(_ settings: Settings) -> URL? {
+        settings.transcriptionProvider.baseURL.flatMap(URL.init(string:))
+    }
 
+    private func fetchChallenge(baseURL: URL) async throws -> String {
+        let settings = settingsService.load()
         let url = baseURL.appendingPathComponent("attest/challenge")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -157,14 +165,9 @@ final class AppAttestService {
     }
 
     private func registerAttestation(
-        keyId: String, attestation: Data, challenge: String
+        baseURL: URL, keyId: String, attestation: Data, challenge: String
     ) async throws {
         let settings = settingsService.load()
-        guard let baseURLString = settings.transcriptionProvider.baseURL,
-              let baseURL = URL(string: baseURLString) else {
-            throw AppAttestError.serverNotConfigured
-        }
-
         let url = baseURL.appendingPathComponent("attest")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"

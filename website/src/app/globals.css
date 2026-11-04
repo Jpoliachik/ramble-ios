@@ -6,7 +6,7 @@
   --color-stone-200: #e7e4df;
   --color-stone-300: #d5d0c8;
   --color-stone-400: #a8a197;
-  --color-stone-500: #7c7568;
+  --color-stone-500: #6b6457;
   --color-stone-600: #57524a;
   --color-stone-700: #3d3a34;
   --color-stone-800: #2a2825;
@@ -26,7 +26,11 @@
   --color-cream: #f4f3ef;
   --color-cream-warm: #f9f5ed;
 
-  --color-red-500: #ff3b30;
+  /* Brand amber. `brand` matches the app's brand-amber colorset (light) and is
+     for the logo circle and other fills. Amber that light is under 3:1 on cream,
+     so text uses the darker `brand-text`, which passes WCAG AA. */
+  --color-brand: #d97706;
+  --color-brand-text: #b45309;
 
   --font-sans: "SF Pro Display", "SF Pro", -apple-system, BlinkMacSystemFont,
     system-ui, "Segoe UI", Roboto, sans-serif;
@@ -34,6 +38,12 @@
     "Book Antiqua", Palatino, Georgia, serif;
   --font-mono: "SF Mono", ui-monospace, SFMono-Regular, "Cascadia Code",
     Menlo, monospace;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
 }
 
 body {
@@ -88,4 +98,8 @@ body {
 
 .hero-enter-buttons {
   animation: hero-fade-up-sm 0.5s ease-out 0.5s both;
+}
+
+.hero-enter-devices {
+  animation: hero-fade-up 0.7s ease-out 0.7s both;
 }

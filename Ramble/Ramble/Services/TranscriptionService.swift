@@ -11,6 +11,7 @@ enum TranscriptionError: Error, LocalizedError {
     case audioFileNotFound
     case modelNotInstalled
     case localeNotSupported
+    case speechPermissionDenied
     case speechAnalyzerUnavailable
     case recognitionFailed(String)
     case proxyNotConfigured
@@ -27,6 +28,8 @@ enum TranscriptionError: Error, LocalizedError {
             return SpeechAnalyzerTranscriptionService.modelNotInstalledError
         case .localeNotSupported:
             return "Speech recognition is not supported for your language"
+        case .speechPermissionDenied:
+            return "Ramble needs speech recognition permission to transcribe on-device. Tap Retry to allow it, or turn it on in Settings."
         case .speechAnalyzerUnavailable:
             return "On-device transcription requires iOS 26 or later"
         case .recognitionFailed(let message):
@@ -48,9 +51,31 @@ enum TranscriptionError: Error, LocalizedError {
 // MARK: - Legacy SFSpeechRecognizer (On-Device, iOS 18+)
 
 final class LegacySpeechTranscriptionService {
+    /// SFSpeechRecognizer won't run without speech recognition consent, and the
+    /// prompt only appears while the app is in the foreground. So callers ask at
+    /// user-initiated moments (starting a recording, tapping Retry) rather than
+    /// when the queue reaches the job, which may be in the background.
+    /// SpeechAnalyzer on iOS 26+ needs no speech consent, so this is a no-op there.
+    static func requestAuthorizationIfNeeded() async {
+        if #available(iOS 26.0, *) { return }
+        guard SettingsService.shared.load().transcriptionProvider == .appleSpeech,
+              SFSpeechRecognizer.authorizationStatus() == .notDetermined else { return }
+        await withCheckedContinuation { continuation in
+            // @Sendable keeps the handler off the default MainActor isolation;
+            // Speech calls it on a background queue.
+            SFSpeechRecognizer.requestAuthorization { @Sendable _ in
+                continuation.resume()
+            }
+        }
+    }
+
     func transcribe(audioURL: URL) async throws -> String {
         guard FileManager.default.fileExists(atPath: audioURL.path) else {
             throw TranscriptionError.audioFileNotFound
+        }
+
+        guard SFSpeechRecognizer.authorizationStatus() == .authorized else {
+            throw TranscriptionError.speechPermissionDenied
         }
 
         guard let recognizer = SFSpeechRecognizer(), recognizer.isAvailable else {

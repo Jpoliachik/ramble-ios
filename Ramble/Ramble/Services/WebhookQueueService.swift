@@ -34,8 +34,7 @@ final class WebhookQueueService: ObservableObject {
         guard !queue.contains(where: { $0.recordingId == recordingId }) else { return }
 
         let settings = settingsService.load()
-        guard settings.webhookEnabled,
-              let webhookURL = settings.webhookURL,
+        guard let webhookURL = settings.webhookURL,
               !webhookURL.isEmpty else { return }
 
         // Update recording webhook status
@@ -56,8 +55,7 @@ final class WebhookQueueService: ObservableObject {
     /// waiting in backoff.
     func resend(recordingId: UUID) {
         let settings = settingsService.load()
-        guard settings.webhookEnabled,
-              let webhookURL = settings.webhookURL,
+        guard let webhookURL = settings.webhookURL,
               !webhookURL.isEmpty else { return }
 
         var recordings = storageService.loadRecordings()
@@ -305,11 +303,14 @@ final class WebhookQueueService: ObservableObject {
     // MARK: - Test Webhook
 
     /// Sends a test webhook payload. Returns nil on success or an error string on failure.
-    func sendTestWebhook() async -> String? {
+    /// `urlOverride` and `secretOverride` let callers test draft values without persisting
+    /// them (used by both the onboarding and settings destination editors).
+    func sendTestWebhook(urlOverride: String? = nil, secretOverride: String? = nil) async -> String? {
         let settings = settingsService.load()
+        let webhookURLString = urlOverride ?? settings.webhookURL ?? ""
+        let webhookSecret = secretOverride ?? settings.webhookSecret
 
-        guard let webhookURLString = settings.webhookURL,
-              !webhookURLString.isEmpty else {
+        if webhookURLString.isEmpty {
             return "No webhook URL configured"
         }
 
@@ -332,7 +333,7 @@ final class WebhookQueueService: ObservableObject {
 
         do {
             let jsonData = try JSONSerialization.data(withJSONObject: payload)
-            let signature = Self.hmacSHA256(data: jsonData, key: settings.webhookSecret)
+            let signature = Self.hmacSHA256(data: jsonData, key: webhookSecret)
 
             var request = URLRequest(url: webhookURL)
             request.httpMethod = "POST"

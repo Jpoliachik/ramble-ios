@@ -8,32 +8,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 For full brand positioning, audience, tone, and messaging guidelines, see **`docs/brand.md`**.
 
-## Current Phase
-
-**v1 push to App Store** — Local-first architecture is in place. Focus is reliability (queues, retry, status transparency), watch sync, and UX polish. Then ship.
-
-### v1 scope
-
-- iOS: record → transcribe → browse/copy transcripts, settings for proxy + webhook
-- Watch: record, sync to phone, minimal recordings list (timestamp, duration, sync status)
-- StoreKit 2 subscription for cloud transcription ($2.99/month)
-- NOT in v1: CarPlay, widgets, Siri, full-text search, tags/folders, watch complication
-
-### Remaining v1 work
-
-- [ ] **App Store assets** — screenshots (iPhone + Apple Watch), privacy policy URL, app description
-- [ ] **End-to-end production testing** — verify real StoreKit subscription flow (sandbox/TestFlight), JWS verification on proxy, and cloud transcription without dev bypass
-- [ ] **Transcript formatting** — transcripts render as one big block of text with no line breaks. Improve formatting with paragraph breaks (Apple Speech segments, cloud provider paragraph support, or heuristic sentence grouping)
-- [ ] **Recording detail title** — show date/time instead of "Recording" in the navigation title on RecordingDetailView
-
 ### Post-v1 — cloud transcription enhancements
 
 These are free features from existing providers (no extra API calls or cost):
 
-- [ ] **Deepgram auto-paragraphs** — add `paragraphs=true` to Deepgram API call; instant readability improvement for longer recordings
-- [ ] **Filler word removal toggle** — settings toggle to strip "um", "uh", etc. Deepgram supports natively; client-side regex for Groq/OpenAI
-- [ ] **Speaker diarization** — opt-in toggle. Deepgram has `diarize=true`, OpenAI has `gpt-4o-transcribe-diarize` model. Labels speakers in transcript. Great for conversations/meetings.
-- [ ] **Language hint** — language picker in settings, passed to all providers. Improves accuracy for non-English users.
+- [x] **Deepgram auto-paragraphs** — `paragraphs=true` on the Deepgram call. Groq derives paragraphs from segment timings; models that return plain text (GPT-Transcribe, Apple Speech) get sentence grouping instead.
+- [x] **Filler word removal toggle** — settings toggle. Deepgram via `filler_words`, client-side regex for Groq/OpenAI.
+- [ ] **Speaker diarization** — opt-in toggle. Deepgram has `diarize=true`, OpenAI has a separate `gpt-4o-transcribe-diarize` model (GPT-Transcribe itself doesn't do speaker labels). Great for conversations/meetings.
+- [x] **Language hint** — language picker in settings, passed to all providers. Improves accuracy for non-English users.
+- [ ] **Recording context** — GPT-Transcribe takes a free-form `prompt` describing the recording's topic or setting, separate from the keyword list. A short "what these recordings usually are" field in Settings would feed it.
+- [ ] **Multiple language hints** — the picker sends one language. GPT-Transcribe accepts several via `languages[]` and Deepgram has `multi`, so a multi-select would help people who codeswitch mid-recording.
 
 ### Future
 
@@ -42,9 +26,9 @@ These are free features from existing providers (no extra API calls or cost):
 ### Release plan
 
 - Open source the repo on GitHub
-- Free app on App Store (Apple Speech on-device transcription + webhook — costs nothing to run)
-- $2.99/month subscription unlocks cloud transcription models via Cloudflare Worker proxy
-- Marketing website at `goodloop.dev/ramble` (source in `website/`, static export)
+- Paid app on App Store, $4.99 one-time (Apple Speech on-device transcription, agent relay, webhook)
+- Optional $2.99/month subscription unlocks cloud transcription models via Cloudflare Worker proxy
+- Marketing website on Vercel, moving to Ramble's own domain (source in `website/`, static export)
 - **App Store URL:** https://apps.apple.com/app/id6761857751 (Apple ID: 6761857751)
 
 ## Build & Development
@@ -62,18 +46,31 @@ xcodebuild -project Ramble/Ramble.xcodeproj -scheme Ramble -destination 'platfor
 xcodebuild -project Ramble/Ramble.xcodeproj -scheme "watch Watch App" -destination 'platform=watchOS Simulator,name=Apple Watch Series 11 (46mm)'
 ```
 
+### Proxy
+
+```bash
+cd proxy
+npm ci
+npm test         # Unit tests for request shaping + transcript formatting
+npm run dev      # Local Worker via wrangler
+```
+
+Tests need no credentials or Worker runtime — they cover the pure helpers in
+`src/index.js`. CI runs them on every PR touching `proxy/**` and gates the
+deploy on them.
+
 ### Website
 
 ```bash
 cd website
 npm install
 npm run build    # Static export to website/out/
-npm run dev      # Dev server at localhost:3000/ramble
+npm run dev      # Dev server at localhost:3000
 ```
 
-The site is configured with `basePath: "/ramble"` and `output: "export"`. The `out/` directory contains plain HTML/CSS/JS — copy it into the goodloop.dev repo to serve at `goodloop.dev/ramble`. No server runtime needed.
+The site is a static export (`output: "export"`) deployed on Vercel from the `website/` root directory, with a preview deployment for every PR that touches it. It is served from the root of Ramble's own domain (not chosen yet), so there is no `basePath`.
 
-**Pages:** Landing (`/`), Privacy Policy (`/privacy`), Terms of Use (`/terms`), Webhook API Docs (`/docs`)
+**Pages:** Landing (`/`), Privacy Policy (`/privacy`), Terms of Use (`/terms`), Connect your agent + relay API (`/docs`), Webhook API Docs (`/docs/webhooks`)
 
 ## Architecture
 
@@ -90,7 +87,7 @@ Ramble/
 ├── watch Watch App/   # watchOS companion
 └── Ramble.xcodeproj/
 website/               # Marketing site (Next.js static export)
-proxy/                 # Cloudflare Worker transcription proxy
+proxy/                 # Cloudflare Worker: transcription proxy + agent relay (RELAY.md)
 ```
 
 ### Data Flow
@@ -102,17 +99,17 @@ proxy/                 # Cloudflare Worker transcription proxy
 
 ### Key Services
 
-| Service | Role |
-|---------|------|
-| `AudioRecorderService` | 16kHz mono AAC capture |
-| `TranscriptionQueueService` | Persistent job queue with retry |
+| Service                           | Role                                                     |
+| --------------------------------- | -------------------------------------------------------- |
+| `AudioRecorderService`            | 16kHz mono AAC capture                                   |
+| `TranscriptionQueueService`       | Persistent job queue with retry                          |
 | `AppleSpeechTranscriptionService` | On-device transcription via SFSpeechRecognizer (default) |
-| `ProxyTranscriptionService` | HTTP client for cloud/custom transcription endpoints |
-| `WebhookQueueService` | Independent queue for webhook delivery with retry |
-| `BackgroundTaskService` | UIKit + BGProcessingTask for background queue draining |
-| `RecordingManager` | Coordinates audio recording lifecycle |
-| `StorageService` | JSON file persistence for recordings |
-| `PhoneConnectivityService` | WatchConnectivity bridge for watch recordings |
+| `ProxyTranscriptionService`       | HTTP client for cloud/custom transcription endpoints     |
+| `WebhookQueueService`             | Independent queue for webhook delivery with retry        |
+| `BackgroundTaskService`           | UIKit + BGProcessingTask for background queue draining   |
+| `RecordingManager`                | Coordinates audio recording lifecycle                    |
+| `StorageService`                  | JSON file persistence for recordings                     |
+| `PhoneConnectivityService`        | WatchConnectivity bridge for watch recordings            |
 
 ### Models
 
@@ -136,12 +133,12 @@ Thin stateless Cloudflare Worker. Receives audio, forwards to transcription prov
 
 ### Cloud Transcription Models
 
-| Model | Provider | Strength |
-|-------|----------|----------|
-| Whisper v3 Turbo | Groq | Fast and accurate — best all-around (default) |
-| Whisper Large v3 | Groq | Best for accents and multilingual audio |
-| Nova-3 | Deepgram | Strong English accuracy, smart formatting |
-| GPT-4o Transcribe | OpenAI | Highest accuracy in noisy environments |
+| Model             | Provider | Strength                                      |
+| ----------------- | -------- | --------------------------------------------- |
+| Whisper v3 Turbo  | Groq     | Fast and accurate — best all-around (default) |
+| Whisper Large v3  | Groq     | Best for accents and multilingual audio       |
+| Nova-3            | Deepgram | Strong English accuracy, smart formatting     |
+| GPT-Transcribe    | OpenAI   | Highest accuracy on noisy real-world audio    |
 
 ## Pre-Launch Checklist
 
@@ -153,5 +150,5 @@ Apple App Attest implemented. Client-side attestation via `DCAppAttestService` p
 
 - **Transcript browsing UX for v1:** Just scroll the list. No search, no tags, no folders.
 - **Watch complication:** Not in v1.
-- **Pricing:** Free app + $2.99/month subscription for cloud transcription. On-device Apple Speech and webhook are free.
+- **Pricing:** $4.99 one-time app purchase. Optional $2.99/month subscription for cloud transcription. On-device Apple Speech, the relay, and webhooks need no subscription.
 - **Platform:** Apple only (iPhone + Apple Watch). No Android, no web.

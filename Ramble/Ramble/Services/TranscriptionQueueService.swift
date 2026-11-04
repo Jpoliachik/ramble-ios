@@ -167,21 +167,30 @@ final class TranscriptionQueueService: ObservableObject {
         }
 
         do {
-            let text: String
+            let rawText: String
             if job.provider.isCloud {
                 // Fetch fresh JWS at call time (not enqueue time) — tokens expire
                 let jws = SubscriptionService.shared.currentJWSTransaction
+                let currentSettings = settingsService.load()
                 let request = ProxyTranscriptionRequest(
                     audioURL: audioURL,
                     model: job.cloudModel ?? .whisperLargeV3Turbo,
+                    language: currentSettings.transcriptionLanguage,
+                    customVocabulary: currentSettings.customVocabulary,
+                    removeFillerWords: currentSettings.removeFillerWords,
                     jwsTransaction: jws
                 )
-                text = try await proxyService.transcribe(request)
+                rawText = try await proxyService.transcribe(request)
             } else if #available(iOS 26.0, *) {
-                text = try await speechAnalyzer.transcribe(audioURL: audioURL)
+                // Cloud transcripts come back paragraphed from the proxy;
+                // on-device output is one block, so group it here for parity.
+                let onDevice = try await speechAnalyzer.transcribe(audioURL: audioURL)
+                rawText = TranscriptFormatter.paragraphs(from: onDevice)
             } else {
-                text = try await legacySpeech.transcribe(audioURL: audioURL)
+                let onDevice = try await legacySpeech.transcribe(audioURL: audioURL)
+                rawText = TranscriptFormatter.paragraphs(from: onDevice)
             }
+            let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
 
             // Success — update recording
             var updatedRecordings = storageService.loadRecordings()
@@ -201,11 +210,13 @@ final class TranscriptionQueueService: ObservableObject {
             removeJob(job)
             isProcessing = false
 
-            // Enqueue webhook if enabled and configured
-            let settings = settingsService.load()
-            if settings.webhookEnabled, let webhookURL = settings.webhookURL, !webhookURL.isEmpty {
+            // Enqueue webhook if a destination is configured
+            if settingsService.load().isWebhookConfigured {
                 WebhookQueueService.shared.enqueue(recordingId: job.recordingId)
             }
+
+            // Hand it to connected agents via the relay (no-op if none)
+            RelayQueueService.shared.enqueue(recordingId: job.recordingId)
 
             processNextIfNeeded()
 
@@ -247,6 +258,22 @@ final class TranscriptionQueueService: ObservableObject {
                 updatedRecordings[idx].lastError = TranscriptionError.localeNotSupported.localizedDescription
                 updatedRecordings[idx].activityLog.append(
                     ActivityEntry("Transcription failed via \(providerLabel(for: job)) — \(TranscriptionError.localeNotSupported.localizedDescription)")
+                )
+                storageService.saveRecordings(updatedRecordings)
+            }
+            removeJob(job)
+            isProcessing = false
+            processNextIfNeeded()
+
+        } catch TranscriptionError.speechPermissionDenied {
+            // No speech recognition consent — retrying on a timer can't fix it,
+            // only the user can (Retry prompts, or Settings if they declined)
+            var updatedRecordings = storageService.loadRecordings()
+            if let idx = updatedRecordings.firstIndex(where: { $0.id == job.recordingId }) {
+                updatedRecordings[idx].status = .failed
+                updatedRecordings[idx].lastError = TranscriptionError.speechPermissionDenied.localizedDescription
+                updatedRecordings[idx].activityLog.append(
+                    ActivityEntry("Transcription failed via \(providerLabel(for: job)) — speech recognition permission not granted")
                 )
                 storageService.saveRecordings(updatedRecordings)
             }

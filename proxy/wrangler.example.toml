@@ -1,5 +1,5 @@
 name = "ramble-transcription-proxy"
-main = "src/index.js"
+main = "src/worker.js"
 compatibility_date = "2024-12-01"
 account_id = "YOUR_CLOUDFLARE_ACCOUNT_ID"
 
@@ -7,7 +7,10 @@ account_id = "YOUR_CLOUDFLARE_ACCOUNT_ID"
 enabled = true
 
 [vars]
-APPLE_BUNDLE_ID = "dev.goodloop.ramble"
+# Relay: transcripts are deleted when the agent acks them, or after this many
+# seconds if never picked up (30 days).
+RETENTION_SECONDS = "2592000"
+APPLE_BUNDLE_ID = "dev.goodloop.Ramble"
 PREMIUM_PRODUCT_ID = "dev.goodloop.ramble.premium.monthly2"
 
 # KV namespace for App Attest state (challenges, attested device keys).
@@ -24,3 +27,18 @@ id = "YOUR_KV_NAMESPACE_ID"
 [[analytics_engine_datasets]]
 binding = "USAGE_ANALYTICS"
 dataset = "ramble_usage"
+
+# --- Relay (see RELAY.md) ---
+# Expiry backstop for queued transcripts. Reads already hide expired ones.
+[triggers]
+crons = ["*/15 * * * *"]
+
+# Relay queues, connections, pairing codes. Until this binding exists the
+# relay endpoints answer 503 and the transcription proxy is unaffected.
+# SETUP: `npx wrangler d1 create ramble-relay`, uncomment and paste the id,
+# then `npx wrangler d1 migrations apply ramble-relay --remote`.
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "ramble-relay"
+# database_id = "YOUR_D1_DATABASE_ID"
+# migrations_dir = "migrations"

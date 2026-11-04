@@ -7,6 +7,10 @@ import AVFoundation
 import Combine
 import Foundation
 
+enum WatchAudioRecorderError: Error {
+    case couldNotStart
+}
+
 @MainActor
 final class WatchAudioRecorderService: NSObject, ObservableObject {
     @Published private(set) var isRecording = false
@@ -38,10 +42,15 @@ final class WatchAudioRecorderService: NSObject, ObservableObject {
             AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
         ]
 
-        audioRecorder = try AVAudioRecorder(url: audioURL, settings: settings)
-        audioRecorder?.isMeteringEnabled = true
-        audioRecorder?.delegate = self
-        audioRecorder?.record()
+        let recorder = try AVAudioRecorder(url: audioURL, settings: settings)
+        recorder.isMeteringEnabled = true
+        recorder.delegate = self
+        guard recorder.record() else {
+            _ = recorder.deleteRecording()
+            try? session.setActive(false, options: .notifyOthersOnDeactivation)
+            throw WatchAudioRecorderError.couldNotStart
+        }
+        audioRecorder = recorder
 
         currentRecordingURL = audioURL
         recordingStartTime = Date()
@@ -92,10 +101,6 @@ final class WatchAudioRecorderService: NSObject, ObservableObject {
 
     private static func normalizeAudioLevel(_ dB: Float) -> Float {
         max(0, min(1, (dB + 50) / 50))
-    }
-
-    func deleteLocalFile(at url: URL) {
-        try? FileManager.default.removeItem(at: url)
     }
 }
 

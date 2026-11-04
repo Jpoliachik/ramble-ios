@@ -7,6 +7,17 @@ import AVFoundation
 import Combine
 import Foundation
 
+enum AudioRecorderError: LocalizedError {
+    case couldNotStart
+
+    var errorDescription: String? {
+        switch self {
+        case .couldNotStart:
+            return "The microphone couldn't start. It may be in use by a call or another app."
+        }
+    }
+}
+
 @MainActor
 final class AudioRecorderService: NSObject, ObservableObject {
     @Published private(set) var isRecording = false
@@ -37,10 +48,16 @@ final class AudioRecorderService: NSObject, ObservableObject {
             AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
         ]
 
-        audioRecorder = try AVAudioRecorder(url: url, settings: settings)
-        audioRecorder?.isMeteringEnabled = true
-        audioRecorder?.delegate = self
-        audioRecorder?.record()
+        let recorder = try AVAudioRecorder(url: url, settings: settings)
+        recorder.isMeteringEnabled = true
+        recorder.delegate = self
+        // record() reports failure by return value, not by throwing — e.g. when
+        // a phone call or another app holds the mic.
+        guard recorder.record() else {
+            try? session.setActive(false, options: .notifyOthersOnDeactivation)
+            throw AudioRecorderError.couldNotStart
+        }
+        audioRecorder = recorder
 
         currentRecordingURL = url
         recordingStartTime = Date()

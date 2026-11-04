@@ -14,6 +14,7 @@ final class RecordingViewModel: ObservableObject {
     @Published private(set) var currentDuration: TimeInterval = 0
     @Published private(set) var inputSourceName: String?
     @Published private(set) var audioLevel: Float = 0
+    @Published private(set) var recordingStartError: RecordingStartError?
 
     // Watch recording state (exposed from connectivity)
     @Published private(set) var watchIsRecording = false
@@ -43,6 +44,7 @@ final class RecordingViewModel: ObservableObject {
         recordingManager.$currentDuration.assign(to: &$currentDuration)
         recordingManager.$inputSourceName.assign(to: &$inputSourceName)
         recordingManager.$audioLevel.assign(to: &$audioLevel)
+        recordingManager.$startError.assign(to: &$recordingStartError)
     }
 
     private func observeConnectivity() {
@@ -97,9 +99,17 @@ final class RecordingViewModel: ObservableObject {
             HapticService.recordStop()
             recordingManager.stopRecording()
         } else {
-            HapticService.recordStart()
             await recordingManager.startRecording()
+            if recordingManager.isRecording {
+                HapticService.recordStart()
+            } else {
+                HapticService.warning()
+            }
         }
+    }
+
+    func dismissRecordingStartError() {
+        recordingManager.clearStartError()
     }
 
     func cancelRecording() {
@@ -124,6 +134,21 @@ final class RecordingViewModel: ObservableObject {
 
     var failedCount: Int {
         recordings.filter { $0.status == .failed }.count
+    }
+
+    /// Transcribed, and a destination is still in flight.
+    var sendingCount: Int {
+        recordings.filter {
+            $0.status == .completed
+                && ($0.deliveryStatus == .pending || $0.deliveryStatus == .sending)
+        }.count
+    }
+
+    /// Transcription failures plus delivery failures, for the sync banner.
+    var needsAttentionCount: Int {
+        recordings.filter {
+            $0.status == .failed || ($0.status == .completed && $0.deliveryStatus == .failed)
+        }.count
     }
 
     var recordingsByDay: [(date: Date, recordings: [Recording])] {

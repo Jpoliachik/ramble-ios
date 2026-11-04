@@ -29,47 +29,53 @@ struct RecordingControlsView: View {
                     .transition(.opacity)
             }
 
-            ZStack {
-                RecordButtonView(isRecording: isRecording, action: onToggleRecording)
+            if !isRecording {
+                CompactMicButton(action: onToggleRecording)
+                    .transition(.opacity)
+            } else {
+                ZStack {
+                    RecordButtonView(isRecording: isRecording, action: onToggleRecording)
 
-                if isRecording {
-                    HStack {
-                        Button {
-                            HapticService.buttonTap()
-                            if duration > 30 {
-                                showCancelConfirmation = true
-                            } else {
-                                onCancel?()
+                    if isRecording {
+                        HStack {
+                            Button {
+                                HapticService.buttonTap()
+                                if duration > 30 {
+                                    showCancelConfirmation = true
+                                } else {
+                                    onCancel?()
+                                }
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 26, height: 26)
+                                    .background(.ultraThinMaterial, in: Circle())
                             }
-                        } label: {
-                            Image(systemName: "xmark")
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                                .frame(width: 26, height: 26)
-                                .background(.ultraThinMaterial, in: Circle())
-                        }
-                        .buttonStyle(.plain)
-                        .confirmationDialog(
-                            "Discard recording?",
-                            isPresented: $showCancelConfirmation,
-                            titleVisibility: .visible
-                        ) {
-                            Button("Discard", role: .destructive) {
-                                onCancel?()
+                            .buttonStyle(.plain)
+                            .confirmationDialog(
+                                "Discard recording?",
+                                isPresented: $showCancelConfirmation,
+                                titleVisibility: .visible
+                            ) {
+                                Button("Discard", role: .destructive) {
+                                    onCancel?()
+                                }
+                            } message: {
+                                Text("This will delete \(DateFormatters.formatDuration(duration)) of audio.")
                             }
-                        } message: {
-                            Text("This will delete \(DateFormatters.formatDuration(duration)) of audio.")
-                        }
 
-                        Spacer()
+                            Spacer()
+                        }
+                        .padding(.leading, 20)
+                        .transition(.move(edge: .leading).combined(with: .opacity))
+
+                        AudioWaveformView(audioLevel: audioLevel)
+                            .offset(x: 90)
+                            .transition(.opacity)
                     }
-                    .padding(.leading, 20)
-                    .transition(.move(edge: .leading).combined(with: .opacity))
-
-                    AudioWaveformView(audioLevel: audioLevel)
-                        .offset(x: 90)
-                        .transition(.opacity)
                 }
+                .transition(.opacity)
             }
 
             if isRecording {

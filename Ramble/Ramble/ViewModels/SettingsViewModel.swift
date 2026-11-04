@@ -9,10 +9,29 @@ import SwiftUI
 
 @MainActor
 final class SettingsViewModel: ObservableObject {
-    @Published var transcriptionProvider: TranscriptionProvider = .appleSpeech
-    @Published var cloudModel: CloudModel = .whisperLargeV3Turbo
+    /// Hard cap on the custom-vocabulary field, set by the tightest provider
+    /// budget: Whisper's `prompt` accepts ~224 tokens (~900 chars) and
+    /// Deepgram's keyterms ~500 tokens, and beyond that the provider silently
+    /// truncates. We clamp on input so the user sees the limit instead of
+    /// getting silently lossy hints.
+    static let maxVocabularyLength = 900
+
+    @Published var transcriptionProvider: TranscriptionProvider = .appleSpeech {
+        didSet { resetLanguageIfUnsupported() }
+    }
+    @Published var cloudModel: CloudModel = .whisperLargeV3Turbo {
+        didSet { resetLanguageIfUnsupported() }
+    }
+    @Published var transcriptionLanguage: TranscriptionLanguage = .auto
+    @Published var customVocabulary: String = "" {
+        didSet {
+            if customVocabulary.count > Self.maxVocabularyLength {
+                customVocabulary = String(customVocabulary.prefix(Self.maxVocabularyLength))
+            }
+        }
+    }
+    @Published var removeFillerWords: Bool = false
     @Published var showSubscriptionPaywall = false
-    @Published var webhookEnabled: Bool = false
     @Published var webhookURL: String = ""
     @Published var webhookSecret: String = ""
     @Published var deviceId: String = ""
@@ -20,6 +39,7 @@ final class SettingsViewModel: ObservableObject {
     @Published var totalDuration: TimeInterval = 0
     @Published var pendingTranscriptions: Int = 0
     @Published var failedTranscriptions: Int = 0
+    @Published var webhookHealth: WebhookHealth = .untested
     @Published var appearanceMode: AppearanceMode = .system {
         didSet {
             // Sync to UserDefaults immediately so @AppStorage in RambleApp updates in real time
@@ -27,14 +47,7 @@ final class SettingsViewModel: ObservableObject {
         }
     }
     @Published var webhookURLError: String?
-    @Published var testWebhookResult: TestWebhookResult?
     @Published var devOverrideKey: String = ""
-
-    enum TestWebhookResult {
-        case loading
-        case success
-        case failure(String)
-    }
 
     /// The cloud model the user tapped before being shown the paywall
     private var pendingCloudModel: CloudModel?
@@ -53,13 +66,23 @@ final class SettingsViewModel: ObservableObject {
                 self?.applyPendingCloudModel()
             }
             .store(in: &cancellables)
+
+        NotificationCenter.default
+            .publisher(for: StorageService.recordingsDidChangeNotification)
+            .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.loadStats()
+            }
+            .store(in: &cancellables)
     }
 
     func load() {
         let settings = settingsService.load()
         transcriptionProvider = settings.transcriptionProvider
         cloudModel = settings.cloudModel
-        webhookEnabled = settings.webhookEnabled
+        transcriptionLanguage = settings.transcriptionLanguage
+        customVocabulary = settings.customVocabulary
+        removeFillerWords = settings.removeFillerWords
         webhookURL = settings.webhookURL ?? ""
         webhookSecret = settings.webhookSecret
         deviceId = settings.deviceId
@@ -72,7 +95,9 @@ final class SettingsViewModel: ObservableObject {
         let settings = Settings(
             transcriptionProvider: transcriptionProvider,
             cloudModel: cloudModel,
-            webhookEnabled: webhookEnabled,
+            transcriptionLanguage: transcriptionLanguage,
+            customVocabulary: customVocabulary,
+            removeFillerWords: removeFillerWords,
             webhookURL: webhookURL.isEmpty ? nil : webhookURL,
             webhookSecret: webhookSecret,
             deviceId: deviceId,
@@ -102,6 +127,17 @@ final class SettingsViewModel: ObservableObject {
         }
     }
 
+    /// When the cloud model changes to one that doesn't support the user's
+    /// previously chosen language (e.g. Welsh on Whisper → Nova-3), demote
+    /// the picker back to `.auto` so we never silently send an unsupported hint.
+    private func resetLanguageIfUnsupported() {
+        guard transcriptionLanguage != .auto else { return }
+        guard transcriptionProvider.isCloud else { return }
+        if !cloudModel.supports(transcriptionLanguage) {
+            transcriptionLanguage = .auto
+        }
+    }
+
     private func applyPendingCloudModel() {
         guard let model = pendingCloudModel else { return }
         pendingCloudModel = nil
@@ -123,38 +159,13 @@ final class SettingsViewModel: ObservableObject {
         webhookSecret = Settings.generateSecret()
     }
 
-    func sendTestWebhook() {
-        // Validate first
-        validateWebhookURL()
-        guard webhookURLError == nil, !webhookURL.isEmpty else { return }
-
-        // Save current settings so the test uses latest values
-        save()
-
-        testWebhookResult = .loading
-        Task {
-            let error = await WebhookQueueService.shared.sendTestWebhook()
-            if let error {
-                testWebhookResult = .failure(error)
-            } else {
-                testWebhookResult = .success
-            }
-            // Auto-dismiss success after a delay
-            if case .success = testWebhookResult {
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
-                if case .success = testWebhookResult {
-                    testWebhookResult = nil
-                }
-            }
-        }
-    }
-
     private func loadStats() {
         let recordings = storageService.loadRecordings()
         totalRecordings = recordings.count
         totalDuration = recordings.reduce(0) { $0 + $1.duration }
         pendingTranscriptions = recordings.filter { [.recorded, .transcribing].contains($0.status) }.count
         failedTranscriptions = recordings.filter { $0.status == .failed }.count
+        webhookHealth = WebhookHealth.compute(from: recordings)
     }
 
     func exportJSON() -> URL? {

@@ -1,0 +1,91 @@
+name: CI
+
+# One gate for every pull request. Each area only runs when its files change,
+# and the final `CI passed` job sums them up, so branch protection needs to
+# require just that one check.
+#
+# The iOS + watchOS app builds on Xcode Cloud (PR builds and TestFlight on
+# main), not here, because macOS runners cost extra on a private repo.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  pull-requests: read  # paths-filter lists PR files via the API
+
+jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      website: ${{ steps.filter.outputs.website }}
+      proxy: ${{ steps.filter.outputs.proxy }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            website:
+              - 'website/**'
+              - '.github/workflows/ci.yml'
+            proxy:
+              - 'proxy/**'
+              - '.github/workflows/ci.yml'
+
+  proxy:
+    name: Proxy tests
+    needs: changes
+    if: needs.changes.outputs.proxy == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: proxy
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: proxy/package-lock.json
+      - run: npm ci
+      - run: npm test
+
+  website:
+    name: Website lint, typecheck, build
+    needs: changes
+    if: needs.changes.outputs.website == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npm run build
+
+  ci-passed:
+    name: CI passed
+    if: always()
+    needs: [changes, proxy, website]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any check failed or was cancelled
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
+      - run: echo "All checks that ran are green."

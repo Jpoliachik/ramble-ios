@@ -5,33 +5,42 @@
 
 import SwiftUI
 
+private enum SettingsLinks {
+    static let privacy = URL(string: "https://goodloop.dev/ramble/privacy")!
+    static let terms = URL(string: "https://goodloop.dev/ramble/terms")!
+    static let docs = URL(string: "https://goodloop.dev/ramble/docs")!
+}
+
 struct SettingsView: View {
     @StateObject private var viewModel = SettingsViewModel()
     @ObservedObject private var subscriptionService = SubscriptionService.shared
+    @ObservedObject private var relay = RelayService.shared
     @Environment(\.dismiss) private var dismiss
     @State private var showDeleteConfirmation = false
     @State private var showExportShare = false
-    @State private var showSecretCopied = false
-    @State private var showRegenerateConfirmation = false
-    @State private var showSecretRevealed = false
     @State private var showTranscriptionInfo = false
     @State private var showWebhookInfo = false
+    @State private var showDestinationEdit = false
     @State private var exportURL: URL?
     @State private var versionTapCount = 0
     @State private var showDebugSheet = false
+    @State private var showConnectAgent = false
 
     var body: some View {
         NavigationView {
             Form {
-                transcriptionSection
+                agentSection
                 webhookSection
+                freeTranscriptionSection
+                cloudTranscriptionSection
+                cloudTuningSection
                 appearanceSection
                 statsSection
                 exportSection
                 dangerZoneSection
                 aboutSection
             }
-            .navigationTitle("Settings")
+            .listSectionSpacing(28)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -58,6 +67,16 @@ struct SettingsView: View {
             .sheet(isPresented: $showWebhookInfo) {
                 WebhookInfoSheet()
             }
+            .sheet(isPresented: $showDestinationEdit) {
+                WebhookDestinationEditSheet(viewModel: viewModel)
+            }
+            .sheet(isPresented: $showConnectAgent) {
+                ConnectAgentView()
+            }
+            .task {
+                guard relay.hasInbox else { return }
+                try? await relay.refreshConnections()
+            }
         }
     }
 
@@ -66,14 +85,17 @@ struct SettingsView: View {
         return false
     }
 
-    private var transcriptionSection: some View {
+    private var freeTranscriptionSection: some View {
         Section {
-            // Apple Speech — always available
-            ProviderRowView(
-                provider: .appleSpeech,
-                isSelected: viewModel.transcriptionProvider == .appleSpeech,
-                onSelect: { viewModel.transcriptionProvider = .appleSpeech }
-            )
+            BrandCard {
+                AppleSpeechRow(
+                    isSelected: viewModel.transcriptionProvider == .appleSpeech,
+                    onTap: { viewModel.transcriptionProvider = .appleSpeech }
+                )
+            }
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+            .listRowSeparator(.hidden)
 
             if !isSpeechAnalyzerAvailable {
                 HStack(spacing: 10) {
@@ -85,169 +107,209 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
                 .padding(.vertical, 4)
-            }
-
-            // Each cloud model shown individually
-            ForEach(CloudModel.allCases) { model in
-                CloudModelRowView(
-                    model: model,
-                    isSelected: viewModel.transcriptionProvider == .cloudTranscription
-                        && viewModel.cloudModel == model,
-                    isPremiumLocked: !subscriptionService.isPremium,
-                    onSelect: { viewModel.selectCloudModel(model) }
-                )
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
             }
         } header: {
-            HStack {
-                Text("Transcription")
-                Spacer()
-                Button {
-                    showTranscriptionInfo = true
-                } label: {
-                    Image(systemName: "info.circle")
-                        .font(.subheadline)
-                        .textCase(.none)
+            VStack(alignment: .leading, spacing: 14) {
+                SettingsGroupTitle(
+                    title: "Transcribe",
+                    subtitle: "How your voice becomes text."
+                ) {
+                    Button {
+                        showTranscriptionInfo = true
+                    } label: {
+                        Image(systemName: "info.circle")
+                            .font(.title3)
+                    }
+                }
+                SettingsSubsectionLabel("Free · on-device")
+            }
+            .textCase(.none)
+        }
+    }
+
+    private var cloudTranscriptionSection: some View {
+        Section {
+            BrandCard {
+                ForEach(Array(CloudModel.allCases.enumerated()), id: \.element.id) { index, model in
+                    CloudModelRow(
+                        model: model,
+                        isSelected: viewModel.transcriptionProvider == .cloudTranscription
+                            && viewModel.cloudModel == model,
+                        isLocked: !subscriptionService.isPremium,
+                        onTap: { viewModel.selectCloudModel(model) }
+                    )
+
+                    if index < CloudModel.allCases.count - 1 {
+                        BrandRowDivider()
+                    }
                 }
             }
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+            .listRowSeparator(.hidden)
+        } header: {
+            if subscriptionService.isPremium {
+                SettingsSubsectionLabel("Cloud · premium")
+            } else {
+                SettingsSubsectionLabel(title: "Cloud · premium") {
+                    Text("$2.99 / month")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.obInkFaint)
+                }
+            }
+        } footer: {
+            Text("Cloud transcription sends audio through our proxy to the provider. The proxy doesn't keep the audio or the text.")
+        }
+    }
+
+    private var cloudTuningSection: some View {
+        // Shown always — when on Apple Speech the section renders as a locked
+        // teaser so the user can see what cloud unlocks.
+        let isCloud = viewModel.transcriptionProvider.isCloud
+        return Section {
+            NavigationLink {
+                LanguagePickerView(
+                    selection: $viewModel.transcriptionLanguage,
+                    supported: viewModel.cloudModel.supportedLanguages
+                )
+            } label: {
+                HStack {
+                    Text("Language")
+                    Spacer()
+                    Text(viewModel.transcriptionLanguage.displayName)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                TextField(
+                    "e.g. Goodloop, Ramble, Cloudflare Workers",
+                    text: $viewModel.customVocabulary,
+                    axis: .vertical
+                )
+                .lineLimit(2...5)
+                .textInputAutocapitalization(.words)
+                .autocorrectionDisabled()
+                Text("Names, jargon, and phrases the model might miss. Comma-separated.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Toggle("Remove filler words", isOn: $viewModel.removeFillerWords)
+        } header: {
+            SettingsSubsectionLabel(title: "Cloud · tuning") {
+                if !isCloud {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Color.obInkFaint)
+                }
+            }
+        }
+        .disabled(!isCloud)
+        .opacity(isCloud ? 1 : 0.5)
+    }
+
+    private var agentSection: some View {
+        Section {
+            if !relay.connections.isEmpty {
+                BrandCard {
+                    ForEach(Array(relay.connections.enumerated()), id: \.element.id) { index, connection in
+                        Button {
+                            showConnectAgent = true
+                        } label: {
+                            HStack(spacing: 12) {
+                                AgentConnectionRow(connection: connection)
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(Color.obInkFaint)
+                            }
+                            .padding(.vertical, 12)
+                            .padding(.horizontal, 16)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+
+                        if index < relay.connections.count - 1 {
+                            BrandRowDivider(leadingInset: 16)
+                        }
+                    }
+                }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                .listRowSeparator(.hidden)
+            }
+
+            BrandPlusActionCard(title: relay.connections.isEmpty ? "Connect your agent" : "Connect another agent") {
+                showConnectAgent = true
+            }
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+            .listRowSeparator(.hidden)
+        } header: {
+            VStack(alignment: .leading, spacing: 14) {
+                SettingsGroupTitle(
+                    title: "Destinations",
+                    subtitle: "Record on your watch. Your agent handles it."
+                )
+                if !relay.connections.isEmpty {
+                    SettingsSubsectionLabel("Connected")
+                }
+            }
+            .textCase(.none)
         }
     }
 
     private var webhookSection: some View {
         Section {
-            Toggle("Post-Transcription Webhook", isOn: $viewModel.webhookEnabled)
-
-            if viewModel.webhookEnabled {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Webhook URL")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    TextField("https://your-webhook.example.com", text: $viewModel.webhookURL)
-                        .keyboardType(.URL)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .onChange(of: viewModel.webhookURL) {
-                            viewModel.validateWebhookURL()
-                        }
-
-                    if let error = viewModel.webhookURLError {
-                        Label(error, systemImage: "exclamationmark.triangle.fill")
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                    }
+            if viewModel.webhookURL.isEmpty {
+                BrandPlusActionCard(title: "Add a webhook") {
+                    showDestinationEdit = true
                 }
-
-                // Test webhook button
-                if !viewModel.webhookURL.isEmpty && viewModel.webhookURLError == nil {
-                    Button {
-                        viewModel.sendTestWebhook()
-                    } label: {
-                        HStack {
-                            switch viewModel.testWebhookResult {
-                            case .loading:
-                                ProgressView()
-                                    .controlSize(.small)
-                                Text("Sending...")
-                            case .success:
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(.green)
-                                Text("Test delivered")
-                            case .failure(let error):
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundStyle(.red)
-                                Text("Failed — \(error)")
-                            case nil:
-                                Image(systemName: "paperplane")
-                                Text("Send Test Webhook")
-                            }
-                        }
-                    }
-                    .disabled(viewModel.testWebhookResult != nil && {
-                        if case .loading = viewModel.testWebhookResult { return true }
-                        return false
-                    }())
-                }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("Signing Secret")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                .listRowSeparator(.hidden)
+            } else {
+                Button {
+                    showDestinationEdit = true
+                } label: {
+                    HStack(spacing: 12) {
+                        Circle()
+                            .fill(viewModel.webhookHealth.color)
+                            .frame(width: 10, height: 10)
+                            .accessibilityLabel(viewModel.webhookHealth.accessibilityLabel)
+                        Text(destinationHost)
+                            .font(.body)
+                            .foregroundStyle(Color.obInk)
                         Spacer()
-                        Button {
-                            withAnimation { showSecretRevealed.toggle() }
-                        } label: {
-                            Image(systemName: showSecretRevealed ? "eye.slash" : "eye")
-                                .font(.footnote)
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(Color.obInkFaint)
                     }
-
-                    if showSecretRevealed {
-                        Text(viewModel.webhookSecret)
-                            .font(.system(.caption, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                    }
-
-                    HStack(spacing: 8) {
-                        Button {
-                            UIPasteboard.general.string = viewModel.webhookSecret
-                            showSecretCopied = true
-                            Task {
-                                try? await Task.sleep(nanoseconds: 1_500_000_000)
-                                showSecretCopied = false
-                            }
-                        } label: {
-                            Label("Copy", systemImage: showSecretCopied ? "checkmark" : "doc.on.doc")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .tint(showSecretCopied ? .green : nil)
-
-                        Button {
-                            showRegenerateConfirmation = true
-                        } label: {
-                            Label("Regenerate", systemImage: "arrow.clockwise")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                    }
-                }
-                .alert("Regenerate Secret?", isPresented: $showRegenerateConfirmation) {
-                    Button("Regenerate", role: .destructive) {
-                        viewModel.regenerateWebhookSecret()
-                    }
-                    Button("Cancel", role: .cancel) {}
-                } message: {
-                    Text("Your webhook endpoint will need to be updated with the new secret to continue accepting requests.")
                 }
             }
-
-            Button {
-                showWebhookInfo = true
-            } label: {
-                HStack {
-                    Image(systemName: "info.circle")
-                        .foregroundStyle(.blue)
-                    Text("Webhook setup guide")
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                }
-            }
-            .foregroundStyle(.primary)
         } header: {
-            Text("Webhook")
+            // Part of Destinations, under the agent connections above.
+            SettingsSubsectionLabel(title: "Webhook") {
+                Button {
+                    showWebhookInfo = true
+                } label: {
+                    Image(systemName: "info.circle")
+                        .font(.subheadline)
+                }
+            }
+        } footer: {
+            Text("Pipe transcripts to any URL that accepts an HTTPS POST. Make sure it's one you trust.")
         }
     }
 
+    private var destinationHost: String {
+        URL(string: viewModel.webhookURL)?.host ?? viewModel.webhookURL
+    }
+
     private var appearanceSection: some View {
-        Section("Appearance") {
+        Section {
             Picker("Theme", selection: $viewModel.appearanceMode) {
                 ForEach(AppearanceMode.allCases) { mode in
                     Label(mode.displayName, systemImage: mode.iconName)
@@ -255,11 +317,13 @@ struct SettingsView: View {
                 }
             }
             .pickerStyle(.menu)
+        } header: {
+            SettingsGroupTitle(title: "Appearance")
         }
     }
 
     private var statsSection: some View {
-        Section("Statistics") {
+        Section {
             HStack {
                 Text("Total Recordings")
                 Spacer()
@@ -290,25 +354,54 @@ struct SettingsView: View {
                         .foregroundStyle(.red)
                 }
             }
+        } header: {
+            SettingsGroupTitle(title: "Statistics")
         }
     }
 
     private var exportSection: some View {
-        Section("Data") {
-            Button("Export All Recordings (JSON)") {
+        Section {
+            Button {
                 if let url = viewModel.exportJSON() {
                     exportURL = url
                     showExportShare = true
                 }
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 16))
+                        .foregroundStyle(Color.obInk)
+                        .frame(width: 22)
+                    Text("Export all recordings (JSON)")
+                        .foregroundStyle(Color.obInk)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.obInkFaint)
+                }
             }
+        } header: {
+            SettingsGroupTitle(title: "Data")
         }
     }
 
     private var dangerZoneSection: some View {
-        Section("Danger Zone") {
-            Button("Delete All Data", role: .destructive) {
+        Section {
+            Button(role: .destructive) {
                 showDeleteConfirmation = true
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 16))
+                        .foregroundStyle(Color.brandAmber)
+                        .frame(width: 22)
+                    Text("Delete all data")
+                        .foregroundStyle(Color.brandAmber)
+                    Spacer()
+                }
             }
+        } header: {
+            SettingsGroupTitle(title: "Danger zone")
         }
         .confirmationDialog(
             "Delete all recordings?",
@@ -342,8 +435,8 @@ struct SettingsView: View {
                     }
 
                 HStack(spacing: 16) {
-                    Link("Privacy Policy", destination: URL(string: "https://goodloop.dev/ramble/privacy")!)
-                    Link("Terms of Use", destination: URL(string: "https://goodloop.dev/ramble/terms")!)
+                    Link("Privacy Policy", destination: SettingsLinks.privacy)
+                    Link("Terms of Use", destination: SettingsLinks.terms)
                 }
                 .font(.caption)
             }
@@ -363,123 +456,21 @@ struct SettingsView: View {
     }
 }
 
-struct ProviderRowView: View {
-    let provider: TranscriptionProvider
-    let isSelected: Bool
-    var isPremiumLocked: Bool = false
-    let onSelect: () -> Void
-
-    var body: some View {
-        Button(action: onSelect) {
-            HStack(spacing: 14) {
-                Image(systemName: provider.iconName)
-                    .font(.title3)
-                    .foregroundStyle(provider.isCloud ? .blue : .green)
-                    .frame(width: 32, height: 32)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(provider.isCloud
-                                ? Color.blue.opacity(0.12)
-                                : Color.green.opacity(0.12))
-                    )
-
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text(provider.displayName)
-                            .font(.body)
-                            .foregroundStyle(.primary)
-                        if isPremiumLocked {
-                            Text("PRO")
-                                .font(.caption2.weight(.bold))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(
-                                    Capsule().fill(Color.blue)
-                                )
-                        }
-                    }
-                    Text(provider.subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                if isSelected {
-                    Image(systemName: "checkmark")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(.tint)
-                } else if isPremiumLocked {
-                    Image(systemName: "lock.fill")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-struct CloudModelRowView: View {
-    let model: CloudModel
-    let isSelected: Bool
-    var isPremiumLocked: Bool = false
-    let onSelect: () -> Void
-
-    var body: some View {
-        Button(action: onSelect) {
-            HStack(spacing: 14) {
-                Image(model.iconName)
-                    .renderingMode(.template)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 18, height: 18)
-                    .foregroundStyle(.blue)
-                    .frame(width: 32, height: 32)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Color.blue.opacity(0.12))
-                    )
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(model.displayName)
-                        .font(.body)
-                        .foregroundStyle(.primary)
-                    Text(model.subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                if isSelected {
-                    Image(systemName: "checkmark")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(.tint)
-                } else if isPremiumLocked {
-                    Image(systemName: "lock.fill")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-}
-
 struct TranscriptionInfoSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    Text("Accurately turn your voice into text. Pick a provider.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 24) {
+                    VStack(spacing: 16) {
+                        OnboardingIllustration(name: "illustration-transcribe")
+                        OnboardingHeadline(size: 28) {
+                            Text("Voice in, ") + Text("text out.").italic()
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 8)
 
                     InfoBlock(
                         icon: "iphone",
@@ -496,19 +487,68 @@ struct TranscriptionInfoSheet: View {
                     InfoBlock(
                         icon: "lock.shield",
                         title: "Cloud models are private too",
-                        text: "Cloud transcription routes through our open-source proxy. No audio or text is stored on our servers — your audio goes to the provider and the transcript comes back. That's it."
+                        text: "Cloud transcription sends your audio through our proxy to the provider, and the transcript comes back. The proxy doesn't keep the audio or the text."
+                    )
+
+                }
+                .padding()
+            }
+            .navigationTitle("About Transcription")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+struct PrivacyInfoSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("Your audio belongs to you. Here's exactly where it goes — and where it doesn't.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    InfoBlock(
+                        icon: "iphone",
+                        title: "Recorded on your device",
+                        text: "Recordings are saved locally to your phone. They aren't uploaded anywhere automatically."
                     )
 
                     InfoBlock(
-                        icon: "eye",
-                        title: "Don't take our word for it",
-                        text: "Ramble is fully open source. Check the code on GitHub — no accounts, no user data stored. Your audio and transcriptions never touch our servers."
+                        icon: "lock.shield",
+                        title: "On-device transcription stays put",
+                        text: "Apple Speech transcribes audio entirely on your iPhone — nothing leaves the device. It's the default."
                     )
 
-                    Link(destination: URL(string: "https://github.com/Jpoliachik/ramble-ios")!) {
+                    InfoBlock(
+                        icon: "cloud",
+                        title: "Cloud transcription is opt-in",
+                        text: "If you choose a cloud model, audio is sent through our proxy to the provider, transcribed, and the text comes back. The proxy doesn't keep the audio or the transcript."
+                    )
+
+                    InfoBlock(
+                        icon: "paperplane",
+                        title: "Webhooks go where you point them",
+                        text: "If you configure a webhook, transcripts are POSTed straight from your phone to a URL you control. Nothing is kept on our side."
+                    )
+
+                    InfoBlock(
+                        icon: "tray.and.arrow.up",
+                        title: "Your agent's inbox is temporary",
+                        text: "When you connect an agent, transcripts wait on the Ramble relay until it picks them up. The text is deleted the moment it does. Anything never picked up is deleted after \(Constants.Relay.unclaimedRetentionDays) days. Audio never goes there. No accounts."
+                    )
+
+                    Link(destination: SettingsLinks.privacy) {
                         HStack {
                             Spacer()
-                            Label("View Source on GitHub", systemImage: "chevron.left.forwardslash.chevron.right")
+                            Label("Read the full privacy policy", systemImage: "doc.text")
                             Spacer()
                         }
                         .padding(.vertical, 12)
@@ -517,7 +557,7 @@ struct TranscriptionInfoSheet: View {
                 }
                 .padding()
             }
-            .navigationTitle("About Transcription")
+            .navigationTitle("How privacy works")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -534,10 +574,15 @@ struct WebhookInfoSheet: View {
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    Text("Automatically send your transcripts somewhere useful.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 24) {
+                    VStack(spacing: 16) {
+                        OnboardingIllustration(name: "illustration-automate")
+                        OnboardingHeadline(size: 28) {
+                            Text("Send it ") + Text("anywhere you point.").italic()
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 8)
 
                     InfoBlock(
                         icon: "paperplane",
@@ -551,7 +596,7 @@ struct WebhookInfoSheet: View {
                         text: "Pipe transcripts into an AI agent, a Zapier workflow, a Notion database, or your own backend. Any HTTPS endpoint that accepts JSON works."
                     )
 
-                    Link(destination: URL(string: "https://goodloop.dev/ramble/docs")!) {
+                    Link(destination: SettingsLinks.docs) {
                         HStack {
                             Spacer()
                             Label("View Full API Docs", systemImage: "doc.text")
@@ -583,7 +628,7 @@ struct InfoBlock: View {
         HStack(alignment: .top, spacing: 14) {
             Image(systemName: icon)
                 .font(.title3)
-                .foregroundStyle(.blue)
+                .foregroundStyle(Color.brandAmber)
                 .frame(width: 28)
 
             VStack(alignment: .leading, spacing: 4) {
@@ -601,6 +646,7 @@ struct DebugSheet: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var viewModel: SettingsViewModel
     @State private var attestStatus = ""
+    @AppStorage(Constants.Relay.baseURLOverrideKey) private var relayBaseURLOverride = ""
     @State private var isReattesting = false
 
     var body: some View {
@@ -621,6 +667,28 @@ struct DebugSheet: View {
                             .buttonStyle(.plain)
                         }
                     }
+                }
+
+                Section {
+                    HStack {
+                        TextField("https://relay.example.com", text: $relayBaseURLOverride)
+                            .keyboardType(.URL)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                        if !relayBaseURLOverride.isEmpty {
+                            Button {
+                                relayBaseURLOverride = ""
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                } header: {
+                    Text("Relay")
+                } footer: {
+                    Text("Point at a `wrangler dev` relay, e.g. http://localhost:8787. Leave empty for the built-in relay. The server bypass key above is sent as the relay's X-Dev-Bypass header.")
                 }
 
                 Section("App Attest") {
@@ -691,6 +759,167 @@ struct DebugSheet: View {
                 }
             }
         }
+    }
+}
+
+struct WebhookDestinationEditSheet: View {
+    @ObservedObject var viewModel: SettingsViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var draftURL: String
+    @State private var draftSecret: String
+    @State private var draftURLError: String?
+
+    init(viewModel: SettingsViewModel) {
+        self.viewModel = viewModel
+        _draftURL = State(initialValue: viewModel.webhookURL)
+        let secret = viewModel.webhookSecret.isEmpty ? Settings.generateSecret() : viewModel.webhookSecret
+        _draftSecret = State(initialValue: secret)
+    }
+
+    private var trimmedURL: String {
+        draftURL.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var body: some View {
+        WebhookDestinationEditor(
+            draftURL: $draftURL,
+            draftSecret: $draftSecret,
+            draftURLError: $draftURLError,
+            isEditing: !viewModel.webhookURL.isEmpty,
+            canSave: !trimmedURL.isEmpty && draftURLError == nil,
+            onSave: save,
+            onCancel: { dismiss() },
+            onValidateURL: validateURL,
+            onRegenerate: { draftSecret = Settings.generateSecret() },
+            onRemove: remove
+        )
+    }
+
+    private func validateURL() {
+        if trimmedURL.isEmpty {
+            draftURLError = nil
+            return
+        }
+        draftURLError = WebhookQueueService.validateWebhookURL(trimmedURL)
+    }
+
+    private func save() {
+        viewModel.webhookURL = trimmedURL
+        viewModel.webhookSecret = draftSecret
+        viewModel.save()
+        HapticService.success()
+        dismiss()
+    }
+
+    private func remove() {
+        viewModel.webhookURL = ""
+        viewModel.save()
+        HapticService.success()
+        dismiss()
+    }
+}
+
+// MARK: - Settings header components
+
+/// Serif group title — top-level grouping label (Destinations, Transcribe).
+/// Mirrors the onboarding headline aesthetic at a smaller size, with an
+/// optional friendly subtitle below.
+private struct SettingsGroupTitle<Trailing: View>: View {
+    let title: String
+    var subtitle: String? = nil
+    @ViewBuilder let trailing: () -> Trailing
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 12) {
+                Text(title)
+                    .font(.system(size: 24, design: .serif).weight(.medium))
+                    .tracking(-0.3)
+                    .foregroundStyle(Color.obInk)
+                Spacer(minLength: 0)
+                trailing()
+            }
+            if let subtitle {
+                Text(subtitle)
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color.obInkSoft)
+            }
+        }
+        .textCase(.none)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, 8)
+    }
+}
+
+extension SettingsGroupTitle where Trailing == EmptyView {
+    init(title: String, subtitle: String? = nil) {
+        self.init(title: title, subtitle: subtitle, trailing: { EmptyView() })
+    }
+}
+
+/// Uppercase tracked subsection label — matches `OnboardingSectionHeader` style.
+/// Optional trailing slot for prices, info buttons, etc.
+private struct SettingsSubsectionLabel<Trailing: View>: View {
+    let title: String
+    @ViewBuilder let trailing: () -> Trailing
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(title)
+                .font(.system(size: 12, weight: .medium))
+                .tracking(1.0)
+                .textCase(.uppercase)
+                .foregroundStyle(Color.obInkFaint)
+            Spacer()
+            trailing()
+        }
+        .textCase(.none)
+    }
+}
+
+extension SettingsSubsectionLabel where Trailing == EmptyView {
+    init(_ title: String) {
+        self.init(title: title, trailing: { EmptyView() })
+    }
+}
+
+/// Language picker — only shows the languages supported by the currently
+/// selected transcription path (provider + model). The caller is responsible
+/// for resetting `selection` to `.auto` if the user switches to a path that
+/// doesn't support their previously chosen language.
+struct LanguagePickerView: View {
+    @Binding var selection: TranscriptionLanguage
+    let supported: Set<TranscriptionLanguage>
+    @Environment(\.dismiss) private var dismiss
+
+    private var visibleLanguages: [TranscriptionLanguage] {
+        let rest = TranscriptionLanguage.sortedCases
+            .filter { $0 != .auto && supported.contains($0) }
+        return [.auto] + rest
+    }
+
+    var body: some View {
+        List {
+            ForEach(visibleLanguages) { language in
+                Button {
+                    selection = language
+                    dismiss()
+                } label: {
+                    HStack {
+                        Text(language.displayName)
+                            .foregroundStyle(Color.obInk)
+                        Spacer()
+                        if selection == language {
+                            Image(systemName: "checkmark")
+                                .foregroundStyle(Color.brandAmber)
+                        }
+                    }
+                }
+            }
+        }
+        .navigationTitle("Language")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

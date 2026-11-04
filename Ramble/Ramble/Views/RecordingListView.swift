@@ -7,7 +7,13 @@ import SwiftUI
 struct RecordingListView: View {
     let recordingsByDay: [(date: Date, recordings: [Recording])]
     let onDelete: (Recording) -> Void
+    let isRecording: Bool
     @Binding var scrollOffset: CGFloat
+
+    @State private var showLockHint = false
+    @State private var lockHintTask: Task<Void, Never>?
+    @State private var showConnectAgent = false
+    @ObservedObject private var relay = RelayService.shared
 
     var body: some View {
         if recordingsByDay.isEmpty {
@@ -46,11 +52,68 @@ struct RecordingListView: View {
     }
 
     private var emptyStateView: some View {
-        ContentUnavailableView(
-            "Hit record and ramble",
-            systemImage: "waveform",
-            description: Text("Talk first, organize later.")
-        )
+        ZStack {
+            VStack(spacing: 28) {
+                RambleBarsMark(size: 72)
+
+                Text("Record on your watch. It shows up here, then goes to your agent.")
+                    .font(.system(size: 18, design: .serif).weight(.medium))
+                    .tracking(-0.5)
+                    .foregroundStyle(Color.obInk)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if relay.hasConnectedAgents {
+                    Text("Open Ramble on your Watch to record.")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Color.obInk.opacity(0.5))
+                        .multilineTextAlignment(.center)
+                } else {
+                    Button {
+                        HapticService.buttonTap()
+                        showConnectAgent = true
+                    } label: {
+                        Text("Connect your agent")
+                            .font(.body.weight(.semibold))
+                            .padding(.horizontal, 8)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Color.brandAmber)
+                    .controlSize(.large)
+                }
+            }
+            .opacity(isRecording ? 0 : 1)
+            .allowsHitTesting(!isRecording)
+
+            Text("Pocket it — we'll keep listening")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(Color.obInk.opacity(0.5))
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .opacity(showLockHint ? 1 : 0)
+        }
+        .padding(.horizontal, 32)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .animation(.easeInOut(duration: 0.4), value: isRecording)
+        .animation(.easeInOut(duration: 0.6), value: showLockHint)
+        .sheet(isPresented: $showConnectAgent) {
+            ConnectAgentView()
+        }
+        .onChange(of: isRecording) { _, newValue in
+            lockHintTask?.cancel()
+            if newValue {
+                lockHintTask = Task {
+                    try? await Task.sleep(for: .seconds(3))
+                    guard !Task.isCancelled else { return }
+                    showLockHint = true
+                    try? await Task.sleep(for: .seconds(5))
+                    guard !Task.isCancelled else { return }
+                    showLockHint = false
+                }
+            } else {
+                showLockHint = false
+            }
+        }
     }
 }
 
@@ -66,6 +129,7 @@ struct RecordingListView: View {
             )
         ],
         onDelete: { _ in },
+        isRecording: false,
         scrollOffset: .constant(0)
     )
 }

@@ -18,12 +18,12 @@ struct RecordButtonView: View {
             ZStack {
                 // Outer ring — always visible
                 Circle()
-                    .stroke(Color.red.opacity(0.8), lineWidth: 4)
+                    .stroke(Color.brandAmber.opacity(0.8), lineWidth: 4)
                     .frame(width: buttonSize, height: buttonSize)
 
                 // Inner shape — filled circle when idle, rounded square when recording
                 RoundedRectangle(cornerRadius: isRecording ? 8 : innerSize / 2)
-                    .fill(Color.red)
+                    .fill(Color.brandAmber)
                     .frame(
                         width: isRecording ? 24 : innerSize,
                         height: isRecording ? 24 : innerSize
@@ -34,6 +34,11 @@ struct RecordButtonView: View {
         }
         .buttonStyle(.plain)
         .animation(.easeInOut(duration: 0.25), value: isRecording)
+        .onAppear {
+            // On the phone this view only appears once recording has started,
+            // so onChange never sees the transition.
+            if isRecording { startPulseAnimation() }
+        }
         .onChange(of: isRecording) { _, newValue in
             if newValue {
                 startPulseAnimation()
@@ -50,6 +55,30 @@ struct RecordButtonView: View {
         ) {
             pulseScale = 1.15
         }
+    }
+}
+
+// MARK: - Compact Mic Button
+
+/// Idle-state record control on the phone. The watch is the main place to
+/// record, so the phone keeps this small; the full control appears once a
+/// recording is running.
+struct CompactMicButton: View {
+    let action: () -> Void
+
+    private let size: CGFloat = 56
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "mic.fill")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: size, height: size)
+                .background(Circle().fill(Color.brandAmber))
+                .shadow(color: .black.opacity(0.15), radius: 6, x: 0, y: 3)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Record on iPhone")
     }
 }
 
@@ -95,7 +124,7 @@ private struct WaveformBar: View {
 
     var body: some View {
         Capsule()
-            .fill(Color.red)
+            .fill(Color.brandAmber)
             .frame(width: barWidth, height: barHeight)
             .onChange(of: audioLevel) { _, newLevel in
                 DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
@@ -111,6 +140,7 @@ private struct WaveformBar: View {
     VStack(spacing: 40) {
         RecordButtonView(isRecording: false) {}
         RecordButtonView(isRecording: true) {}
+        CompactMicButton {}
 
         HStack(spacing: 20) {
             AudioWaveformView(audioLevel: 0)

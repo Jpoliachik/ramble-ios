@@ -9,6 +9,9 @@ import Foundation
 struct ProxyTranscriptionRequest {
     let audioURL: URL
     let model: CloudModel
+    let language: TranscriptionLanguage
+    let customVocabulary: String
+    let removeFillerWords: Bool
     let jwsTransaction: String?
 }
 
@@ -31,21 +34,35 @@ final class ProxyTranscriptionService {
         // Best-effort attestation before the first request
         try? await appAttestService.attestIfNeeded()
 
-        // Check file size to determine if chunking is needed
+        // Providers cap both the size and the length of a single request, and
+        // at 16 kHz mono AAC the length limit is hit first by a wide margin —
+        // 25 minutes of speech is only a few MB.
         let attributes = try FileManager.default.attributesOfItem(atPath: request.audioURL.path)
         let fileSize = attributes[.size] as? Int ?? 0
+        let duration = await audioDuration(of: request.audioURL) ?? 0
 
-        if fileSize < Constants.Transcription.maxSingleUploadSize {
-            let audioData = try Data(contentsOf: request.audioURL)
-            return try await uploadAndTranscribe(
-                audioData: audioData, baseURL: baseURL, request: request,
-                deviceId: settings.deviceId
-            )
-        } else {
+        let isOversized = fileSize >= Constants.Transcription.maxSingleUploadSize
+        let isTooLong = duration > Constants.Transcription.maxSingleUploadDuration
+
+        if isOversized || isTooLong {
             return try await transcribeChunked(
                 baseURL: baseURL, request: request, deviceId: settings.deviceId
             )
         }
+
+        let audioData = try Data(contentsOf: request.audioURL)
+        return try await uploadAndTranscribe(
+            audioData: audioData, baseURL: baseURL, request: request,
+            deviceId: settings.deviceId
+        )
+    }
+
+    /// Duration in seconds, or nil when the asset can't be read — in which case
+    /// the file-size check alone decides whether to chunk.
+    private func audioDuration(of url: URL) async -> Double? {
+        guard let duration = try? await AVURLAsset(url: url).load(.duration) else { return nil }
+        let seconds = CMTimeGetSeconds(duration)
+        return seconds.isFinite && seconds > 0 ? seconds : nil
     }
 
     // MARK: - Chunked Transcription
@@ -161,11 +178,20 @@ final class ProxyTranscriptionService {
         body.append(audioData)
         body.appendString("\r\n")
 
-        // Model selection part
-        body.appendString("--\(boundary)\r\n")
-        body.appendString("Content-Disposition: form-data; name=\"model\"\r\n\r\n")
-        body.appendString(request.model.rawValue)
-        body.appendString("\r\n")
+        body.appendField(name: "model", value: request.model.rawValue, boundary: boundary)
+
+        if let languageCode = request.language.code, request.model.supports(request.language) {
+            body.appendField(name: "language", value: languageCode, boundary: boundary)
+        }
+
+        let vocab = request.customVocabulary.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !vocab.isEmpty {
+            body.appendField(name: "vocabulary", value: vocab, boundary: boundary)
+        }
+
+        if request.removeFillerWords {
+            body.appendField(name: "remove_filler_words", value: "true", boundary: boundary)
+        }
 
         body.appendString("--\(boundary)--\r\n")
 
@@ -237,5 +263,12 @@ private extension Data {
         if let data = string.data(using: .utf8) {
             append(data)
         }
+    }
+
+    mutating func appendField(name: String, value: String, boundary: String) {
+        appendString("--\(boundary)\r\n")
+        appendString("Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n")
+        appendString(value)
+        appendString("\r\n")
     }
 }

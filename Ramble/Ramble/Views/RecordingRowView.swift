@@ -25,9 +25,15 @@ struct RecordingRowView: View {
                 case .transcribing, .recorded:
                     transcribingPlaceholder
                 case .completed, .failed:
-                    if let transcription = recording.transcription, !transcription.isEmpty {
-                        Text(transcription)
+                    if let preview = transcriptionPreview {
+                        Text(preview)
                             .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    if let note = deliveryNote {
+                        Text(note)
+                            .font(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
@@ -40,6 +46,26 @@ struct RecordingRowView: View {
             statusIcon
         }
         .padding(.vertical, 6)
+    }
+
+    /// Second line for completed recordings that aren't fully delivered, so a
+    /// transcript with nowhere to go never reads as done.
+    private var deliveryNote: String? {
+        guard recording.status == .completed else { return nil }
+        switch recording.deliveryStatus {
+        case .none:
+            return RelayService.shared.hasConnectedAgents ? "Not sent" : "Not sent · connect your agent"
+        default:
+            return nil
+        }
+    }
+
+    private var transcriptionPreview: String? {
+        guard let transcription = recording.transcription else { return nil }
+        let collapsed = transcription
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+        return collapsed.isEmpty ? nil : collapsed
     }
 
     private var transcribingPlaceholder: some View {
@@ -56,7 +82,7 @@ struct RecordingRowView: View {
     private var statusIcon: some View {
         switch recording.status {
         case .completed:
-            switch recording.webhookStatus {
+            switch recording.deliveryStatus {
             case .pending, .sending:
                 ProgressView()
                     .controlSize(.mini)
@@ -64,9 +90,13 @@ struct RecordingRowView: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)
                     .font(.subheadline)
-            case .delivered, .none:
+            case .delivered:
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(.green)
+                    .font(.subheadline)
+            case .none:
+                Image(systemName: "tray")
+                    .foregroundStyle(.secondary)
                     .font(.subheadline)
             }
         case .failed:

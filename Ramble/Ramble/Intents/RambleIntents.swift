@@ -12,7 +12,11 @@ struct StartRecordingIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        await RecordingManager.shared.startRecording()
+        let manager = RecordingManager.shared
+        await manager.startRecording()
+        guard manager.isRecording else {
+            return .result(dialog: "Couldn't start recording. \(manager.startError?.message ?? "")")
+        }
         return .result(dialog: "Recording started.")
     }
 }
@@ -45,6 +49,9 @@ struct ToggleRecordingIntent: AppIntent {
             return .result(dialog: "Recording saved.")
         } else {
             await manager.startRecording()
+            guard manager.isRecording else {
+                return .result(dialog: "Couldn't start recording. \(manager.startError?.message ?? "")")
+            }
             return .result(dialog: "Recording started.")
         }
     }

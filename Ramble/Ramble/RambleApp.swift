@@ -10,6 +10,7 @@ import SwiftUI
 @main
 struct RambleApp: App {
     @AppStorage("appearanceMode") private var appearanceMode: String = AppearanceMode.system.rawValue
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
 
     init() {
         BackgroundTaskService.shared.registerBackgroundTasks()
@@ -34,6 +35,15 @@ struct RambleApp: App {
                 .preferredColorScheme(
                     AppearanceMode(rawValue: appearanceMode)?.colorScheme
                 )
+                .sheet(isPresented: Binding(
+                    get: { !hasCompletedOnboarding },
+                    set: { isPresented in
+                        if !isPresented { hasCompletedOnboarding = true }
+                    }
+                )) {
+                    OnboardingView()
+                        .interactiveDismissDisabled()
+                }
                 .onReceive(
                     NotificationCenter.default.publisher(
                         for: UIApplication.didEnterBackgroundNotification
@@ -51,6 +61,7 @@ struct RambleApp: App {
                 ) { _ in
                     TranscriptionQueueService.shared.resumePendingJobs()
                     WebhookQueueService.shared.resumePendingJobs()
+                    RelayQueueService.shared.resumePendingJobs()
                 }
         }
     }
