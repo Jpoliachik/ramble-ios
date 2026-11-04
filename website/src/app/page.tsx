@@ -92,6 +92,10 @@ const faqs: { q: string; a: ReactNode }[] = [
     a: "Then you're on your phone, waiting for a reply. With Ramble you say it and keep going. Your agent works on it while you get on with your day.",
   },
   {
+    q: "Why not use my agent's own app?",
+    a: "Most agent apps don't have a real Watch app, and the ones that do need a connection. Ramble records with no phone and no signal, queues everything up, and makes sure each thought reaches your agent once you're back online. It's also simple on purpose: you say it and move on, instead of staring at your phone waiting for a reply.",
+  },
+  {
     q: "Does my agent reply on my watch?",
     a: "No, and that's the point. Nothing pulls you back in. You check in with your agent when you're ready.",
   },
