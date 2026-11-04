@@ -47,6 +47,14 @@ enum KeychainService {
         return .found(string)
     }
 
+    /// Whether Ramble's Keychain items can't be read right now. One probe
+    /// shared by every queue: all items share one accessibility class, and
+    /// `deviceId` is written on first launch (SettingsService) and kept for
+    /// good, so it's always there to probe.
+    static var isLocked: Bool {
+        lookup(forKey: "deviceId") == .locked
+    }
+
     /// The stored value, or nil when it's missing or the phone is locked.
     /// Use `lookup(forKey:)` when those two cases need different handling.
     static func string(forKey key: String) -> String? {

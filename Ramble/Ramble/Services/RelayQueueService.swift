@@ -50,7 +50,7 @@ final class RelayQueueService: ObservableObject {
     @Published private(set) var isProcessing = false
 
     var hasActiveWork: Bool {
-        isProcessing || (!relay.isWaitingForUnlock && queue.contains { ($0.nextRetryAt ?? .distantPast) <= Date() })
+        isProcessing || (!KeychainService.isLocked && queue.contains { ($0.nextRetryAt ?? .distantPast) <= Date() })
     }
 
     private let storageService = StorageService.shared
@@ -91,12 +91,14 @@ final class RelayQueueService: ObservableObject {
     }
 
     func resumePendingJobs() {
+        // Read once: each is a Keychain or defaults lookup.
+        let missedSince = relay.hasConnectedAgents ? relay.connectedSince : nil
         var missed: [UUID] = []
         for recording in storageService.loadRecordings() {
             guard !queue.contains(where: { $0.recordingId == recording.id }) else { continue }
             if let status = recording.relayStatus, status == .pending || status == .sending {
                 queue.append(RelayJob(recordingId: recording.id))
-            } else if isMissed(recording) {
+            } else if let missedSince, isMissed(recording, since: missedSince) {
                 queue.append(RelayJob(recordingId: recording.id))
                 missed.append(recording.id)
             }
@@ -118,20 +120,17 @@ final class RelayQueueService: ObservableObject {
     /// locked phone, because the Keychain read made it look like no agent was
     /// connected. Recordings from before the first agent was paired are left
     /// alone, so connecting an agent never floods it with old thoughts.
-    private func isMissed(_ recording: Recording) -> Bool {
-        guard recording.relayStatus == nil,
-              recording.status == .completed,
-              let text = recording.transcription,
-              !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              relay.hasConnectedAgents,
-              let since = relay.connectedSince else { return false }
-        return recording.createdAt >= since
+    private func isMissed(_ recording: Recording, since: Date) -> Bool {
+        recording.createdAt >= since
+            && recording.relayStatus == nil
+            && recording.status == .completed
+            && !(recording.transcription ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     func processNextIfNeeded() {
         guard !isProcessing else { return }
         // Locked phone: jobs stay queued and resume on unlock (see RambleApp).
-        guard !relay.isWaitingForUnlock else { return }
+        guard !KeychainService.isLocked else { return }
         let now = Date()
         guard let job = queue.first(where: { ($0.nextRetryAt ?? .distantPast) <= now }) else {
             scheduleWake()
@@ -176,6 +175,7 @@ final class RelayQueueService: ObservableObject {
                     $0.activityLog.append(ActivityEntry("Not sent — no agent is connected"))
                 }
                 removeJob(job)
+                relay.noteNoAgentsConnected()
                 _ = try? await relay.refreshConnections()
                 return
             }
