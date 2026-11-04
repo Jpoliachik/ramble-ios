@@ -55,7 +55,7 @@ struct MainView: View {
                     HStack(alignment: .firstTextBaseline) {
                         HStack(spacing: 8) {
                             Circle()
-                                .fill(Color.brandRed)
+                                .fill(Color.brandAmber)
                                 .frame(width: 12, height: 12)
                                 .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 }
                             Text("Ramble")
@@ -204,7 +204,7 @@ private struct OnboardingCompletionToast: View {
         HStack(spacing: 10) {
             ZStack {
                 Circle()
-                    .fill(Color.brandRed)
+                    .fill(Color.brandAmber)
                     .frame(width: 22, height: 22)
 
                 Image(systemName: "checkmark")

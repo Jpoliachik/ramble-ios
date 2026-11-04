@@ -104,7 +104,7 @@ struct OnboardingNavRow: View {
             } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(Color.brandRed)
+                    .foregroundStyle(Color.brandAmber)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
@@ -140,7 +140,7 @@ struct OnboardingProgressBar: View {
         HStack(spacing: spacing) {
             ForEach(1...OnboardingStep.bodyStepCount, id: \.self) { index in
                 Capsule()
-                    .fill(index <= activeStep ? Color.brandRed : Color.obHair)
+                    .fill(index <= activeStep ? Color.brandAmber : Color.obHair)
                     .frame(width: index == activeStep ? activeWidth : dotSize, height: dotSize)
             }
         }
@@ -189,7 +189,7 @@ struct OnboardingBody: View {
     }
 }
 
-// MARK: - Wordmark (red dot + italic serif)
+// MARK: - Wordmark (amber dot + italic serif)
 
 struct OnboardingWordmark: View {
     let size: CGFloat
@@ -201,7 +201,7 @@ struct OnboardingWordmark: View {
     var body: some View {
         HStack(alignment: .center, spacing: size * 0.3) {
             Circle()
-                .fill(Color.brandRed)
+                .fill(Color.brandAmber)
                 .frame(width: size * 0.42, height: size * 0.42)
 
             Text("Ramble")
@@ -282,7 +282,7 @@ struct BrandPlusActionCard: View {
             HStack(spacing: 12) {
                 ZStack {
                     Circle()
-                        .fill(Color.brandRed)
+                        .fill(Color.brandAmber)
                         .frame(width: 28, height: 28)
                     Image(systemName: "plus")
                         .font(.system(size: 13, weight: .bold))
@@ -349,7 +349,7 @@ struct SendVisual: View {
         HStack(alignment: .center, spacing: 8) {
             Image(systemName: "waveform")
                 .font(.system(size: 14))
-                .foregroundStyle(Color.brandRed)
+                .foregroundStyle(Color.brandAmber)
 
             Text(voiceText)
                 .font(.system(size: 10, design: .serif).italic())
@@ -392,7 +392,7 @@ struct SendVisual: View {
                     .frame(maxWidth: .infinity, alignment: .trailing)
 
                 Circle()
-                    .fill(Color.brandRed)
+                    .fill(Color.brandAmber)
                     .frame(width: Self.dotSize, height: Self.dotSize)
                     .offset(x: dotTravel * CGFloat(progress))
                     .opacity(travelOpacity(for: progress))
@@ -416,7 +416,7 @@ struct SendVisual: View {
         HStack(alignment: .center, spacing: 8) {
             Image(systemName: "paperplane.fill")
                 .font(.system(size: 13))
-                .foregroundStyle(Color.brandRed)
+                .foregroundStyle(Color.brandAmber)
 
             Text(endpointText)
                 .font(.system(size: 10, design: .monospaced))
@@ -478,7 +478,7 @@ struct OnboardingPrimaryButton: View {
             .frame(height: 56)
             .background(
                 RoundedRectangle(cornerRadius: 14)
-                    .fill(Color.brandRed)
+                    .fill(Color.brandAmber)
             )
             .opacity(isDisabled ? 0.4 : 1)
         }
@@ -529,7 +529,7 @@ struct OnboardingSecondaryLink: View {
         } label: {
             Text(title)
                 .font(.system(size: 15))
-                .foregroundStyle(Color.brandRed)
+                .foregroundStyle(Color.brandAmber)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
         }
@@ -572,7 +572,7 @@ struct OnboardingItalicTag: View {
     var body: some View {
         Text(text)
             .font(.system(size: 13, design: .serif).italic().weight(.medium))
-            .foregroundStyle(Color.brandRed)
+            .foregroundStyle(Color.brandAmber)
     }
 }
 

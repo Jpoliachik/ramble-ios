@@ -26,8 +26,11 @@
   --color-cream: #f4f3ef;
   --color-cream-warm: #f9f5ed;
 
-  --color-red-500: #d7263d;
-  --color-red-600: #c01f33;
+  /* Brand amber. `brand` matches the app's brand-amber colorset (light) and is
+     for the logo circle and other fills. Amber that light is under 3:1 on cream,
+     so text uses the darker `brand-text`, which passes WCAG AA. */
+  --color-brand: #d97706;
+  --color-brand-text: #b45309;
 
   --font-sans: "SF Pro Display", "SF Pro", -apple-system, BlinkMacSystemFont,
     system-ui, "Segoe UI", Roboto, sans-serif;

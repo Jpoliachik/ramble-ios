@@ -98,11 +98,11 @@ export default function AgentDocs() {
               <CodeBlock>{API_EXAMPLE}</CodeBlock>
               <p>
                 What the relay stores and for how long is in the{" "}
-                <Link href="/privacy" className="text-red-600 underline-offset-2 hover:underline">
+                <Link href="/privacy" className="text-brand-text underline-offset-2 hover:underline">
                   privacy policy
                 </Link>
                 . To send transcripts to your own server instead, see{" "}
-                <Link href="/docs/webhooks" className="text-red-600 underline-offset-2 hover:underline">
+                <Link href="/docs/webhooks" className="text-brand-text underline-offset-2 hover:underline">
                   Webhooks
                 </Link>
                 .

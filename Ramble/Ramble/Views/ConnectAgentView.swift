@@ -29,7 +29,7 @@ struct ConnectAgentView: View {
                                 AgentConnectionRow(connection: connection)
                                 Button("Disconnect") { connectionToDisconnect = connection }
                                     .font(.subheadline)
-                                    .foregroundStyle(Color.brandRed)
+                                    .foregroundStyle(Color.brandAmber)
                                     .buttonStyle(.borderless)
                             }
                         }
@@ -59,7 +59,7 @@ struct ConnectAgentView: View {
                     Section {
                         Label(errorMessage, systemImage: "exclamationmark.triangle")
                             .font(.subheadline)
-                            .foregroundStyle(Color.brandRed)
+                            .foregroundStyle(Color.brandAmber)
                     }
                 }
 
@@ -124,7 +124,7 @@ struct ConnectAgentView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(Color.brandRed)
+                .tint(Color.brandAmber)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
@@ -234,7 +234,7 @@ private struct PairCodeCountdown: View {
                  ? "Expires in \(remaining / 60):\(String(format: "%02d", remaining % 60))"
                  : "Expired. Get a new code.")
                 .font(.subheadline.monospacedDigit())
-                .foregroundStyle(remaining > 0 ? Color.obInkFaint : Color.brandRed)
+                .foregroundStyle(remaining > 0 ? Color.obInkFaint : Color.brandAmber)
         }
     }
 }

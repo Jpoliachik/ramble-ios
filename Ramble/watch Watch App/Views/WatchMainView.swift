@@ -82,7 +82,7 @@ struct WatchMainView: View {
             Text(WatchFormat.duration(recordingManager.currentDuration))
                 .font(.system(size: 28, weight: .bold, design: .serif))
                 .monospacedDigit()
-                .foregroundStyle(Color.brandRed)
+                .foregroundStyle(Color.brandAmber)
                 .contentTransition(.numericText())
                 .transition(.opacity)
         } else if let startFailureMessage {

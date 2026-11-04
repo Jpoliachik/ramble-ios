@@ -18,12 +18,12 @@ struct RecordButtonView: View {
             ZStack {
                 // Outer ring — always visible
                 Circle()
-                    .stroke(Color.brandRed.opacity(0.8), lineWidth: 4)
+                    .stroke(Color.brandAmber.opacity(0.8), lineWidth: 4)
                     .frame(width: buttonSize, height: buttonSize)
 
                 // Inner shape — filled circle when idle, rounded square when recording
                 RoundedRectangle(cornerRadius: isRecording ? 8 : innerSize / 2)
-                    .fill(Color.brandRed)
+                    .fill(Color.brandAmber)
                     .frame(
                         width: isRecording ? 24 : innerSize,
                         height: isRecording ? 24 : innerSize
@@ -74,7 +74,7 @@ struct CompactMicButton: View {
                 .font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: size, height: size)
-                .background(Circle().fill(Color.brandRed))
+                .background(Circle().fill(Color.brandAmber))
                 .shadow(color: .black.opacity(0.15), radius: 6, x: 0, y: 3)
         }
         .buttonStyle(.plain)
@@ -124,7 +124,7 @@ private struct WaveformBar: View {
 
     var body: some View {
         Capsule()
-            .fill(Color.brandRed)
+            .fill(Color.brandAmber)
             .frame(width: barWidth, height: barHeight)
             .onChange(of: audioLevel) { _, newLevel in
                 DispatchQueue.main.asyncAfter(deadline: .now() + delay) {

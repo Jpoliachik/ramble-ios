@@ -20,7 +20,7 @@ const primaryButton =
   "inline-flex items-center gap-2 rounded-full bg-stone-900 px-6 py-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-stone-800";
 const secondaryButton =
   "inline-flex items-center gap-2 rounded-full border border-stone-300 px-6 py-3 text-sm font-medium text-stone-700 transition-colors hover:border-stone-400 hover:bg-stone-100";
-const inlineLink = "text-red-600 underline-offset-2 hover:underline";
+const inlineLink = "text-brand-text underline-offset-2 hover:underline";
 const stepBadge =
   "flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-stone-900 font-serif text-sm font-semibold text-white";
 
@@ -153,7 +153,7 @@ export default function Home() {
             </div>
             <h1 className="hero-enter-title font-serif text-[1.9rem] font-semibold leading-[1.15] tracking-tight text-stone-900 min-[400px]:text-4xl sm:text-5xl lg:text-[2.9rem] lg:leading-[1.1]">
               <span className="block whitespace-nowrap">Talk to your watch.</span>
-              <span className="block whitespace-nowrap italic text-red-500">Your agent handles it.</span>
+              <span className="block whitespace-nowrap italic text-brand-text">Your agent handles it.</span>
             </h1>
             <p className="hero-enter-subtitle mt-6 max-w-xl text-base leading-relaxed text-stone-500 sm:text-lg lg:text-xl">
               <span className="block">Stay in the moment, capture the thought.</span>
@@ -205,7 +205,7 @@ export default function Home() {
                 <div className="relative">
                   <span
                     aria-hidden="true"
-                    className="absolute -left-[5px] top-[36%] h-9 w-[6px] rounded-l-sm bg-red-500/80"
+                    className="absolute -left-[5px] top-[36%] h-9 w-[6px] rounded-l-sm bg-brand/80"
                   />
                   <span
                     aria-hidden="true"
@@ -265,7 +265,7 @@ export default function Home() {
             </div>
             <div className="mt-5 flex flex-col text-sm">
               <PopIn className="max-w-[90%] self-end">
-                <p className="rounded-2xl rounded-br-md bg-[#b45309] px-4 py-2.5 text-white">
+                <p className="rounded-2xl rounded-br-md bg-brand-text px-4 py-2.5 text-white">
                   {SETUP_MESSAGE}
                   <br />
                   <span className="whitespace-nowrap underline underline-offset-2">{SITE_HOST}/docs</span>

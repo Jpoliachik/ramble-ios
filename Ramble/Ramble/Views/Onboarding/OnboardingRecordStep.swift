@@ -76,7 +76,7 @@ struct OnboardingRecordStep: View {
         HStack(spacing: 12) {
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.brandRed)
+                    .fill(Color.brandAmber)
                     .frame(width: 32, height: 32)
 
                 Image(systemName: "mic.fill")

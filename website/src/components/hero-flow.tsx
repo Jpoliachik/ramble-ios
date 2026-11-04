@@ -69,7 +69,7 @@ export default function HeroFlow() {
           />
           <circle
             cx="36" cy="50" r="22"
-            fill="#D7263D"
+            fill="#D97706"
             className={animate ? "hf-pulse" : ""}
           />
         </svg>
@@ -88,7 +88,7 @@ export default function HeroFlow() {
         {animate && (
           <span
             aria-hidden="true"
-            className="hf-dot absolute top-1/2 h-3 w-3 rounded-full bg-red-500"
+            className="hf-dot absolute top-1/2 h-3 w-3 rounded-full bg-brand"
             style={{ boxShadow: "0 0 12px rgba(215, 38, 61, 0.6)" }}
             onAnimationIteration={advance}
           />
@@ -110,7 +110,7 @@ export default function HeroFlow() {
             className="hf-slide-out absolute inset-0 flex items-center gap-2 px-3 sm:px-4"
             aria-hidden="true"
           >
-            <Prev.Icon className="h-4 w-4 shrink-0 text-red-500" strokeWidth={2.25} />
+            <Prev.Icon className="h-4 w-4 shrink-0 text-brand" strokeWidth={2.25} />
             <span className="whitespace-nowrap text-xs font-medium text-stone-700 sm:text-sm">{Prev.label}</span>
           </div>
         )}
@@ -118,7 +118,7 @@ export default function HeroFlow() {
           key={`curr-${index}`}
           className={`absolute inset-0 flex items-center gap-2 px-3 sm:px-4 ${Prev ? "hf-slide-in" : ""}`}
         >
-          <Current.Icon className="h-4 w-4 shrink-0 text-red-500" strokeWidth={2.25} aria-hidden="true" />
+          <Current.Icon className="h-4 w-4 shrink-0 text-brand" strokeWidth={2.25} aria-hidden="true" />
           <span className="whitespace-nowrap text-xs font-medium text-stone-700 sm:text-sm">{Current.label}</span>
         </div>
         <span className="sr-only">Sends what you say to your agent, like Muse, Grok Bot, or Dot.</span>
