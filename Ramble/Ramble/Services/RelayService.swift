@@ -79,9 +79,6 @@ final class RelayService: ObservableObject {
 
     private init() {}
 
-    /// The inbox secret exists but can't be read until the phone is unlocked.
-    var isWaitingForUnlock: Bool { KeychainService.lookup(forKey: Self.inboxSecretKey) == .locked }
-
     /// True while the phone is locked too: the secret is there, just unreadable.
     var hasInbox: Bool { KeychainService.lookup(forKey: Self.inboxSecretKey) != .notFound }
 
@@ -154,6 +151,8 @@ final class RelayService: ObservableObject {
         case .locked: throw RelayError.deviceLocked
         case .notFound: break
         }
+        // Creating an inbox needs App Attest, whose key is locked too.
+        guard !KeychainService.isLocked else { throw RelayError.deviceLocked }
 
         var headers: [String: String] = [:]
         if let bypass = UserDefaults.standard.string(forKey: SubscriptionService.devOverrideUserDefaultsKey),
@@ -177,6 +176,12 @@ final class RelayService: ObservableObject {
         let secret = try decoder.decode(CreatedInbox.self, from: data).inboxSecret
         KeychainService.setString(secret, forKey: Self.inboxSecretKey)
         return secret
+    }
+
+    /// The relay just said no agent is connected. Believe it right away so a
+    /// failed refresh can't leave a stale count that keeps re-sending.
+    func noteNoAgentsConnected() {
+        setConnections([])
     }
 
     private func setConnections(_ list: [RelayConnection]) {

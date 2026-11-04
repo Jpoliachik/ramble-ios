@@ -14,7 +14,7 @@ final class WebhookQueueService: ObservableObject {
     @Published private(set) var isProcessing = false
 
     var hasActiveWork: Bool {
-        isProcessing || (!queue.isEmpty && settingsService.secretsAvailable)
+        isProcessing || (!queue.isEmpty && !KeychainService.isLocked)
     }
 
     private let storageService = StorageService.shared
@@ -76,7 +76,7 @@ final class WebhookQueueService: ObservableObject {
         guard !isProcessing, let job = queue.first else { return }
         // Locked phone: the signing secret can't be read. Jobs stay queued
         // and resume when the phone unlocks (see RambleApp).
-        guard settingsService.secretsAvailable else { return }
+        guard !KeychainService.isLocked else { return }
         processJob(job)
     }
 
