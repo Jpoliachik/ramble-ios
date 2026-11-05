@@ -122,7 +122,7 @@ proxy/                 # Cloudflare Worker: transcription proxy + agent relay (R
 ### Tech Stack
 
 - SwiftUI for all UI
-- Deployment target: iOS 26.2, watchOS 26.2
+- Deployment target: iOS 26.2, watchOS 10.0 (covers Series 4+ and first-gen SE; guard newer watch APIs with `#available`)
 
 ### Proxy API
 
