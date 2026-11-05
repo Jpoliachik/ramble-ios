@@ -11,6 +11,10 @@ struct MainView: View {
     @State private var showSettings = false
     @State private var scrollOffset: CGFloat = 0
     @State private var showOnboardingToast = false
+    @State private var showConnectAgent = false
+    @State private var path: [Recording] = []
+    /// Cached so the status line doesn't read settings on every frame while recording.
+    @State private var hasWebhook = SettingsService.shared.load().isWebhookConfigured
 
     @AppStorage("shouldShowOnboardingToast") private var shouldShowOnboardingToast: Bool = false
 
@@ -22,23 +26,20 @@ struct MainView: View {
         min(max(scrollOffset / scrollThreshold, 0), 1)
     }
 
-    /// Transcripts the relay is holding for the agent. Comes from the relay's
-    /// own count, since the phone never hears when the agent picks one up.
-    private var waitingCount: Int {
-        relay.connections.map(\.pending).max() ?? 0
-    }
-
-    private var showSyncBanner: Bool {
-        SyncStatusBannerView.isVisible(
-            transcribing: viewModel.pendingCount,
-            sending: viewModel.sendingCount,
-            waiting: waitingCount,
-            failed: viewModel.needsAttentionCount
+    private var homeStatus: HomeStatus {
+        HomeStatus.compute(
+            recordings: viewModel.recordings,
+            connections: relay.connections,
+            hasAgent: relay.hasConnectedAgents,
+            hasWebhook: hasWebhook
         )
     }
 
+    private var isListEmpty: Bool { viewModel.recordings.isEmpty }
+
     var body: some View {
-        NavigationStack {
+        let status = homeStatus
+        NavigationStack(path: $path) {
             ZStack(alignment: .bottom) {
                 // Recording list — full height, scrolls under header and controls
                 RecordingListView(
@@ -47,7 +48,7 @@ struct MainView: View {
                     isRecording: viewModel.isRecording,
                     scrollOffset: $scrollOffset
                 )
-                .contentMargins(.top, showSyncBanner ? 100 : 48, for: .scrollContent)
+                .contentMargins(.top, 92, for: .scrollContent)
                 .contentMargins(.bottom, viewModel.isRecording ? 200 : 96, for: .scrollContent)
 
                 // Top bar — floats over list, slides apart and fades on scroll
@@ -78,22 +79,31 @@ struct MainView: View {
                     .allowsHitTesting(scrollProgress < 0.5)
                     .animation(.easeOut(duration: 0.15), value: scrollProgress)
 
-                    if showSyncBanner {
-                        SyncStatusBannerView(
-                            transcribingCount: viewModel.pendingCount,
-                            sendingCount: viewModel.sendingCount,
-                            waitingCount: waitingCount,
-                            failedCount: viewModel.needsAttentionCount
-                        )
-                        .transition(.opacity)
-                    }
+                    // Pills stay put while the list scrolls; quiet lines fade with the title.
+                    HomeStatusLine(
+                        status: status,
+                        isEmptyList: isListEmpty,
+                        hasAgent: relay.hasConnectedAgents,
+                        onTap: { handleStatusTap(status) }
+                    )
+                    .padding(.horizontal, 20)
+                    .opacity(status.isPill ? 1 : 1 - scrollProgress)
+                    .opacity(viewModel.isRecording && isListEmpty ? 0 : 1)
+                    .allowsHitTesting(status.isPill)
 
                     Spacer()
                 }
-                .animation(.easeInOut(duration: 0.2), value: showSyncBanner)
+                .animation(.easeInOut(duration: 0.2), value: status)
 
                 // Floating bottom controls
-                RecordingControlsView(
+                VStack(spacing: 10) {
+                    if isListEmpty && !viewModel.isRecording {
+                        Text("Or record here")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .transition(.opacity)
+                    }
+                    RecordingControlsView(
                     isRecording: viewModel.isRecording,
                     duration: viewModel.currentDuration,
                     inputSourceName: viewModel.inputSourceName,
@@ -106,7 +116,9 @@ struct MainView: View {
                     onCancel: {
                         viewModel.cancelRecording()
                     }
-                )
+                    )
+                }
+                .animation(.easeInOut(duration: 0.3), value: isListEmpty && !viewModel.isRecording)
                 .padding(.top, viewModel.isRecording ? 80 : 24)
                 .padding(.bottom, 16)
                 .frame(maxWidth: .infinity)
@@ -142,8 +154,11 @@ struct MainView: View {
             .navigationDestination(for: Recording.self) { recording in
                 RecordingDetailView(recording: recording)
             }
-            .sheet(isPresented: $showSettings) {
+            .sheet(isPresented: $showSettings, onDismiss: refreshWebhookSetting) {
                 SettingsView()
+            }
+            .sheet(isPresented: $showConnectAgent) {
+                ConnectAgentView()
             }
             .alert(
                 "Couldn't start recording",
@@ -176,6 +191,7 @@ struct MainView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
+            refreshWebhookSetting()
             Task { _ = try? await relay.refreshConnections() }
         }
         .onChange(of: shouldShowOnboardingToast) { _, newValue in
@@ -186,6 +202,32 @@ struct MainView: View {
                 triggerOnboardingToastIfNeeded()
             }
         }
+    }
+
+    private func refreshWebhookSetting() {
+        hasWebhook = SettingsService.shared.load().isWebhookConfigured
+    }
+
+    /// Each pill opens its fix: Connect, the agent, or the note that's stuck.
+    private func handleStatusTap(_ status: HomeStatus) {
+        switch status {
+        case .noAgent, .agentQuiet, .waitingLong:
+            showConnectAgent = true
+        case .didntSend:
+            openNewest { DeliveryStage($0).needsAttention }
+        case .notSent:
+            openNewest { DeliveryStage($0) == .onPhone }
+        case .working, .waiting, .allGood:
+            break
+        }
+    }
+
+    private func openNewest(where matches: (Recording) -> Bool) {
+        guard let recording = viewModel.recordings
+            .filter(matches)
+            .max(by: { $0.createdAt < $1.createdAt })
+        else { return }
+        path = [recording]
     }
 
     private func triggerOnboardingToastIfNeeded() {
