@@ -21,8 +21,16 @@ export const PAIR_CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTVWXYZ';
 export const PULL_LIMIT = 50;
 export const MAX_TEXT_LENGTH = 200_000;
 export const STATUS_LIMIT = 100;
+export const MAX_NAME_LENGTH = 40;
+export const MAX_HOOK_HEADERS = 8;
+export const MAX_HOOK_HEADERS_BYTES = 4096;
+// While a ping is unanswered (no pull since), don't send another for this
+// long. A burst of recordings is one agent run, and a broken hook gets at
+// most one ping per window.
+export const HOOK_REPING_SECONDS = 10 * 60;
+export const HOOK_TIMEOUT_MS = 5000;
 
-const RELAY_PATHS = /^\/(inboxes|inbox|inbox\/ack|inbox\/status|pair\/code|pair\/exchange|connections(\/[^/]+)?)$/;
+const RELAY_PATHS = /^\/(inboxes|inbox|inbox\/ack|inbox\/status|pair\/code|pair\/exchange|agent|connections(\/[^/]+)?)$/;
 
 export function isRelayPath(pathname) {
   return RELAY_PATHS.test(pathname);
@@ -37,6 +45,10 @@ export async function handleRelayRequest(request, env, deps = {}) {
     db: env.DB,
     now: deps.now ?? Date.now(),
     verifyAssertion: deps.verifyAssertion ?? verifyAssertionForRequest,
+    // Pings run after the response, so the app's upload never waits on them.
+    waitUntil: deps.waitUntil ?? ((promise) => promise),
+    fetch: deps.fetch ?? ((...args) => fetch(...args)),
+    origin: new URL(request.url).origin,
   };
   const { pathname } = new URL(request.url);
   const route = `${request.method} ${pathname.replace(/^\/connections\/.+$/, '/connections/:id')}`;
@@ -55,6 +67,8 @@ export async function handleRelayRequest(request, env, deps = {}) {
       case 'POST /pair/exchange': return await exchangePairCode(request, ctx);
       case 'GET /inbox': return await pull(request, ctx);
       case 'POST /inbox/ack': return await ack(request, ctx);
+      case 'GET /agent': return await getAgent(request, ctx);
+      case 'PATCH /agent': return await updateAgent(request, ctx);
       default: return wrongMethod(pathname);
     }
   } catch (err) {
@@ -88,12 +102,12 @@ async function upload(request, ctx) {
   if (item.error) return json({ error: item.error }, 400);
 
   const { results: connections } = await ctx.db
-    .prepare('SELECT id FROM connections WHERE inbox_id = ?')
+    .prepare('SELECT id, hook_url, hook_headers, hook_pinged_at, last_pull_at FROM connections WHERE inbox_id = ?')
     .bind(inbox.id)
     .all();
   if (connections.length > 0) {
     const expiresAt = ctx.now + retentionSeconds(ctx.env) * 1000;
-    await ctx.db.batch(
+    const inserted = await ctx.db.batch(
       connections.map((c) =>
         ctx.db
           .prepare(
@@ -104,6 +118,9 @@ async function upload(request, ctx) {
           .bind(c.id, item.recordingId, item.createdAt, item.duration, item.text, expiresAt, ctx.now),
       ),
     );
+    // Wake hooked agents that got a new copy (a resent upload pings no one).
+    const toPing = connections.filter((c, i) => inserted[i].meta.changes > 0 && shouldPing(c, ctx.now));
+    if (toPing.length > 0) ctx.waitUntil(Promise.all(toPing.map((c) => pingHook(c, ctx))));
   }
   return json({ queued: connections.length });
 }
@@ -176,7 +193,7 @@ async function listConnections(request, ctx) {
 
   const { results } = await ctx.db
     .prepare(
-      `SELECT c.id, c.created_at, c.last_pull_at,
+      `SELECT c.id, c.name, c.created_at, c.last_pull_at, c.hook_url, c.hook_pinged_at, c.hook_status,
               (SELECT COUNT(*) FROM entries e
                 WHERE e.connection_id = c.id AND e.expires_at > ?) AS pending
          FROM connections c WHERE c.inbox_id = ? ORDER BY c.created_at`,
@@ -187,9 +204,15 @@ async function listConnections(request, ctx) {
   return json({
     connections: results.map((c) => ({
       id: c.id,
+      name: c.name ?? null,
       created_at: iso(c.created_at),
       last_pull_at: c.last_pull_at ? iso(c.last_pull_at) : null,
       pending: c.pending,
+      // The URL and headers stay on the relay; the app only needs to know
+      // a hook exists and whether its last ping worked.
+      hook: c.hook_url
+        ? { last_ping_at: c.hook_pinged_at ? iso(c.hook_pinged_at) : null, last_status: c.hook_status ?? null }
+        : null,
     })),
   });
 }
@@ -217,10 +240,14 @@ async function disconnect(request, connectionId, ctx) {
  * the code expires), so a lost response never strands the agent.
  */
 async function exchangePairCode(request, ctx) {
-  const code = (await readJSON(request))?.code;
+  const body = await readJSON(request);
+  const code = body?.code;
   if (typeof code !== 'string' || !code.trim()) {
     return json({ error: 'Send JSON like {"code": "K7QX-MP4D"} with the code from the Ramble app' }, 400);
   }
+  // Optional, so the user can tell agents apart in the app. Bad names are
+  // dropped rather than failing the pairing.
+  const name = cleanName(body?.name);
   const codeHash = await sha256Hex(normalizePairCode(code));
 
   // Claim the code. The conditional update makes only one exchange win, even
@@ -237,8 +264,8 @@ async function exchangePairCode(request, ctx) {
     .first();
   if (claimed) {
     await ctx.db
-      .prepare('INSERT INTO connections (id, inbox_id, token_hash, created_at) VALUES (?, ?, ?, ?)')
-      .bind(connectionId, claimed.inbox_id, await sha256Hex(token), ctx.now)
+      .prepare('INSERT INTO connections (id, inbox_id, token_hash, created_at, name) VALUES (?, ?, ?, ?, ?)')
+      .bind(connectionId, claimed.inbox_id, await sha256Hex(token), ctx.now, name)
       .run();
     return json({ token }, 201);
   }
@@ -303,6 +330,197 @@ async function ack(request, ctx) {
   return json({ deleted: result.meta.changes });
 }
 
+/** What the relay knows about this agent. Header values are never echoed. */
+async function getAgent(request, ctx) {
+  const connection = await authAgent(request, ctx);
+  if (!connection) return unauthorized();
+  return json(agentView(connection));
+}
+
+/**
+ * The agent sets its own name and, optionally, a wake-up webhook:
+ *   {"name": "Grok Bot", "hook": {"url": "https://…", "headers": {"Authorization": "Bearer …"}}}
+ * Either field can be left out. "hook": null removes the hook. Setting a hook
+ * sends one test ping right away and returns its HTTP status, so the agent
+ * knows at once whether its URL and headers work.
+ */
+async function updateAgent(request, ctx) {
+  const connection = await authAgent(request, ctx);
+  if (!connection) return unauthorized();
+
+  const body = await readJSON(request);
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return json({ error: 'Send JSON like {"name": "My agent", "hook": {"url": "https://…", "headers": {…}}}' }, 400);
+  }
+
+  const updates = [];
+  if ('name' in body) {
+    const name = cleanName(body.name);
+    if (body.name !== null && !name) return json({ error: `"name" must be 1–${MAX_NAME_LENGTH} characters` }, 400);
+    updates.push(ctx.db.prepare('UPDATE connections SET name = ? WHERE id = ?').bind(name, connection.id));
+    connection.name = name;
+  }
+
+  let hook;
+  if ('hook' in body) {
+    if (body.hook === null) {
+      updates.push(
+        ctx.db
+          .prepare(
+            `UPDATE connections SET hook_url = NULL, hook_headers = NULL, hook_pinged_at = NULL, hook_status = NULL
+              WHERE id = ?`,
+          )
+          .bind(connection.id),
+      );
+      Object.assign(connection, { hook_url: null, hook_headers: null, hook_pinged_at: null, hook_status: null });
+    } else {
+      hook = validateHook(body.hook, ctx.origin);
+      if (hook.error) return json({ error: hook.error }, 400);
+      const headers = JSON.stringify(hook.headers);
+      updates.push(
+        ctx.db
+          .prepare(
+            `UPDATE connections SET hook_url = ?, hook_headers = ?, hook_pinged_at = NULL, hook_status = NULL
+              WHERE id = ?`,
+          )
+          .bind(hook.url, headers, connection.id),
+      );
+      Object.assign(connection, { hook_url: hook.url, hook_headers: headers });
+    }
+  }
+  if (updates.length > 0) await ctx.db.batch(updates);
+
+  if (hook) {
+    const status = await pingHook(connection, ctx, 'ramble.test');
+    connection.hook_status = status;
+  }
+  return json(agentView(connection));
+}
+
+function agentView(c) {
+  return {
+    name: c.name ?? null,
+    hook: c.hook_url
+      ? {
+          url: c.hook_url,
+          header_names: Object.keys(JSON.parse(c.hook_headers || '{}')),
+          last_ping_at: c.hook_pinged_at ? iso(c.hook_pinged_at) : null,
+          last_status: c.hook_status ?? null,
+        }
+      : null,
+  };
+}
+
+// --- Wake-up hooks -----------------------------------------------------------
+
+/**
+ * Ping unless a ping is already out that the agent hasn't answered with a
+ * pull, and it went out less than HOOK_REPING_SECONDS ago.
+ */
+export function shouldPing(c, now) {
+  if (!c.hook_url) return false;
+  if (c.hook_pinged_at == null) return true;
+  if (c.last_pull_at != null && c.last_pull_at >= c.hook_pinged_at) return true;
+  return now - c.hook_pinged_at >= HOOK_REPING_SECONDS * 1000;
+}
+
+/**
+ * One POST, no retries, never throws. Carries no transcript text: the agent
+ * pulls with its own token, so text only ever leaves the relay that way.
+ * Returns the HTTP status, or 0 if the request failed.
+ */
+async function pingHook(c, ctx, event = 'ramble.notes_waiting') {
+  const pullURL = `${ctx.origin}/inbox`;
+  const text =
+    event === 'ramble.test'
+      ? 'Ramble test ping: your wake-up hook works. Nothing new to pick up.'
+      : `New Ramble notes are waiting. Pull them from ${pullURL} with your Ramble token, handle them, then ack.`;
+  let status = 0;
+  try {
+    // The test ping doesn't count as an unanswered ping: there's nothing to pull.
+    if (event !== 'ramble.test') {
+      await ctx.db.prepare('UPDATE connections SET hook_pinged_at = ? WHERE id = ?').bind(ctx.now, c.id).run();
+    }
+    const res = await ctx.fetch(c.hook_url, {
+      method: 'POST',
+      headers: {
+        ...JSON.parse(c.hook_headers || '{}'),
+        'Content-Type': 'application/json',
+        'User-Agent': 'Ramble-Relay/1 (+https://ramble.watch/docs)',
+      },
+      body: JSON.stringify({ event, text, pull_url: pullURL }),
+      redirect: 'manual',
+      signal: AbortSignal.timeout(HOOK_TIMEOUT_MS),
+    });
+    status = res.status;
+  } catch {
+    status = 0;
+  }
+  try {
+    await ctx.db.prepare('UPDATE connections SET hook_status = ? WHERE id = ?').bind(status, c.id).run();
+  } catch {
+    // Best effort: a lost status only affects what the app displays.
+  }
+  return status;
+}
+
+const RESERVED_HEADERS = new Set([
+  'host', 'content-length', 'content-type', 'connection', 'transfer-encoding', 'user-agent', 'cookie',
+]);
+
+/** HTTPS only, public hostnames only, a few plain headers. */
+export function validateHook(hook, relayOrigin) {
+  if (!hook || typeof hook !== 'object' || Array.isArray(hook)) {
+    return { error: '"hook" must be {"url": "https://…", "headers": {…}} or null' };
+  }
+  let url;
+  try {
+    url = new URL(hook.url);
+  } catch {
+    return { error: '"hook.url" must be a full https:// URL' };
+  }
+  const host = url.hostname.toLowerCase();
+  if (
+    url.protocol !== 'https:' ||
+    String(hook.url).length > 2048 ||
+    url.username ||
+    url.password ||
+    !host.includes('.') ||
+    /^[\d.]+$/.test(host) ||
+    host.startsWith('[') ||
+    /\.(local|internal|localhost|lan|home|arpa)$/.test(host) ||
+    url.origin === relayOrigin
+  ) {
+    return { error: '"hook.url" must be a public https:// URL with a hostname' };
+  }
+
+  const headers = hook.headers ?? {};
+  if (typeof headers !== 'object' || Array.isArray(headers)) {
+    return { error: '"hook.headers" must be an object of header names to values' };
+  }
+  const entries = Object.entries(headers);
+  if (entries.length > MAX_HOOK_HEADERS) return { error: `"hook.headers" can have at most ${MAX_HOOK_HEADERS} headers` };
+  for (const [name, value] of entries) {
+    if (!/^[A-Za-z0-9-]{1,64}$/.test(name) || RESERVED_HEADERS.has(name.toLowerCase())) {
+      return { error: `"hook.headers" can't set "${name}"` };
+    }
+    if (typeof value !== 'string' || /[\r\n\0]/.test(value)) {
+      return { error: `"hook.headers.${name}" must be a single-line string` };
+    }
+  }
+  if (JSON.stringify(headers).length > MAX_HOOK_HEADERS_BYTES) {
+    return { error: `"hook.headers" must be under ${MAX_HOOK_HEADERS_BYTES} bytes` };
+  }
+  return { url: url.href, headers };
+}
+
+/** Trimmed, single line, 1–MAX_NAME_LENGTH characters; anything else is null. */
+export function cleanName(value) {
+  if (typeof value !== 'string') return null;
+  const name = value.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
+  return name && name.length <= MAX_NAME_LENGTH ? name : null;
+}
+
 // --- Expiry (cron) -----------------------------------------------------------
 
 /** Reads already skip expired rows; this only reclaims space. */
@@ -341,7 +559,13 @@ async function authInbox(request, ctx) {
 async function authAgent(request, ctx) {
   const token = bearer(request, 'rmba_');
   if (!token) return null;
-  return ctx.db.prepare('SELECT id FROM connections WHERE token_hash = ?').bind(await sha256Hex(token)).first();
+  return ctx.db
+    .prepare(
+      `SELECT id, name, hook_url, hook_headers, hook_pinged_at, hook_status
+         FROM connections WHERE token_hash = ?`,
+    )
+    .bind(await sha256Hex(token))
+    .first();
 }
 
 /** Lenient: "Bearer <t>", "bearer <t>", or the bare token all work. */
@@ -428,6 +652,7 @@ const METHODS = {
   '/pair/code': 'POST',
   '/pair/exchange': 'POST',
   '/connections': 'GET',
+  '/agent': 'GET or PATCH',
 };
 
 /** Every relay path exists; only the method was wrong. Say which one fits. */

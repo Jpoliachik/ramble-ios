@@ -17,20 +17,39 @@ import {
   purgeExpired,
   retentionSeconds,
   validateUpload,
+  validateHook,
+  cleanName,
+  shouldPing,
+  HOOK_REPING_SECONDS,
 } from '../src/relay.js';
 import { createTestDB } from './d1.js';
 
 const T0 = Date.UTC(2026, 10, 1, 12, 0, 0);
 const DAY = 24 * 3600 * 1000;
 
-let db, env, now, attestOK;
+let db, env, now, attestOK, pings, pingStatus, background;
 
 beforeEach(() => {
   db = createTestDB();
   env = { DB: db };
   now = T0;
   attestOK = true;
+  pings = [];
+  pingStatus = 200;
+  background = [];
 });
+
+// Stands in for outbound fetch: records each hook ping.
+async function fakeFetch(url, init) {
+  pings.push({ url, headers: init.headers, body: JSON.parse(init.body) });
+  if (pingStatus === 0) throw new Error('network down');
+  return new Response(null, { status: pingStatus });
+}
+
+/** Runs the pings the relay handed to waitUntil. */
+async function settle() {
+  await Promise.all(background.splice(0));
+}
 
 async function call(method, path, { body, auth, headers = {} } = {}) {
   const h = new Headers({ 'X-App-Attest-Key-Id': 'key', 'X-App-Attest': 'assertion', ...headers });
@@ -42,7 +61,12 @@ async function call(method, path, { body, auth, headers = {} } = {}) {
       body: body === undefined ? undefined : JSON.stringify(body),
     }),
     env,
-    { now, verifyAssertion: async () => ({ valid: attestOK, reason: 'stub' }) },
+    {
+      now,
+      verifyAssertion: async () => ({ valid: attestOK, reason: 'stub' }),
+      fetch: fakeFetch,
+      waitUntil: (promise) => background.push(promise),
+    },
   );
   return { status: res.status, body: await res.json() };
 }
@@ -451,7 +475,7 @@ describe('helpers and routing', () => {
   });
 
   it('claims only relay paths', () => {
-    for (const p of ['/inboxes', '/inbox', '/inbox/ack', '/pair/code', '/pair/exchange', '/connections', '/connections/con_x']) {
+    for (const p of ['/inboxes', '/inbox', '/inbox/ack', '/pair/code', '/pair/exchange', '/agent', '/connections', '/connections/con_x']) {
       assert.ok(isRelayPath(p), p);
     }
     for (const p of ['/transcribe', '/health', '/attest', '/receipts', '/inbox/x/y']) assert.ok(!isRelayPath(p), p);
@@ -464,5 +488,180 @@ describe('helpers and routing', () => {
     assert.equal((await call('PUT', '/inbox')).status, 405);
     env = {};
     assert.equal((await call('GET', '/inbox')).status, 503);
+  });
+});
+
+describe('agent name', () => {
+  it('takes an optional name at pairing and shows it to the app', async () => {
+    const secret = await newInbox();
+    const { code } = (await call('POST', '/pair/code', { auth: secret })).body;
+    assert.equal((await call('POST', '/pair/exchange', { body: { code, name: '  Grok\nBot ' } })).status, 201);
+    const [c] = await connections(secret);
+    assert.equal(c.name, 'Grok Bot');
+    assert.equal(c.hook, null);
+  });
+
+  it('drops a bad name at pairing instead of failing', async () => {
+    const secret = await newInbox();
+    const { code } = (await call('POST', '/pair/code', { auth: secret })).body;
+    assert.equal((await call('POST', '/pair/exchange', { body: { code, name: 'x'.repeat(41) } })).status, 201);
+    assert.equal((await connections(secret))[0].name, null);
+  });
+
+  it('lets an agent rename itself later', async () => {
+    const secret = await newInbox();
+    const token = await connect(secret);
+    const res = await call('PATCH', '/agent', { auth: token, body: { name: 'Muse' } });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.name, 'Muse');
+    assert.equal((await connections(secret))[0].name, 'Muse');
+    assert.equal((await call('PATCH', '/agent', { auth: token, body: { name: '' } })).status, 400);
+    assert.equal((await call('GET', '/agent', { auth: token })).body.name, 'Muse');
+  });
+});
+
+describe('wake-up hooks', () => {
+  const HOOK = { url: 'https://hooks.example.com/run/abc', headers: { Authorization: 'Bearer key_123' } };
+
+  async function hooked() {
+    const secret = await newInbox();
+    const token = await connect(secret);
+    const res = await call('PATCH', '/agent', { auth: token, body: { hook: HOOK } });
+    assert.equal(res.status, 200);
+    pings = [];
+    return { secret, token };
+  }
+
+  it('sends a test ping when a hook is set, and reports its status', async () => {
+    const secret = await newInbox();
+    const token = await connect(secret);
+    const res = await call('PATCH', '/agent', { auth: token, body: { hook: HOOK } });
+    assert.equal(res.body.hook.last_status, 200);
+    assert.deepEqual(res.body.hook.header_names, ['Authorization']);
+    assert.ok(!JSON.stringify(res.body).includes('key_123'), 'header values are never echoed');
+    assert.equal(pings.length, 1);
+    assert.equal(pings[0].url, HOOK.url);
+    assert.equal(pings[0].headers.Authorization, 'Bearer key_123');
+    assert.equal(pings[0].body.event, 'ramble.test');
+
+    const [c] = await connections(secret);
+    assert.equal(c.hook.last_status, 200);
+    assert.ok(!('url' in c.hook), 'the app never sees the hook URL');
+  });
+
+  it('pings on a new note without the transcript text', async () => {
+    const { secret } = await hooked();
+    await upload(secret, 1);
+    await settle();
+    assert.equal(pings.length, 1);
+    assert.equal(pings[0].body.event, 'ramble.notes_waiting');
+    assert.equal(pings[0].body.pull_url, 'https://relay.test/inbox');
+    assert.ok(!JSON.stringify(pings[0].body).includes('thought 1'));
+  });
+
+  it("doesn't ping again for a resent upload", async () => {
+    const { secret } = await hooked();
+    await upload(secret, 1);
+    await upload(secret, 1);
+    await settle();
+    assert.equal(pings.length, 1);
+  });
+
+  it('holds further pings until the agent pulls, then pings again', async () => {
+    const { secret, token } = await hooked();
+    await upload(secret, 1);
+    await settle();
+    now += 1000;
+    await upload(secret, 2);
+    await settle();
+    assert.equal(pings.length, 1, 'the first ping is still unanswered');
+
+    now += 1000;
+    await pull(token);
+    now += 1000;
+    await upload(secret, 3);
+    await settle();
+    assert.equal(pings.length, 2, 'the agent pulled, so the next note pings');
+  });
+
+  it('pings again after the re-ping window if the agent never pulls', async () => {
+    const { secret } = await hooked();
+    await upload(secret, 1);
+    await settle();
+    now += HOOK_REPING_SECONDS * 1000;
+    await upload(secret, 2);
+    await settle();
+    assert.equal(pings.length, 2);
+  });
+
+  it('records a failed ping and keeps the note queued', async () => {
+    const { secret, token } = await hooked();
+    pingStatus = 0;
+    await upload(secret, 1);
+    await settle();
+    assert.equal((await connections(secret))[0].hook.last_status, 0);
+    assert.equal((await pull(token)).items.length, 1);
+  });
+
+  it('only pings agents that have a hook', async () => {
+    const { secret } = await hooked();
+    await connect(secret);
+    const res = await upload(secret, 1);
+    await settle();
+    assert.equal(res.body.queued, 2);
+    assert.equal(pings.length, 1);
+  });
+
+  it('removes a hook with null', async () => {
+    const { secret, token } = await hooked();
+    const res = await call('PATCH', '/agent', { auth: token, body: { hook: null } });
+    assert.equal(res.body.hook, null);
+    await upload(secret, 1);
+    await settle();
+    assert.equal(pings.length, 0);
+    assert.equal((await connections(secret))[0].hook, null);
+  });
+
+  it('needs the agent token', async () => {
+    const secret = await newInbox();
+    assert.equal((await call('PATCH', '/agent', { auth: secret, body: { hook: HOOK } })).status, 401);
+    assert.equal((await call('GET', '/agent')).status, 401);
+  });
+
+  it('rejects unsafe URLs and headers', () => {
+    const relay = 'https://relay.test';
+    assert.ok(!validateHook(HOOK, relay).error);
+    for (const url of [
+      'http://hooks.example.com/x',
+      'https://localhost/x',
+      'https://127.0.0.1/x',
+      'https://[::1]/x',
+      'https://printer.local/x',
+      'https://user:pw@hooks.example.com/x',
+      'https://relay.test/inbox',
+      'not a url',
+    ]) {
+      assert.ok(validateHook({ url }, relay).error, url);
+    }
+    assert.ok(validateHook({ url: HOOK.url, headers: { Host: 'x' } }, relay).error);
+    assert.ok(validateHook({ url: HOOK.url, headers: { 'X-A': 'a\r\nX-B: b' } }, relay).error);
+    assert.ok(validateHook({ url: HOOK.url, headers: { 'Bad Name': 'x' } }, relay).error);
+    assert.ok(validateHook({ url: HOOK.url, headers: { A: 1 } }, relay).error);
+    assert.ok(validateHook(null, relay).error);
+  });
+
+  it('cleans names', () => {
+    assert.equal(cleanName(' Grok   Bot '), 'Grok Bot');
+    assert.equal(cleanName(''), null);
+    assert.equal(cleanName(42), null);
+    assert.equal(cleanName('x'.repeat(41)), null);
+  });
+
+  it('decides when to ping', () => {
+    const base = { hook_url: 'https://h.example.com' };
+    assert.equal(shouldPing({ hook_url: null }, T0), false);
+    assert.equal(shouldPing({ ...base, hook_pinged_at: null }, T0), true);
+    assert.equal(shouldPing({ ...base, hook_pinged_at: T0, last_pull_at: T0 + 1 }, T0 + 2), true);
+    assert.equal(shouldPing({ ...base, hook_pinged_at: T0, last_pull_at: null }, T0 + 1), false);
   });
 });

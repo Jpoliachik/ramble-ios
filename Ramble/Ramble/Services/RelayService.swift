@@ -18,9 +18,26 @@ struct RelayPairCode: Decodable {
 
 struct RelayConnection: Decodable, Identifiable, Hashable {
     let id: String
+    /// What the agent called itself when it paired ("Grok Bot"). Optional.
+    let name: String?
     let createdAt: Date
     let lastPullAt: Date?
     let pending: Int
+    /// Set when the agent registered a wake-up webhook with the relay.
+    let hook: RelayHook?
+}
+
+/// An agent's wake-up webhook, as the relay reports it. The URL and headers
+/// stay on the relay; the app only sees whether the last ping worked.
+struct RelayHook: Decodable, Hashable {
+    let lastPingAt: Date?
+    /// HTTP status of the last ping; 0 means no response.
+    let lastStatus: Int?
+
+    var isFailing: Bool {
+        guard let lastStatus else { return false }
+        return !(200..<300).contains(lastStatus)
+    }
 }
 
 enum RelayError: LocalizedError {

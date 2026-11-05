@@ -18,6 +18,7 @@ const sectionsByPage: Record<DocsPage, Section[]> = {
     { id: "pairing", label: "Pairing" },
     { id: "agent-instructions", label: "Instructions for the agent" },
     { id: "checking", label: "Checking cheaply" },
+    { id: "wake-up-hook", label: "Wake-up hook" },
     { id: "api", label: "API" },
     { id: "connections", label: "Tokens and connections" },
     { id: "requests", label: "Making requests" },

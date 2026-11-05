@@ -16,8 +16,8 @@ Tap the watch and talk. The iPhone transcribes it and passes the text to your ag
 
 Relay: https://ramble-transcription-proxy.jpoliachik.workers.dev
 
-1. Pair. POST {"code": "<code>"} to /pair/exchange and save the returned "token". If the request times out or drops, send the same code again: for 10 minutes (until your first check) it returns the same token. A 400 means the code is wrong or expired; ask the user for a new one. The token is a password to the user's transcripts: anyone who has it can read and delete them. Store it the way your platform stores secrets, and keep it out of chat, memory, and logs.
-2. Separate checking from acting. Most checks find nothing, so the cost of this connection is the empty checks, not the transcripts. Make the check as cheap as you can: a small script, hook, or scheduled HTTP fetch that runs without the model, calls GET /inbox with `Authorization: Bearer <token>`, and wakes the agent only when "items" is not empty. Every 1 to 5 minutes is fine for a check like that. Only if your platform can't run anything without the agent, schedule a full agent run instead. Hourly or even daily is fine, since nothing expires for 30 days. Tell the user how often you'll check.
+1. Pair. POST {"code": "<code>", "name": "<your name, like Grok Bot>"} to /pair/exchange and save the returned "token". If the request times out or drops, send the same code again: for 10 minutes (until your first check) it returns the same token. A 400 means the code is wrong or expired; ask the user for a new one. The token is a password to the user's transcripts: anyone who has it can read and delete them. Store it the way your platform stores secrets, and keep it out of chat, memory, and logs.
+2. Separate checking from acting. Most checks find nothing, so the cost of this connection is the empty checks, not the transcripts. Make the check as cheap as you can: a small script, hook, or scheduled HTTP fetch that runs without the model, calls GET /inbox with `Authorization: Bearer <token>`, and wakes the agent only when "items" is not empty. Every 1 to 5 minutes is fine for a check like that. Only if your platform can't run anything without the agent, schedule a full agent run instead. Hourly or even daily is fine, since nothing expires for 30 days. Tell the user how often you'll check. If you can receive webhooks (an HTTPS URL that starts a run), also register a wake-up hook (below) so new notes reach you right away.
 3. Act. For each item, do what the user asked in "transcription". Read relative times ("in an hour", "tomorrow") from "created_at", the moment recording started, in the user's local offset. If that time has already passed, treat it as overdue and tell the user.
 4. Ack. POST {"ids": [...]} to /inbox/ack with the ids handled. This deletes them. Anything not acked comes back on the next check. If "has_more" is true, check again right away.
 5. Only 401 means stop. A 401 means the user disconnected you: stop checking and tell them. Anything else (403, 5xx, a timeout) is temporary: retry after 2, 5, then 15 seconds and keep your schedule.
@@ -26,7 +26,7 @@ Send a User-Agent header on every request (any name, like my-agent/1.0).
 
 ## Checking cheaply
 
-An empty inbox is the common case. The HTTP request is tiny; waking a whole agent to make it is not. Best: a watcher (script, hook, or scheduled fetch) that runs without the model and wakes the agent only when something is waiting. Fallback: a scheduled agent run, less often (hourly or daily is fine). If the agent has an always-on HTTPS URL that wakes it, a webhook (Part 2) avoids polling entirely.
+An empty inbox is the common case. The HTTP request is tiny; waking a whole agent to make it is not. Best: a watcher (script, hook, or scheduled fetch) that runs without the model and wakes the agent only when something is waiting. Fallback: a scheduled agent run, less often (hourly or daily is fine). If the agent has an HTTPS URL that wakes it, register it as a wake-up hook (next section) and the relay will call it when something is waiting.
 
 Example watcher, for cron or any scheduler. It prints the inbox only when the agent should wake:
 
@@ -47,14 +47,33 @@ esac
 echo "$body"
 ```
 
+## Wake-up hook (optional)
+
+If your platform gives you an HTTPS URL that starts a run (a webhook-triggered routine or automation), the relay can call it whenever a new note is waiting, so you don't need frequent checks. Register it once, after pairing:
+
+```
+PATCH /agent
+Authorization: Bearer rmba_…
+{"hook": {"url": "https://your-platform.example/run/abc", "headers": {"Authorization": "Bearer <your webhook key>"}}}
+→ {"name": "…", "hook": {"url": "…", "header_names": ["Authorization"], "last_ping_at": null, "last_status": 200}}
+```
+
+- The relay sends one test ping right away. "last_status" is its HTTP status; 2xx means it worked, 0 means no response.
+- Each ping is a POST with your headers and this JSON body: {"event": "ramble.notes_waiting", "text": "New Ramble notes are waiting. …", "pull_url": "…/inbox"} (the test ping's event is "ramble.test"). It never contains the transcript. When pinged, check the inbox, act, and ack as usual.
+- After a ping, the next one waits until you check the inbox (or 10 minutes pass), so a burst of notes is one run.
+- Pings are best effort: one try, no retries. Keep a slow scheduled check (daily is fine) as a backup.
+- Use "headers" for whatever your webhook needs: usually one Authorization header. HTTPS with a public hostname only; up to 8 headers.
+- {"hook": null} removes it. GET /agent shows what's registered (header values are never shown).
+
 ## API
 
 Relay: https://ramble-transcription-proxy.jpoliachik.workers.dev (every path below is relative to it).
 
 ```
 POST /pair/exchange
-{"code": "K7QX-MP4D"}
+{"code": "K7QX-MP4D", "name": "Grok Bot"}
 → 201 {"token": "rmba_…"}          (a retry with the same code: 200, same token)
+                                   ("name" is optional, up to 40 characters, shown to the user)
 
 GET /inbox
 Authorization: Bearer rmba_…
@@ -67,6 +86,11 @@ POST /inbox/ack
 Authorization: Bearer rmba_…
 {"ids": [41]}
 → {"deleted": 1}
+
+PATCH /agent                       (optional: rename yourself, set or remove a wake-up hook)
+Authorization: Bearer rmba_…
+{"name": "Grok Bot", "hook": {"url": "https://…", "headers": {"Authorization": "Bearer …"}}}
+→ {"name": "Grok Bot", "hook": {"url": "…", "header_names": [...], "last_ping_at": …, "last_status": 200}}
 ```
 
 - Up to 50 items per check, oldest first.
@@ -78,7 +102,7 @@ Authorization: Bearer rmba_…
 
 - The token doesn't expire. It works until the user taps Disconnect in Ramble, which also deletes anything waiting for that agent.
 - Each code makes its own connection, so several agents can be connected at once. Each gets its own copy of every transcript; acking deletes only your copy. Pairing a new agent leaves the others alone.
-- The user sees every connected agent in Settings → Connect agent, with when it last checked and how many transcripts are waiting.
+- The user sees every connected agent in Settings → Connect agent, with its name (if you sent one), when it last checked, and how many transcripts are waiting. They can disconnect each agent on its own.
 - Ramble sends only recordings made while at least one agent is connected.
 
 ## Making requests
@@ -152,6 +176,7 @@ Use either or both.
 Everything above works for any agent. Specifics we know about:
 
 - Muse: use a hook (a small script watches the inbox and wakes the agent when something arrives), not a scheduled agent run every few minutes.
+- Grok Bot: add a routine with a webhook trigger and register its URL and key as a wake-up hook (headers {"Authorization": "Bearer <key>"}). Grok shows the URL and key in the routine's Webhook section. Add a daily scheduled check as a backup. Each routine run uses Grok usage, so avoid a schedule every few minutes.
 - Agents in a sandbox with a network allowlist: add ramble-transcription-proxy.jpoliachik.workers.dev to the allowed hosts, or every request fails before it leaves the sandbox.
 
 # Part 2: Webhook API

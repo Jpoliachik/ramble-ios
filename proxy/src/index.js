@@ -89,7 +89,7 @@ export default {
     console.log(`[relay] expired entries=${result.entries} pair_codes=${result.pairCodes}`);
   },
 
-  async fetch(request, env) {
+  async fetch(request, env, executionCtx) {
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: corsHeaders() });
     }
@@ -114,7 +114,9 @@ export default {
     }
 
     if (isRelayPath(url.pathname)) {
-      return handleRelayRequest(request, env);
+      return handleRelayRequest(request, env, {
+        waitUntil: executionCtx ? (promise) => executionCtx.waitUntil(promise) : undefined,
+      });
     }
 
     if (url.pathname === '/health') {
