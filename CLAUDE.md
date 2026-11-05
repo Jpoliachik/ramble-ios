@@ -138,9 +138,14 @@ Thin stateless Cloudflare Worker. Receives audio, forwards to transcription prov
 | Model             | Provider | Strength                                      |
 | ----------------- | -------- | --------------------------------------------- |
 | Whisper v3 Turbo  | Groq     | Fast and accurate — best all-around (default) |
-| Whisper Large v3  | Groq     | Best for accents and multilingual audio       |
+| Whisper Large v3  | Groq     | Best for non-English languages                |
 | Nova-3            | Deepgram | Strong English accuracy, smart formatting     |
-| GPT-Transcribe    | OpenAI   | Highest accuracy on noisy real-world audio    |
+| GPT-Transcribe    | OpenAI   | Most accurate overall (slower, pricier)       |
+
+Basis (Artificial Analysis AA-WER, Nov 2026): GPT-Transcribe 3.3%, Whisper
+v3 Turbo 4.6%, Nova-3 5.2%. Turbo is ~7x cheaper than Nova-3/GPT-Transcribe.
+Don't claim a model is best for noise or accents: no independent benchmark
+backs that for these four.
 
 ## Pre-Launch Checklist
 

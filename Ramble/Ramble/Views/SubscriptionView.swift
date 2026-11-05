@@ -77,7 +77,7 @@ struct SubscriptionView: View {
             BrandFeatureRow(
                 icon: "slider.horizontal.3",
                 title: "Pick the model that fits",
-                subtitle: "Speed, accents, multilingual — your call"
+                subtitle: "Speed, accuracy, languages — your call"
             )
             BrandRowDivider()
             BrandFeatureRow(

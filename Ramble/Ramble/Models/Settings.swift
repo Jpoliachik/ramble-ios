@@ -198,9 +198,9 @@ enum CloudModel: String, Codable, CaseIterable, Identifiable {
     var subtitle: String {
         switch self {
         case .whisperLargeV3Turbo: return "Fast & accurate default"
-        case .whisperLargeV3: return "Accents & multilingual"
+        case .whisperLargeV3: return "Best for other languages"
         case .deepgramNova3: return "Clean English formatting"
-        case .openAIGPTTranscribe: return "Best for noisy audio"
+        case .openAIGPTTranscribe: return "Most accurate"
         }
     }
 
