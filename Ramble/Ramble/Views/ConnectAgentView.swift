@@ -49,10 +49,13 @@ struct ConnectAgentView: View {
             .animation(.smooth, value: isPairing)
             .background(Color(.systemGroupedBackground))
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    // Button(role: .close) is iOS 26-only; the iOS target is
-                    // 18.6, so use a plain button to keep the build compiling.
-                    Button("Close") { dismiss() }
+                // The Connect flow has its own Cancel at the bottom.
+                if !isPairing {
+                    ToolbarItem(placement: .confirmationAction) {
+                        // Button(role: .close) is iOS 26-only; the iOS target is
+                        // 18.6, so use a plain button to keep the build compiling.
+                        Button("Close") { dismiss() }
+                    }
                 }
             }
             .confirmationDialog(
@@ -110,7 +113,7 @@ struct ConnectAgentView: View {
                     .font(.system(size: 32, design: .serif).weight(.medium))
                     .tracking(-0.3)
                     .foregroundStyle(Color.obInk)
-                    .padding(.horizontal, 4)
+                    .padding(.horizontal, 20)
                     .padding(.top, 8)
                     .padding(.bottom, 8)
 

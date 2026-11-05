@@ -34,6 +34,7 @@ struct SettingsView: View {
                 aboutSection
             }
             .listSectionSpacing(24)
+            .tint(Color.brandAmber)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -58,7 +59,7 @@ struct SettingsView: View {
             .task {
                 watchState = WatchInstallState.current()
                 guard relay.hasInbox else { return }
-                try? await relay.refreshConnections()
+                _ = try? await relay.refreshConnections()
             }
         }
     }
@@ -287,10 +288,11 @@ struct SettingsView: View {
         }
     }
 
+    /// Matches the system NavigationLink chevron on the other rows.
     private var chevron: some View {
         Image(systemName: "chevron.right")
-            .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(Color.obInkFaint)
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(Color(.tertiaryLabel))
     }
 }
 
