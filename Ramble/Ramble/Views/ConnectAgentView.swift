@@ -347,20 +347,21 @@ private struct AgentStatusCard: View {
                     .foregroundStyle(Color.obInk)
                 Spacer(minLength: 8)
                 if let onDisconnect {
-                    Button("Disconnect", role: .destructive, action: onDisconnect)
+                    // Quiet grey: the confirmation dialog carries the red.
+                    Button("Disconnect", action: onDisconnect)
                         .font(.system(size: 14))
                         .buttonStyle(.plain)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Color.obInkFaint)
                 }
             }
             Text(AgentHealth.summary(connection))
                 .font(.system(size: 15))
                 .foregroundStyle(Color.obInkSoft)
             if let hook = connection.hook {
-                Label(
-                    hook.isFailing ? "Wake-up hook isn't answering" : "Wakes up when a note arrives",
-                    systemImage: hook.isFailing ? "bolt.slash" : "bolt.fill"
-                )
+                HStack(spacing: 4) {
+                    Image(systemName: hook.isFailing ? "bolt.slash" : "bolt.fill")
+                    Text(hook.isFailing ? "Wake-up hook isn't answering" : "Wakes up when a note arrives")
+                }
                 .font(.system(size: 13))
                 .foregroundStyle(hook.isFailing ? Color.connectAmberText : Color.obInkFaint)
             }

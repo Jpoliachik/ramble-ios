@@ -112,12 +112,17 @@ struct SettingsView: View {
         guard let connection = primaryConnection else {
             return relay.hasConnectedAgents ? "Connected" : "Not connected"
         }
-        // With several agents, say which one this line is about.
-        let prefix = relay.connections.count > 1 ? "\(AgentHealth.displayName(connection)): " : ""
-        if AgentHealth(connection) == .quiet, let last = connection.lastPullAt {
-            return prefix + "Hasn't checked in · \(HomeStatusLine.age(since: last))"
+        // Several agents: name the one that needs attention, or just count them.
+        if relay.connections.count > 1 {
+            if AgentHealth(connection) == .quiet {
+                return "\(AgentHealth.displayName(connection)) hasn't checked in"
+            }
+            return "\(relay.connections.count) agents connected"
         }
-        return prefix + AgentHealth.summary(connection)
+        if AgentHealth(connection) == .quiet, let last = connection.lastPullAt {
+            return "Hasn't checked in · \(HomeStatusLine.age(since: last))"
+        }
+        return AgentHealth.summary(connection)
     }
 
     private var agentDot: Color {
