@@ -18,6 +18,8 @@ import {
   retentionSeconds,
   validateUpload,
   validateHook,
+  sealHeaders,
+  openHeaders,
   cleanName,
   shouldPing,
   HOOK_REPING_SECONDS,
@@ -620,6 +622,30 @@ describe('wake-up hooks', () => {
     await settle();
     assert.equal(pings.length, 0);
     assert.equal((await connections(secret))[0].hook, null);
+  });
+
+  it('encrypts hook headers at rest when HOOK_ENCRYPTION_KEY is set', async () => {
+    env.HOOK_ENCRYPTION_KEY = 'test-secret';
+    const { secret, token } = await hooked();
+    const stored = db.sqlite.prepare('SELECT hook_headers FROM connections').get().hook_headers;
+    assert.match(stored, /^enc:v1:/);
+    assert.ok(!stored.includes('key_123'));
+    assert.deepEqual((await call('GET', '/agent', { auth: token })).body.hook.header_names, ['Authorization']);
+    await upload(secret, 1);
+    await settle();
+    assert.equal(pings[0].headers.Authorization, 'Bearer key_123');
+
+    // Wrong key: nothing leaks and nothing throws, the ping just goes without it.
+    assert.deepEqual(await openHeaders(stored, { HOOK_ENCRYPTION_KEY: 'other' }), {});
+    assert.deepEqual(await openHeaders(stored, {}), {});
+  });
+
+  it('round-trips sealed headers and still reads plain ones', async () => {
+    const env2 = { HOOK_ENCRYPTION_KEY: 'k' };
+    const headers = { Authorization: 'Bearer x' };
+    assert.deepEqual(await openHeaders(await sealHeaders(headers, env2), env2), headers);
+    assert.deepEqual(await openHeaders(JSON.stringify(headers), env2), headers);
+    assert.equal(await sealHeaders(headers, {}), JSON.stringify(headers));
   });
 
   it('needs the agent token', async () => {

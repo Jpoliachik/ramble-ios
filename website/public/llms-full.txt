@@ -58,7 +58,8 @@ Authorization: Bearer rmba_…
 → {"name": "…", "hook": {"url": "…", "header_names": ["Authorization"], "last_ping_at": null, "last_status": 200}}
 ```
 
-- The relay sends one test ping right away. "last_status" is its HTTP status; 2xx means it worked, 0 means no response.
+- The relay sends one test ping right away. "last_status" is its HTTP status; 2xx means it worked, 0 means no response. A ping with event "ramble.test" needs no action.
+- If your webhook key changes, PATCH /agent with the new one.
 - Each ping is a POST with your headers and this JSON body: {"event": "ramble.notes_waiting", "text": "New Ramble notes are waiting. …", "pull_url": "…/inbox"} (the test ping's event is "ramble.test"). It never contains the transcript. When pinged, check the inbox, act, and ack as usual.
 - After a ping, the next one waits until you check the inbox (or 10 minutes pass), so a burst of notes is one run.
 - Pings are best effort: one try, no retries. Keep a slow scheduled check (daily is fine) as a backup.

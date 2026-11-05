@@ -334,7 +334,7 @@ async function ack(request, ctx) {
 async function getAgent(request, ctx) {
   const connection = await authAgent(request, ctx);
   if (!connection) return unauthorized();
-  return json(agentView(connection));
+  return json(await agentView(connection, ctx.env));
 }
 
 /**
@@ -376,7 +376,7 @@ async function updateAgent(request, ctx) {
     } else {
       hook = validateHook(body.hook, ctx.origin);
       if (hook.error) return json({ error: hook.error }, 400);
-      const headers = JSON.stringify(hook.headers);
+      const headers = await sealHeaders(hook.headers, ctx.env);
       updates.push(
         ctx.db
           .prepare(
@@ -394,16 +394,16 @@ async function updateAgent(request, ctx) {
     const status = await pingHook(connection, ctx, 'ramble.test');
     connection.hook_status = status;
   }
-  return json(agentView(connection));
+  return json(await agentView(connection, ctx.env));
 }
 
-function agentView(c) {
+async function agentView(c, env) {
   return {
     name: c.name ?? null,
     hook: c.hook_url
       ? {
           url: c.hook_url,
-          header_names: Object.keys(JSON.parse(c.hook_headers || '{}')),
+          header_names: Object.keys(await openHeaders(c.hook_headers, env)),
           last_ping_at: c.hook_pinged_at ? iso(c.hook_pinged_at) : null,
           last_status: c.hook_status ?? null,
         }
@@ -433,7 +433,7 @@ async function pingHook(c, ctx, event = 'ramble.notes_waiting') {
   const pullURL = `${ctx.origin}/inbox`;
   const text =
     event === 'ramble.test'
-      ? 'Ramble test ping: your wake-up hook works. Nothing new to pick up.'
+      ? 'Ramble test ping: your wake-up hook works. Nothing new to pick up, no action needed.'
       : `New Ramble notes are waiting. Pull them from ${pullURL} with your Ramble token, handle them, then ack.`;
   let status = 0;
   try {
@@ -444,7 +444,7 @@ async function pingHook(c, ctx, event = 'ramble.notes_waiting') {
     const res = await ctx.fetch(c.hook_url, {
       method: 'POST',
       headers: {
-        ...JSON.parse(c.hook_headers || '{}'),
+        ...(await openHeaders(c.hook_headers, ctx.env)),
         'Content-Type': 'application/json',
         'User-Agent': 'Ramble-Relay/1 (+https://ramble.watch/docs)',
       },
@@ -462,6 +462,44 @@ async function pingHook(c, ctx, event = 'ramble.notes_waiting') {
     // Best effort: a lost status only affects what the app displays.
   }
   return status;
+}
+
+// Hook headers usually hold a key that starts the agent's runs, so they're
+// encrypted at rest (AES-GCM) when the Worker has HOOK_ENCRYPTION_KEY set.
+// Without it they're stored as plain JSON. Reads handle both.
+const SEALED_PREFIX = 'enc:v1:';
+
+async function hookCryptoKey(env) {
+  if (!env.HOOK_ENCRYPTION_KEY) return null;
+  const raw = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(env.HOOK_ENCRYPTION_KEY));
+  return crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']);
+}
+
+const toB64 = (bytes) => btoa(String.fromCharCode(...new Uint8Array(bytes)));
+const fromB64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+
+export async function sealHeaders(headers, env) {
+  const plain = JSON.stringify(headers);
+  const key = await hookCryptoKey(env);
+  if (!key) return plain;
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const sealed = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(plain));
+  return `${SEALED_PREFIX}${toB64(iv)}.${toB64(sealed)}`;
+}
+
+/** Never throws: unreadable headers come back empty, and the ping then fails visibly. */
+export async function openHeaders(stored, env) {
+  if (!stored) return {};
+  try {
+    if (!stored.startsWith(SEALED_PREFIX)) return JSON.parse(stored);
+    const key = await hookCryptoKey(env);
+    if (!key) return {};
+    const [iv, data] = stored.slice(SEALED_PREFIX.length).split('.');
+    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromB64(iv) }, key, fromB64(data));
+    return JSON.parse(new TextDecoder().decode(plain));
+  } catch {
+    return {};
+  }
 }
 
 const RESERVED_HEADERS = new Set([

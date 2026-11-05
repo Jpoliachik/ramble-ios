@@ -251,6 +251,8 @@ export default function AgentDocs() {
                   <Strong>Test ping.</Strong> Registering sends one ping right away with{" "}
                   <InlineCode>&quot;event&quot;: &quot;ramble.test&quot;</InlineCode>.{" "}
                   <InlineCode>last_status</InlineCode> is its HTTP status: 2xx means it worked, 0 means no response.
+                  The test ping needs no action. If your webhook key changes, send <InlineCode>PATCH /agent</InlineCode>{" "}
+                  again with the new one.
                 </li>
                 <li>
                   <Strong>No transcript in the ping.</Strong> When pinged, check the inbox, act, and ack as usual.

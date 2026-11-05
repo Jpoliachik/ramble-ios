@@ -17,7 +17,7 @@ It runs in the same Cloudflare Worker as the [transcription proxy](README.md), w
 | Connection | random id, inbox id, hash of the agent's token, created and last-pull times; optionally the name the agent gave itself and its wake-up hook (URL, headers, last ping time and status) | you tap Disconnect |
 | Transcript | recording id, recorded-at time, received time, duration, text, expiry (one copy per connected agent) | the agent acks it, you disconnect, you tap Delete everything, or 30 days pass |
 
-No accounts, emails, names, IP addresses, or audio. Credentials are stored only as SHA-256 hashes, with one exception: a freshly issued agent token sits next to its pairing code until the agent first pulls with it (at most 10 minutes), so a retried exchange gets the same token back. An agent's wake-up hook headers are also stored as given, because the relay has to send them back out. They can only start that agent's own run, which then pulls with its separate token.
+No accounts, emails, names, IP addresses, or audio. Credentials are stored only as SHA-256 hashes, with one exception: a freshly issued agent token sits next to its pairing code until the agent first pulls with it (at most 10 minutes), so a retried exchange gets the same token back. An agent's wake-up hook headers can't be hashed, because the relay has to send them back out. They're encrypted at rest with AES-GCM when the Worker has the `HOOK_ENCRYPTION_KEY` secret (`npx wrangler secret put HOOK_ENCRYPTION_KEY`, any long random string), and stored as plain JSON without it. They can only start that agent's own run, which then pulls with its separate token.
 
 ## Authentication
 
