@@ -2,8 +2,10 @@
 //  WatchRecordingsListView.swift
 //  watch Watch App
 //
+//  Recent notes, grouped by what needs you. Counts and reasons live here,
+//  not on the home screen.
+//
 
-import Combine
 import SwiftUI
 
 struct WatchRecordingsListView: View {
@@ -12,58 +14,131 @@ struct WatchRecordingsListView: View {
     @StateObject private var connectivity = WatchConnectivityService.shared
 
     var body: some View {
+        let notes = WatchDelivery.notes()
+        let needsYou = notes.filter { $0.state.needsYou }
+        let waiting = notes.filter { $0.state == .waiting || $0.state == .moving }
+        let onPhone = notes.filter { $0.state == .onPhone }
+
         Group {
-            if history.entries.isEmpty {
+            if notes.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "waveform")
                         .font(.title2)
-                        .foregroundStyle(.secondary)
-                    Text("No recordings yet")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Text("No notes yet")
+                        .font(.footnote)
                 }
+                .foregroundStyle(.secondary)
             } else {
                 List {
-                    Section {
-                        ForEach(history.entries) { entry in
-                            WatchRecordingRow(
-                                entry: entry,
-                                state: .resolve(entry, syncQueue: syncQueue, connectivity: connectivity)
-                            )
+                    if !needsYou.isEmpty {
+                        Section {
+                            ForEach(needsYou) { WatchRecordingRow(entry: $0.entry, state: $0.state) }
+                        } header: {
+                            Text("Needs you · \(needsYou.count)").foregroundStyle(.red)
                         }
-                    } footer: {
-                        if !syncQueue.jobs.isEmpty {
-                            Text("Recordings stay on your watch until your iPhone has them.")
+                    }
+                    if !waiting.isEmpty {
+                        Section("Waiting · \(waiting.count)") {
+                            ForEach(waiting) { WatchRecordingRow(entry: $0.entry, state: $0.state) }
+                        }
+                    }
+                    if !onPhone.isEmpty {
+                        Section("On iPhone") {
+                            ForEach(onPhone) { WatchRecordingRow(entry: $0.entry, state: $0.state) }
                         }
                     }
                 }
             }
         }
         .navigationTitle("Recent")
+        .onAppear {
+            // Seeing a lost note is all there is to do about it
+            let lost = notes.filter { $0.state == .lost }.map(\.id)
+            history.markLostSeen(lost)
+        }
     }
 }
 
 struct WatchRecordingRow: View {
     let entry: WatchRecordingHistoryEntry
-    let state: WatchRecordingState
+    let state: WatchDeliveryState
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack {
+        HStack(spacing: 8) {
+            icon
+                .frame(width: 18)
+            VStack(alignment: .leading, spacing: 1) {
                 Text(entry.createdAt, format: .dateTime.month(.abbreviated).day().hour().minute())
-                    .font(.caption)
-                    .fontWeight(.medium)
-                Spacer()
-                Text(WatchFormat.duration(entry.duration))
-                    .font(.caption2)
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
+                    .font(.footnote.weight(.medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                if let reason {
+                    Text(reason)
+                        .font(.caption2)
+                        .foregroundStyle(.red)
+                }
             }
-            Label(state.label, systemImage: state.symbol)
+            Spacer(minLength: 2)
+            Text(WatchFormat.duration(entry.duration))
                 .font(.caption2)
-                .foregroundStyle(state.tint)
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
         }
         .accessibilityElement(children: .combine)
+        .accessibilityValue(accessibilityState)
+    }
+
+    @ViewBuilder
+    private var icon: some View {
+        switch state {
+        case .onPhone:
+            Image(systemName: "checkmark.circle").foregroundStyle(.secondary)
+        case .moving:
+            ProgressView().controlSize(.mini)
+        case .waiting:
+            Image(systemName: "clock").foregroundStyle(.secondary)
+        case .stuck, .lost:
+            Image(systemName: "exclamationmark.circle").foregroundStyle(.red)
+        }
+    }
+
+    private var reason: String? {
+        switch state {
+        case .stuck(let since): return WatchFormat.waitingReason(since: since)
+        case .lost: return "Audio lost"
+        default: return nil
+        }
+    }
+
+    private var accessibilityState: String {
+        switch state {
+        case .onPhone: return "On iPhone"
+        case .moving: return "Sending to iPhone"
+        case .waiting: return "Waiting for iPhone"
+        case .stuck(let since): return WatchFormat.waitingReason(since: since)
+        case .lost: return "Audio lost"
+        }
+    }
+}
+
+/// The words behind a bar alert: what happened and how to fix it.
+struct WatchAlertDetailView: View {
+    let alert: WatchAlert
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 8) {
+                Label(alert.detailTitle, systemImage: alert.symbol)
+                    .font(.headline)
+                    .foregroundStyle(alert.isBlocking ? Color.red : Color.primary)
+                ForEach(alert.detailBody, id: \.self) { paragraph in
+                    Text(paragraph)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 }
 
