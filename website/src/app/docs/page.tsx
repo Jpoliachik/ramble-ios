@@ -16,9 +16,12 @@ const AGENT_INSTRUCTIONS = `Ramble connection
 Relay: ${RELAY_URL}
 
 1. Pair. When I give you a code like ${PAIR_CODE_EXAMPLE}, POST {"code": "<the code>"}
-   to /pair/exchange and save the returned "token" as a secret. If that request
-   times out or drops, send the same code again: for ${PAIR_CODE_TTL} it returns the
-   same token. A 400 means the code is wrong or expired, so ask me for a new one.
+   to /pair/exchange and save the returned "token". If that request times out or
+   drops, send the same code again: for ${PAIR_CODE_TTL} it returns the same token.
+   A 400 means the code is wrong or expired, so ask me for a new one.
+   The token is a password to my transcripts: anyone who has it can read and
+   delete them. Store it the way your platform stores secrets, and keep it out
+   of chat, memory, and logs.
 
 2. Separate checking from acting. Most checks find nothing, so the cost of this
    connection is the empty checks, not the transcripts. Make the check as cheap
