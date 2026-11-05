@@ -217,6 +217,8 @@ private struct WatchAlertLabel: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
+        // Read once here: the keyframe closure is Sendable and can't touch the environment
+        let shakes = !reduceMotion
         Button(action: action) {
             HStack(spacing: 3) {
                 Image(systemName: alert.symbol)
@@ -234,7 +236,7 @@ private struct WatchAlertLabel: View {
         }
         .buttonStyle(.plain)
         .keyframeAnimator(initialValue: CGFloat(0), trigger: nudge) { content, offset in
-            content.offset(x: reduceMotion ? 0 : offset)
+            content.offset(x: shakes ? offset : 0)
         } keyframes: { _ in
             KeyframeTrack {
                 LinearKeyframe(-5, duration: 0.06)
