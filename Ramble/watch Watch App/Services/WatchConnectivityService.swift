@@ -6,6 +6,7 @@
 import Combine
 import Foundation
 import WatchConnectivity
+import WatchKit
 
 @MainActor
 final class WatchConnectivityService: NSObject, ObservableObject {
@@ -43,13 +44,21 @@ final class WatchConnectivityService: NSObject, ObservableObject {
         let recordingId: String
         let createdAt: Date
         let duration: TimeInterval
+        /// Per-hop timing for the phone's activity log. Optional, so either
+        /// side can be on an older build.
+        var firstSentAt: Date?
+        var sentAt: Date?
+        var attempt: Int?
     }
 
     // MARK: - File Transfer (via persistent queue)
 
     /// How long a handed-off recording waits for the phone's receipt before
     /// it's sent again. The phone ignores duplicates, so resending is safe.
-    static let receiptTimeout: TimeInterval = 15 * 60
+    /// Most receipts now come back within seconds, in the reply to a wake
+    /// message (see `wakePhone`), so this only covers a phone that got the
+    /// file but couldn't save it.
+    static let receiptTimeout: TimeInterval = 5 * 60
 
     func transferJob(_ job: WatchSyncJob) {
         guard WCSession.default.activationState == .activated,
@@ -61,10 +70,14 @@ final class WatchConnectivityService: NSObject, ObservableObject {
             return // Delivered; waiting for the phone to say it saved it
         }
 
+        let sent = syncQueue.markSent(jobId: job.id) ?? job
         let metadata = RecordingMetadata(
             recordingId: job.id.uuidString,
             createdAt: job.createdAt,
-            duration: job.duration
+            duration: job.duration,
+            firstSentAt: sent.firstSentAt,
+            sentAt: sent.lastSentAt,
+            attempt: sent.sendCount
         )
         guard let metadataData = try? JSONEncoder().encode(metadata),
               let metadataString = String(data: metadataData, encoding: .utf8)
@@ -75,6 +88,80 @@ final class WatchConnectivityService: NSObject, ObservableObject {
             metadata: ["recording": metadataString]
         )
         activeTransfers[transfer] = job.id
+        // transferFile alone is delivered whenever the system likes, and a
+        // locked iPhone may not hand it to Ramble until it's opened (seen:
+        // 40 minutes). A message wakes Ramble on the phone right away.
+        wakePhone()
+        scheduleBackgroundRetryIfNeeded()
+    }
+
+    // MARK: - Waking the phone
+
+    private var lastWakeAt: Date?
+
+    /// Sends a small message that launches Ramble on the iPhone in the
+    /// background, so a file sitting in WatchConnectivity's queue reaches
+    /// the app now instead of when the phone is next opened. The reply holds
+    /// the ids the phone already saved, which count as receipts.
+    /// Only works while the watch app is running and the phone is in reach;
+    /// otherwise transferFile still gets there on its own schedule.
+    func wakePhone(force: Bool = false) {
+        let session = WCSession.default
+        guard session.activationState == .activated, session.isReachable else { return }
+        let ids = syncQueue.jobs.map(\.id.uuidString)
+        guard !ids.isEmpty else { return }
+        if !force, let lastWakeAt, Date().timeIntervalSince(lastWakeAt) < 3 { return }
+        lastWakeAt = Date()
+        Self.sendWake(recordingIds: ids)
+    }
+
+    /// Nonisolated so the reply and error handlers, which WatchConnectivity
+    /// calls on its own queue, aren't tied to the main actor.
+    private nonisolated static func sendWake(recordingIds: [String]) {
+        WCSession.default.sendMessage(
+            ["type": "wake", "recordingIds": recordingIds],
+            replyHandler: { reply in
+                guard let ids = receiptIDs(in: reply), !ids.isEmpty else { return }
+                Task { @MainActor in
+                    WatchConnectivityService.shared.handleReceipts(ids)
+                }
+            },
+            errorHandler: { error in
+                print("Wake message to iPhone failed: \(error)")
+            }
+        )
+    }
+
+    // MARK: - Background retry
+
+    static let backgroundRetryTaskID = "dev.goodloop.ramble.watch.retry"
+    private static let backgroundRetryInterval: TimeInterval = 10 * 60
+    private var backgroundRetryDate: Date?
+
+    /// The in-app retry timer is a Task.sleep, which never fires while
+    /// watchOS has the app suspended. A background refresh gives the queue
+    /// another pass (resend after the receipt timeout, pick up receipts)
+    /// even if the app isn't opened again.
+    func scheduleBackgroundRetryIfNeeded() {
+        guard !syncQueue.jobs.isEmpty else { return }
+        if let backgroundRetryDate, backgroundRetryDate > Date() { return }
+        let date = Date().addingTimeInterval(Self.backgroundRetryInterval)
+        backgroundRetryDate = date
+        WKApplication.shared().scheduleBackgroundRefresh(
+            withPreferredDate: date,
+            userInfo: Self.backgroundRetryTaskID as NSString
+        ) { error in
+            if let error { print("Couldn't schedule watch background retry: \(error)") }
+        }
+    }
+
+    /// Runs from the app refresh background task (see watchApp).
+    func runBackgroundRetry() async {
+        backgroundRetryDate = nil
+        await waitForPendingContent()
+        syncQueue.pruneOrphanedJobs()
+        retryPendingTransfers()
+        scheduleBackgroundRetryIfNeeded()
     }
 
     func retryPendingTransfers() {
@@ -95,6 +182,10 @@ final class WatchConnectivityService: NSObject, ObservableObject {
         for job in syncQueue.jobs {
             transferJob(job)
         }
+        // Files already handed off are skipped above, but the phone may be
+        // holding them unopened. Wake it either way.
+        wakePhone()
+        scheduleBackgroundRetryIfNeeded()
     }
 
     private func recordingId(for transfer: WCSessionFileTransfer) -> UUID? {
@@ -144,6 +235,10 @@ final class WatchConnectivityService: NSObject, ObservableObject {
             // stays until the phone's receipt says it's safe.
             syncQueue.markHandedOff(jobId: jobId)
             scheduleRetry(afterSeconds: Self.receiptTimeout + 5)
+            // The file is on the phone now. Wake Ramble there so it saves
+            // it and replies with the receipt, even if the earlier wake
+            // landed before the file did.
+            wakePhone(force: true)
         }
     }
 

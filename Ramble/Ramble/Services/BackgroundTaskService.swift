@@ -27,9 +27,24 @@ final class BackgroundTaskService {
 
     // MARK: - Immediate Background Processing
 
+    /// Holds the background task open even with no queued work, so a file
+    /// the watch is about to deliver lands while Ramble is still awake.
+    private var keepAliveUntil: Date = .distantPast
+
+    private var hasActiveWork: Bool {
+        TranscriptionQueueService.shared.hasActiveWork
+            || WebhookQueueService.shared.hasActiveWork
+            || RelayQueueService.shared.hasActiveWork
+    }
+
     /// Begin a UIKit background task for immediate execution time (~30s).
     /// Call this when entering background to finish in-flight transcription + webhook work.
-    func beginImmediateBackgroundProcessing() {
+    /// `keepAliveFor` keeps it running that long even when the queues are
+    /// empty (used when the watch wakes Ramble ahead of a file).
+    func beginImmediateBackgroundProcessing(keepAliveFor: TimeInterval = 0) {
+        if keepAliveFor > 0 {
+            keepAliveUntil = max(keepAliveUntil, Date().addingTimeInterval(keepAliveFor))
+        }
         guard backgroundTaskID == .invalid else {
             print("[Background] Immediate background task already active")
             return
@@ -56,18 +71,24 @@ final class BackgroundTaskService {
             webhookQueue.resumePendingJobs()
             relayQueue.resumePendingJobs()
 
-            while transcriptionQueue.hasActiveWork || webhookQueue.hasActiveWork || relayQueue.hasActiveWork {
-                let remaining = UIApplication.shared.backgroundTimeRemaining
-                if remaining < 5 {
-                    print("[Background] Running low on time (\(String(format: "%.0f", remaining))s), stopping")
-                    break
+            // Loops again if work arrived while pickups were refreshing,
+            // since a second call returns early while this task is open.
+            var outOfTime = false
+            repeat {
+                while self.hasActiveWork || Date() < self.keepAliveUntil {
+                    let remaining = UIApplication.shared.backgroundTimeRemaining
+                    if remaining < 5 {
+                        print("[Background] Running low on time (\(String(format: "%.0f", remaining))s), stopping")
+                        outOfTime = true
+                        break
+                    }
+                    try? await Task.sleep(nanoseconds: 500_000_000)
                 }
-                try? await Task.sleep(nanoseconds: 500_000_000)
-            }
-            if UIApplication.shared.backgroundTimeRemaining > 10 {
-                await relayQueue.refreshPickups()
-            }
-            DeliveryMonitor.shared.evaluate()
+                if !outOfTime, UIApplication.shared.backgroundTimeRemaining > 10 {
+                    await relayQueue.refreshPickups()
+                }
+                DeliveryMonitor.shared.evaluate()
+            } while !outOfTime && self.hasActiveWork
 
             print("[Background] Immediate background processing finished")
             self.endImmediateBackgroundProcessing()

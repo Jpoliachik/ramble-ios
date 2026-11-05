@@ -16,7 +16,7 @@ struct WatchRecordingsListView: View {
     var body: some View {
         let notes = WatchDelivery.notes()
         let needsYou = notes.filter { $0.state.needsYou }
-        let waiting = notes.filter { $0.state == .waiting || $0.state == .moving }
+        let waiting = notes.filter { [.waiting, .moving, .reachedPhone].contains($0.state) }
         let onPhone = notes.filter { $0.state == .onPhone }
 
         Group {
@@ -97,6 +97,8 @@ struct WatchRecordingRow: View {
             ProgressView().controlSize(.mini)
         case .waiting:
             Image(systemName: "clock").foregroundStyle(.secondary)
+        case .reachedPhone:
+            Image(systemName: "iphone").foregroundStyle(.secondary)
         case .stuck, .lost:
             Image(systemName: "exclamationmark.circle").foregroundStyle(.red)
         }
@@ -115,6 +117,7 @@ struct WatchRecordingRow: View {
         case .onPhone: return "On iPhone"
         case .moving: return "Sending to iPhone"
         case .waiting: return "Waiting for iPhone"
+        case .reachedPhone: return "Reached iPhone, waiting for Ramble to save it"
         case .stuck(let since): return WatchFormat.waitingReason(since: since)
         case .lost: return "Audio lost"
         }
