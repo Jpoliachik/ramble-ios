@@ -91,11 +91,11 @@ private struct TrySayingView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private static let ideas = [
-        "\u{201C}Reply to Sarah\u{2019}s email. Thursday works.\u{201D}",
-        "\u{201C}Find a time with Dan next week and invite him.\u{201D}",
-        "\u{201C}Add this to my project notes and draft a follow-up.\u{201D}",
-        "\u{201C}Catch me up on the Acme thread before my 2pm.\u{201D}",
-        "\u{201C}Pull last week\u{2019}s numbers and send them to the team.\u{201D}",
+        "\u{201C}Tell Sarah Thursday works.\u{201D}",
+        "\u{201C}Find a time with Dan next week.\u{201D}",
+        "\u{201C}Add this to my project notes.\u{201D}",
+        "\u{201C}Catch me up on the Acme thread.\u{201D}",
+        "\u{201C}Send the team last week\u{2019}s numbers.\u{201D}",
     ]
     private static let interval: TimeInterval = 3.5
 
