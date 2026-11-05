@@ -85,16 +85,17 @@ struct RecordingListView: View {
 }
 
 /// Home with no notes yet: a watch with a slow idle pulse and one idea at a
-/// time of what to say, some beyond to-dos to show what an agent can do.
+/// time of what to say. Each one leans on the agent's access to email,
+/// calendar, and notes, so it reads as more than a Siri command.
 private struct TrySayingView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private static let ideas = [
-        "\u{201C}Remind me to call Sam after lunch.\u{201D}",
-        "\u{201C}Add oat milk to the grocery list.\u{201D}",
-        "\u{201C}Walking meetings on Fridays. Think it through.\u{201D}",
-        "\u{201C}What was that podcast Maya mentioned?\u{201D}",
-        "\u{201C}Draft a thank-you note to Alex.\u{201D}",
+        "\u{201C}Reply to Sarah\u{2019}s email. Thursday works.\u{201D}",
+        "\u{201C}Find a time with Dan next week and invite him.\u{201D}",
+        "\u{201C}Add this to my project notes and draft a follow-up.\u{201D}",
+        "\u{201C}Catch me up on the Acme thread before my 2pm.\u{201D}",
+        "\u{201C}Pull last week\u{2019}s numbers and send them to the team.\u{201D}",
     ]
     private static let interval: TimeInterval = 3.5
 
