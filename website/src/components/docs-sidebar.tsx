@@ -5,11 +5,12 @@ import Link from "next/link";
 
 type Section = { id: string; label: string; indent?: boolean };
 
-export type DocsPage = "agent" | "webhooks";
+export type DocsPage = "agent" | "webhooks" | "help";
 
 const pages: { key: DocsPage; href: string; label: string }[] = [
   { key: "agent", href: "/docs", label: "Connect your agent" },
   { key: "webhooks", href: "/docs/webhooks", label: "Webhooks" },
+  { key: "help", href: "/docs/help", label: "Troubleshooting" },
 ];
 
 const sectionsByPage: Record<DocsPage, Section[]> = {
@@ -29,6 +30,12 @@ const sectionsByPage: Record<DocsPage, Section[]> = {
     { id: "platforms", label: "Automation platforms", indent: true },
     { id: "custom", label: "Build your own endpoint", indent: true },
     { id: "step-3", label: "3. Test it" },
+  ],
+  help: [
+    { id: "requirements", label: "Requirements" },
+    { id: "watch", label: "Apple Watch" },
+    { id: "transcription", label: "Transcription" },
+    { id: "agent", label: "Your agent" },
   ],
 };
 

@@ -26,3 +26,8 @@ export const RELAY_URL = "https://ramble-transcription-proxy.jpoliachik.workers.
 // Pairing code defaults from the relay (PR #32). Proposed, not locked.
 export const PAIR_CODE_EXAMPLE = "K7QX-MP4D";
 export const PAIR_CODE_TTL = "10 minutes";
+// Minimum OS versions. Keep in sync with IPHONEOS_DEPLOYMENT_TARGET and
+// WATCHOS_DEPLOYMENT_TARGET in Ramble/Ramble.xcodeproj.
+export const MIN_IOS = "26.2";
+export const MIN_WATCHOS = "10.0";
+export const WATCH_MODELS = "Apple Watch Series 4 and later, every Apple Watch SE, and every Apple Watch Ultra";
