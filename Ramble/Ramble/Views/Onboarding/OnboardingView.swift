@@ -2,6 +2,11 @@
 //  OnboardingView.swift
 //  Ramble
 //
+//  First launch: three intro beats, pick where notes go, connect an agent
+//  (copy → paste → waiting → connected, all on one screen), then get the
+//  watch app. Microphone access is asked on the first iPhone recording, and
+//  the transcription model lives in Settings.
+//
 
 import SwiftUI
 
@@ -9,8 +14,11 @@ struct OnboardingView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
     @AppStorage("shouldShowOnboardingToast") private var shouldShowOnboardingToast: Bool = false
 
-    @State private var step: OnboardingStep = .welcome
+    @State private var step: OnboardingStep = .intro
     @State private var direction: TransitionDirection = .forward
+    /// Set when the person saved a webhook instead of connecting an agent,
+    /// so Back from the watch step returns to the destination step.
+    @State private var skippedConnect = false
 
     var body: some View {
         ZStack {
@@ -18,12 +26,11 @@ struct OnboardingView: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // Persistent nav row — fades in/out when moving between Welcome and the body
-                // steps, but is the *same* view instance across body steps so only the active
-                // dot animates between transitions.
+                // Persistent nav row: the same view instance across body steps,
+                // so only the active progress dot animates between them.
                 if let activeStep = step.progressIndex {
                     OnboardingNavRow(activeStep: activeStep) {
-                        if let previous = step.previous {
+                        if let previous = previousStep {
                             advance(to: previous)
                         }
                     }
@@ -32,22 +39,32 @@ struct OnboardingView: View {
 
                 Group {
                     switch step {
-                    case .welcome:
-                        OnboardingWelcomeStep(
-                            onContinue: { advance(to: .record) }
+                    case .intro:
+                        OnboardingIntroStep(
+                            onContinue: { advance(to: .destination) }
                         )
-                    case .record:
-                        OnboardingRecordStep(
-                            onPermissionGranted: { advance(to: .transcribe) }
+                    case .destination:
+                        OnboardingDestinationStep(
+                            onAddAgent: {
+                                skippedConnect = false
+                                advance(to: .connect)
+                            },
+                            onWebhookSaved: {
+                                skippedConnect = true
+                                advance(to: .watch)
+                            },
+                            onLater: {
+                                skippedConnect = true
+                                advance(to: .watch)
+                            }
                         )
-                    case .transcribe:
-                        OnboardingTranscribeStep(
-                            onContinue: { advance(to: .send) }
+                    case .connect:
+                        OnboardingConnectStep(
+                            onContinue: { advance(to: .watch) },
+                            onLater: { advance(to: .watch) }
                         )
-                    case .send:
-                        OnboardingSendStep(
-                            onFinish: finish
-                        )
+                    case .watch:
+                        OnboardingWatchStep(onFinish: finish)
                     }
                 }
                 .transition(slideTransition)
@@ -55,6 +72,15 @@ struct OnboardingView: View {
             }
         }
         .preferredColorScheme(nil)
+    }
+
+    private var previousStep: OnboardingStep? {
+        switch step {
+        case .intro: return nil
+        case .destination: return .intro
+        case .connect: return .destination
+        case .watch: return skippedConnect ? .destination : .connect
+        }
     }
 
     private var slideTransition: AnyTransition {

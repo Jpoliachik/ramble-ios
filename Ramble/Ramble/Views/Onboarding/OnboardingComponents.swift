@@ -7,32 +7,33 @@ import SwiftUI
 
 // MARK: - Step state
 
+/// Intro (three beats) → where notes go → connect your agent → watch app.
+/// Choosing a webhook on the destination step skips `connect`.
 enum OnboardingStep: Int, CaseIterable {
-    case welcome
-    case record
-    case transcribe
-    case send
+    case intro
+    case destination
+    case connect
+    case watch
 
-    /// 1-based position in the 3-step body. Welcome returns nil (no dots shown).
+    /// 1-based position in the 3-step body. The intro returns nil (no dots shown).
     var progressIndex: Int? {
         switch self {
-        case .welcome: return nil
-        case .record: return 1
-        case .transcribe: return 2
-        case .send: return 3
-        }
-    }
-
-    var previous: OnboardingStep? {
-        switch self {
-        case .welcome: return nil
-        case .record: return .welcome
-        case .transcribe: return .record
-        case .send: return .transcribe
+        case .intro: return nil
+        case .destination: return 1
+        case .connect: return 2
+        case .watch: return 3
         }
     }
 
     static let bodyStepCount = 3
+}
+
+// MARK: - Pairing message
+
+enum PairingMessage {
+    static func text(code: String) -> String {
+        "I downloaded Ramble, connect it. My pairing code is \(code). Instructions: https://ramble.watch/docs"
+    }
 }
 
 // MARK: - Design tokens
