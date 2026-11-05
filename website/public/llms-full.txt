@@ -311,9 +311,39 @@ Filter on either field to skip test payloads in production.
 
 Webhooks fire after transcription completes — not after recording. Transcription timing depends on audio length and network conditions. The webhook queue is independent from transcription — a slow or failing webhook never blocks the UI or other recordings.
 
+# Part 3: Requirements and troubleshooting
+
+Human-readable version: https://ramble.watch/docs/help
+
+## Requirements
+
+- iPhone: iOS 26.2 or later.
+- Apple Watch: watchOS 10.0 or later. That's Apple Watch Series 4 and later, every Apple Watch SE, and every Apple Watch Ultra.
+- Check versions: iPhone Settings → General → About. For the watch: Watch app on the iPhone → General → About.
+
+## Apple Watch
+
+- **The iPhone app installed, but the watch app didn't.** Check the watch's watchOS version first. Below 10.0, the App Store installs the iPhone app and silently skips the watch app; update the watch in Watch app → General → Software Update. If the version is fine: Watch app on the iPhone → Available Apps → Install next to Ramble. Turn on Watch app → App Store → Automatic App Install so it happens on its own next time.
+- **"Allow microphone in Settings" on the watch.** On the watch: Settings → Privacy & Security → Microphone → turn on Ramble.
+- **"Saved on watch" or "Sending to iPhone".** Normal when the iPhone isn't nearby. Recordings stay on the watch until the iPhone has them, then send on their own. If one seems stuck with the iPhone close by, open Ramble on the iPhone.
+
+## Transcription
+
+- **On-device transcription fails or asks for permission.** iPhone Settings → Ramble → Speech Recognition → on, then tap Retry on the recording. If the recording says Speech Model Required, tap Download Speech Model & Retry (needs a network connection once).
+- **Cloud transcription doesn't work.** It needs the optional upgrade and a network connection. If Ramble couldn't verify the device with Apple, wait and retry. Apple Speech is always available in Settings.
+
+## Your agent
+
+- **The agent isn't getting recordings.** iPhone: Settings → Connect agent shows each agent's last check and how many transcripts are waiting for it. "Hasn't checked in yet" or an old check time: the agent isn't checking; set the check up again from the agent loop in Part 1. Transcripts waiting: they reached the relay; the agent hasn't picked them up yet. Nothing waiting and nothing received: open the recording on the iPhone and tap Send to Agent.
+- **"Not sent · connect your agent" on a recording.** Ramble only sends recordings made while an agent is connected. Connect one, then open the recording and tap Send to Agent.
+- **Pairing code expired or didn't work.** A code works once and expires after 10 minutes. Settings → Connect agent → New code.
+- **401, 403, or connection errors.** 401: the agent was disconnected; pair again with a new code. 403: the HTTP client is filtered; send a User-Agent header. Sandboxed agents need ramble-transcription-proxy.jpoliachik.workers.dev on their network allowlist. See "Making requests" and "Platform notes" in Part 1.
+- **A webhook delivery failed.** Ramble retries 3 times, then marks it failed. Fix the endpoint, open the recording, and tap Resend Webhook.
+
 # About Ramble
 
 - Watch app with an iPhone companion. Record on the watch; the phone transcribes and delivers.
+- Requires iOS 26.2+ and watchOS 10.0+ (Series 4 and later, any SE, any Ultra).
 - One-time purchase: $4.99. Includes on-device transcription, the agent connection, and webhooks.
 - Optional upgrade: cloud transcription for $2.99/month. Never required; cancel any time and everything else keeps working.
 - No accounts. Transcripts pass through the relay and are deleted on delivery, or after 30 days (PLACEHOLDER) at most if never picked up. Audio never goes to the relay.

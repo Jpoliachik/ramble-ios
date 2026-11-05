@@ -8,6 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 For full brand positioning, audience, tone, and messaging guidelines, see **`docs/brand.md`**.
 
+For design philosophy and the design system (color, type, spacing, motion, haptics), see **`docs/design.md`**. Read it before any UI work on the watch, iPhone, or website.
+
 ### Post-v1 — cloud transcription enhancements
 
 These are free features from existing providers (no extra API calls or cost):
@@ -70,7 +72,7 @@ npm run dev      # Dev server at localhost:3000
 
 The site is a static export (`output: "export"`) deployed on Vercel from the `website/` root directory, with a preview deployment for every PR that touches it. It is served from the root of Ramble's own domain, https://ramble.watch, so there is no `basePath`.
 
-**Pages:** Landing (`/`), Privacy Policy (`/privacy`), Terms of Use (`/terms`), Connect your agent + relay API (`/docs`), Webhook API Docs (`/docs/webhooks`)
+**Pages:** Landing (`/`), Privacy Policy (`/privacy`), Terms of Use (`/terms`), Connect your agent + relay API (`/docs`), Webhook API Docs (`/docs/webhooks`), Requirements + troubleshooting (`/docs/help`)
 
 ## Architecture
 
@@ -122,7 +124,7 @@ proxy/                 # Cloudflare Worker: transcription proxy + agent relay (R
 ### Tech Stack
 
 - SwiftUI for all UI
-- Deployment target: iOS 26.2, watchOS 26.2
+- Deployment target: iOS 26.2, watchOS 10.0 (covers Series 4+ and first-gen SE; guard newer watch APIs with `#available`). If you change a deployment target, update `MIN_IOS`/`MIN_WATCHOS` in `website/src/lib/site.ts` and the requirements in `website/public/llms*.txt`
 
 ### Proxy API
 

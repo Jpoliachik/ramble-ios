@@ -79,7 +79,7 @@ struct WatchRecordButtonView: View {
         }
         .buttonStyle(.plain)
         .opacity(dimmed && !isRecording ? 0.4 : 1)
-        .handGestureShortcut(.primaryAction)
+        .primaryActionDoubleTap()
         .animation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.3, dampingFraction: 0.8), value: isRecording)
         .animation(.easeInOut(duration: 0.2), value: showCheck)
         .accessibilityLabel(isRecording ? "Stop recording" : "Record")
@@ -136,6 +136,18 @@ private struct BreathingRing: View {
             expanded ? .easeOut(duration: 2.2) : nil
         }
         .accessibilityHidden(true)
+    }
+}
+
+private extension View {
+    /// Double-tap (watchOS 11+) triggers the record button. Older watches skip it.
+    @ViewBuilder
+    func primaryActionDoubleTap() -> some View {
+        if #available(watchOS 11.0, *) {
+            handGestureShortcut(.primaryAction)
+        } else {
+            self
+        }
     }
 }
 
