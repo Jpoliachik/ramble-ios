@@ -51,3 +51,10 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # `d1 migrations apply` runs its queries in JSON mode, which mutes
+      # Wrangler's console logger, so a Cloudflare API error (bad token
+      # permissions, for one) exits 1 with no message. The log file keeps it.
+      - name: Show Wrangler logs
+        if: failure()
+        run: cat ~/.config/.wrangler/logs/*.log || true
