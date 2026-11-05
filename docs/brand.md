@@ -65,6 +65,8 @@ The tagline should convey: (1) the watch, (2) your agent, (3) you don't have to 
 
 ## Visual identity
 
+Full design system (philosophy, type, spacing, motion, haptics) lives in [`design.md`](design.md).
+
 - **Palette:** Clean and warm. Sage/stone/cream tones, anchored by deep amber (the brand amber).
 - **Typography:** SF Pro for body/UI, New York serif (system) for headlines and italic accents.
 - **Logo:** Simple waveform mark that works at small sizes (watch complication, app icon). The wordmark is "Ramble" in italic serif preceded by the brand-amber dot.
