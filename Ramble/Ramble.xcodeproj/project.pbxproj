@@ -461,7 +461,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "watch Watch App/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Ramble;
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Ramble needs microphone access to record your voice journals.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Ramble records what you say on your watch and sends it to your agent.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = dev.goodloop.Ramble;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -494,7 +494,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "watch Watch App/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Ramble;
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Ramble needs microphone access to record your voice journals.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Ramble records what you say on your watch and sends it to your agent.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = dev.goodloop.Ramble;
 				LD_RUNPATH_SEARCH_PATHS = (
