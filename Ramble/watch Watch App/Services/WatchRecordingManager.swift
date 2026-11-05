@@ -14,6 +14,10 @@ final class WatchRecordingManager: ObservableObject {
     @Published private(set) var isRecording = false
     @Published private(set) var currentDuration: TimeInterval = 0
     @Published private(set) var audioLevel: Float = 0
+    /// Bumped every time a recording is saved, however it stopped: the
+    /// button, double-tap, Siri, or a call taking the mic. Home shows the
+    /// same check for all of them.
+    @Published private(set) var stopCount = 0
 
     private let audioRecorder = WatchAudioRecorderService()
     private let connectivity = WatchConnectivityService.shared
@@ -106,6 +110,7 @@ final class WatchRecordingManager: ObservableObject {
             duration: job.duration
         )
 
+        stopCount += 1
         connectivity.transferJob(job)
         WatchStuckNoteAlerts.shared.update()
 

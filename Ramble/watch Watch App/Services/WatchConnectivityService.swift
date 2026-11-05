@@ -14,6 +14,9 @@ final class WatchConnectivityService: NSObject, ObservableObject {
     /// Recording IDs currently handed to WatchConnectivity and not yet finished.
     @Published private(set) var inFlightIDs: Set<UUID> = []
     @Published private(set) var isPhoneReachable = false
+    /// False when the paired iPhone doesn't have Ramble, so notes can never
+    /// leave the watch. Starts true so the alert doesn't flash at launch.
+    @Published private(set) var isCompanionAppInstalled = true
 
     /// Maps in-flight WCSessionFileTransfer to the job ID so we can update the queue on completion.
     /// Ephemeral — if the app is killed, jobs stay in the persistent queue and retry on next launch.
@@ -197,8 +200,10 @@ extension WatchConnectivityService: WCSessionDelegate {
         }
         guard activationState == .activated else { return }
         let reachable = session.isReachable
+        let installed = session.isCompanionAppInstalled
         Task { @MainActor in
             self.isPhoneReachable = reachable
+            self.isCompanionAppInstalled = installed
             // Launch-time retries run before activation finishes and are
             // skipped, so pick up anything still queued now.
             self.retryPendingTransfers()
@@ -211,6 +216,16 @@ extension WatchConnectivityService: WCSessionDelegate {
             let becameReachable = reachable && !self.isPhoneReachable
             self.isPhoneReachable = reachable
             if becameReachable {
+                self.retryPendingTransfers()
+            }
+        }
+    }
+
+    nonisolated func sessionCompanionAppInstalledDidChange(_ session: WCSession) {
+        let installed = session.isCompanionAppInstalled
+        Task { @MainActor in
+            self.isCompanionAppInstalled = installed
+            if installed {
                 self.retryPendingTransfers()
             }
         }

@@ -55,6 +55,21 @@ final class WatchRecordingHistory: ObservableObject {
         save()
     }
 
+    /// Lost notes the person has already seen in Recent. They stay listed,
+    /// but stop turning the history badge red.
+    @Published private(set) var seenLostIDs: Set<UUID> = Set(
+        (UserDefaults.standard.stringArray(forKey: "seenLostNoteIDs") ?? []).compactMap(UUID.init(uuidString:))
+    )
+
+    func markLostSeen(_ ids: [UUID]) {
+        let updated = seenLostIDs.union(ids)
+        guard updated != seenLostIDs else { return }
+        // Only keep IDs still in history, so the set can't grow forever
+        let current = Set(entries.map(\.id))
+        seenLostIDs = updated.intersection(current)
+        UserDefaults.standard.set(seenLostIDs.map(\.uuidString), forKey: "seenLostNoteIDs")
+    }
+
     // MARK: - Persistence
 
     private func load() {
