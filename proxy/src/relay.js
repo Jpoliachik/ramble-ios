@@ -20,8 +20,9 @@ export const PAIR_CODE_TTL_SECONDS = 10 * 60;
 export const PAIR_CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTVWXYZ';
 export const PULL_LIMIT = 50;
 export const MAX_TEXT_LENGTH = 200_000;
+export const STATUS_LIMIT = 100;
 
-const RELAY_PATHS = /^\/(inboxes|inbox|inbox\/ack|pair\/code|pair\/exchange|connections(\/[^/]+)?)$/;
+const RELAY_PATHS = /^\/(inboxes|inbox|inbox\/ack|inbox\/status|pair\/code|pair\/exchange|connections(\/[^/]+)?)$/;
 
 export function isRelayPath(pathname) {
   return RELAY_PATHS.test(pathname);
@@ -46,6 +47,7 @@ export async function handleRelayRequest(request, env, deps = {}) {
       case 'POST /inboxes': return await createInbox(request, ctx);
       case 'POST /inbox': return await upload(request, ctx);
       case 'DELETE /inbox': return await purgeInbox(request, ctx);
+      case 'POST /inbox/status': return await inboxStatus(request, ctx);
       case 'POST /pair/code': return await createPairCode(request, ctx);
       case 'GET /connections': return await listConnections(request, ctx);
       case 'DELETE /connections/:id': return await disconnect(request, pathname.split('/')[2], ctx);
@@ -104,6 +106,41 @@ async function upload(request, ctx) {
     );
   }
   return json({ queued: connections.length });
+}
+
+/**
+ * How many agents each recording is still waiting for. Ack deletes, so 0
+ * means every agent picked it up (or it expired, or its agent was
+ * disconnected). Lets the app tell "sent" from "your agent has it" without
+ * the relay storing anything more.
+ */
+async function inboxStatus(request, ctx) {
+  const inbox = await authInbox(request, ctx);
+  if (!inbox) return unauthorized();
+
+  const ids = (await readJSON(request))?.recording_ids;
+  if (
+    !Array.isArray(ids) ||
+    ids.length === 0 ||
+    ids.length > STATUS_LIMIT ||
+    !ids.every((id) => typeof id === 'string' && /^[A-Za-z0-9-]{1,64}$/.test(id))
+  ) {
+    return json({ error: `"recording_ids" must be an array of 1–${STATUS_LIMIT} recording ids` }, 400);
+  }
+  const unique = [...new Set(ids)];
+  const { results } = await ctx.db
+    .prepare(
+      `SELECT e.recording_id, COUNT(*) AS waiting FROM entries e
+         JOIN connections c ON c.id = e.connection_id
+        WHERE c.inbox_id = ? AND e.expires_at > ? AND e.recording_id IN (${unique.map(() => '?').join(',')})
+        GROUP BY e.recording_id`,
+    )
+    .bind(inbox.id, ctx.now, ...unique)
+    .all();
+  const waiting = new Map(results.map((r) => [r.recording_id, r.waiting]));
+  return json({
+    recordings: unique.map((id) => ({ recording_id: id, waiting: waiting.get(id) ?? 0 })),
+  });
 }
 
 /** "Delete everything now". Connections stay. */
@@ -387,6 +424,7 @@ const METHODS = {
   '/inboxes': 'POST',
   '/inbox': 'GET (agent pull), POST or DELETE (app)',
   '/inbox/ack': 'POST',
+  '/inbox/status': 'POST',
   '/pair/code': 'POST',
   '/pair/exchange': 'POST',
   '/connections': 'GET',

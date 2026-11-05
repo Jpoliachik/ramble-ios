@@ -10,7 +10,7 @@ struct WatchRecordingHistoryEntry: Codable, Identifiable {
     let id: UUID
     let createdAt: Date
     let duration: TimeInterval
-    /// Set when WatchConnectivity confirms the file reached the phone.
+    /// Set when the phone's receipt says it saved the recording.
     var syncedAt: Date?
 }
 

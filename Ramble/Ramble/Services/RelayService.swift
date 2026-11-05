@@ -149,6 +149,21 @@ final class RelayService: ObservableObject {
         return try decoder.decode(UploadResult.self, from: data).queued
     }
 
+    /// How many agents each recording is still waiting for on the relay.
+    /// 0 means every agent picked it up (or it expired).
+    func waitingCounts(for recordingIds: [UUID]) async throws -> [UUID: Int] {
+        guard hasInbox, !recordingIds.isEmpty else { return [:] }
+        let body = try JSONSerialization.data(withJSONObject: [
+            "recording_ids": recordingIds.map(\.uuidString),
+        ])
+        let data = try await send("POST", "inbox/status", body: body, auth: try await ensureInbox())
+        var counts: [UUID: Int] = [:]
+        for item in try decoder.decode(StatusList.self, from: data).recordings {
+            if let id = UUID(uuidString: item.recordingId) { counts[id] = item.waiting }
+        }
+        return counts
+    }
+
     // MARK: - Inbox
 
     /// App Attest is checked only here, once per install.
@@ -241,4 +256,8 @@ private struct CreatedInbox: Decodable { let inboxSecret: String }
 private struct ConnectionList: Decodable { let connections: [RelayConnection] }
 private struct UploadResult: Decodable { let queued: Int }
 private struct DeletedCount: Decodable { let deleted: Int }
+private struct StatusList: Decodable {
+    struct Item: Decodable { let recordingId: String; let waiting: Int }
+    let recordings: [Item]
+}
 private struct ErrorBody: Decodable { let error: String }

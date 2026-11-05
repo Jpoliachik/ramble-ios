@@ -139,9 +139,12 @@ struct RecordingDetailView: View {
                 case .failed:
                     Image(systemName: "exclamationmark.triangle.fill")
                     Text(recording.relayStatus == .failed ? "Agent delivery failed" : "Webhook failed")
+                case .delivered where recording.isWaitingForAgent:
+                    Image(systemName: "checkmark.circle")
+                    Text("Waiting for agent")
                 case .delivered:
                     Image(systemName: "checkmark.circle.fill")
-                    Text("Sent")
+                    Text(recording.pickedUpAt != nil ? "Picked up" : "Sent")
                 case .none:
                     Image(systemName: "tray")
                     Text("Not sent")
@@ -371,7 +374,8 @@ struct RecordingDetailView: View {
                 if recording.relayStatus != nil || recording.status == .completed {
                     relayActionRow(for: recording)
                 }
-            } else if recording.status == .completed && recording.deliveryStatus == nil {
+            } else if recording.status == .completed
+                        && (recording.deliveryStatus == nil || recording.relayStatus == .failed) {
                 Button {
                     HapticService.buttonTap()
                     showConnectAgent = true
@@ -380,7 +384,8 @@ struct RecordingDetailView: View {
                 }
             }
         } footer: {
-            if recording.status == .completed && recording.deliveryStatus == nil && !relay.hasConnectedAgents {
+            if recording.status == .completed && !relay.hasConnectedAgents
+                && (recording.deliveryStatus == nil || recording.relayStatus == .failed) {
                 Text("This transcript is only on your phone. Connect your agent to send it there.")
             }
         }

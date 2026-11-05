@@ -22,6 +22,22 @@ final class WatchRecordingManager: ObservableObject {
 
     private init() {
         observeRecorder()
+        audioRecorder.onEndedBySystem = { [weak self] in
+            // A call or Siri took the mic. Keep what was said so far.
+            WatchHapticService.recordStop()
+            self?.stopRecordingAndTransfer()
+        }
+    }
+
+    /// Get the next recording ready before the tap. Call when the app
+    /// appears, returns to the foreground, or finishes a recording.
+    func prewarm() {
+        audioRecorder.prewarm()
+    }
+
+    /// Deletes header-only files from prepared recorders that never ran.
+    func removeUnusedPreparedFiles() {
+        audioRecorder.removeUnusedPreparedFiles(keeping: Set(syncQueue.jobs.map(\.audioFileName)))
     }
 
     private func observeRecorder() {
@@ -48,8 +64,9 @@ final class WatchRecordingManager: ObservableObject {
         guard await Self.hasMicrophoneAccess() else { return false }
 
         do {
+            // Nothing goes to the phone here: the watch never waits on or
+            // tells the phone anything before it records.
             _ = try audioRecorder.startRecording()
-            connectivity.sendRecordingStarted()
             return true
         } catch {
             print("Failed to start recording: \(error)")
@@ -72,7 +89,6 @@ final class WatchRecordingManager: ObservableObject {
 
     func stopRecordingAndTransfer() {
         guard let result = audioRecorder.stopRecording() else { return }
-        connectivity.sendRecordingStopped()
 
         // Add to persistent queue FIRST, then attempt transfer
         let audioFileName = result.url.lastPathComponent
@@ -91,5 +107,11 @@ final class WatchRecordingManager: ObservableObject {
         )
 
         connectivity.transferJob(job)
+        WatchStuckNoteAlerts.shared.update()
+
+        // Ready for the next one straight away
+        Task { @MainActor in
+            self.prewarm()
+        }
     }
 }

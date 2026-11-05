@@ -49,6 +49,13 @@
 			);
 			target = 8A290E2C2F2152E10020317A /* Ramble */;
 		};
+		5D1E0A0B2F9A000100C0FFEE /* Exceptions for "watch Watch App" folder in "watch Watch App" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 8A290E5A2F2153440020317A /* watch Watch App */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -62,6 +69,9 @@
 		};
 		8A290E5C2F2153440020317A /* watch Watch App */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				5D1E0A0B2F9A000100C0FFEE /* Exceptions for "watch Watch App" folder in "watch Watch App" target */,
+			);
 			path = "watch Watch App";
 			sourceTree = "<group>";
 		};
@@ -449,6 +459,7 @@
 				DEVELOPMENT_TEAM = SW6VLKWS7Q;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "watch Watch App/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Ramble;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Ramble needs microphone access to record your voice journals.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
@@ -481,6 +492,7 @@
 				DEVELOPMENT_TEAM = SW6VLKWS7Q;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "watch Watch App/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Ramble;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Ramble needs microphone access to record your voice journals.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";

@@ -7,9 +7,10 @@ import SwiftUI
 
 /// Where a recording is, as far as the watch knows.
 enum WatchRecordingState {
-    /// The phone has it.
+    /// The phone saved it and sent a receipt.
     case sent
-    /// Handed to WatchConnectivity and the phone is reachable.
+    /// Handed to WatchConnectivity and the phone is reachable, or the file
+    /// arrived and the watch is waiting for the phone's receipt.
     case sending
     /// Queued on the watch; it will send when the phone is around.
     case savedOnWatch
@@ -22,7 +23,8 @@ enum WatchRecordingState {
         connectivity: WatchConnectivityService
     ) -> WatchRecordingState {
         if entry.syncedAt != nil { return .sent }
-        guard syncQueue.jobs.contains(where: { $0.id == entry.id }) else { return .notSent }
+        guard let job = syncQueue.jobs.first(where: { $0.id == entry.id }) else { return .notSent }
+        if job.handedOffAt != nil { return .sending }
         if connectivity.inFlightIDs.contains(entry.id) && connectivity.isPhoneReachable {
             return .sending
         }

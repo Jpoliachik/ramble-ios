@@ -9,6 +9,7 @@ import {
   PAIR_CODE_ALPHABET,
   PAIR_CODE_TTL_SECONDS,
   PULL_LIMIT,
+  STATUS_LIMIT,
   generatePairCode,
   handleRelayRequest,
   isRelayPath,
@@ -110,6 +111,60 @@ describe('the whole loop', () => {
     assert.match(secret, /^rmbi_/);
     assert.match(token, /^rmba_/);
     assert.ok(!dump.includes(secret) && !dump.includes(token));
+  });
+});
+
+describe('pickup status', () => {
+  const status = (secret, ids) => call('POST', '/inbox/status', { auth: secret, body: { recording_ids: ids } });
+  const id = (n) => recording(n).recording_id;
+
+  it('counts agents still waiting, and drops to 0 once every agent acks', async () => {
+    const secret = await newInbox();
+    const a = await connect(secret);
+    const b = await connect(secret);
+    await upload(secret, 1);
+    await upload(secret, 2);
+
+    assert.deepEqual((await status(secret, [id(1), id(2)])).body, {
+      recordings: [{ recording_id: id(1), waiting: 2 }, { recording_id: id(2), waiting: 2 }],
+    });
+
+    const first = (await pull(a)).items.find((item) => item.recording_id === id(1));
+    await ack(a, [first.id]);
+    assert.equal((await status(secret, [id(1)])).body.recordings[0].waiting, 1);
+
+    const second = (await pull(b)).items.find((item) => item.recording_id === id(1));
+    await ack(b, [second.id]);
+    assert.deepEqual((await status(secret, [id(1), id(2)])).body.recordings, [
+      { recording_id: id(1), waiting: 0 },
+      { recording_id: id(2), waiting: 2 },
+    ]);
+  });
+
+  it('treats expired items as no longer waiting', async () => {
+    const secret = await newInbox();
+    await connect(secret);
+    await upload(secret, 1);
+    now = T0 + DEFAULT_RETENTION_SECONDS * 1000 + 1;
+    assert.equal((await status(secret, [id(1)])).body.recordings[0].waiting, 0);
+  });
+
+  it("only sees the caller's own inbox", async () => {
+    const mine = await newInbox();
+    const theirs = await newInbox();
+    await connect(theirs);
+    await upload(theirs, 1);
+    assert.equal((await status(mine, [id(1)])).body.recordings[0].waiting, 0);
+  });
+
+  it('rejects bad input and agent tokens', async () => {
+    const secret = await newInbox();
+    const token = await connect(secret);
+    assert.equal((await status(secret, [])).status, 400);
+    assert.equal((await status(secret, ['not ok!'])).status, 400);
+    assert.equal((await status(secret, Array.from({ length: STATUS_LIMIT + 1 }, (_, n) => id(n)))).status, 400);
+    assert.equal((await status(token, [id(1)])).status, 401);
+    assert.equal((await call('GET', '/inbox/status', { auth: secret })).status, 405);
   });
 });
 

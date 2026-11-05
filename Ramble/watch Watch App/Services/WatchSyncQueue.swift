@@ -12,6 +12,13 @@ struct WatchSyncJob: Codable, Identifiable {
     let createdAt: Date
     let duration: TimeInterval
     var retryCount: Int = 0
+    /// When WatchConnectivity last finished sending the file. The audio stays
+    /// on the watch until the phone's receipt arrives; if none comes, the
+    /// file is sent again (see WatchConnectivityService.receiptTimeout).
+    var handedOffAt: Date?
+
+    /// When the recording ended, i.e. when it started waiting to reach the phone.
+    var savedAt: Date { createdAt.addingTimeInterval(duration) }
 
     var fileURL: URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -65,11 +72,18 @@ final class WatchSyncQueue: ObservableObject {
         WatchRecordingHistory.shared.markSynced(id: jobId)
     }
 
+    func markHandedOff(jobId: UUID) {
+        guard let idx = jobs.firstIndex(where: { $0.id == jobId }) else { return }
+        jobs[idx].handedOffAt = Date()
+        saveQueue()
+    }
+
     /// Never gives up and never deletes the audio: the watch may hold the only
     /// copy. Retries are spaced out by WatchConnectivityService.
     func markFailed(jobId: UUID) {
         guard let idx = jobs.firstIndex(where: { $0.id == jobId }) else { return }
         jobs[idx].retryCount += 1
+        jobs[idx].handedOffAt = nil
         saveQueue()
     }
 

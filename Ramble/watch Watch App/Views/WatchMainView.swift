@@ -138,9 +138,16 @@ struct WatchMainView: View {
     // MARK: - Actions
 
     private func refreshOnForeground() {
-        // Retry anything still waiting, including transfers from previous sessions
-        syncQueue.pruneOrphanedJobs()
-        connectivity.retryPendingTransfers()
+        // Queued behind the first frame. Getting the recorder ready comes
+        // first, since a tap can follow the launch almost at once.
+        Task { @MainActor in
+            recordingManager.prewarm()
+            // Retry anything still waiting, including transfers from previous sessions
+            syncQueue.pruneOrphanedJobs()
+            connectivity.retryPendingTransfers()
+            recordingManager.removeUnusedPreparedFiles()
+            WatchStuckNoteAlerts.shared.update()
+        }
     }
 
     /// A tap always records on the watch, whatever the phone is doing.

@@ -64,6 +64,10 @@ final class BackgroundTaskService {
                 }
                 try? await Task.sleep(nanoseconds: 500_000_000)
             }
+            if UIApplication.shared.backgroundTimeRemaining > 10 {
+                await relayQueue.refreshPickups()
+            }
+            DeliveryMonitor.shared.evaluate()
 
             print("[Background] Immediate background processing finished")
             self.endImmediateBackgroundProcessing()
@@ -107,6 +111,8 @@ final class BackgroundTaskService {
             while (transcriptionQueue.hasActiveWork || webhookQueue.hasActiveWork || relayQueue.hasActiveWork) && Date() < deadline {
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
             }
+            await relayQueue.refreshPickups()
+            DeliveryMonitor.shared.evaluate()
         }
 
         task.expirationHandler = {

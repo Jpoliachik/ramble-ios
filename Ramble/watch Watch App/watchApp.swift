@@ -17,5 +17,11 @@ struct watch_Watch_AppApp: App {
         WindowGroup {
             WatchMainView()
         }
+        // The phone's "saved it" receipts can arrive while Ramble is asleep.
+        // Wake to read them, so the watch frees the audio and doesn't alert
+        // about notes the phone already has.
+        .backgroundTask(.watchConnectivity) {
+            await WatchConnectivityService.shared.waitForPendingContent()
+        }
     }
 }

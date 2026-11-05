@@ -48,9 +48,10 @@ final class RelayQueueService: ObservableObject {
     static let shared = RelayQueueService()
 
     @Published private(set) var isProcessing = false
+    private var isCheckingPickups = false
 
     var hasActiveWork: Bool {
-        isProcessing || (!KeychainService.isLocked && queue.contains { ($0.nextRetryAt ?? .distantPast) <= Date() })
+        isProcessing || isCheckingPickups || (!KeychainService.isLocked && queue.contains { ($0.nextRetryAt ?? .distantPast) <= Date() })
     }
 
     private let storageService = StorageService.shared
@@ -113,6 +114,7 @@ final class RelayQueueService: ObservableObject {
         for i in queue.indices { queue[i].nextRetryAt = nil }
         saveQueue()
         processNextIfNeeded()
+        Task { await refreshPickups() }
     }
 
     /// A transcribed recording made while an agent was connected that never
@@ -170,8 +172,10 @@ final class RelayQueueService: ObservableObject {
             guard queued > 0 else {
                 // Every agent was disconnected (maybe from another screen), so
                 // nothing is waiting anywhere. Don't call it sent.
+                // Failed, not just "not sent": it was meant for an agent and
+                // none will get it, so it counts as needing the user.
                 updateRecording(job.recordingId) {
-                    $0.relayStatus = nil
+                    $0.relayStatus = .failed
                     $0.activityLog.append(ActivityEntry("Not sent — no agent is connected"))
                 }
                 removeJob(job)
@@ -181,6 +185,8 @@ final class RelayQueueService: ObservableObject {
             }
             updateRecording(job.recordingId) {
                 $0.relayStatus = .delivered
+                $0.relayUploadedAt = Date()
+                $0.pickedUpAt = nil
                 $0.activityLog.append(ActivityEntry(
                     "Sent to the relay for \(queued) agent\(queued == 1 ? "" : "s")",
                     httpStatus: 200
@@ -218,6 +224,38 @@ final class RelayQueueService: ObservableObject {
                 $0.activityLog.append(ActivityEntry("Send to agent failed — \(error.localizedDescription)"))
             }
             removeJob(job)
+        }
+    }
+
+    // MARK: - Pickup
+
+    /// How long the relay keeps a note nobody picked up (RETENTION_SECONDS).
+    /// After that, "gone from the relay" means expired, not picked up.
+    static let relayRetention: TimeInterval = 30 * 24 * 3600
+
+    /// Asks the relay which delivered notes agents have picked up since.
+    /// Cheap, and only runs when something is still waiting.
+    func refreshPickups() async {
+        guard !isCheckingPickups, relay.hasInbox, !KeychainService.isLocked else { return }
+        let cutoff = Date().addingTimeInterval(-Self.relayRetention)
+        let waiting = storageService.loadRecordings().filter {
+            $0.isWaitingForAgent && ($0.relayUploadedAt ?? .distantPast) > cutoff
+        }
+        guard !waiting.isEmpty else { return }
+
+        isCheckingPickups = true
+        defer { isCheckingPickups = false }
+        for start in stride(from: 0, to: waiting.count, by: 100) {
+            let batch = Array(waiting[start..<min(start + 100, waiting.count)])
+            // An older relay without /inbox/status, or no network: try next wake.
+            guard let counts = try? await relay.waitingCounts(for: batch.map(\.id)) else { return }
+            let now = Date()
+            for recording in batch where counts[recording.id] == 0 {
+                updateRecording(recording.id) {
+                    $0.pickedUpAt = now
+                    $0.activityLog.append(ActivityEntry("Picked up by your agent"))
+                }
+            }
         }
     }
 

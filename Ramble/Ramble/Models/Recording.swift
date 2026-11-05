@@ -31,6 +31,14 @@ struct Recording: Identifiable, Codable, Hashable {
     /// `.delivered` means the relay accepted it and queued it for every
     /// connected agent.
     var relayStatus: WebhookStatus?
+    /// When the relay accepted it (relayStatus became `.delivered`).
+    var relayUploadedAt: Date?
+    /// When the phone saw that every agent had picked it up from the relay.
+    var pickedUpAt: Date?
+    /// When it reached this phone, for recordings from the watch. A note can
+    /// wait on the watch for hours, so createdAt says nothing about how long
+    /// it has been stuck on the phone.
+    var receivedAt: Date?
     var lastError: String?
     var activityLog: [ActivityEntry]
     var cloudTranscriptionCount: Int
@@ -71,6 +79,9 @@ struct Recording: Identifiable, Codable, Hashable {
         transcription = try container.decodeIfPresent(String.self, forKey: .transcription)
         webhookStatus = try container.decodeIfPresent(WebhookStatus.self, forKey: .webhookStatus)
         relayStatus = try container.decodeIfPresent(WebhookStatus.self, forKey: .relayStatus)
+        relayUploadedAt = try container.decodeIfPresent(Date.self, forKey: .relayUploadedAt)
+        pickedUpAt = try container.decodeIfPresent(Date.self, forKey: .pickedUpAt)
+        receivedAt = try container.decodeIfPresent(Date.self, forKey: .receivedAt)
 
         // New status field, or migrate from old transcriptionStatus/status values
         if let statusString = try? container.decode(String.self, forKey: .status) {
@@ -113,6 +124,11 @@ struct Recording: Identifiable, Codable, Hashable {
         return statuses.isEmpty ? nil : .delivered
     }
 
+    /// Accepted by the relay and still waiting there for an agent.
+    var isWaitingForAgent: Bool {
+        relayStatus == .delivered && relayUploadedAt != nil && pickedUpAt == nil
+    }
+
     var audioFileURL: URL {
         StorageService.audioDirectory.appendingPathComponent(audioFileName)
     }
@@ -126,6 +142,7 @@ struct Recording: Identifiable, Codable, Hashable {
         case id, createdAt, duration, audioFileName
         case status
         case transcription, webhookStatus, relayStatus, lastError, activityLog, cloudTranscriptionCount
+        case relayUploadedAt, pickedUpAt, receivedAt
         // Legacy keys for migration
         case transcriptionStatus
         case lastTranscriptionError
@@ -141,6 +158,9 @@ struct Recording: Identifiable, Codable, Hashable {
         try container.encodeIfPresent(transcription, forKey: .transcription)
         try container.encodeIfPresent(webhookStatus, forKey: .webhookStatus)
         try container.encodeIfPresent(relayStatus, forKey: .relayStatus)
+        try container.encodeIfPresent(relayUploadedAt, forKey: .relayUploadedAt)
+        try container.encodeIfPresent(pickedUpAt, forKey: .pickedUpAt)
+        try container.encodeIfPresent(receivedAt, forKey: .receivedAt)
         try container.encodeIfPresent(lastError, forKey: .lastError)
         if !activityLog.isEmpty {
             try container.encode(activityLog, forKey: .activityLog)
