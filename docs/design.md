@@ -109,20 +109,3 @@ Haptics confirm the record loop so the person never has to look.
 ## Iconography
 
 SF Symbols only, matched to the text weight next to them. Prefer one glyph to a sentence. The waveform (`waveform`) and the bars mark mean "Ramble" or "recording". Status dots are small and colorless unless they need the person (then amber, or red for failure). Badges are dots, not counts.
-
-## Where this is used
-
-- **Watch screens and states:** [Watch app design artifact](https://claude.ai/artifact/KBWLa5f7Y8MdjKiEJpWkMH), the current-state map and round 1 redesign, built on these tokens.
-- **iPhone onboarding:** the onboarding simplification work reuses `OnboardingComponents.swift`, which is where most of these tokens live today.
-- **Website:** `website/src/app/globals.css` and `animated-logo.tsx`.
-
-## Known drift
-
-Things in the code that don't match this doc yet. Fix as screens are touched.
-
-- Color and font tokens are named `ob*` / `OnboardingFont` but are used app-wide. Worth renaming to `Color.ink*` / `RambleFont` in a shared `DesignTokens.swift`.
-- Amber text and on-amber label colors are hardcoded in `ConnectAgentView.swift` instead of the asset catalog.
-- `MainView.swift` hardcodes a near-black capsule fill (`#141210` at 95%).
-- Watch `AccentColor` is empty; it should point at `brand-amber`.
-- Some comments still say "red" (`RambleBarsMark`, `OnboardingIllustration`) from before the Nov 1 amber switch.
-- The website defines a `sage` scale that is almost unused; the palette is amber + warm neutrals.
