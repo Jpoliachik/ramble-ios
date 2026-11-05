@@ -8,6 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 For full brand positioning, audience, tone, and messaging guidelines, see **`docs/brand.md`**.
 
+For design philosophy and the design system (color, type, spacing, motion, haptics), see **`docs/design.md`**. Read it before any UI work on the watch, iPhone, or website.
+
 ### Post-v1 — cloud transcription enhancements
 
 These are free features from existing providers (no extra API calls or cost):
