@@ -12,6 +12,8 @@ struct MainView: View {
     @State private var scrollOffset: CGFloat = 0
     @State private var showOnboardingToast = false
     @State private var showConnectAgent = false
+    /// "Connect" goes straight to the Connect flow; other pills open the agent's status.
+    @State private var connectStartsPairing = false
     @State private var path: [Recording] = []
     /// Cached so the status line doesn't read settings on every frame while recording.
     @State private var hasWebhook = SettingsService.shared.load().isWebhookConfigured
@@ -158,7 +160,7 @@ struct MainView: View {
                 SettingsView()
             }
             .sheet(isPresented: $showConnectAgent) {
-                ConnectAgentView()
+                ConnectAgentView(startPairing: connectStartsPairing)
             }
             .alert(
                 "Couldn't start recording",
@@ -211,7 +213,11 @@ struct MainView: View {
     /// Each pill opens its fix: Connect, the agent, or the note that's stuck.
     private func handleStatusTap(_ status: HomeStatus) {
         switch status {
-        case .noAgent, .agentQuiet, .waitingLong:
+        case .noAgent:
+            connectStartsPairing = true
+            showConnectAgent = true
+        case .agentQuiet, .waitingLong:
+            connectStartsPairing = false
             showConnectAgent = true
         case .didntSend:
             openNewest { DeliveryStage($0).needsAttention }

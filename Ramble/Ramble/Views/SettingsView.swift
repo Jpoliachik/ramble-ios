@@ -16,33 +16,24 @@ struct SettingsView: View {
     @ObservedObject private var subscriptionService = SubscriptionService.shared
     @ObservedObject private var relay = RelayService.shared
     @Environment(\.dismiss) private var dismiss
-    @State private var showDeleteConfirmation = false
-    @State private var showExportShare = false
-    @State private var showTranscriptionInfo = false
-    @State private var showWebhookInfo = false
+    @Environment(\.openURL) private var openURL
     @State private var showDestinationEdit = false
-    @State private var exportURL: URL?
+    @State private var showPrivacyInfo = false
     @State private var versionTapCount = 0
     @State private var showDebugSheet = false
     @State private var showConnectAgent = false
-    /// True when the sheet should open on a new code rather than the manage screen.
-    @State private var connectAgentStartsPairing = false
+    @State private var watchState: WatchInstallState = .checking
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
-                agentSection
-                webhookSection
-                freeTranscriptionSection
-                cloudTranscriptionSection
-                cloudTuningSection
-                appearanceSection
-                statsSection
-                exportSection
-                dangerZoneSection
+                destinationsSection
+                watchSection
+                transcriptionSection
+                appSection
                 aboutSection
             }
-            .listSectionSpacing(28)
+            .listSectionSpacing(24)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -52,42 +43,352 @@ struct SettingsView: View {
                     }
                 }
             }
-            .sheet(isPresented: $viewModel.showSubscriptionPaywall) {
-                SubscriptionView()
-            }
-            .sheet(isPresented: $showExportShare) {
-                if let url = exportURL {
-                    ShareSheet(activityItems: [url])
-                }
-            }
             .sheet(isPresented: $showDebugSheet) {
                 DebugSheet(viewModel: viewModel)
             }
-            .sheet(isPresented: $showTranscriptionInfo) {
-                TranscriptionInfoSheet()
-            }
-            .sheet(isPresented: $showWebhookInfo) {
-                WebhookInfoSheet()
+            .sheet(isPresented: $showPrivacyInfo) {
+                PrivacyInfoSheet()
             }
             .sheet(isPresented: $showDestinationEdit) {
                 WebhookDestinationEditSheet(viewModel: viewModel)
             }
             .sheet(isPresented: $showConnectAgent) {
-                ConnectAgentView(startPairing: connectAgentStartsPairing)
+                ConnectAgentView()
             }
             .task {
+                watchState = WatchInstallState.current()
                 guard relay.hasInbox else { return }
                 try? await relay.refreshConnections()
             }
         }
     }
 
+    // MARK: - Where notes go
+
+    private var destinationsSection: some View {
+        Section {
+            Button {
+                HapticService.buttonTap()
+                showConnectAgent = true
+            } label: {
+                SettingsRow(
+                    icon: "sparkles",
+                    iconTint: .brandAmber,
+                    title: "Your agent",
+                    subtitle: agentSubtitle,
+                    dot: agentDot
+                ) {
+                    chevron
+                }
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                HapticService.buttonTap()
+                showDestinationEdit = true
+            } label: {
+                SettingsRow(
+                    icon: "link",
+                    title: "Webhook",
+                    subtitle: viewModel.webhookURL.isEmpty ? "Off" : destinationHost,
+                    dot: viewModel.webhookURL.isEmpty ? nil : webhookDot
+                ) {
+                    if viewModel.webhookURL.isEmpty {
+                        Text("Add")
+                            .foregroundStyle(Color.obInkFaint)
+                    }
+                    chevron
+                }
+            }
+            .buttonStyle(.plain)
+        } header: {
+            SettingsGroupTitle(title: "Where notes go")
+        }
+    }
+
+    /// Same words and dot colors as the Home status line.
+    private var agentSubtitle: String {
+        guard let connection = primaryConnection else {
+            return relay.hasConnectedAgents ? "Connected" : "Not connected"
+        }
+        if AgentHealth(connection) == .quiet, let last = connection.lastPullAt {
+            return "Hasn't checked in · \(HomeStatusLine.age(since: last))"
+        }
+        return AgentHealth.summary(connection)
+    }
+
+    private var agentDot: Color {
+        guard relay.hasConnectedAgents else { return Color(.tertiaryLabel) }
+        if let connection = primaryConnection, AgentHealth(connection) == .quiet { return .brandAmber }
+        return .green
+    }
+
+    /// The connection most worth describing: a quiet one first, then the
+    /// one that checked in most recently.
+    private var primaryConnection: RelayConnection? {
+        relay.connections.first { AgentHealth($0) == .quiet }
+            ?? relay.connections.max { ($0.lastPullAt ?? .distantPast) < ($1.lastPullAt ?? .distantPast) }
+    }
+
+    private var webhookDot: Color {
+        switch viewModel.webhookHealth {
+        case .healthy: return .green
+        case .error: return .red
+        case .untested: return Color(.tertiaryLabel)
+        }
+    }
+
+    private var destinationHost: String {
+        URL(string: viewModel.webhookURL)?.host ?? viewModel.webhookURL
+    }
+
+    // MARK: - Watch
+
+    private var watchSection: some View {
+        Section {
+            Button {
+                guard watchState == .notInstalled, let url = URL(string: "itms-watchs://") else { return }
+                HapticService.buttonTap()
+                openURL(url)
+            } label: {
+                HStack(spacing: 12) {
+                    Image("ramble-app-icon")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 30, height: 30)
+                        .clipShape(Circle())
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Ramble on Apple Watch")
+                            .foregroundStyle(Color.obInk)
+                        Text(watchSubtitle)
+                            .font(.footnote)
+                            .foregroundStyle(Color.obInkFaint)
+                    }
+                    Spacer()
+                    switch watchState {
+                    case .installed:
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(Color.green)
+                    case .notInstalled:
+                        Text("Install")
+                            .foregroundStyle(Color.brandAmber)
+                        chevron
+                    case .checking, .noWatch:
+                        EmptyView()
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        } header: {
+            SettingsGroupTitle(title: "Watch")
+        }
+    }
+
+    private var watchSubtitle: String {
+        switch watchState {
+        case .checking: return "Checking…"
+        case .installed: return "Installed"
+        case .notInstalled: return "Not installed yet. Install it from the Watch app."
+        case .noWatch: return "No Apple Watch paired. You can record on iPhone."
+        }
+    }
+
+    // MARK: - Transcription
+
+    private var transcriptionSection: some View {
+        Section {
+            NavigationLink {
+                TranscriptionSettingsView(viewModel: viewModel)
+            } label: {
+                SettingsRow(
+                    icon: "waveform",
+                    title: "Model",
+                    subtitle: modelSubtitle
+                ) {
+                    EmptyView()
+                }
+            }
+        } header: {
+            SettingsGroupTitle(title: "Transcription")
+        }
+    }
+
+    private var modelSubtitle: String {
+        if viewModel.transcriptionProvider.isCloud {
+            return "Cloud · \(viewModel.cloudModel.displayName)"
+        }
+        return "On-device · free"
+    }
+
+    // MARK: - App
+
+    private var appSection: some View {
+        Section {
+            Picker(selection: $viewModel.appearanceMode) {
+                ForEach(AppearanceMode.allCases) { mode in
+                    Label(mode.displayName, systemImage: mode.iconName)
+                        .tag(mode)
+                }
+            } label: {
+                SettingsRow(icon: "moon", title: "Appearance") { EmptyView() }
+            }
+            .pickerStyle(.menu)
+
+            Button {
+                HapticService.buttonTap()
+                showPrivacyInfo = true
+            } label: {
+                SettingsRow(icon: "lock", title: "How privacy works") { chevron }
+            }
+            .buttonStyle(.plain)
+
+            NavigationLink {
+                YourDataView(viewModel: viewModel)
+            } label: {
+                SettingsRow(
+                    icon: "shippingbox",
+                    title: "Your data",
+                    subtitle: "\(viewModel.totalRecordings) \(viewModel.totalRecordings == 1 ? "note" : "notes") · \(formatTotalDuration(viewModel.totalDuration))"
+                ) {
+                    EmptyView()
+                }
+            }
+        } header: {
+            SettingsGroupTitle(title: "App")
+        }
+    }
+
+    private var aboutSection: some View {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
+
+        return Section {
+            VStack(spacing: 8) {
+                Text("Ramble \(version) (\(build))")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .onTapGesture {
+                        versionTapCount += 1
+                        if versionTapCount >= 4 {
+                            versionTapCount = 0
+                            showDebugSheet = true
+                        }
+                    }
+
+                HStack(spacing: 16) {
+                    Link("Privacy Policy", destination: SettingsLinks.privacy)
+                    Link("Terms of Use", destination: SettingsLinks.terms)
+                }
+                .font(.caption)
+            }
+            .frame(maxWidth: .infinity)
+            .listRowBackground(Color.clear)
+        }
+    }
+
+    private var chevron: some View {
+        Image(systemName: "chevron.right")
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(Color.obInkFaint)
+    }
+}
+
+private func formatTotalDuration(_ duration: TimeInterval) -> String {
+    let hours = Int(duration) / 3600
+    let minutes = (Int(duration) % 3600) / 60
+    if hours > 0 {
+        return "\(hours)h \(minutes)m"
+    } else {
+        return "\(minutes)m"
+    }
+}
+
+/// A settings row: rounded icon tile, title, optional subtitle with a status
+/// dot, and a trailing slot.
+private struct SettingsRow<Trailing: View>: View {
+    let icon: String
+    var iconTint: Color = Color.obInkSoft
+    let title: String
+    var subtitle: String? = nil
+    var dot: Color? = nil
+    @ViewBuilder let trailing: () -> Trailing
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(iconTint)
+                .frame(width: 30, height: 30)
+                .background(
+                    iconTint == .brandAmber ? Color.brandAmberSoft : Color(.tertiarySystemFill),
+                    in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                )
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .foregroundStyle(Color.obInk)
+                if let subtitle {
+                    HStack(spacing: 6) {
+                        if let dot {
+                            Circle().fill(dot).frame(width: 7, height: 7)
+                        }
+                        Text(subtitle)
+                            .lineLimit(1)
+                    }
+                    .font(.footnote)
+                    .foregroundStyle(Color.obInkFaint)
+                }
+            }
+            Spacer(minLength: 8)
+            trailing()
+        }
+        .contentShape(Rectangle())
+    }
+}
+
+// MARK: - Transcription model page
+
+/// The model picker, cloud upgrade and cloud tuning, one level down so
+/// people who never change the model never see the price list.
+private struct TranscriptionSettingsView: View {
+    @ObservedObject var viewModel: SettingsViewModel
+    @ObservedObject private var subscriptionService = SubscriptionService.shared
+    @State private var showTranscriptionInfo = false
+
     private var isSpeechAnalyzerAvailable: Bool {
         if #available(iOS 26.0, *) { return true }
         return false
     }
 
-    private var freeTranscriptionSection: some View {
+    var body: some View {
+        Form {
+            freeSection
+            cloudSection
+            tuningSection
+        }
+        .listSectionSpacing(24)
+        .navigationTitle("Model")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showTranscriptionInfo = true
+                } label: {
+                    Image(systemName: "info.circle")
+                }
+                .accessibilityLabel("About transcription")
+            }
+        }
+        .sheet(isPresented: $showTranscriptionInfo) {
+            TranscriptionInfoSheet()
+        }
+        .sheet(isPresented: $viewModel.showSubscriptionPaywall) {
+            SubscriptionView()
+        }
+        .onDisappear { viewModel.save() }
+    }
+
+    private var freeSection: some View {
         Section {
             BrandCard {
                 AppleSpeechRow(
@@ -113,25 +414,11 @@ struct SettingsView: View {
                 .listRowSeparator(.hidden)
             }
         } header: {
-            VStack(alignment: .leading, spacing: 14) {
-                SettingsGroupTitle(
-                    title: "Transcribe",
-                    subtitle: "How your voice becomes text."
-                ) {
-                    Button {
-                        showTranscriptionInfo = true
-                    } label: {
-                        Image(systemName: "info.circle")
-                            .font(.title3)
-                    }
-                }
-                SettingsSubsectionLabel("Free · on-device")
-            }
-            .textCase(.none)
+            SettingsSubsectionLabel("Free · on-device")
         }
     }
 
-    private var cloudTranscriptionSection: some View {
+    private var cloudSection: some View {
         Section {
             BrandCard {
                 ForEach(Array(CloudModel.allCases.enumerated()), id: \.element.id) { index, model in
@@ -166,9 +453,9 @@ struct SettingsView: View {
         }
     }
 
-    private var cloudTuningSection: some View {
-        // Shown always — when on Apple Speech the section renders as a locked
-        // teaser so the user can see what cloud unlocks.
+    private var tuningSection: some View {
+        // Shown always: on Apple Speech it renders as a locked teaser so
+        // the person can see what cloud unlocks.
         let isCloud = viewModel.transcriptionProvider.isCloud
         return Section {
             NavigationLink {
@@ -212,200 +499,60 @@ struct SettingsView: View {
         .disabled(!isCloud)
         .opacity(isCloud ? 1 : 0.5)
     }
+}
 
-    private var agentSection: some View {
-        Section {
-            if !relay.connections.isEmpty {
-                BrandCard {
-                    ForEach(Array(relay.connections.enumerated()), id: \.element.id) { index, connection in
-                        Button {
-                            connectAgentStartsPairing = false
-                            showConnectAgent = true
-                        } label: {
-                            HStack(spacing: 12) {
-                                AgentConnectionRow(connection: connection)
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundStyle(Color.obInkFaint)
-                            }
-                            .padding(.vertical, 12)
-                            .padding(.horizontal, 16)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
+// MARK: - Your data
 
-                        if index < relay.connections.count - 1 {
-                            BrandRowDivider(leadingInset: 16)
-                        }
-                    }
+/// Stats, export and "Delete all data", kept off the main Settings screen
+/// so nothing destructive sits there.
+private struct YourDataView: View {
+    @ObservedObject var viewModel: SettingsViewModel
+    @State private var showExportShare = false
+    @State private var exportURL: URL?
+    @State private var showDeleteConfirmation = false
+
+    var body: some View {
+        Form {
+            Section {
+                LabeledContent("Notes", value: "\(viewModel.totalRecordings)")
+                LabeledContent("Total length", value: formatTotalDuration(viewModel.totalDuration))
+                if viewModel.pendingTranscriptions > 0 {
+                    LabeledContent("Waiting to transcribe", value: "\(viewModel.pendingTranscriptions)")
                 }
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
-                .listRowSeparator(.hidden)
-            }
-
-            BrandPlusActionCard(title: relay.connections.isEmpty ? "Connect your agent" : "Connect another agent") {
-                connectAgentStartsPairing = true
-                showConnectAgent = true
-            }
-            .listRowBackground(Color.clear)
-            .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
-            .listRowSeparator(.hidden)
-        } header: {
-            VStack(alignment: .leading, spacing: 14) {
-                SettingsGroupTitle(
-                    title: "Destinations",
-                    subtitle: "Record on your watch. Your agent handles it."
-                )
-                if !relay.connections.isEmpty {
-                    SettingsSubsectionLabel("Connected")
+                if viewModel.failedTranscriptions > 0 {
+                    LabeledContent("Couldn't transcribe", value: "\(viewModel.failedTranscriptions)")
                 }
             }
-            .textCase(.none)
-        }
-    }
 
-    private var webhookSection: some View {
-        Section {
-            if viewModel.webhookURL.isEmpty {
-                BrandPlusActionCard(title: "Add a webhook") {
-                    showDestinationEdit = true
-                }
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
-                .listRowSeparator(.hidden)
-            } else {
+            Section {
                 Button {
-                    showDestinationEdit = true
-                } label: {
-                    HStack(spacing: 12) {
-                        Circle()
-                            .fill(viewModel.webhookHealth.color)
-                            .frame(width: 10, height: 10)
-                            .accessibilityLabel(viewModel.webhookHealth.accessibilityLabel)
-                        Text(destinationHost)
-                            .font(.body)
-                            .foregroundStyle(Color.obInk)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundStyle(Color.obInkFaint)
+                    if let url = viewModel.exportJSON() {
+                        exportURL = url
+                        showExportShare = true
                     }
-                }
-            }
-        } header: {
-            // Part of Destinations, under the agent connections above.
-            SettingsSubsectionLabel(title: "Webhook") {
-                Button {
-                    showWebhookInfo = true
                 } label: {
-                    Image(systemName: "info.circle")
-                        .font(.subheadline)
+                    Label("Export all notes (JSON)", systemImage: "square.and.arrow.up")
+                        .foregroundStyle(Color.obInk)
                 }
-            }
-        } footer: {
-            Text("Pipe transcripts to any URL that accepts an HTTPS POST. Make sure it's one you trust.")
-        }
-    }
-
-    private var destinationHost: String {
-        URL(string: viewModel.webhookURL)?.host ?? viewModel.webhookURL
-    }
-
-    private var appearanceSection: some View {
-        Section {
-            Picker("Theme", selection: $viewModel.appearanceMode) {
-                ForEach(AppearanceMode.allCases) { mode in
-                    Label(mode.displayName, systemImage: mode.iconName)
-                        .tag(mode)
-                }
-            }
-            .pickerStyle(.menu)
-        } header: {
-            SettingsGroupTitle(title: "Appearance")
-        }
-    }
-
-    private var statsSection: some View {
-        Section {
-            HStack {
-                Text("Total Recordings")
-                Spacer()
-                Text("\(viewModel.totalRecordings)")
-                    .foregroundStyle(.secondary)
-            }
-            HStack {
-                Text("Total Duration")
-                Spacer()
-                Text(formatTotalDuration(viewModel.totalDuration))
-                    .foregroundStyle(.secondary)
+            } footer: {
+                Text("Transcripts and details for every note, as one JSON file.")
             }
 
-            if viewModel.pendingTranscriptions > 0 {
-                HStack {
-                    Text("Pending Transcriptions")
-                    Spacer()
-                    Text("\(viewModel.pendingTranscriptions)")
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            if viewModel.failedTranscriptions > 0 {
-                HStack {
-                    Text("Failed Transcriptions")
-                    Spacer()
-                    Text("\(viewModel.failedTranscriptions)")
+            Section {
+                Button(role: .destructive) {
+                    showDeleteConfirmation = true
+                } label: {
+                    Label("Delete all data", systemImage: "trash")
                         .foregroundStyle(.red)
                 }
             }
-        } header: {
-            SettingsGroupTitle(title: "Statistics")
         }
-    }
-
-    private var exportSection: some View {
-        Section {
-            Button {
-                if let url = viewModel.exportJSON() {
-                    exportURL = url
-                    showExportShare = true
-                }
-            } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 16))
-                        .foregroundStyle(Color.obInk)
-                        .frame(width: 22)
-                    Text("Export all recordings (JSON)")
-                        .foregroundStyle(Color.obInk)
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.obInkFaint)
-                }
+        .navigationTitle("Your data")
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showExportShare) {
+            if let url = exportURL {
+                ShareSheet(activityItems: [url])
             }
-        } header: {
-            SettingsGroupTitle(title: "Data")
-        }
-    }
-
-    private var dangerZoneSection: some View {
-        Section {
-            Button(role: .destructive) {
-                showDeleteConfirmation = true
-            } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "trash")
-                        .font(.system(size: 16))
-                        .foregroundStyle(Color.brandAmber)
-                        .frame(width: 22)
-                    Text("Delete all data")
-                        .foregroundStyle(Color.brandAmber)
-                    Spacer()
-                }
-            }
-        } header: {
-            SettingsGroupTitle(title: "Danger zone")
         }
         .confirmationDialog(
             "Delete all recordings?",
@@ -418,44 +565,6 @@ struct SettingsView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This will permanently delete all recordings and transcriptions.")
-        }
-    }
-
-    private var aboutSection: some View {
-        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
-
-        return Section {
-            VStack(spacing: 8) {
-                Text("Ramble v\(version) (\(build))")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .onTapGesture {
-                        versionTapCount += 1
-                        if versionTapCount >= 4 {
-                            versionTapCount = 0
-                            showDebugSheet = true
-                        }
-                    }
-
-                HStack(spacing: 16) {
-                    Link("Privacy Policy", destination: SettingsLinks.privacy)
-                    Link("Terms of Use", destination: SettingsLinks.terms)
-                }
-                .font(.caption)
-            }
-            .frame(maxWidth: .infinity)
-            .listRowBackground(Color.clear)
-        }
-    }
-
-    private func formatTotalDuration(_ duration: TimeInterval) -> String {
-        let hours = Int(duration) / 3600
-        let minutes = (Int(duration) % 3600) / 60
-        if hours > 0 {
-            return "\(hours)h \(minutes)m"
-        } else {
-            return "\(minutes)m"
         }
     }
 }
