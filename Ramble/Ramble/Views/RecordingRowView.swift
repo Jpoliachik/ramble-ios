@@ -48,15 +48,14 @@ struct RecordingRowView: View {
         .padding(.vertical, 6)
     }
 
-    /// Second line for completed recordings that aren't fully delivered, so a
-    /// transcript with nowhere to go never reads as done.
+    private var stage: DeliveryStage { DeliveryStage(recording) }
+
+    /// Second line for notes that are stuck, so a transcript with
+    /// nowhere to go never reads as done. Same words as the note screen.
     private var deliveryNote: String? {
-        guard recording.status == .completed else { return nil }
-        switch recording.deliveryStatus {
-        case .none:
-            return RelayService.shared.hasConnectedAgents ? "Not sent" : "Not sent · connect your agent"
-        default:
-            return nil
+        switch stage {
+        case .onPhone, .didntSend, .couldntTranscribe: return stage.label
+        default: return nil
         }
     }
 
@@ -72,7 +71,7 @@ struct RecordingRowView: View {
         HStack(spacing: 6) {
             ProgressView()
                 .controlSize(.mini)
-            Text(recording.status == .transcribing ? "Transcribing..." : "Waiting...")
+            Text(stage.label)
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }
@@ -80,32 +79,17 @@ struct RecordingRowView: View {
 
     @ViewBuilder
     private var statusIcon: some View {
-        switch recording.status {
-        case .completed:
-            switch recording.deliveryStatus {
-            case .pending, .sending:
+        if stage.isInProgress {
+            // The transcribing placeholder already shows a spinner.
+            if recording.status == .completed {
                 ProgressView()
                     .controlSize(.mini)
-            case .failed:
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
-                    .font(.subheadline)
-            case .delivered:
-                // Outline until the agent has it, filled once it's picked up.
-                Image(systemName: recording.isWaitingForAgent ? "checkmark.circle" : "checkmark.circle.fill")
-                    .foregroundStyle(.green)
-                    .font(.subheadline)
-            case .none:
-                Image(systemName: "tray")
-                    .foregroundStyle(.secondary)
-                    .font(.subheadline)
             }
-        case .failed:
-            Image(systemName: recording.isModelNotInstalled ? "arrow.down.circle.fill" : "exclamationmark.circle.fill")
-                .foregroundStyle(recording.isModelNotInstalled ? .orange : .red)
+        } else if let symbol = stage.systemImage {
+            Image(systemName: symbol)
+                .foregroundStyle(stage.iconTint)
                 .font(.subheadline)
-        case .transcribing, .recorded:
-            EmptyView()
+                .accessibilityLabel(stage.label)
         }
     }
 }

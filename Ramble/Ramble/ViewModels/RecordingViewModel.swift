@@ -128,29 +128,6 @@ final class RecordingViewModel: ObservableObject {
         }
     }
 
-    var pendingCount: Int {
-        recordings.filter { [.recorded, .transcribing].contains($0.status) }.count
-    }
-
-    var failedCount: Int {
-        recordings.filter { $0.status == .failed }.count
-    }
-
-    /// Transcribed, and a destination is still in flight.
-    var sendingCount: Int {
-        recordings.filter {
-            $0.status == .completed
-                && ($0.deliveryStatus == .pending || $0.deliveryStatus == .sending)
-        }.count
-    }
-
-    /// Transcription failures plus delivery failures, for the sync banner.
-    var needsAttentionCount: Int {
-        recordings.filter {
-            $0.status == .failed || ($0.status == .completed && $0.deliveryStatus == .failed)
-        }.count
-    }
-
     var recordingsByDay: [(date: Date, recordings: [Recording])] {
         let calendar = Calendar.current
         let grouped = Dictionary(grouping: recordings) { recording in

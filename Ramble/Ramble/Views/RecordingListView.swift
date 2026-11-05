@@ -12,8 +12,6 @@ struct RecordingListView: View {
 
     @State private var showLockHint = false
     @State private var lockHintTask: Task<Void, Never>?
-    @State private var showConnectAgent = false
-    @ObservedObject private var relay = RelayService.shared
 
     var body: some View {
         if recordingsByDay.isEmpty {
@@ -53,37 +51,9 @@ struct RecordingListView: View {
 
     private var emptyStateView: some View {
         ZStack {
-            VStack(spacing: 28) {
-                RambleBarsMark(size: 72)
-
-                Text("Record on your watch. It shows up here, then goes to your agent.")
-                    .font(.system(size: 18, design: .serif).weight(.medium))
-                    .tracking(-0.5)
-                    .foregroundStyle(Color.obInk)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                if relay.hasConnectedAgents {
-                    Text("Open Ramble on your Watch to record.")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(Color.obInk.opacity(0.5))
-                        .multilineTextAlignment(.center)
-                } else {
-                    Button {
-                        HapticService.buttonTap()
-                        showConnectAgent = true
-                    } label: {
-                        Text("Connect your agent")
-                            .font(.body.weight(.semibold))
-                            .padding(.horizontal, 8)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Color.brandAmber)
-                    .controlSize(.large)
-                }
-            }
-            .opacity(isRecording ? 0 : 1)
-            .allowsHitTesting(!isRecording)
+            TrySayingView()
+                .opacity(isRecording ? 0 : 1)
+                .allowsHitTesting(!isRecording)
 
             Text("Pocket it — we'll keep listening")
                 .font(.system(size: 14, weight: .medium))
@@ -96,9 +66,6 @@ struct RecordingListView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .animation(.easeInOut(duration: 0.4), value: isRecording)
         .animation(.easeInOut(duration: 0.6), value: showLockHint)
-        .sheet(isPresented: $showConnectAgent) {
-            ConnectAgentView()
-        }
         .onChange(of: isRecording) { _, newValue in
             lockHintTask?.cancel()
             if newValue {
@@ -112,6 +79,63 @@ struct RecordingListView: View {
                 }
             } else {
                 showLockHint = false
+            }
+        }
+    }
+}
+
+/// Home with no notes yet: a watch with a slow idle pulse and one idea at a
+/// time of what to say, some beyond to-dos to show what an agent can do.
+private struct TrySayingView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private static let ideas = [
+        "\u{201C}Remind me to call Sam after lunch.\u{201D}",
+        "\u{201C}Add oat milk to the grocery list.\u{201D}",
+        "\u{201C}Walking meetings on Fridays. Think it through.\u{201D}",
+        "\u{201C}What was that podcast Maya mentioned?\u{201D}",
+        "\u{201C}Draft a thank-you note to Alex.\u{201D}",
+    ]
+    private static let interval: TimeInterval = 3.5
+
+    var body: some View {
+        VStack(spacing: 24) {
+            OnboardingWatchFrame {
+                OnboardingRecordGlyph()
+                    .phaseAnimator([false, true]) { glyph, inhale in
+                        glyph.scaleEffect(reduceMotion ? 1 : (inhale ? 1.06 : 0.96))
+                    } animation: { _ in .easeInOut(duration: 1.4) }
+            }
+            .scaleEffect(1.2)
+            .padding(.vertical, 18)
+            .accessibilityHidden(true)
+
+            TimelineView(.periodic(from: .now, by: Self.interval)) { context in
+                let index = reduceMotion ? 0 : Int(context.date.timeIntervalSinceReferenceDate / Self.interval) % Self.ideas.count
+                VStack(spacing: 14) {
+                    Text("TRY SAYING")
+                        .font(.system(size: 13, weight: .semibold))
+                        .tracking(0.4)
+                        .foregroundStyle(.secondary)
+
+                    Text(Self.ideas[index])
+                        .font(.system(size: 24, design: .serif).italic())
+                        .foregroundStyle(Color.obInk)
+                        .multilineTextAlignment(.center)
+                        .frame(minHeight: 64)
+                        .id(index)
+                        .transition(.opacity)
+
+                    HStack(spacing: 7) {
+                        ForEach(Self.ideas.indices, id: \.self) { i in
+                            Circle()
+                                .fill(i == index ? Color.brandAmber : Color.obInk.opacity(0.12))
+                                .frame(width: 7, height: 7)
+                        }
+                    }
+                    .accessibilityHidden(true)
+                }
+                .animation(.easeInOut(duration: 0.4), value: index)
             }
         }
     }
