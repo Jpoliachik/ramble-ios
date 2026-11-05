@@ -154,6 +154,19 @@ struct ConnectAgentView: View {
                     privacyNote
                         .padding(.top, 14)
                     actions
+                    // Most people use one agent, so this stays a quiet footnote.
+                    Button {
+                        HapticService.buttonTap()
+                        note = nil
+                        isPairing = true
+                    } label: {
+                        Text("Using more than one agent? **Connect another**")
+                            .font(.footnote)
+                            .foregroundStyle(Color.obInkFaint)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 4)
+                    .padding(.top, 10)
                 }
 
                 if let errorMessage {
@@ -226,23 +239,6 @@ struct ConnectAgentView: View {
 
     private var actions: some View {
         VStack(spacing: 0) {
-            Button {
-                HapticService.buttonTap()
-                note = nil
-                isPairing = true
-            } label: {
-                HStack {
-                    Text("Connect another agent")
-                    Spacer()
-                    Image(systemName: "plus")
-                        .font(.footnote.weight(.semibold))
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 13)
-                .contentShape(Rectangle())
-            }
-            .foregroundStyle(Color.obInk)
-            Divider().padding(.leading, 16)
             Button(role: .destructive) {
                 showDeleteConfirmation = true
             } label: {
@@ -313,7 +309,9 @@ enum AgentHealth: Equatable {
         let checked: String
         if let last = connection.lastPullAt {
             let age = HomeStatusLine.age(since: last)
-            checked = age == "now" ? "Checked in just now" : "Checked in \(age) ago"
+            // "Last checked in" under a quiet card's "Hasn't checked in" heading.
+            let verb = connection.pending > 0 && age != "now" ? "Last checked in" : "Checked in"
+            checked = age == "now" ? "Checked in just now" : "\(verb) \(age) ago"
         } else {
             checked = "Hasn't checked in yet"
         }
