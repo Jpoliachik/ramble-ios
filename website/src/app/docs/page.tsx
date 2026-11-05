@@ -395,7 +395,8 @@ export default function AgentDocs() {
                     wake-up hook
                   </a>{" "}
                   with the header <InlineCode>Authorization: Bearer &lt;key&gt;</InlineCode>. The routine&rsquo;s
-                  Webhook section shows both. Add a daily scheduled check as a backup. Each routine run uses Grok
+                  Webhook section shows both. The key lets anyone start that routine, so give it to Grok through a
+                  secure secret card rather than ordinary chat. Add a daily scheduled check as a backup. Each routine run uses Grok
                   usage, so avoid a schedule every few minutes.
                 </li>
                 <li>

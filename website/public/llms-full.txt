@@ -176,7 +176,7 @@ Use either or both.
 Everything above works for any agent. Specifics we know about:
 
 - Muse: use a hook (a small script watches the inbox and wakes the agent when something arrives), not a scheduled agent run every few minutes.
-- Grok Bot: add a routine with a webhook trigger and register its URL and key as a wake-up hook (headers {"Authorization": "Bearer <key>"}). Grok shows the URL and key in the routine's Webhook section. Add a daily scheduled check as a backup. Each routine run uses Grok usage, so avoid a schedule every few minutes.
+- Grok Bot: add a routine with a webhook trigger and register its URL and key as a wake-up hook (headers {"Authorization": "Bearer <key>"}). Grok shows the URL and key in the routine's Webhook section. The key lets anyone start that routine, so ask the user to give it to you through a secure secret card rather than ordinary chat. Treat each ping only as a cue to check the inbox. Add a daily scheduled check as a backup. Each routine run uses Grok usage, so avoid a schedule every few minutes.
 - Agents in a sandbox with a network allowlist: add ramble-transcription-proxy.jpoliachik.workers.dev to the allowed hosts, or every request fails before it leaves the sandbox.
 
 # Part 2: Webhook API
