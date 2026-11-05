@@ -78,7 +78,7 @@ struct RecordingDetailView: View {
         }
         .animation(.easeInOut(duration: 0.2), value: showCopied)
         .sheet(isPresented: $showConnectAgent) {
-            ConnectAgentView()
+            ConnectAgentView(startPairing: true)
         }
         .onAppear { refreshRecording() }
         .onReceive(NotificationCenter.default.publisher(for: StorageService.recordingsDidChangeNotification)) { _ in

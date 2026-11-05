@@ -15,6 +15,8 @@ import SwiftUI
 import UIKit
 
 struct OnboardingConnectStep: View {
+    var continueTitle = "Continue"
+    var laterTitle = "Set up later"
     let onContinue: () -> Void
     let onLater: () -> Void
 
@@ -78,11 +80,11 @@ struct OnboardingConnectStep: View {
             .animation(.smooth(duration: 0.3), value: stage)
         } bottomBar: {
             VStack(spacing: 0) {
-                OnboardingPrimaryButton(title: "Continue", isDisabled: stage != .connected, action: onContinue)
+                OnboardingPrimaryButton(title: continueTitle, isDisabled: stage != .connected, action: onContinue)
                 if stage == .connected {
                     Color.clear.frame(height: 47)
                 } else {
-                    OnboardingSecondaryLink(title: "Set up later", action: onLater)
+                    OnboardingSecondaryLink(title: laterTitle, action: onLater)
                 }
             }
             .padding(.horizontal, 16)
