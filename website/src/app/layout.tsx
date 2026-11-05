@@ -64,6 +64,9 @@ export default function RootLayout({
               <Link href="/docs/webhooks" className="hover:text-stone-900 transition-colors">
                 Webhooks
               </Link>
+              <Link href="/docs/help" className="hover:text-stone-900 transition-colors">
+                Help
+              </Link>
               <Link href="/privacy" className="hover:text-stone-900 transition-colors">
                 Privacy
               </Link>
