@@ -1,17 +1,12 @@
 # Free notes and unlock
 
 ## Purpose
-How Ramble is paid for: 25 free notes, then a one-time $14.99 unlock with no subscription. Covers counting free notes, notes held when free notes run out, buying and restoring the unlock, how every device learns about it, fair use, people who paid under the earlier pricing, and what Ramble says about price. The wire contract (status codes, reasons, purchase and notification endpoints) is in relay-api.md; where held notes appear on screen is in watch.md and phone.md.
+How Ramble is paid for: 25 free notes, then a one-time $14.99 unlock with no subscription. Covers counting free notes, notes held when free notes run out, buying and restoring the unlock, how every device learns about it, fair use, early buyers (paid download or cloud subscription), and what Ramble says about price. The wire contract (status codes, reasons, purchase and notification endpoints) is in relay-api.md; where held notes appear on screen is in watch.md and phone.md.
 
 ## Free notes
 
 ### Requirement: 25 free notes per inbox
 Ramble SHALL transcribe the first 25 notes from an inbox for free, counted on the server by distinct note, at the moment an upload is accepted. Notes from the person's watch and iPhone share one count.
-
-#### Scenario: A note uses one free note
-- GIVEN an inbox that is not unlocked and has 25 free notes left
-- WHEN the watch uploads a note and the server accepts it
-- THEN the inbox has 24 free notes left
 
 #### Scenario: A retried upload never counts twice
 - GIVEN a note that was accepted, but the device never saw the reply
@@ -51,11 +46,16 @@ Before unlock, the iPhone app SHALL show the count the server last reported: in 
 - THEN they see "3 free notes left", and tapping it opens the unlock sheet
 
 ### Requirement: The count belongs to the inbox
-A fresh inbox SHALL start with 25 free notes. Reinstalling Ramble on the iPhone creates a fresh inbox, so the count starts again at 25. "Delete waiting notes" (delivery.md) SHALL NOT change the count or the unlock.
+A fresh inbox SHALL start with 25 free notes. A reinstall that finds its inbox credential still on the iPhone SHALL keep the same inbox, with its free count, unlock and agents. A reinstall without it SHALL start a fresh inbox with 25 free notes; agents must be connected again (delivery.md). "Delete waiting notes" (delivery.md) SHALL NOT change the count or the unlock.
 
-#### Scenario: Reinstall
-- GIVEN a person with 0 free notes left and no purchase
-- WHEN they delete and reinstall Ramble on the iPhone
+#### Scenario: Reinstall keeps the inbox
+- GIVEN a person with 4 free notes left whose iPhone still holds its inbox credential
+- WHEN they delete and reinstall Ramble
+- THEN the inbox still has 4 free notes left and its agents stay connected
+
+#### Scenario: Reinstall starts fresh
+- GIVEN a person with 0 free notes left, no purchase, and no inbox credential left on the iPhone
+- WHEN they reinstall Ramble
 - THEN the fresh inbox has 25 free notes left
 
 ## Out of free notes
@@ -67,7 +67,8 @@ When an inbox with no free notes left and no unlock uploads a note, the server S
 - GIVEN an inbox with 0 free notes left and no unlock
 - WHEN the watch uploads a note
 - THEN the server refuses it with reason "free_notes_used"
-- AND the watch keeps the audio and shows its Unlock alert (watch.md)
+- AND the watch keeps the audio, shows its Unlock alert (watch.md), and tells the iPhone the note is held
+- AND the iPhone counts it in its "notes to unlock" pill (phone.md)
 
 #### Scenario: 26th note on the iPhone
 - GIVEN an inbox with 0 free notes left and no unlock
@@ -120,8 +121,7 @@ The unlock sheet SHALL show the price exactly as the App Store reports it for th
 #### Scenario: Store unreachable
 - GIVEN the App Store price cannot be loaded
 - WHEN the person opens the unlock sheet
-- THEN the button reads "Unlock" and is disabled
-- AND a line reads "Can't reach the App Store. Try again in a moment."
+- THEN the button reads "Unlock", disabled, above "Can't reach the App Store. Try again in a moment."
 
 ### Requirement: Purchase outcomes
 The app SHALL show the person the outcome of every purchase attempt, and no outcome SHALL lose a held note.
@@ -145,7 +145,11 @@ The app SHALL show the person the outcome of every purchase attempt, and no outc
 - GIVEN an account whose purchase needs approval, or a pending payment
 - WHEN the purchase is submitted
 - THEN the sheet shows "Waiting for approval. Your notes are kept and will transcribe once it's approved."
-- AND when approval arrives, the app confirms it with the server the next time it runs, and held notes upload
+
+#### Scenario: Approval arrives later
+- GIVEN a pending purchase was approved while Ramble was closed
+- WHEN the app next runs
+- THEN it confirms the purchase with the server and held notes upload
 
 #### Scenario: Paid, but the server can't be reached
 - GIVEN the App Store purchase succeeded
@@ -177,7 +181,7 @@ The unlock SHALL live on the server, attached to inboxes. The iPhone SHALL send 
 - THEN the server rejects it and the inbox stays locked
 
 ### Requirement: Purchase bound to inboxes, at most 5
-A first purchase SHALL carry the account token the relay gave the inbox it was bought from. A restore MAY come from a different inbox and counts toward the cap. One purchase SHALL unlock at most 5 inboxes, counting only inboxes that uploaded a note in the last 90 days, keyed on the purchase's original transaction (or the app purchase record for early buyers).
+A first purchase SHALL carry the account token the server gave the inbox it was bought from. A restore MAY come from a different inbox, including a fresh inbox after a reinstall, and counts toward the cap. One purchase SHALL unlock at most 5 inboxes, counting only inboxes that uploaded a note in the last 90 days, keyed on the purchase's original transaction (or the app purchase record for early buyers).
 
 #### Scenario: First purchase from the wrong inbox
 - GIVEN a first purchase whose account token does not match the inbox sending it
@@ -187,20 +191,21 @@ A first purchase SHALL carry the account token the relay gave the inbox it was b
 #### Scenario: Sixth iPhone
 - GIVEN a purchase bound to 5 inboxes that uploaded in the last 90 days
 - WHEN it is restored on a sixth inbox
-- THEN the server refuses, and the app shows "This purchase is in use on 5 iPhones. A spot opens when one of them goes 90 days without sending a note."
-
-#### Scenario: An inbox ages out
-- GIVEN one of the 5 inboxes has not uploaded for 90 days
-- WHEN the purchase is restored on another iPhone
-- THEN that iPhone's inbox is unlocked
+- THEN the server refuses, and the app shows "This purchase is in use on 5 iPhones. Each fresh start after a reinstall counts as one. A spot opens when one of them goes 90 days without sending a note."
 
 ### Requirement: Refunds remove the unlock
-When Apple reports a refund or revocation through its server notifications (endpoint in relay-api.md), the server SHALL remove the unlock from every inbox bound to that purchase and SHALL reject that purchase record from then on. Notes accepted before then SHALL still be transcribed.
+When Apple reports a refund or revocation through its server notifications (endpoint in relay-api.md), the server SHALL remove the unlock from every inbox bound to that purchase and SHALL reject that purchase record from then on. Each inbox SHALL return to the free state with its used free-note count unchanged (notes accepted while unlocked never use free notes). Notes accepted before the refund SHALL still be transcribed, and transcripts already made stay.
 
-#### Scenario: Refunded after use
-- GIVEN an unlocked inbox that has used all 25 free notes
+#### Scenario: Refunded after running out
+- GIVEN an inbox that used all 25 free notes, then unlocked and sent 40 more notes
 - WHEN Apple notifies the server of a refund
-- THEN later uploads are held as "Unlock to transcribe"
+- THEN the inbox has 0 free notes left, and later uploads are refused with reason "free_notes_used" and held as "Unlock to transcribe"
+- AND the next time the app reads the account, Settings shows "0 of 25 free notes left" with "Unlock"
+
+#### Scenario: Refunded early
+- GIVEN an inbox that used 3 free notes before unlocking
+- WHEN Apple notifies the server of a refund
+- THEN the inbox has 22 free notes left
 
 ### Requirement: Test purchases never unlock production
 The production server SHALL reject purchase records and server notifications from the App Store sandbox and from Xcode testing, and SHALL accept no developer bypass key. A separate test server SHALL accept sandbox records.
@@ -215,18 +220,13 @@ The production server SHALL reject purchase records and server notifications fro
 ### Requirement: 50 hours a month per purchase
 An unlocked purchase SHALL include 50 hours of transcribed audio per calendar month (UTC), counted across every inbox bound to it and resetting on the 1st. Duration SHALL be measured by the server from the transcription result, never taken from the device. There SHALL be no separate per-device limit, and before purchase only the 25 free notes apply.
 
-#### Scenario: Shared across devices
-- GIVEN one purchase used by a watch and an iPhone
-- WHEN together they transcribe 50 hours in November
-- THEN further uploads that month are held
-
 #### Scenario: The note that crosses the line
 - GIVEN 49.5 hours used this month
 - WHEN a 60-minute note is accepted
 - THEN it transcribes in full, and only uploads after it are held
 
 ### Requirement: Over fair use, notes are held
-When the allowance is used up, the server SHALL refuse uploads with payment required, reason "fair_use", and a retry time equal to the reset, keeping and counting nothing. The device SHALL keep the audio, show the note as "Over fair use" with the detail "This note will transcribe on Dec 1." (the reset date), retry at the reset time and whenever the app opens, and raise no stuck-note alert.
+When the allowance is used up, the server SHALL refuse uploads with payment required, reason "fair_use", and a retry time equal to the reset, keeping and counting nothing. The device SHALL keep the audio, show the note as "Over fair use" with the detail "This note will transcribe on <Mon D>." (the reset date), retry at the reset time and whenever the app opens, and raise no stuck-note alert.
 
 #### Scenario: Held until the reset
 - GIVEN a purchase that has used 50 hours in November
@@ -235,35 +235,32 @@ When the allowance is used up, the server SHALL refuse uploads with payment requ
 - AND after December 1 (UTC) the iPhone retries, and the notes upload and transcribe
 
 ### Requirement: Fair use shown only when close
-The iPhone app SHALL mention fair use only once 80% (40 hours) is used, with "You've used 41 of 50 hours this month. Resets Dec 1." in Settings and on Home. Otherwise fair use appears only in the Terms of Use, the App Store description and the unlock sheet.
+The iPhone app SHALL mention fair use only once 80% (40 hours) is used, with "You've used N of 50 hours this month. Resets <Mon D>." in Settings and on Home. Otherwise fair use appears only in the Terms of Use, the App Store description and the unlock sheet.
 
-#### Scenario: Normal use
-- GIVEN 20 hours used this month
+#### Scenario: Close to the limit
+- GIVEN 41 hours used in November
 - WHEN the person opens Settings
-- THEN no fair-use figure appears
+- THEN they see "You've used 41 of 50 hours this month. Resets Dec 1."
 
 ## Early buyers
 
-### Requirement: Paid-download buyers are unlocked
-A person whose first download of Ramble was a paid build (build number below the first free build) SHALL be treated as unlocked, proved by Apple's signed app purchase record. The app SHALL send it on its own at first launch and on "Restore Purchases". The 5-inbox cap and fair use apply.
+The first free build is the first build that offers free notes; its build number is FIRST_FREE_BUILD, set at release. A person's "first free-notes launch" is the first time they open a build at or above it.
 
-#### Scenario: Paid buyer opens the free-notes version
+### Requirement: Paid-download buyers are unlocked
+A person whose first download of Ramble was a build below FIRST_FREE_BUILD SHALL be treated as unlocked, proved by Apple's signed app purchase record. The app SHALL send it on its own at first launch and on "Restore Purchases". The 5-inbox cap and fair use apply.
+
+#### Scenario: Paid buyer's first free-notes launch
 - GIVEN a person who bought Ramble for $4.99
-- WHEN they first open a version of Ramble with free notes
+- WHEN they reach their first free-notes launch
 - THEN the inbox is unlocked with no purchase
 - AND the app shows once: "You're all set. You bought Ramble early, so every note transcribes. No unlock needed."
 
-#### Scenario: Free download
-- GIVEN a person whose first download was a free build
-- WHEN the app sends their app purchase record
-- THEN they get the 25 free notes like everyone else
-
 ### Requirement: Active subscribers are unlocked
-A person whose monthly cloud subscription is active or in its grace period when they first open a version of Ramble with free notes SHALL be treated as unlocked permanently. A lapsed subscription SHALL NOT unlock. The subscription product SHALL be accepted only as this proof.
+A person whose monthly cloud subscription is active or in its grace period at their first free-notes launch SHALL be treated as unlocked permanently. A lapsed subscription SHALL NOT unlock. The subscription product SHALL be accepted only as this proof.
 
 #### Scenario: Lapsed subscriber
 - GIVEN a person whose subscription ended months earlier
-- WHEN they first open a version of Ramble with free notes
+- WHEN they reach their first free-notes launch
 - THEN they get the 25 free notes like everyone else
 
 ### Requirement: Subscribers are told how to stop billing
@@ -271,7 +268,7 @@ Apple keeps billing a subscription until the person cancels it. While an unlocke
 
 #### Scenario: Active subscriber opens the app
 - GIVEN a person whose subscription is still set to renew
-- WHEN they first open a version of Ramble with free notes
+- WHEN they reach their first free-notes launch
 - THEN they see: "Cloud transcription is now included for everyone. You don't need your subscription anymore. Apple keeps billing it until you cancel." with "Manage subscription" and "Not now"
 - AND "Manage subscription" opens Apple's subscription settings
 
@@ -283,7 +280,7 @@ Apple keeps billing a subscription until the person cancels it. While an unlocke
 ## What Ramble says about price
 
 ### Requirement: One price story everywhere
-The app, website, Terms of Use, Privacy Policy and App Store listing SHALL describe pricing as "Free to download. 25 notes free, then $14.99 once." (the app uses the store's local price), with no monthly price. The Terms of Use and App Store description SHALL state fair use as 50 hours of audio per month per purchase, and that refunds are handled by Apple.
+The app, website, Terms of Use, Privacy Policy and App Store listing SHALL describe pricing as "Free to download. 25 notes free, then $14.99 once." (the app uses the store's local price), with no monthly price. The Terms of Use and App Store description SHALL state fair use as "50 hours of audio per calendar month" per purchase, and that refunds are handled by Apple.
 
 #### Scenario: Terms page
 - GIVEN the published Terms of Use
@@ -292,7 +289,7 @@ The app, website, Terms of Use, Privacy Policy and App Store listing SHALL descr
 - AND it says nothing about auto-renewal
 
 ### Requirement: Words to avoid
-Copy SHALL NOT call the free notes a "trial", and SHALL NOT say "unlimited" (fair use applies), "premium", "Subscribe", or "per month". "Subscription" SHALL appear only in "No subscription." and in messages to subscribers.
+Copy SHALL NOT call the free notes a "trial", and SHALL NOT say "unlimited" (fair use applies), "premium", "Subscribe", or "per month" or "/month" next to a price. The only monthly wording allowed is the fair-use line "50 hours of audio per calendar month" and the in-app "this month" usage line. "Subscription" SHALL appear only in "No subscription." and in messages to subscribers.
 
 #### Scenario: Out of free notes
 - GIVEN a person with 0 free notes left

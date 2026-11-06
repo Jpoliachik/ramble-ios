@@ -56,22 +56,22 @@ The server SHALL transcribe every note with Groq Whisper v3 Turbo first, for fre
 - THEN Groq Whisper v3 Turbo produces its transcript
 
 ### Requirement: Fallback only when a provider is overloaded or down
-The server SHALL move to the next provider, in the order Groq → Deepgram Nova-3 → OpenAI GPT-Transcribe, only when the current one answers 5xx or 429, cannot be reached, or gives no answer within 120 seconds. Any other provider error SHALL NOT trigger a fallback. Notes longer than 25 minutes SHALL skip OpenAI, which takes no more per request.
+The server SHALL move to the next provider, in the order Groq → Deepgram Nova-3 → OpenAI GPT-Transcribe, only when the current one answers 5xx or 429, rejects or lacks Ramble's key (the operator is alerted), cannot be reached, or gives no answer within 120 seconds. Any other provider error SHALL NOT trigger a fallback. Notes longer than 25 minutes SHALL skip OpenAI. No note SHALL fail permanently or be marked silent because of Ramble's own configuration.
 
 #### Scenario: Groq rate-limits
 - GIVEN Groq answers a note with 429
 - WHEN the attempt continues
 - THEN the same audio is sent to Deepgram Nova-3
 
+#### Scenario: Groq key rejected
+- GIVEN Groq answers 401 to Ramble's key
+- WHEN the attempt continues
+- THEN Deepgram is tried, the note is not failed, and the operator is alerted
+
 #### Scenario: Audio rejected
 - GIVEN Groq answers 400 because it cannot decode the audio
 - WHEN the attempt ends
 - THEN no other provider is tried and the note fails permanently
-
-#### Scenario: Long note during an outage
-- GIVEN a 40-minute note, and Groq and Deepgram both answer 503
-- WHEN the attempt would reach OpenAI
-- THEN OpenAI is skipped and the attempt ends as a retryable failure
 
 ### Requirement: Spend circuit breaker on the fallbacks
 The server SHALL stop using Deepgram and OpenAI for the rest of the UTC day once their combined estimated spend that day reaches $5.00. While the breaker is open, notes that Groq cannot take wait and are retried with Groq only.
@@ -88,19 +88,12 @@ The server SHALL send audio only to providers whose API terms exclude training o
 - GIVEN a note falls back to Deepgram
 - WHEN the server sends the audio
 - THEN the request opts out of Deepgram's model improvement program
-
-### Requirement: No transcription without provider keys
-If the server is missing a provider's key, that provider SHALL count as down: the note waits and is retried, and the operator is alerted. No note SHALL fail permanently or be marked silent because of Ramble's own configuration.
-
-#### Scenario: Groq key rejected
-- GIVEN Groq answers 401 to Ramble's key
-- WHEN the attempt ends
-- THEN the note is retried later, not failed, and the operator is alerted
+- AND Deepgram is one of the three providers the privacy policy names
 
 ## Options
 
 ### Requirement: Options set on the iPhone apply to every note
-The person SHALL be able to set three options in the iPhone app (phone.md): Language (default "Auto-detect", with every language in the list available), Vocabulary (up to 900 characters, default empty), and "Remove filler words" (default off). They SHALL be kept with the inbox on the server, and a note SHALL be transcribed with the options in effect when its transcription starts, whichever device recorded it.
+The person SHALL be able to set three options in the iPhone app (phone.md): Language (default "Auto-detect", with every language in phone.md's Language list), Vocabulary (up to 900 characters, default empty), and "Remove filler words" (default off). They SHALL be kept with the inbox on the server. A note's options SHALL be fixed when its first attempt starts, whichever device recorded it, and every retry SHALL use those same options.
 
 #### Scenario: Watch note uses phone settings
 - GIVEN Language is set to Spanish on the iPhone
@@ -108,9 +101,9 @@ The person SHALL be able to set three options in the iPhone app (phone.md): Lang
 - THEN the note is transcribed with a Spanish language hint
 
 #### Scenario: Change while a note waits
-- GIVEN a note is waiting for a retry
-- WHEN the person turns on "Remove filler words"
-- THEN that note's transcript has filler words removed
+- GIVEN a note's first attempt ran with "Remove filler words" off and failed
+- WHEN the person turns it on before the retry
+- THEN the retried note keeps its filler words, and notes whose first attempt starts afterwards lose them
 
 ### Requirement: Language hint
 The server SHALL pass the chosen language to the provider, and SHALL let the provider detect the language when the setting is "Auto-detect" or when a fallback provider does not support the chosen language.
@@ -126,7 +119,7 @@ The server SHALL pass the chosen language to the provider, and SHALL let the pro
 - THEN Deepgram is given no language hint, neither Welsh nor English, and detects the language itself
 
 ### Requirement: Vocabulary hints
-The server SHALL use the vocabulary as a list of terms separated by commas or line breaks, ignoring case-only duplicates and characters a provider rejects, up to 100 terms of up to 100 characters each. The hint SHALL never appear in the transcript unless it was spoken.
+The server SHALL use the vocabulary as a list of terms separated by commas or line breaks, ignoring case-only duplicates and dropping "<", ">" and line breaks inside a term, up to 100 terms of up to 100 characters each. The hint SHALL never appear in the transcript unless it was spoken.
 
 #### Scenario: Hint not echoed
 - GIVEN the vocabulary is "Goodloop, Ramble"
@@ -147,7 +140,7 @@ When "Remove filler words" is on, the transcript SHALL leave out "um", "uh", "er
 - THEN "um" and "uh" stay in it, as they would from Groq
 
 ### Requirement: Paragraphs
-Every transcript SHALL be broken into paragraphs, with no setting: a new paragraph starts after a pause of 2 seconds or more, or, when the provider gives no timing, every few sentences once the transcript passes 500 characters. A transcript under 500 characters with no long pause is one paragraph.
+Every transcript SHALL be broken into paragraphs, with no setting: a new paragraph starts after a pause of 2 seconds or more. When the provider gives no timing, a transcript of 500 characters or more breaks at the first sentence end once a paragraph reaches 350 characters, and a last piece under 80 characters joins the paragraph before it. A transcript under 500 characters with no 2-second pause is one paragraph.
 
 #### Scenario: Pause in speech
 - GIVEN the person pauses for 3 seconds mid-note
@@ -157,23 +150,30 @@ Every transcript SHALL be broken into paragraphs, with no setting: a new paragra
 ## Silent notes
 
 ### Requirement: No speech detected
-The server SHALL finish a note as "No speech detected", with an empty transcript, when the provider returns no text, rejects the audio as too short, or returns only one of the phrases Whisper invents for silence: "Thank you.", "Thanks for watching!", "Thank you for watching.", "you" or "Bye.", ignoring case and surrounding punctuation. A silent note SHALL use a free note like any other (subscription.md). It gets no agent copy, no wake-up hook and no webhook (delivery.md). The result is reported as "no_speech" (relay-api.md).
+The server SHALL finish a note as "No speech detected", with an empty transcript and result "no_speech" (relay-api.md), when the provider returns no text, rejects the audio as too short, or returns only one of these phrases, ignoring case and surrounding punctuation: "Thank you.", "Thanks for watching!", "Thank you for watching.", "you" or "Bye.".
 
 #### Scenario: Pocket recording
 - GIVEN a 20-second note of fabric noise
 - WHEN Groq returns "Thank you."
 - THEN the note shows "No speech detected" with an empty transcript
-- AND the person's agent receives nothing
 
 #### Scenario: Real thanks inside a longer note
 - GIVEN a note whose transcript is "Thank you. Remind me to call Sam tomorrow."
 - WHEN its result is checked
 - THEN it is a normal transcript and is delivered
 
+### Requirement: Silent notes go nowhere
+A silent note SHALL use a free note like any other (subscription.md) and SHALL get no agent copy, no wake-up hook and no webhook (delivery.md).
+
+#### Scenario: Agent connected
+- GIVEN an agent is connected
+- WHEN a note finishes as "No speech detected"
+- THEN the agent receives nothing and the person's free-note count goes down by one
+
 ## Length
 
 ### Requirement: 60-minute cap
-A note SHALL be at most 60 minutes long. The watch and the iPhone stop recording at 60:00 (watch.md, phone.md). The server SHALL refuse an upload whose audio is longer than 61 minutes or larger than the size limit, without storing or counting it (relay-api.md), and SHALL transcribe any accepted note whole, in one piece.
+A note SHALL be at most 60 minutes long. The watch and the iPhone stop recording at 60:00 (watch.md, phone.md) and record at no more than 32 kbps, so a 60-minute note fits the 20 MB upload limit. The server SHALL refuse an upload whose audio is longer than 61 minutes or larger than the size limit, without storing or counting it (relay-api.md), and SHALL transcribe any accepted note whole, in one piece.
 
 #### Scenario: Full-length note
 - GIVEN a 60-minute note from the watch
@@ -196,25 +196,20 @@ The server SHALL take each note's length from the provider's response, or from t
 ## Failures
 
 ### Requirement: Retryable failures keep retrying for 20 hours
-When every allowed provider is overloaded, down, slow, or unavailable to Ramble, the server SHALL retry the note after 1, 2, 5, 10 and 15 minutes, then every 30 minutes, until 20 hours after the upload was accepted. The note then fails permanently. While it waits, the person sees "Transcribing…".
-
-#### Scenario: Short outage
-- GIVEN all providers fail for 10 minutes
-- WHEN they recover
-- THEN the next retry produces the transcript with no action from the person
+When every allowed provider is overloaded, down, slow, or unavailable to Ramble, the server SHALL wait 1, 2, 5, 10, then 15 minutes between attempts, then 30 minutes between each later attempt, until 20 hours after the upload was accepted. The note then fails permanently. While it waits, the person sees "Transcribing…".
 
 #### Scenario: Window ends
 - GIVEN a note has failed every attempt for 20 hours
 - WHEN the window ends
-- THEN the note fails permanently with reason "retry_window_expired"
+- THEN the note fails permanently, with result "retries_exhausted" (relay-api.md)
 
 ### Requirement: Permanent failures
-A note SHALL fail permanently when a provider rejects the audio itself (any 4xx other than 401, 403 and 429), with reason "audio_rejected", or when the retry window ends. The person's devices show "Couldn't transcribe", with no retry. The free note it used is given back (subscription.md). The audio stays wherever each device keeps it (watch.md, phone.md).
+A note SHALL fail permanently, with result "audio_rejected", when a provider rejects the audio itself (any 4xx other than 401, 403 and 429), or with result "retries_exhausted" when the retry window ends. The person's devices show "Couldn't transcribe", with no retry, and the reason "Ramble couldn't turn this audio into text." or "Ramble couldn't reach a transcription service in time." respectively. The free note it used is given back (subscription.md). The audio stays wherever each device keeps it (watch.md, phone.md).
 
 #### Scenario: Corrupt audio
 - GIVEN a free note whose audio no provider can decode
 - WHEN Groq answers 400
-- THEN the note shows "Couldn't transcribe" with no way to retry
+- THEN the note shows "Couldn't transcribe" and "Ramble couldn't turn this audio into text.", with no way to retry
 - AND the person's free-note count goes back up by one
 
 ## Audio retention
@@ -243,17 +238,17 @@ Fair use SHALL count each note's measured length against its purchase's monthly 
 - THEN it is transcribed, and the next upload is refused as over fair use
 
 ### Requirement: Free-tier audio breaker
-When free inboxes together reach 200 hours of measured audio in a UTC day, the server SHALL refuse to create new free inboxes until the next UTC day (relay-api.md) and SHALL alert the operator. Notes from existing inboxes SHALL still be transcribed.
+When free inboxes together reach 200 hours of measured audio in a UTC day, the server SHALL refuse every request to create an inbox until the next UTC day (relay-api.md) and SHALL alert the operator. Notes from existing inboxes SHALL still be transcribed.
 
 #### Scenario: Scripted signups
 - GIVEN free inboxes have used 200 hours of audio today
 - WHEN another iPhone tries to set up Ramble
-- THEN it is told to try later, the operator is alerted, and existing free inboxes still get transcripts
+- THEN its setup is refused for now (phone.md shows what the person sees), the operator is alerted, and existing inboxes still get transcripts
 
 ## Operator
 
 ### Requirement: Daily usage summary
-Once a day, shortly after 14:00 UTC, the server SHALL send the operator a summary of the previous UTC day:
+Once a day, between 14:00 and 14:05 UTC, the server SHALL send the operator a summary of the previous UTC day:
 - active inboxes, notes accepted and audio hours, free versus unlocked
 - new unlocks, and notes refused for free notes used or fair use
 - notes and estimated spend per provider, and fallback count
@@ -263,9 +258,9 @@ Once a day, shortly after 14:00 UTC, the server SHALL send the operator a summar
 #### Scenario: Morning summary
 - GIVEN 400 notes were accepted yesterday
 - WHEN 14:00 UTC passes
-- THEN within a few minutes the operator gets one message with yesterday's numbers and no transcript text
+- THEN by 14:05 UTC the operator gets one message with yesterday's numbers and no transcript text
 
-### Requirement: Threshold alerts with cooldown
+### Requirement: Threshold alerts
 The server SHALL check every minute and alert the operator when any of these holds:
 - Groq answered 429 three or more times in the last hour
 - any fallback was used in the last hour, or the fallback breaker is open
@@ -276,17 +271,23 @@ The server SHALL check every minute and alert the operator when any of these hol
 - the free-tier audio breaker tripped
 - more than 3% of notes finished in the last hour failed permanently, counting only hours with at least 10 finished notes
 
-The same alert, for the same purchase where it applies, SHALL repeat at most once every 6 hours while it still holds.
-
 #### Scenario: Stuck note
 - GIVEN an accepted note has been transcribing for 6 minutes
 - WHEN the next check runs
-- THEN the operator is alerted once, and not again for 6 hours while that alert still holds
+- THEN the operator is alerted
 
 #### Scenario: Held notes don't alert
 - GIVEN a note was refused because the person is out of free notes
 - WHEN it waits on the device for days
 - THEN no stuck-note alert fires, because the server never accepted it
+
+### Requirement: Alert cooldown
+The same alert, for the same purchase where it applies, SHALL repeat at most once every 6 hours while it still holds.
+
+#### Scenario: Still stuck
+- GIVEN the stuck-note alert fired at 10:00 and the note is still waiting
+- WHEN checks run until 15:59
+- THEN no second stuck-note alert is sent before 16:00
 
 ### Requirement: Alerts go to one external webhook
 The server SHALL POST every summary and alert, including alerts defined in relay-api.md, to one alert webhook outside Ramble, such as a phone push service, configured by the operator. Messages SHALL contain no transcript text and no inbox secrets. When no alert webhook is set, nothing is sent.
