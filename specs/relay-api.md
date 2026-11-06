@@ -31,7 +31,7 @@ The relay SHALL be served at `https://api.ramble.watch`, and every path here is 
 - THEN it gets `200 {"service": "Ramble relay", "docs": "https://ramble.watch/docs", "llms": "https://ramble.watch/llms-full.txt"}`
 
 ### Requirement: Three credentials
-Calls other than pairing exchange, inbox creation, App Attest registration and Apple notifications SHALL carry `Authorization: Bearer <credential>`: an inbox secret (`rmbi_…`, the phone), a watch token (`rmbw_…`, the watch) or an agent key (`rmba_…`, an agent). Each is 32 random bytes; the relay SHALL keep only a SHA-256 hash, never a readable copy. `bearer <credential>` and the bare credential are accepted. A missing, unknown or revoked credential SHALL get `401` ("Invalid or revoked credentials. Send \"Authorization: Bearer <token>\"."); a valid credential on an endpoint its caller may not use SHALL get `403` with `"reason": "wrong_credential"` and keep working.
+Calls other than pairing exchange, inbox creation, App Attest registration and Apple notifications SHALL carry `Authorization: Bearer <credential>`: an inbox secret (`rmbi_…`, the phone), a watch token (`rmbw_…`, the watch) or an agent key (`rmba_…`, an agent). Each is 32 random bytes; the relay SHALL keep only a SHA-256 hash, never a readable copy. The one exception is a new agent key during its pairing code's 10 minutes, so a retried exchange gets the same key: it is kept encrypted with a key derived from the exchange's `request_id`, and deleted when the code expires. `bearer <credential>` and the bare credential are accepted. A missing, unknown or revoked credential SHALL get `401` ("Invalid or revoked credentials. Send \"Authorization: Bearer <token>\"."); a valid credential on an endpoint its caller may not use SHALL get `403` with `"reason": "wrong_credential"` and keep working.
 
 #### Scenario: Lenient header
 - GIVEN a valid agent key
@@ -93,15 +93,15 @@ Every error SHALL be `{"error": "<sentence>"}`, plus `"reason": "<code>"` wherev
 - THEN `fair_use` is `{"used_hours": 41, "limit_hours": 100, "resets_at": "2026-12-01T00:00:00.000Z"}`
 
 ### Requirement: Submitting a purchase
-`POST /entitlement` with `{"signed_transaction": "<JWS>"}` or, for early buyers, `{"app_transaction": "<JWS>"}` SHALL return `200` with the `GET /account` body once the record is verified: signature chained to Apple's root CA, bundle ID `dev.goodloop.Ramble`, not revoked or refunded, not Sandbox or Xcode on production. A transaction SHALL be for the unlock product; `dev.goodloop.ramble.premium.monthly2` is accepted only as early-buyer proof ([purchase.md](purchase.md)). Re-sending a bound record SHALL return `200` and change nothing.
+`POST /entitlement` with `{"signed_transaction": "<JWS>"}` or, for early buyers, `{"app_transaction": "<JWS>"}` SHALL return `200` with the `GET /account` body once the record is verified: signature chained to Apple's root CA, bundle ID `dev.goodloop.Ramble`, not revoked or refunded, not from Xcode testing. On production, a Sandbox unlock purchase is verified against Apple's sandbox and gives a 7-day test unlock, and a Sandbox app transaction is never early-buyer proof ([purchase.md](purchase.md)). A transaction SHALL be for the unlock product; `dev.goodloop.ramble.premium.monthly2` is accepted only as early-buyer proof ([purchase.md](purchase.md)). Re-sending a bound record SHALL return `200` and change nothing.
 
 #### Scenario: Forged or refunded record
-- GIVEN a self-signed JWS, a refunded transaction, or a Sandbox record sent to production
+- GIVEN a self-signed JWS, a refunded transaction, or an Xcode test record sent to production
 - WHEN it is submitted
 - THEN the response is `403` with `"reason": "invalid_transaction"` and the inbox stays locked
 
 ### Requirement: Purchases are bound to inboxes
-A first-time unlock purchase SHALL be accepted only when its app account token equals this inbox's `account_token`; a restored purchase may carry another inbox's token. A purchase SHALL unlock at most 5 inboxes, counting only inboxes that uploaded a note in the last 90 days, keyed on the original transaction ID (or the app transaction ID for early buyers). Family-shared purchases SHALL NOT unlock.
+A first-time unlock purchase SHALL be accepted only when its app account token equals this inbox's `account_token`; a restored purchase may carry another inbox's token. A purchase SHALL unlock at most 5 inboxes, counting every inbox it was bound to or that uploaded a note in the last 90 days, keyed on the original transaction ID (or the app transaction ID for early buyers). Family-shared purchases SHALL NOT unlock.
 
 #### Scenario: Purchase made for another inbox
 - GIVEN a first-time purchase whose account token belongs to inbox A
@@ -109,7 +109,7 @@ A first-time unlock purchase SHALL be accepted only when its app account token e
 - THEN the response is `403` with `"reason": "wrong_account"`
 
 #### Scenario: Sixth active inbox
-- GIVEN one purchase bound to 5 inboxes that all uploaded in the last 90 days
+- GIVEN one purchase bound to 5 inboxes in the last 90 days, whether or not they uploaded
 - WHEN a sixth inbox submits it
 - THEN the response is `403` with `"reason": "too_many_inboxes"`
 
@@ -169,7 +169,7 @@ The relay SHALL refuse these uploads, storing and counting nothing. Refusals mar
 | Not one of the audio types above | `415` | `unsupported_type` | yes |
 | Empty body, body bytes ≠ `Content-Length`, missing or invalid recorded time | `400` | `bad_upload` | yes |
 | Recorded time more than 5 minutes in the future | `400` | `recorded_in_future` | no: retry once it isn't ahead |
-| No `Content-Length` (`411`), or body not finished within 10 minutes (`408`) | `411` / `408` | `length_required` / `upload_timeout` | no |
+| No `Content-Length` (`411`), or body not finished within 30 minutes (`408`) | `411` / `408` | `length_required` / `upload_timeout` | no |
 
 #### Scenario: Watch clock far ahead
 - GIVEN a watch whose clock is an hour fast
@@ -364,10 +364,23 @@ Relay logs SHALL contain no request bodies, transcript text, audio, credentials 
 ## Old app versions
 
 ### Requirement: Old builds work until LEGACY_UNTIL, then are told to update
-LEGACY_UNTIL is the retirement date for old builds' paths, set at release (by default 60 days after the first free-notes build ships). Until then, `POST /transcribe` (cloud transcription for early subscribers) and text `POST /inbox` (old builds delivering transcripts to agents) SHALL keep working for old builds, only when the subscription record chains to Apple's root CA, the App Attest checks above pass, and within the rate limits above. `GET /analytics`, and from LEGACY_UNTIL on those two paths, SHALL answer `410` with `"error": "This version of Ramble is out of date. Update Ramble from the App Store."`, and SHALL transcribe, queue or reveal nothing.
+LEGACY_UNTIL is the retirement date for old builds' paths, set at release (by default 60 days after the first free-notes build ships). Until then, `POST /transcribe` (cloud transcription for early subscribers) and text `POST /inbox` (old builds delivering transcripts to agents) SHALL keep working for old builds, within the rate limits above, under these checks:
+
+- Text `POST /inbox` needs only the old build's inbox secret, as today, and no purchase record, so $4.99 buyers' old builds keep delivering.
+- `POST /transcribe` needs the App Attest checks above and a subscription record that passes the same checks as `POST /entitlement` and has not expired. It SHALL apply the upload size limits above, count audio toward a 100-hour monthly cap per original transaction, and always transcribe with the default provider chain ([transcription.md](transcription.md)), ignoring any model the client asks for. `GET /analytics`, and from LEGACY_UNTIL on those two paths, SHALL answer `410` with `"error": "This version of Ramble is out of date. Update Ramble from the App Store."`, and SHALL transcribe, queue or reveal nothing.
 
 #### Scenario: Old subscriber before and after the date
 - GIVEN an old build with an active subscription and a valid App Attest assertion
 - WHEN it sends `POST /transcribe` with audio before LEGACY_UNTIL
 - THEN it gets the transcript
 - AND from LEGACY_UNTIL on, that request or a text `POST /inbox` gets `410`, and nothing is transcribed or queued for any agent
+
+#### Scenario: Old $4.99 build delivers text
+- GIVEN an old build of a $4.99 buyer with no subscription, transcribing on device
+- WHEN it sends a text `POST /inbox` before LEGACY_UNTIL
+- THEN the transcript is queued for its agents as before
+
+#### Scenario: Expired subscription on the old path
+- GIVEN an old build whose subscription record expired last month
+- WHEN it sends `POST /transcribe` before LEGACY_UNTIL
+- THEN the response is `403`, and nothing is transcribed

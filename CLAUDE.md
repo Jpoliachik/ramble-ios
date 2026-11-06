@@ -43,8 +43,8 @@ These are free features from existing providers (no extra API calls or cost):
 ### Release plan
 
 - Open source the repo on GitHub
-- Paid app on App Store, $4.99 one-time (Apple Speech on-device transcription, agent relay, webhook)
-- Optional $2.99/month subscription unlocks cloud transcription models via Cloudflare Worker proxy
+- Free download: 25 notes free, then a $14.99 one-time unlock, no subscription (`specs/purchase.md`)
+- Cloud transcription only (Groq Whisper v3 Turbo with server-side fallback) via the Cloudflare Worker relay
 - Marketing website on Vercel at https://ramble.watch (source in `website/`, static export)
 - **App Store URL:** https://apps.apple.com/app/id6761857751 (Apple ID: 6761857751)
 
@@ -174,5 +174,5 @@ Apple App Attest implemented. Client-side attestation via `DCAppAttestService` p
 
 - **Transcript browsing UX for v1:** Just scroll the list. No search, no tags, no folders.
 - **Watch complication:** Not in v1.
-- **Pricing:** $4.99 one-time app purchase. Optional $2.99/month subscription for cloud transcription. On-device Apple Speech, the relay, and webhooks need no subscription.
+- **Pricing:** Free download, 25 notes free, then $14.99 once. Fair use 100 hours/month per purchase. Early $4.99 buyers and active subscribers are unlocked (`specs/purchase.md`).
 - **Platform:** Apple only (iPhone + Apple Watch). No Android, no web.

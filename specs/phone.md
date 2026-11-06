@@ -8,6 +8,15 @@ What the person sees and does in Ramble on iPhone: first launch, Home, recording
 ### Requirement: Onboarding steps
 On first launch the app SHALL show onboarding as a sheet that cannot be swiped away: three intro beats ("Say it to your watch.", "Leave your phone behind.", "Your agent handles it.", each moving on after 6 seconds or by swiping, with "Get started" always visible), then "Where should notes go?", then connecting an agent ("Add your agent", [delivery.md](delivery.md)) unless skipped, then the watch step.
 
+### Requirement: Consent line under "Get started"
+Directly under "Get started" the intro SHALL show, in small type: "Ramble sends your recordings to a cloud service to turn them into text, then sends the text to your agent." followed by a "Privacy" link to the Privacy Policy, which names the transcription providers. Tapping "Get started" is the person's consent; there is no separate step or checkbox. Until it is tapped on this install, the phone SHALL NOT upload any note or connect the watch, so neither device sends audio before consent.
+
+#### Scenario: Watch recorded before consent
+- GIVEN the watch recorded two notes and the phone app has never run
+- WHEN the person opens Ramble on iPhone and is on the intro beats
+- THEN nothing has been uploaded and the watch still shows "Set up"
+- AND after they tap "Get started", the watch is connected and its two notes upload
+
 #### Scenario: Skipping the agent
 - GIVEN the person is on "Where should notes go?"
 - WHEN they tap "Set up later", or save a webhook from the "Any webhook" row
@@ -30,12 +39,17 @@ When the phone can't set itself up with Ramble's server (offline, or the server 
 - THEN the message shows, the note reads "Waiting to send", and setup completes on a later open
 
 ### Requirement: The phone connects the watch
-The phone SHALL give the watch a credential that can only upload that watch's notes, read them back and read the account state, after the app first runs, after a reinstall, and when the paired watch changes, with no control for the person ([watch.md](watch.md)). A reinstall that still finds the phone's earlier connection SHALL keep it (agents, free count and unlock stay); otherwise it starts fresh and agents must connect again ([delivery.md](delivery.md)).
+The phone SHALL give the watch a credential that can only upload that watch's notes, read them back and read the account state, after the person taps "Get started" on first run, after a reinstall, when the paired watch changes, and whenever the watch says it has no working connection (no credential, or the server refused it), including when that message wakes the phone app in the background, with no control for the person ([watch.md](watch.md)). A reinstall that still finds the phone's earlier connection SHALL keep it (agents, free count and unlock stay); otherwise it starts fresh and agents must connect again ([delivery.md](delivery.md)).
 
 #### Scenario: First phone launch
 - GIVEN the watch has recorded notes but the phone app has never run
-- WHEN the person opens Ramble on iPhone
+- WHEN the person opens Ramble on iPhone and taps "Get started"
 - THEN the watch is connected and uploads its held notes
+
+#### Scenario: Watch lost its connection
+- GIVEN the phone has been set up for weeks and the watch app was reinstalled
+- WHEN the watch app opens and tells the phone it has no connection
+- THEN the phone gives it a new one without being opened, and the watch's waiting notes upload
 
 ## Home
 

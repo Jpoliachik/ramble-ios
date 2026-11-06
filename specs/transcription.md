@@ -191,25 +191,35 @@ A note SHALL be at most 60 minutes long. The watch and the iPhone stop recording
 - THEN it is refused as too long and nothing is stored or counted
 
 ### Requirement: Length is measured on the server
-The server SHALL take each note's length from the provider's response, or from the audio file when a provider reports none, and SHALL never use a length reported by a device. No note SHALL count for more than 61 minutes. This length is what fair use, usage numbers and spend estimates count.
+The server SHALL take each note's length from the provider's response, or from the audio file when a provider reports none, and SHALL never use a length reported by a device or by the file's own header. The full measured length SHALL count, with no cap, and a note measured at more than 61 minutes SHALL alert the operator (a file whose header understated its length). This length is what fair use, the free-tier audio breaker, usage numbers and spend estimates count.
 
 #### Scenario: Device claims a short note
 - GIVEN a device reports a note as 10 seconds long
 - WHEN Groq reports 42 minutes of audio
 - THEN 42 minutes count toward fair use
 
+#### Scenario: Header understates the length
+- GIVEN an accepted upload whose header claims 59 minutes
+- WHEN Groq reports 5 hours of audio
+- THEN 5 hours count toward fair use, and the operator is alerted
+
 ## Failures
 
 ### Requirement: Retryable failures keep retrying for 20 hours
-When every allowed provider is overloaded, down, slow, or unavailable to Ramble, the server SHALL wait 1, 2, 5, 10, then 15 minutes between attempts, then 30 minutes between each later attempt, until 20 hours after the upload (or hand retry) was accepted. The note then fails permanently. While it waits, the person sees "Transcribing…".
+When every allowed provider is overloaded, down, slow, or unavailable to Ramble (including a provider answering with a billing, quota or spend-limit error, or 402 or 413, which SHALL send the note to the next provider and never fail it as "audio_rejected"), the server SHALL wait 1, 2, 5, 10, then 15 minutes between attempts, then 30 minutes between each later attempt, until 20 hours after the upload (or hand retry) was accepted. The note then fails permanently. While it waits, the person sees "Transcribing…".
 
 #### Scenario: Window ends
 - GIVEN a note has failed every attempt for 20 hours
 - WHEN the window ends
 - THEN the note fails permanently, with result "retries_exhausted" (relay-api.md)
 
+#### Scenario: Groq spend limit reached
+- GIVEN Groq answers every request with a billing or spend-limit error
+- WHEN a note is attempted
+- THEN it goes to the fallback provider, or keeps retrying as "Transcribing…", and is never marked "audio_rejected"
+
 ### Requirement: Permanent failures
-A note SHALL fail permanently, with result "audio_rejected", when a provider rejects the audio itself (any 4xx other than 401, 403 and 429), or with result "retries_exhausted" when the retry window ends. The person's devices show "Couldn't transcribe", with "Retry" on the iPhone while hand retries remain (phone.md), and the reason "Ramble couldn't turn this audio into text." or "Ramble couldn't reach a transcription service in time." respectively. The free note it used is given back (purchase.md). The audio stays wherever each device keeps it (watch.md, phone.md).
+A note SHALL fail permanently, with result "audio_rejected", when a provider rejects the audio itself (any 4xx other than 401, 402, 403, 413 and 429, and other than an error the provider marks as billing, quota or rate related), or with result "retries_exhausted" when the retry window ends. The person's devices show "Couldn't transcribe", with "Retry" on the iPhone while hand retries remain (phone.md), and the reason "Ramble couldn't turn this audio into text." or "Ramble couldn't reach a transcription service in time." respectively. The free note it used is given back (purchase.md). The audio stays wherever each device keeps it (watch.md, phone.md).
 
 #### Scenario: Corrupt audio
 - GIVEN a free note whose audio no provider can decode
