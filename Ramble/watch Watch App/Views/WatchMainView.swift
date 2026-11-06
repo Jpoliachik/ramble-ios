@@ -41,7 +41,8 @@ struct WatchMainView: View {
         WatchAlert.resolve(
             micDenied: micDenied,
             micBusy: micBusyToken != nil,
-            companionAppInstalled: connectivity.isCompanionAppInstalled
+            companionAppInstalled: connectivity.isCompanionAppInstalled,
+            phoneNeedsUnlock: connectivity.phoneNeedsUnlock
         )
     }
 

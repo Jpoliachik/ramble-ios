@@ -26,7 +26,7 @@ the watch to wake the iPhone app is `sendMessage` [M1].
 | Hop | Primary | Durable fallback | Why |
 | --- | --- | --- | --- |
 | Watch → iPhone (wake) | `sendMessage` with reply, sent at Stop while the watch app is still running | none needed: the file is already queued | Only API documented to launch the iOS app in the background [M1][V1] |
-| Watch → iPhone (audio) | `transferFile` | resend after receipt timeout; watch keeps audio until the phone's receipt | Survives suspension and relaunch; queue visible via `outstandingFileTransfers` [T1][T2] |
+| Watch → iPhone (audio) | `sendMessageData` for notes ≤ 48 KB while reachable, plus `transferFile` always | resend after receipt timeout; watch keeps audio until the phone's receipt | Survives suspension and relaunch; queue visible via `outstandingFileTransfers` [T1][T2] |
 | iPhone → watch (receipt) | reply to the wake message | `transferUserInfo` "received" | Reply is instant when reachable; userInfo is a guaranteed, ordered queue [U1][V1] |
 | iPhone: run time after arrival | `beginBackgroundTask` | `BGAppRefreshTask`, `BGProcessingTask` | Finite foreground-equivalent time to transcribe and POST [B1][B2] |
 | iPhone → relay | default `URLSession` inside the background task | queue retry on next launch / refresh | Background sessions are discretionary; we have run time already [N2][N3] |
@@ -183,16 +183,35 @@ PR #59 (sendMessage wake + transferFile + reply receipts + watch refresh retry
 4. **iPhone `BGAppRefreshTask`** is a cheap backup for relay retries; don't
    count on it for WC delivery.
 
-Follow-ups, in order, if device timing still shows gaps:
+Added on top of PR #59:
 
-1. Watch shows "Unlock your iPhone" when
+1. Watch shows "Unlock" when
    `iOSDeviceNeedsUnlockAfterRebootForReachability` is true [M4].
-2. For notes under a measured size, also send the bytes with
-   `sendMessageData` while reachable, keeping `transferFile` as the durable
-   copy (the phone dedupes by recording id). This skips WC's file pacing
-   entirely. Size limit is undocumented, so handle `payloadTooLarge` [M2][M5].
-3. Direct watch → relay upload as a fallback after N minutes without a phone
-   receipt (section above).
+2. Notes up to 48 KB (about 12 s) also go as `sendMessageData` while
+   reachable, with `transferFile` kept as the durable copy. The phone dedupes
+   by recording id and replies with a receipt; the watch then cancels the
+   queued transfer. This skips WC's file pacing. The size limit is
+   undocumented, so any error just leaves it to the file transfer [M2][M5].
+
+Deferred (Justin, Nov 6): direct watch → relay upload as a fallback when the
+phone is unreachable. Decide after device testing.
+
+## Troubleshooting: why a note isn't syncing
+
+Start with the note's activity log on the iPhone (Details). It shows each hop
+with timing, how the note arrived (message or file transfer), and whether the
+phone was locked.
+
+| Symptom | Likely cause | Apple reference |
+| --- | --- | --- |
+| Watch says "Unlock" | iPhone restarted and hasn't been unlocked; it's unreachable until then | [M4] |
+| Stuck after the phone was out of range at Stop | Watch app was suspended by the time the phone was back, so no wake went out; only the system-paced file transfer remains | [M3][T1] |
+| Long note slow, short notes fast | Notes over 48 KB go by file transfer only, which the system paces | [T1][F1] |
+| "Reached iPhone" but no receipt | Phone got the file but couldn't save it (before first unlock, disk full); watch resends after 5 min | [L2] |
+| Phone has it, agent doesn't | Transcription or relay POST ran out of background time; retries on next refresh or open | [B1][B2] |
+| Everything slow in Low Power Mode | Background work is deferred more aggressively **(unverified)** | [B2] |
+| Nothing arrives after force-quitting Ramble on the iPhone | Background launches for force-quit apps **(unverified)**; open Ramble once | [M1] |
+| Watch never retries in the background | Refresh budget is small without a complication | [K3][K4] |
 
 ## References
 

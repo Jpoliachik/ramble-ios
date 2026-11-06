@@ -18,6 +18,9 @@ final class WatchConnectivityService: NSObject, ObservableObject {
     /// False when the paired iPhone doesn't have Ramble, so notes can never
     /// leave the watch. Starts true so the alert doesn't flash at launch.
     @Published private(set) var isCompanionAppInstalled = true
+    /// True when the iPhone restarted and hasn't been unlocked since. It
+    /// stays unreachable until then, so the watch asks for an unlock.
+    @Published private(set) var phoneNeedsUnlock = false
 
     /// Maps in-flight WCSessionFileTransfer to the job ID so we can update the queue on completion.
     /// Ephemeral — if the app is killed, jobs stay in the persistent queue and retry on next launch.
@@ -88,6 +91,10 @@ final class WatchConnectivityService: NSObject, ObservableObject {
             metadata: ["recording": metadataString]
         )
         activeTransfers[transfer] = job.id
+        // Short notes also ride inside a message, which skips the file
+        // queue's own pacing. The file transfer above stays as the copy that
+        // survives the app being suspended; the phone ignores the duplicate.
+        sendInline(job, metadata: metadataString)
         // transferFile alone is delivered whenever the system likes, and a
         // locked iPhone may not hand it to Ramble until it's opened (seen:
         // 40 minutes). A message wakes Ramble on the phone right away.
@@ -128,6 +135,50 @@ final class WatchConnectivityService: NSObject, ObservableObject {
             },
             errorHandler: { error in
                 print("Wake message to iPhone failed: \(error)")
+            }
+        )
+    }
+
+    // MARK: - Inline delivery
+
+    /// Notes up to this size also go as message data while the phone is in
+    /// reach. Apple doesn't document a message size limit, so this stays
+    /// well under what's commonly reported to work. About 12 seconds of
+    /// audio at our 16 kHz AAC settings.
+    static let inlineMaxBytes = 48 * 1024
+
+    /// Sends the audio and its metadata in one message:
+    /// 4-byte big-endian metadata length, metadata JSON, then the audio.
+    /// The phone saves it and replies with a receipt, so a short note is
+    /// usually confirmed within seconds. On any error the file transfer
+    /// still delivers it.
+    private func sendInline(_ job: WatchSyncJob, metadata: String) {
+        guard WCSession.default.isReachable,
+              let audio = try? Data(contentsOf: job.fileURL),
+              audio.count <= Self.inlineMaxBytes
+        else { return }
+        let metadataBytes = Data(metadata.utf8)
+        var payload = Data()
+        var length = UInt32(metadataBytes.count).bigEndian
+        withUnsafeBytes(of: &length) { payload.append(contentsOf: $0) }
+        payload.append(metadataBytes)
+        payload.append(audio)
+        Self.sendInlineData(payload)
+    }
+
+    private nonisolated static func sendInlineData(_ payload: Data) {
+        WCSession.default.sendMessageData(
+            payload,
+            replyHandler: { replyData in
+                guard let reply = (try? JSONSerialization.jsonObject(with: replyData)) as? [String: Any],
+                      let ids = receiptIDs(in: reply), !ids.isEmpty
+                else { return }
+                Task { @MainActor in
+                    WatchConnectivityService.shared.handleReceipts(ids)
+                }
+            },
+            errorHandler: { error in
+                print("Inline send to iPhone failed, file transfer will deliver it: \(error)")
             }
         )
     }
@@ -245,6 +296,12 @@ final class WatchConnectivityService: NSObject, ObservableObject {
     /// The phone saved this recording. Only now can the watch copy go.
     private func handleReceipt(_ recordingId: UUID) {
         guard let job = syncQueue.jobs.first(where: { $0.id == recordingId }) else { return }
+        // A receipt can beat the file (inline send, or a wake reply), so drop
+        // the queued copy instead of sending the phone a duplicate.
+        for transfer in WCSession.default.outstandingFileTransfers
+        where self.recordingId(for: transfer) == recordingId {
+            transfer.cancel()
+        }
         activeTransfers = activeTransfers.filter { $0.value != recordingId }
         try? FileManager.default.removeItem(at: job.fileURL)
         syncQueue.markCompleted(jobId: recordingId)
@@ -296,9 +353,11 @@ extension WatchConnectivityService: WCSessionDelegate {
         guard activationState == .activated else { return }
         let reachable = session.isReachable
         let installed = session.isCompanionAppInstalled
+        let needsUnlock = session.iOSDeviceNeedsUnlockAfterRebootForReachability
         Task { @MainActor in
             self.isPhoneReachable = reachable
             self.isCompanionAppInstalled = installed
+            self.phoneNeedsUnlock = needsUnlock
             // Launch-time retries run before activation finishes and are
             // skipped, so pick up anything still queued now.
             self.retryPendingTransfers()
@@ -307,9 +366,11 @@ extension WatchConnectivityService: WCSessionDelegate {
 
     nonisolated func sessionReachabilityDidChange(_ session: WCSession) {
         let reachable = session.isReachable
+        let needsUnlock = session.iOSDeviceNeedsUnlockAfterRebootForReachability
         Task { @MainActor in
             let becameReachable = reachable && !self.isPhoneReachable
             self.isPhoneReachable = reachable
+            self.phoneNeedsUnlock = needsUnlock
             if becameReachable {
                 self.retryPendingTransfers()
             }

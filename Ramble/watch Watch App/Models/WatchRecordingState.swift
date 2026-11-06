@@ -99,6 +99,9 @@ enum WatchAlert: String, Identifiable, Hashable {
     case micBusy
     /// The paired iPhone doesn't have Ramble, so notes can't leave the watch.
     case noPhone
+    /// The iPhone restarted and hasn't been unlocked since, so it can't take
+    /// anything from the watch until it is.
+    case unlockPhone
 
     var id: String { rawValue }
 
@@ -109,6 +112,7 @@ enum WatchAlert: String, Identifiable, Hashable {
         case .micOff: return "Mic off"
         case .micBusy: return "Mic busy"
         case .noPhone: return "No phone"
+        case .unlockPhone: return "Unlock"
         }
     }
 
@@ -116,11 +120,12 @@ enum WatchAlert: String, Identifiable, Hashable {
         switch self {
         case .micOff, .micBusy: return "mic.slash"
         case .noPhone: return "iphone.slash"
+        case .unlockPhone: return "lock.fill"
         }
     }
 
     /// Red when it stops a recording. Gray when recording still works.
-    var isBlocking: Bool { self != .noPhone }
+    var isBlocking: Bool { self != .noPhone && self != .unlockPhone }
 
     /// Tapping again is the fix for a busy mic, so it has no detail screen.
     var hasDetail: Bool { self != .micBusy }
@@ -130,6 +135,7 @@ enum WatchAlert: String, Identifiable, Hashable {
         case .micOff: return "Microphone is off"
         case .micBusy: return "Microphone is busy"
         case .noPhone: return "Ramble isn't on your iPhone"
+        case .unlockPhone: return "Unlock your iPhone"
         }
     }
 
@@ -147,13 +153,24 @@ enum WatchAlert: String, Identifiable, Hashable {
                 "Your notes are safe on this watch, but they can't reach your agent yet.",
                 "Install Ramble on your iPhone and open it once. Waiting notes will send on their own."
             ]
+        case .unlockPhone:
+            return [
+                "Your iPhone restarted and hasn't been unlocked yet, so it can't take notes from your watch.",
+                "Your notes are safe here. Unlock your iPhone once and they'll send on their own."
+            ]
         }
     }
 
-    static func resolve(micDenied: Bool, micBusy: Bool, companionAppInstalled: Bool) -> WatchAlert? {
+    static func resolve(
+        micDenied: Bool,
+        micBusy: Bool,
+        companionAppInstalled: Bool,
+        phoneNeedsUnlock: Bool = false
+    ) -> WatchAlert? {
         if micDenied { return .micOff }
         if micBusy { return .micBusy }
         if !companionAppInstalled { return .noPhone }
+        if phoneNeedsUnlock { return .unlockPhone }
         return nil
     }
 }
