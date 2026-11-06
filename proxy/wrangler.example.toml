@@ -11,7 +11,24 @@ enabled = true
 # seconds if never picked up (30 days).
 RETENTION_SECONDS = "2592000"
 APPLE_BUNDLE_ID = "dev.goodloop.Ramble"
+# Early subscribers' product: accepted only as early-buyer proof.
 PREMIUM_PRODUCT_ID = "dev.goodloop.ramble.premium.monthly2"
+# The one-time unlock (non-consumable).
+UNLOCK_PRODUCT_ID = "dev.goodloop.ramble.unlock"
+# App Store environment whose server notifications this relay accepts.
+APPSTORE_ENVIRONMENT = "Production"
+# Set at release (see specs/purchase.md "Early buyers"):
+#   FIRST_FREE_BUILD  build number of the first free-notes build, e.g. "120".
+#                     Downloads from a lower build are early buyers.
+#   FREE_RELEASE_AT   ISO time that build was released; subscriptions active
+#                     then are early buyers.
+#   LEGACY_UNTIL      ISO date old builds' POST /transcribe and text POST /inbox
+#                     stop working (410), by default 60 days after release.
+# FIRST_FREE_BUILD = ""
+# FREE_RELEASE_AT = ""
+# LEGACY_UNTIL = ""
+# Public base URL used in hook pings' pull_url when no request is in flight.
+RELAY_BASE_URL = "https://ramble-transcription-proxy.jpoliachik.workers.dev"
 
 # KV namespace for App Attest state (challenges, attested device keys).
 # SETUP REQUIRED: Run `wrangler kv namespace create ATTEST_KV` and paste
@@ -20,18 +37,12 @@ PREMIUM_PRODUCT_ID = "dev.goodloop.ramble.premium.monthly2"
 binding = "ATTEST_KV"
 id = "YOUR_KV_NAMESPACE_ID"
 
-# Analytics Engine for anonymous usage metrics (model popularity, request volume).
-# SETUP REQUIRED: Run `wrangler analytics-engine create USAGE_ANALYTICS` (or create
-# via the Cloudflare dashboard under Account → Analytics Engine) and paste the
-# dataset ID below. No PII is stored — device IDs are SHA-256 hashed before writing.
-[[analytics_engine_datasets]]
-binding = "USAGE_ANALYTICS"
-dataset = "ramble_usage"
-
 # --- Relay (see RELAY.md) ---
-# Expiry backstop for queued transcripts. Reads already hide expired ones.
+# Every minute: transcription retries and stalled attempts (picked up within
+# a minute of going stale), expiry, audio cleanup, operator alerts, and the
+# 14:00 UTC daily summary.
 [triggers]
-crons = ["*/15 * * * *"]
+crons = ["* * * * *"]
 
 # Relay queues, connections, pairing codes. Until this binding exists the
 # relay endpoints answer 503 and the transcription proxy is unaffected.
@@ -42,3 +53,14 @@ crons = ["*/15 * * * *"]
 # database_name = "ramble-relay"
 # database_id = "YOUR_D1_DATABASE_ID"
 # migrations_dir = "migrations"
+
+# Note audio, stored only until the note is transcribed (or fails for good).
+# SETUP (Justin): create the bucket before deploying, private, with a 1-day
+# lifecycle rule as the backstop for failed deletes:
+#   npx wrangler r2 bucket create ramble-audio
+#   then add an object lifecycle rule deleting objects after 1 day
+#   (dashboard: R2 > ramble-audio > Settings > Object lifecycle rules).
+# Deploys fail until the bucket exists.
+[[r2_buckets]]
+binding = "AUDIO"
+bucket_name = "ramble-audio"
