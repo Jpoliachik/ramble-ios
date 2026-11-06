@@ -333,6 +333,55 @@ export default function AgentDocs() {
             </section>
 
             <section className="space-y-4">
+              <SectionHeader id="timing">Delivery timing</SectionHeader>
+              <p>
+                A note goes watch → iPhone → transcription → relay. With the iPhone nearby, even locked in a pocket,
+                that usually takes seconds to a minute. Apple&rsquo;s limits can make it longer:
+              </p>
+              <ul className="list-disc space-y-2 pl-5">
+                <li>
+                  <Strong>iPhone out of range or off.</Strong> Notes wait on the watch and send once the two are back
+                  together.
+                </li>
+                <li>
+                  <Strong>Longer notes.</Strong> Watch-to-iPhone file transfers are{" "}
+                  <a
+                    href="https://developer.apple.com/documentation/watchconnectivity/wcsession/transferfile(_:metadata:)"
+                    className="text-brand-text underline-offset-2 hover:underline"
+                  >
+                    paced by the system
+                  </a>{" "}
+                  for power, so they can take minutes, occasionally more.
+                </li>
+                <li>
+                  <Strong>iPhone just restarted.</Strong> Nothing moves until it&rsquo;s{" "}
+                  <a
+                    href="https://developer.apple.com/documentation/watchconnectivity/wcsession/iosdeviceneedsunlockafterrebootforreachability"
+                    className="text-brand-text underline-offset-2 hover:underline"
+                  >
+                    unlocked once
+                  </a>
+                  .
+                </li>
+                <li>
+                  <Strong>Limited background time.</Strong> iOS gives Ramble{" "}
+                  <a
+                    href="https://developer.apple.com/documentation/backgroundtasks/choosing-background-strategies-for-your-app"
+                    className="text-brand-text underline-offset-2 hover:underline"
+                  >
+                    short, system-scheduled windows
+                  </a>{" "}
+                  to transcribe and upload, so a note can wait for the next one or for the app to open.
+                </li>
+              </ul>
+              <p>
+                So notes can arrive late and out of order. Go by <InlineCode>created_at</InlineCode>, not arrival time,
+                and don&rsquo;t read an empty inbox as &ldquo;nothing was recorded&rdquo;. A late note isn&rsquo;t lost: the
+                watch keeps each one until the iPhone confirms it has it.
+              </p>
+            </section>
+
+            <section className="space-y-4">
               <SectionHeader id="platforms">Platform notes</SectionHeader>
               <p>Everything above works for any agent. These are the specifics we know about.</p>
               <ul className="list-disc space-y-2 pl-5">

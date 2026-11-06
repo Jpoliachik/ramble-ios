@@ -99,6 +99,8 @@ proxy/                 # Cloudflare Worker: transcription proxy + agent relay (R
 3. **Store** — Transcript saved locally to Recording model
 4. **Webhook** — Optional POST of transcript to user-configured URL
 
+Watch recordings reach the phone over WatchConnectivity (`sendMessage` wake + `transferFile`, receipts back). For which Apple APIs we use at each hop, why, their documented limits, and Apple references, see **`docs/sync-architecture.md`**. Read it before changing the watch → phone → relay path.
+
 ### Key Services
 
 | Service                           | Role                                                     |

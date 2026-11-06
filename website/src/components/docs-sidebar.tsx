@@ -22,6 +22,7 @@ const sectionsByPage: Record<DocsPage, Section[]> = {
     { id: "connections", label: "Tokens and connections" },
     { id: "requests", label: "Making requests" },
     { id: "relay-or-webhook", label: "Relay or webhook" },
+    { id: "timing", label: "Delivery timing" },
     { id: "platforms", label: "Platform notes" },
   ],
   webhooks: [

@@ -152,7 +152,7 @@ final class PhoneConnectivityService: NSObject, ObservableObject {
     /// recorded → watch started sending → reached this phone, with the
     /// phone's lock and app state at arrival. Transcription and relay steps
     /// add their own entries after this, so the whole path reads in order.
-    private func arrivalLog(for metadata: RecordingMetadata, receivedAt: Date) -> [ActivityEntry] {
+    private func arrivalLog(for metadata: RecordingMetadata, receivedAt: Date, via path: String) -> [ActivityEntry] {
         let savedAt = metadata.createdAt.addingTimeInterval(metadata.duration)
         var log = [ActivityEntry("Recorded on Apple Watch", at: metadata.createdAt)]
 
@@ -166,7 +166,7 @@ final class PhoneConnectivityService: NSObject, ObservableObject {
             log.append(ActivityEntry("Watch sent it again (try \(attempt))", at: sentAt))
         }
 
-        var arrival = "Reached iPhone, \(DateFormatters.formatGap(from: savedAt, to: receivedAt)) after it was recorded"
+        var arrival = "Reached iPhone by \(path), \(DateFormatters.formatGap(from: savedAt, to: receivedAt)) after it was recorded"
         if let sentAt = metadata.sentAt {
             arrival += " and \(DateFormatters.formatGap(from: sentAt, to: receivedAt)) after the watch sent it"
         }
@@ -274,15 +274,82 @@ extension PhoneConnectivityService: WCSessionDelegate {
             print("Failed to parse watch recording metadata")
             return
         }
+        // Must copy before returning: WatchConnectivity deletes the file then.
+        ingest(metadata, via: "file transfer") { destinationURL in
+            try FileManager.default.copyItem(at: file.fileURL, to: destinationURL)
+        }
+    }
 
+    /// A short note sent inline by the watch (see the watch's `sendInline`):
+    /// 4-byte big-endian metadata length, metadata JSON, then the audio.
+    /// Replies with a receipt once it's saved; an empty reply means the
+    /// watch keeps its copy and the file transfer delivers it.
+    func session(
+        _ session: WCSession,
+        didReceiveMessageData messageData: Data,
+        replyHandler: @escaping (Data) -> Void
+    ) {
+        let bytes = [UInt8](messageData)
+        guard bytes.count > 4 else { replyHandler(Data()); return }
+        let length = bytes[0..<4].reduce(0) { Int($0) << 8 | Int($1) }
+        guard bytes.count >= 4 + length,
+              let metadata = try? JSONDecoder().decode(
+                RecordingMetadata.self,
+                from: Data(bytes[4..<(4 + length)])
+              )
+        else {
+            print("Failed to parse inline watch recording")
+            replyHandler(Data())
+            return
+        }
+        let audio = Data(bytes[(4 + length)...])
+        ingest(metadata, via: "message", writeAudio: { destinationURL in
+            try audio.write(to: destinationURL)
+        }, onSaved: { saved in
+            let reply: [String: Any] = saved
+                ? ["type": "received", "recordingIds": [metadata.recordingId]]
+                : [:]
+            replyHandler((try? JSONSerialization.data(withJSONObject: reply)) ?? Data())
+        })
+    }
+
+    /// Saves a watch recording that arrived by file transfer or message.
+    /// `writeAudio` runs synchronously before this returns; `onSaved` gets
+    /// whether the recording is on disk here (and so was receipted).
+    private func ingest(
+        _ metadata: RecordingMetadata,
+        via path: String,
+        writeAudio: (URL) throws -> Void,
+        onSaved: ((Bool) -> Void)? = nil
+    ) {
         let audioFileName = "\(metadata.recordingId).m4a"
         let destinationURL = StorageService.audioDirectory.appendingPathComponent(audioFileName)
+
+        // The other path may have saved this note already. Keep that audio
+        // and just confirm again.
+        if let existingID = UUID(uuidString: metadata.recordingId),
+           storageService.loadRecordings().contains(where: { $0.id == existingID }),
+           FileManager.default.fileExists(atPath: destinationURL.path) {
+            sendReceipt(for: existingID)
+            onSaved?(true)
+            Task { @MainActor in
+                // A second copy means the watch hadn't heard back yet.
+                // Worth seeing when chasing a delay.
+                guard var existing = self.storageService.loadRecordings()
+                    .first(where: { $0.id == existingID }) else { return }
+                existing.activityLog.append(ActivityEntry(
+                    "Also arrived by \(path)\(metadata.attempt.map { " (try \($0))" } ?? ""); already saved, receipt resent"
+                ))
+                self.storageService.updateRecording(existing)
+            }
+            return
+        }
 
         do {
             if FileManager.default.fileExists(atPath: destinationURL.path) {
                 try FileManager.default.removeItem(at: destinationURL)
             }
-            try FileManager.default.copyItem(at: file.fileURL, to: destinationURL)
+            try writeAudio(destinationURL)
 
             let receivedAt = Date()
 
@@ -294,7 +361,7 @@ extension PhoneConnectivityService: WCSessionDelegate {
                     audioFileName: audioFileName
                 )
                 recording.receivedAt = receivedAt
-                recording.activityLog = self.arrivalLog(for: metadata, receivedAt: receivedAt)
+                recording.activityLog = self.arrivalLog(for: metadata, receivedAt: receivedAt, via: path)
 
                 let isNew = storageService.addRecording(recording)
                 // Confirm only what's really on disk. Before the first unlock
@@ -304,6 +371,7 @@ extension PhoneConnectivityService: WCSessionDelegate {
                 if saved != nil {
                     self.sendReceipt(for: recording.id)
                 }
+                onSaved?(saved != nil)
                 if !isNew, var existing = saved {
                     // A resend of something already here means a receipt
                     // went missing. Worth seeing when chasing a delay.
@@ -325,6 +393,7 @@ extension PhoneConnectivityService: WCSessionDelegate {
 
         } catch {
             print("Failed to save watch recording: \(error)")
+            onSaved?(false)
         }
     }
 }
