@@ -216,6 +216,8 @@ export async function uploadNote(request, rawId, ctx) {
     return unavailable();
   }
 
+  // Accepted now, after the (possibly long) body arrived.
+  ctx = { ...ctx, now: ctx.clock() };
   const accepted = await acceptNote(ctx, {
     cred, id, retry, account, contentType, seconds, audioKey, recordedAt, recordedMs,
   });

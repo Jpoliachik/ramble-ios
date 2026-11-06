@@ -1,69 +1,68 @@
-# Ramble Transcription Proxy
+# Ramble Relay
 
-This is the production proxy that Ramble uses for cloud transcription. It's a stateless Cloudflare Worker that receives audio, forwards it to a transcription provider, and returns text. It stores nothing — no audio, no transcriptions, no user data.
+This is the server Ramble's iPhone and Apple Watch apps talk to. It's one Cloudflare Worker that takes each note's audio, transcribes it, keeps the transcript for the person's own devices until they have it, and hands a copy to each agent the person connected. The code is in this repo so you can verify exactly what it does.
 
-The code is in this repo so you can verify exactly what it does.
+Ramble's server is a relay, not an archive. Your audio is sent to a transcription provider and deleted as soon as the transcript is ready. Transcripts are deleted when your agent picks them up, or after 30 days. Your full history lives only on your iPhone.
 
-The same Worker also serves the **Ramble Relay**, which holds transcripts until your agent picks them up and then deletes them. The relay has its own routes and its own small database, described in [RELAY.md](RELAY.md). Transcription never touches it.
+The behavior is specified in [`specs/`](../specs/): the HTTP contract is [`relay-api.md`](../specs/relay-api.md), the pipeline [`transcription.md`](../specs/transcription.md), agents and retention [`delivery.md`](../specs/delivery.md), free notes and the unlock [`purchase.md`](../specs/purchase.md). Agent-facing docs are in [RELAY.md](RELAY.md).
 
-## How It Works
+## How it works
 
-1. App sends audio to `POST /transcribe`
-2. Proxy verifies the request (App Attest assertion + active subscription)
-3. Audio is forwarded to the selected transcription provider
-4. Provider returns text, proxy passes it back to the app
+1. The watch or iPhone uploads a note's audio to `PUT /notes/:id` (the note's UUID is the idempotency key).
+2. The relay stores the audio in a private R2 bucket, then accepts the note, counting a free note or fair-use hours.
+3. It transcribes right away: Groq Whisper v3 Turbo first, falling back to Deepgram Nova-3 and OpenAI GPT-Transcribe only when a provider is overloaded or down. Quick transcripts come back in the upload response.
+4. The audio is deleted. One copy of the transcript goes to each connected agent, and one is kept for the person's devices until the phone acks it (and, for a watch note, the watch has seen it), at most 30 days.
+5. A cron job every minute retries failed attempts (for up to 20 hours), picks up stalled ones, expires old data, and sends operator alerts.
 
-That's it. Transcription keeps no audio or transcripts, no database, and no user accounts.
+## Code map
 
-## Supported Models
+| File | What it does |
+|---|---|
+| `src/index.js` | Routing, the request context, the cron |
+| `src/auth.js` | Credentials (`rmbi_` phone, `rmbw_` watch, `rmba_` agent) and the rate limits table |
+| `src/account.js` | Inbox creation, free notes, the unlock and its binding, refunds, settings, the watch token |
+| `src/notes.js` | Audio uploads, the transcription pipeline and retries, the device copy and acks |
+| `src/relay.js` | Pairing, agent copies, pull and ack, delivery status, wake-up hooks, old builds' text upload |
+| `src/legacy.js` | Old builds' `POST /transcribe` for early subscribers, until `LEGACY_UNTIL` |
+| `src/ops.js` | Operator alerts and the daily usage summary |
+| `src/transcribe.js`, `src/audio.js` | Providers, fallback, spend breaker, formatting; audio length from the container |
+| `src/apple.js`, `src/attest.js`, `src/ratelimit.js`, `src/crypto.js` | Apple-signed records, App Attest, the D1 rate limiter |
+| `migrations/` | D1 schema |
 
-| Model | Provider | Key |
-|-------|----------|-----|
-| Whisper v3 Turbo | Groq | `whisper-large-v3-turbo` (default) |
-| Whisper Large v3 | Groq | `whisper-large-v3` |
-| Nova-3 | Deepgram | `deepgram-nova-3` |
-| GPT-Transcribe | OpenAI | `openai-gpt-transcribe` |
+## Configuration
 
-Retired model keys keep working — `openai-gpt-4o-transcribe` resolves to `openai-gpt-transcribe`, so app versions already on people's phones don't break when a model is replaced.
+Bindings (in `wrangler.toml`):
 
-## Transcription Request
+| Binding | What |
+|---|---|
+| `DB` | D1 database `ramble-relay` (apply `migrations/` with `npx wrangler d1 migrations apply ramble-relay --remote`) |
+| `AUDIO` | R2 bucket `ramble-audio`, private, with a 1-day object lifecycle rule as the backstop for failed deletes |
+| `ATTEST_KV` | KV namespace for App Attest challenges and keys |
 
-`POST /transcribe` takes multipart form data:
+Secrets (`npx wrangler secret put NAME`):
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `audio` | yes | The recording. The app sends 16 kHz mono AAC, split client-side into pieces under 24 MB and 20 minutes so every request stays inside the providers' size and length limits. |
-| `model` | no | One of the keys above. Defaults to `whisper-large-v3-turbo`. |
-| `language` | no | ISO-639-1 hint. Omit to auto-detect. |
-| `vocabulary` | no | Comma- or newline-separated names and jargon. |
-| `remove_filler_words` | no | `"true"` to strip "um", "uh", and friends. |
+| Secret | What |
+|---|---|
+| `GROQ_API_KEY` | Primary transcription provider |
+| `DEEPGRAM_API_KEY`, `OPENAI_API_KEY` | Fallback providers |
+| `HOOK_ENCRYPTION_KEY` | Encrypts agents' wake-up hook headers at rest. Without it, setting a hook answers 503 |
+| `ALERT_WEBHOOK_URL` | Where operator alerts and the daily summary are POSTed as plain text (for example an ntfy topic). Unset: nothing is sent |
 
-Each provider takes those hints differently, which is the reason the proxy exists rather than the app calling providers directly:
+Vars (`[vars]`): `RETENTION_SECONDS`, `APPLE_BUNDLE_ID`, `UNLOCK_PRODUCT_ID`, `PREMIUM_PRODUCT_ID`, `APPSTORE_ENVIRONMENT` (`Production`), `RELAY_BASE_URL`, and three set at release: `FIRST_FREE_BUILD` (build number of the first free-notes build), `FREE_RELEASE_AT` (its release time, ISO 8601) and `LEGACY_UNTIL` (when old builds' paths start answering 410). Without `FIRST_FREE_BUILD`/`FREE_RELEASE_AT` nobody counts as an early buyer; without `LEGACY_UNTIL` the old paths keep working.
 
-| | Groq (Whisper) | Deepgram Nova-3 | OpenAI GPT-Transcribe |
-|---|---|---|---|
-| Vocabulary | `prompt` (framed as a sentence, echo stripped from the result) | one `keyterm` per term | one `keywords[]` per term |
-| Language | `language` | `language`, or `multi` to auto-detect | `languages[]` (sending `language` too is rejected) |
-| Filler words | stripped from the response | `filler_words` parameter | stripped from the response |
-| Paragraphs | from segment timings, breaking on pauses | native `paragraphs=true` | grouped from sentences — the model returns plain text with no timings |
+There is no developer bypass. `DEV_BYPASS_TOKEN` and `ANALYTICS_TOKEN` are no longer read and can be deleted.
 
-Response is `{"text": "..."}`, or `{"error": "..."}` with a 4xx/5xx status.
+Apple: point App Store Server Notifications (version 2) for production at `https://<relay>/appstore/notifications`.
 
-## Endpoints
+## What is stored
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/transcribe` | Multipart audio in, `{"text": "..."}` out |
-| `POST` | `/attest/challenge` | Issue a challenge for App Attest registration |
-| `POST` | `/attest` | Register a device via App Attest |
-| `GET` | `/health` | Health check |
-| | `/inboxes`, `/inbox`, `/inbox/ack`, `/pair/*`, `/connections` | Relay — see [RELAY.md](RELAY.md) |
+- **Inboxes:** a hash of the secret, the account token, the free-note count, the bound purchase, and the transcription settings.
+- **Notes:** ID, source device, status, recorded time as sent, measured length, and the transcript until the person's devices have it. Audio sits in R2 only until transcription ends, and at most 1 day.
+- **Agent copies:** transcript text until the agent acks it or 30 days pass; afterwards a row without text, so the app can show "picked up" or "not picked up".
+- **Purchases:** Apple's original transaction ID, kind, environment, refund time; fair-use seconds per month.
+- **Operator data:** counted events (refusals, provider trouble) for 3 days, alert cooldowns, rate-limit counters, estimated spend per provider per day.
 
-## Authentication
-
-**App Attest** — Apple's device attestation proves requests come from a real copy of Ramble on a real Apple device. The app attests once, then sends an assertion with each request. All `/transcribe` requests must include valid attestation headers.
-
-**Subscription verification** — Cloud transcription requires an active StoreKit 2 subscription. The proxy verifies Apple's signed JWS transaction directly — no server-side receipt validation, no App Store Server API calls.
+Logs carry no request bodies, transcript text, audio, credentials or network addresses; inbox IDs and App Attest key IDs appear only as short hashes, and provider error bodies are cut to 200 characters.
 
 ## App Attest Implementation Notes
 
@@ -100,7 +99,7 @@ During attestation, the credential public key is available in two places: the CO
 
 **4. App Attest works on local Xcode dev builds**
 
-`DCAppAttestService` works on any real Apple device, including apps built directly from Xcode. The only difference is the environment: dev builds use `appattestdevelop` as the AAGUID, while TestFlight/App Store builds use `appattest`. The proxy accepts both. App Attest does NOT work on the iOS Simulator.
+`DCAppAttestService` works on any real Apple device, including apps built directly from Xcode. The only difference is the environment: dev builds use `appattestdevelop` as the AAGUID, while TestFlight/App Store builds use `appattest`. The production relay accepts only `appattest`. App Attest does NOT work on the iOS Simulator.
 
 ## Deploy Your Own
 
@@ -117,39 +116,17 @@ During attestation, the credential public key is available in two places: the CO
    ```
    Paste the returned ID into `wrangler.toml`.
 
-4. Set your API keys as secrets:
-   ```bash
-   npx wrangler secret put GROQ_API_KEY
-   npx wrangler secret put DEEPGRAM_API_KEY    # optional
-   npx wrangler secret put OPENAI_API_KEY      # optional
-   ```
+4. Create the D1 database and the R2 bucket (see Configuration), paste the D1 id into `wrangler.toml`, and apply the migrations.
 
-5. Deploy:
+5. Set the secrets listed under Configuration.
+
+6. Deploy:
    ```bash
    npm install
    npm run deploy
    ```
 
-## Anonymous Usage Analytics
-
-When you use cloud transcription, the proxy records anonymous usage metrics via Cloudflare Analytics Engine. This helps us understand which models are popular and keep the service running well.
-
-**What's collected per transcription request:**
-- Model name and provider (e.g. "whisper-large-v3-turbo" via Groq)
-- Audio file size and transcript length (character count, not the text itself)
-- Processing duration
-- Success or failure status
-- SHA-256 hashed device ID — a one-way hash for counting unique devices, not reversible to your actual device ID
-
-**What's NOT collected:**
-- Audio content
-- Transcription text
-- IP addresses
-- Anything that identifies you as a person
-
-On-device transcription (Apple Speech) never contacts the proxy, so it generates zero analytics data. You can verify all of this in [`proxy/src/analytics.js`](src/analytics.js).
-
-### Local Development
+## Local Development
 
 ```bash
 npm install
@@ -157,8 +134,7 @@ npm run dev
 npm test        # Unit tests — no credentials or Worker runtime needed
 ```
 
-`npm test` covers the pure parts: model resolution, keyword sanitizing, language
-resolution, and transcript formatting. CI runs it on every PR touching `proxy/`
-and the deploy is gated on it.
-
-You'll likely want to set `DEV_BYPASS_TOKEN` as a var in `wrangler.toml` during development to skip subscription verification.
+`npm test` runs every endpoint against the real schema (node:sqlite stands in for
+D1) with fakes for R2, providers, App Attest and Apple, plus the provider, audio,
+Apple and App Attest unit tests. CI runs it on every PR touching `proxy/` and the
+deploy is gated on it.

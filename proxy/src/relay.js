@@ -8,7 +8,7 @@
 // phone can tell "picked up" from "removed unread".
 
 import { address, authenticate, countLimit, limit, peekLimit } from './auth.js';
-import { DAY, HOUR, baseURL, fail, iso, json, randomToken, readJSON, sha256Hex, unavailable, UUID_RE } from './http.js';
+import { DAY, baseURL, fail, iso, json, randomToken, readJSON, sha256Hex, unavailable, UUID_RE } from './http.js';
 import { alert } from './ops.js';
 
 export const DEFAULT_RETENTION_SECONDS = 30 * 24 * 60 * 60;
@@ -715,4 +715,3 @@ export function normalizePairCode(input) {
   return String(input).toUpperCase().replace(/[\s-]/g, '').slice(0, 32);
 }
 
-export { HOUR };
