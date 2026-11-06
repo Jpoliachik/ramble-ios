@@ -63,6 +63,13 @@ final class WatchStuckNoteAlerts {
                 repeats: false
             )
             add(Self.laterID, scheduled.alert, trigger: trigger)
+            // The phone's receipts only count once this app reads them, and
+            // it may be asleep with them waiting. Wake a few minutes before
+            // the alert so notes the iPhone already has cancel it, instead
+            // of a false "hasn't reached your iPhone".
+            WatchConnectivityService.shared.scheduleBackgroundRetryIfNeeded(
+                before: scheduled.fireAt.addingTimeInterval(-5 * 60)
+            )
         } else {
             center.removePendingNotificationRequests(withIdentifiers: [Self.laterID])
         }

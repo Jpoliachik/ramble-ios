@@ -193,10 +193,15 @@ final class WatchConnectivityService: NSObject, ObservableObject {
     /// watchOS has the app suspended. A background refresh gives the queue
     /// another pass (resend after the receipt timeout, pick up receipts)
     /// even if the app isn't opened again.
-    func scheduleBackgroundRetryIfNeeded() {
+    /// `before` asks for the pass to run no later than that date. The
+    /// stuck-note alert uses it so receipts the phone already sent are read
+    /// before a scheduled "still on your watch" notification fires. watchOS
+    /// keeps one scheduled refresh, so an earlier request replaces a later one.
+    func scheduleBackgroundRetryIfNeeded(before deadline: Date? = nil) {
         guard !syncQueue.jobs.isEmpty else { return }
-        if let backgroundRetryDate, backgroundRetryDate > Date() { return }
-        let date = Date().addingTimeInterval(Self.backgroundRetryInterval)
+        var date = Date().addingTimeInterval(Self.backgroundRetryInterval)
+        if let deadline { date = min(date, max(deadline, Date().addingTimeInterval(60))) }
+        if let backgroundRetryDate, backgroundRetryDate > Date(), backgroundRetryDate <= date { return }
         backgroundRetryDate = date
         WKApplication.shared().scheduleBackgroundRefresh(
             withPreferredDate: date,
