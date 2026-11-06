@@ -168,15 +168,20 @@ A transcribed or silent note SHALL leave Recent 24 hours after its transcript ar
 ## Sending notes
 
 ### Requirement: Upload straight to Ramble's server
-After every stop, the watch SHALL upload the note straight to Ramble's server over any connection it has (through the iPhone, Wi-Fi, or cellular), without needing the iPhone app open. An upload SHOULD start within 1 minute of the stop while the app is open; with the app in the background, watchOS decides when. Upload rules are in relay-api.md.
+After every stop, the watch SHALL upload the note straight to Ramble's server over any connection it has (through the iPhone, Wi-Fi, or cellular), without needing the iPhone app open. The watch SHALL start each upload as a background transfer at the stop, while the app is still in front, so it can finish after the wrist drops. Without the iPhone nearby, sending is promised only while the watch app is open or soon after the stop; in Low Power Mode watchOS turns off Wi-Fi and cellular away from the iPhone, so notes wait until the app is opened or the iPhone is back. With the app in the background, watchOS decides when transfers run. Upload rules are in relay-api.md.
 
 #### Scenario: iPhone left at home
 - GIVEN the iPhone is at home and the watch is on Wi-Fi
-- WHEN the person records a note
-- THEN the note uploads and is transcribed without the iPhone
+- WHEN the person records a note and stops
+- THEN the note's upload starts at the stop, and it uploads and is transcribed without the iPhone
+
+#### Scenario: Low Power Mode away from the iPhone
+- GIVEN the watch is in Low Power Mode and the iPhone is at home
+- WHEN the person records a note and lowers their wrist
+- THEN the note waits on the watch and uploads the next time the app is opened or the iPhone is back in reach
 
 ### Requirement: Retry until accepted
-The watch SHALL keep every note the server has not accepted and SHALL never give up on it or delete its audio because uploads fail. It SHALL retry 10 seconds after a failure while the app is open, doubling to every 5 minutes, and whenever the app opens, a connection returns or the watch is set up. It SHOULD also retry about every 10 minutes in the background, as often as watchOS allows. When the server says to wait (rate limit), the watch SHALL wait that long.
+The watch SHALL keep every note the server has not accepted and SHALL never give up on it or delete its audio because uploads fail. It SHALL retry 10 seconds after a failure while the app is open, doubling to every 5 minutes, and whenever the app opens, a connection returns or the watch is set up. It MAY also retry in background passes, as often as watchOS allows; background retries are best effort and not promised. When the server says to wait (rate limit), the watch SHALL wait that long.
 
 #### Scenario: Answer lost in transit
 - GIVEN the server accepted a note but the watch never got the answer
@@ -200,7 +205,7 @@ The watch SHALL learn each accepted note's status and transcript from the server
 - THEN the note moves to "Done" with its first line once the transcript is ready
 
 ### Requirement: Keep audio until it is safe
-The watch SHALL keep a note's audio until both the transcript is done (or transcription failed, or the server refused the note) and the iPhone has confirmed it has the audio. If the iPhone never confirms, the audio SHALL be deleted 30 days after the transcript is done.
+The watch SHALL keep a note's audio until both the transcript is done (or transcription failed, or the server refused the note) and the iPhone has confirmed it has the audio. If the iPhone never confirms, the audio SHALL be deleted 30 days after the note reaches a final state (done, failed for good, or refused for good).
 
 #### Scenario: Transcribed, iPhone away
 - GIVEN a note is transcribed while the iPhone is away
@@ -225,11 +230,16 @@ When the server holds a note over fair use, the watch SHALL keep the note and it
 - THEN the note uploads and is transcribed
 
 ### Requirement: Not set up yet
-Until the iPhone has connected the watch, the watch SHALL record and keep notes, show "Set up" (or "No phone"), and upload every waiting note once connected. When the server stops accepting the watch's connection, the watch SHALL keep its notes, show "Set up", and wait for the iPhone to connect it again.
+Until the iPhone has connected the watch, the watch SHALL record and keep notes, show "Set up" (or "No phone"), and upload every waiting note once connected. When the watch has no connection, or the server stops accepting it, the watch SHALL keep its notes, show "Set up", and tell the iPhone it needs a connection each time the app opens and the iPhone is in reach; the iPhone then connects it again (phone.md).
+
+#### Scenario: Watch app reinstalled
+- GIVEN the watch app was deleted and reinstalled, so it has no connection
+- WHEN the person opens it with the iPhone in reach
+- THEN the iPhone connects it without the person doing anything on the iPhone, and waiting notes upload
 
 #### Scenario: Watch app used first
 - GIVEN Ramble was installed on both devices but never opened on the iPhone
-- WHEN the person records three notes on the watch, then opens Ramble on the iPhone
+- WHEN the person records three notes on the watch, then opens Ramble on the iPhone and taps "Get started"
 - THEN the watch is connected and uploads all three notes
 
 ### Requirement: Connection replaced

@@ -297,9 +297,10 @@ The agent screen's "TEMPORARY BY DESIGN" note, the website privacy page, the llm
 - THEN the privacy note uses that wording
 
 ### Requirement: Backups and the App Store label are disclosed
-The privacy policy SHALL state that deleted transcripts can remain in the database's point-in-time backup for up to 30 days and are used only to recover from an outage. The App Store privacy label SHALL list Audio Data alongside the transcript data.
+The privacy policy SHALL name every transcription provider Ramble may send audio to (Groq, and each fallback provider in [transcription.md](transcription.md)), say that transcripts go to the agents and webhook the person connects, and state that deleted transcripts can remain in the database's point-in-time backup for up to 30 days and are used only to recover from an outage. It is what the onboarding consent line links to ([phone.md](phone.md)). The App Store privacy label SHALL list Audio Data alongside the transcript data.
 
 #### Scenario: Reading the privacy policy
 - GIVEN a person opens https://ramble.watch/privacy
 - WHEN they read how long transcripts are kept
 - THEN the page names the 30-day relay limit and the up-to-30-day backup window
+- AND it names Groq and the fallback transcription providers
