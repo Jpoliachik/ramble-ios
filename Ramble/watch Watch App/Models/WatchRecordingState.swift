@@ -18,6 +18,9 @@ enum WatchDeliveryState: Equatable {
     case moving
     /// Queued on the watch. Normal when the phone is away.
     case waiting
+    /// The file reached the iPhone, but Ramble there hasn't confirmed it
+    /// saved it yet (usually it hasn't been woken to open it).
+    case reachedPhone
     /// Moving or waiting for longer than the stuck threshold.
     case stuck(since: Date)
     /// Never confirmed and no longer queued: the audio went missing.
@@ -43,6 +46,7 @@ enum WatchDeliveryState: Equatable {
         guard let job else { return .lost }
         if now.timeIntervalSince(job.savedAt) >= stuckAfter { return .stuck(since: job.savedAt) }
         if isInFlight && isPhoneReachable { return .moving }
+        if job.handedOffAt != nil { return .reachedPhone }
         return .waiting
     }
 }
@@ -77,7 +81,7 @@ enum WatchHistoryBadge: Equatable {
                 if !seenLostIDs.contains(note.id) { return .needsYou }
             case .moving:
                 badge = .moving
-            case .waiting:
+            case .waiting, .reachedPhone:
                 if badge == .none { badge = .waiting }
             case .onPhone:
                 break

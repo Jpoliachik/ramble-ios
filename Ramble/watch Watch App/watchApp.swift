@@ -23,5 +23,10 @@ struct watch_Watch_AppApp: App {
         .backgroundTask(.watchConnectivity) {
             await WatchConnectivityService.shared.waitForPendingContent()
         }
+        // Retries notes still waiting for the phone while the app is
+        // suspended, when its own retry timer can't fire.
+        .backgroundTask(.appRefresh(WatchConnectivityService.backgroundRetryTaskID)) {
+            await WatchConnectivityService.shared.runBackgroundRetry()
+        }
     }
 }

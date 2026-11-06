@@ -67,6 +67,8 @@ struct RambleApp: App {
                     BackgroundTaskService.shared.beginImmediateBackgroundProcessing()
                     // Also schedule deferred BGProcessingTask as fallback
                     BackgroundTaskService.shared.scheduleSyncTask()
+                    // Periodic backup check for watch notes the phone hasn't collected
+                    BackgroundTaskService.shared.scheduleRefreshTask()
                     // Hand any stuck-note alerts to the system now, in case
                     // Ramble doesn't run again for a while.
                     DeliveryMonitor.shared.evaluate()

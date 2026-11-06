@@ -16,6 +16,13 @@ struct WatchSyncJob: Codable, Identifiable {
     /// on the watch until the phone's receipt arrives; if none comes, the
     /// file is sent again (see WatchConnectivityService.receiptTimeout).
     var handedOffAt: Date?
+    /// When the watch first handed the file to WatchConnectivity, and when it
+    /// last did. Sent to the phone with the file so its activity log can
+    /// tell a slow watch from a slow transfer. Optional so queues saved by
+    /// older builds still load.
+    var firstSentAt: Date?
+    var lastSentAt: Date?
+    var sendCount: Int?
 
     /// When the recording ended, i.e. when it started waiting to reach the phone.
     var savedAt: Date { createdAt.addingTimeInterval(duration) }
@@ -70,6 +77,18 @@ final class WatchSyncQueue: ObservableObject {
 
         // Update recording history with sync timestamp
         WatchRecordingHistory.shared.markSynced(id: jobId)
+    }
+
+    /// The file was just handed to WatchConnectivity. Returns the updated job.
+    @discardableResult
+    func markSent(jobId: UUID) -> WatchSyncJob? {
+        guard let idx = jobs.firstIndex(where: { $0.id == jobId }) else { return nil }
+        let now = Date()
+        if jobs[idx].firstSentAt == nil { jobs[idx].firstSentAt = now }
+        jobs[idx].lastSentAt = now
+        jobs[idx].sendCount = (jobs[idx].sendCount ?? 0) + 1
+        saveQueue()
+        return jobs[idx]
     }
 
     func markHandedOff(jobId: UUID) {
