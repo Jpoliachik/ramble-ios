@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Ramble** is an open-source voice capture app for iPhone + Apple Watch. Record your thoughts on the go, get accurate transcripts, and pipe them into your agent, workflow, or automation via webhook. Open source, private by design, no accounts.
+**Ramble** is a voice capture app for Apple Watch + iPhone. Record your thoughts on the go, get accurate transcripts, and pipe them into your agent, workflow, or automation via webhook. No accounts; the server is a relay, not an archive.
 
 For full brand positioning, audience, tone, and messaging guidelines, see **`docs/brand.md`**.
 
@@ -25,24 +25,15 @@ These rules are not optional. They apply to every change, however small:
 7. **Specs describe the present only.** No history, change logs, plans, or TODOs in specs. Plans go in a thread or in `docs/`.
 8. **Report it.** When you finish a task, say which specs you updated, or say "No spec change" with the reason.
 
-### Post-v1 — cloud transcription enhancements
+### Ideas for later
 
-These are free features from existing providers (no extra API calls or cost):
-
-- [x] **Deepgram auto-paragraphs** — `paragraphs=true` on the Deepgram call. Groq derives paragraphs from segment timings; models that return plain text (GPT-Transcribe, Apple Speech) get sentence grouping instead.
-- [x] **Filler word removal toggle** — settings toggle. Deepgram via `filler_words`, client-side regex for Groq/OpenAI.
-- [ ] **Speaker diarization** — opt-in toggle. Deepgram has `diarize=true`, OpenAI has a separate `gpt-4o-transcribe-diarize` model (GPT-Transcribe itself doesn't do speaker labels). Great for conversations/meetings.
-- [x] **Language hint** — language picker in settings, passed to all providers. Improves accuracy for non-English users.
-- [ ] **Recording context** — GPT-Transcribe takes a free-form `prompt` describing the recording's topic or setting, separate from the keyword list. A short "what these recordings usually are" field in Settings would feed it.
-- [ ] **Multiple language hints** — the picker sends one language. GPT-Transcribe accepts several via `languages[]` and Deepgram has `multi`, so a multi-select would help people who codeswitch mid-recording.
-
-### Future
-
-- [ ] **Localization** — translate the app UI into additional languages
+- **Speaker diarization** — opt-in. Deepgram has `diarize=true`; Groq Turbo doesn't do speaker labels.
+- **Multiple language hints** — for people who codeswitch mid-recording.
+- **On-device Apple Speech** — possible opt-in fast follow, not at launch.
+- **Localization** — translate the app UI into additional languages.
 
 ### Release plan
 
-- Open source the repo on GitHub
 - Free download: 25 notes free, then a $14.99 one-time unlock, no subscription (`specs/purchase.md`)
 - Cloud transcription only (Groq Whisper v3 Turbo with server-side fallback) via the Cloudflare Worker relay
 - Marketing website on Vercel at https://ramble.watch (source in `website/`, static export)
@@ -68,13 +59,15 @@ xcodebuild -project Ramble/Ramble.xcodeproj -scheme "watch Watch App" -destinati
 ```bash
 cd proxy
 npm ci
-npm test         # Unit tests for request shaping + transcript formatting
+npm test         # Relay API, pipeline, providers, Apple verification, rate limits
 npm run dev      # Local Worker via wrangler
 ```
 
-Tests need no credentials or Worker runtime — they cover the pure helpers in
-`src/index.js`. CI runs them on every PR touching `proxy/**` and gates the
-deploy on them.
+Tests need no credentials or Worker runtime: they run the Worker's request
+handler against a SQLite stand-in for D1 and fakes for R2, providers and Apple
+(`test/harness.js`, `test/d1.js`). CI runs them on every PR touching
+`proxy/**` and gates the deploy on them. Bindings, secrets and vars are listed
+in `proxy/README.md`.
 
 ### Website
 
@@ -87,7 +80,7 @@ npm run dev      # Dev server at localhost:3000
 
 The site is a static export (`output: "export"`) deployed on Vercel from the `website/` root directory, with a preview deployment for every PR that touches it. It is served from the root of Ramble's own domain, https://ramble.watch, so there is no `basePath`.
 
-**Pages:** Landing (`/`), Privacy Policy (`/privacy`), Terms of Use (`/terms`), Connect your agent + relay API (`/docs`), Webhook API Docs (`/docs/webhooks`), Requirements + troubleshooting (`/docs/help`)
+**Pages:** Landing (`/`), Privacy Policy (`/privacy`), Terms of Use (`/terms`), Support (`/support`), Connect your agent + relay API (`/docs`), Webhook API Docs (`/docs/webhooks`), Requirements + troubleshooting (`/docs/help`)
 
 ## Architecture
 
@@ -109,66 +102,49 @@ proxy/                 # Cloudflare Worker: transcription proxy + agent relay (R
 
 ### Data Flow
 
-1. **Record** — AudioRecorderService captures 16kHz mono AAC audio
-2. **Transcribe** — TranscriptionQueueService dispatches to on-device (Apple Speech) or cloud endpoint
-3. **Store** — Transcript saved locally to Recording model
-4. **Webhook** — Optional POST of transcript to user-configured URL
+1. **Record** — watch or iPhone captures 16kHz mono AAC (60-minute cap)
+2. **Upload** — each device uploads its own notes straight to the relay with `PUT /notes/:id` (watch: background URLSession with a phone-minted watch token; phone: inbox secret). The note ID is the idempotency key.
+3. **Transcribe** — the relay stores audio in R2, transcribes (Groq Whisper v3 Turbo, then Deepgram, then OpenAI as fallbacks), deletes the audio, and copies the transcript to each eligible agent
+4. **History** — the phone pulls transcripts with `GET /notes` and acks them; watch notes merge by ID with details and audio sent over WatchConnectivity
+5. **Webhook** — optional POST from the phone once it has the transcript
 
-Watch recordings reach the phone over WatchConnectivity (`sendMessage` wake + `transferFile`, receipts back). For which Apple APIs we use at each hop, why, their documented limits, and Apple references, see **`docs/sync-architecture.md`**. Read it before changing the watch → phone → relay path.
+WatchConnectivity now carries only the watch token and account state (phone → watch), note details and "needs a connection" (watch → phone), and best-effort audio for playback. See **`docs/sync-architecture.md`** for the Apple APIs at each hop and their limits; read it before changing the watch → relay or watch → phone path.
 
 ### Key Services
 
-| Service                           | Role                                                     |
-| --------------------------------- | -------------------------------------------------------- |
-| `AudioRecorderService`            | 16kHz mono AAC capture                                   |
-| `TranscriptionQueueService`       | Persistent job queue with retry                          |
-| `AppleSpeechTranscriptionService` | On-device transcription via SFSpeechRecognizer (default) |
-| `ProxyTranscriptionService`       | HTTP client for cloud/custom transcription endpoints     |
-| `WebhookQueueService`             | Independent queue for webhook delivery with retry        |
-| `BackgroundTaskService`           | UIKit + BGProcessingTask for background queue draining   |
-| `RecordingManager`                | Coordinates audio recording lifecycle                    |
-| `StorageService`                  | JSON file persistence for recordings                     |
-| `PhoneConnectivityService`        | WatchConnectivity bridge for watch recordings            |
+| Service | Role |
+| --- | --- |
+| `UploadQueueService` (phone) | Uploads phone notes, handles holds, refusals, retries and hand retries |
+| `NoteSyncService` (phone) | Check-in: settings, `GET /notes` + ack, delivery status, account |
+| `RelayService` (phone) | Relay HTTP client, inbox creation (App Attest), watch token |
+| `AccountService` (phone) | Last known free notes / unlock / fair use |
+| `PurchaseService` (phone) | StoreKit 2 unlock, restore, early-buyer proofs |
+| `PhoneConnectivityService` (phone) | WatchConnectivity: application context, note details, audio |
+| `WebhookQueueService` (phone) | Webhook delivery with retry |
+| `BackgroundTaskService` (phone) | Background check-ins and uploads |
+| `WatchRelayService` (watch) | Upload, status polling, holds and their release |
+| `WatchConnectivityService` (watch) | Watch side of the WatchConnectivity contract |
+| `WatchNoteStore` (watch) | Persisted watch notes and audio retention |
 
 ### Models
 
-- `Recording` — Core model: id, createdAt, duration, audioFileName, status, transcription, webhookStatus, lastError
-- `RecordingStatus` — recorded → transcribing → completed / failed
-- `TranscriptionJob` — Single-phase job with retry backoff
-- `WebhookJob` — Webhook delivery job with retry
-- `Settings` — transcriptionProvider, cloudModel, webhookEnabled, webhookURL, webhookSecret, deviceId
+- `Recording` (phone) — a note: id, createdAt, duration, source, audio, server status and result, transcript, delivery and webhook state
+- `WatchNote` (watch) — a watch note: upload state, holds, server status, first line, audio kept until safe
+- `RelayAccount` — `GET /account`: unlocked, free notes, fair use, account token
+- `WebhookJob` — webhook delivery job with retry
 
 ### Tech Stack
 
 - SwiftUI for all UI
 - Deployment target: iOS 26.2, watchOS 10.0 (covers Series 4+ and first-gen SE; guard newer watch APIs with `#available`). If you change a deployment target, update `MIN_IOS`/`MIN_WATCHOS` in `website/src/lib/site.ts` and the requirements in `website/public/llms*.txt`
 
-### Proxy API
+### Relay API
 
-Thin stateless Cloudflare Worker. Receives audio, forwards to transcription provider, returns text. Stores nothing. Protected by Apple App Attest.
+The full contract is **`specs/relay-api.md`**; agent-facing docs are `proxy/RELAY.md` and `/docs`. In short: the phone creates an inbox once with an App Attest assertion and gets an inbox secret (`rmbi_`); it mints an upload-only watch token (`rmbw_`); agents pair with a one-time code for an agent key (`rmba_`). Audio lives in R2 only until transcribed; transcripts for the person's devices and agent copies are deleted on ack or after 30 days. Purchases are verified server-side against Apple's root CA (`src/apple.js`).
 
-- `POST /transcribe` — Multipart audio in, `{"text": "..."}` out
-- `X-Device-ID` header for usage tracking
+### Transcription
 
-### Cloud Transcription Models
-
-| Model             | Provider | Strength                                      |
-| ----------------- | -------- | --------------------------------------------- |
-| Whisper v3 Turbo  | Groq     | Fast and accurate — best all-around (default) |
-| Whisper Large v3  | Groq     | Best for non-English languages                |
-| Nova-3            | Deepgram | Strong English accuracy, smart formatting     |
-| GPT-Transcribe    | OpenAI   | Most accurate overall (slower, pricier)       |
-
-Basis (Artificial Analysis AA-WER, Nov 2026): GPT-Transcribe 3.3%, Whisper
-v3 Turbo 4.6%, Nova-3 5.2%. Turbo is ~7x cheaper than Nova-3/GPT-Transcribe.
-Don't claim a model is best for noise or accents: no independent benchmark
-backs that for these four.
-
-## Pre-Launch Checklist
-
-### Proxy endpoint authentication — DONE
-
-Apple App Attest implemented. Client-side attestation via `DCAppAttestService` proves requests come from a legitimate copy of Ramble on a real Apple device. Assertion sent with each cloud transcription request, verified server-side.
+One model for everyone: Groq Whisper v3 Turbo. Deepgram Nova-3, then OpenAI GPT-Transcribe, are fallbacks only when Groq is overloaded or down, behind a daily spend breaker (`specs/transcription.md`). There is no model picker. Don't claim a model is best for noise or accents: no independent benchmark backs that.
 
 ## Resolved Questions
 

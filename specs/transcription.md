@@ -155,7 +155,7 @@ Every transcript SHALL be broken into paragraphs, with no setting: a new paragra
 ## Silent notes
 
 ### Requirement: No speech detected
-The server SHALL finish a note as "No speech detected", with an empty transcript and result "no_speech" (relay-api.md), when the provider returns no text, rejects the audio as too short, or returns only one of these phrases, ignoring case and surrounding punctuation: "Thank you.", "Thanks for watching!", "Thank you for watching.", "you" or "Bye.".
+The server SHALL finish a note as "No speech detected", with an empty transcript and result "no_speech" (relay-api.md), when the provider returns no text, rejects the audio as too short, returns only one of these phrases, ignoring case and surrounding punctuation: "Thank you.", "Thanks for watching!", "Thank you for watching.", "you" or "Bye.", or marks every part of the audio as silence (Whisper's no-speech probability over 0.6 with low confidence).
 
 #### Scenario: Pocket recording
 - GIVEN a 20-second note of fabric noise
@@ -245,7 +245,7 @@ The server SHALL delete a note's audio as soon as the note has a transcript, is 
 ## Cost limits
 
 ### Requirement: Fair use counts measured audio
-Fair use SHALL count each note's measured length against its purchase's monthly allowance (numbers, reset and what the person sees: purchase.md). An upload over the allowance SHALL be refused and nothing kept or counted (relay-api.md). A note already accepted SHALL always be transcribed, even if it takes the purchase over the allowance.
+Fair use SHALL count each note's measured length against its purchase's monthly allowance (numbers, reset and what the person sees: purchase.md). An upload over the allowance SHALL be refused and nothing kept or counted (relay-api.md). A note already accepted SHALL always be transcribed, even if it takes the purchase over the allowance. A note that fails for good gives its counted length back.
 
 #### Scenario: Crossing the line
 - GIVEN a purchase is 10 minutes under its allowance

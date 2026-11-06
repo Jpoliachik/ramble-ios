@@ -31,7 +31,7 @@ The watch step SHALL read "Now, put it on your watch." with "Open the Watch app"
 - THEN Continue stays disabled, rechecked every 2 seconds, and enables once the install lands
 
 ### Requirement: Setup can't reach Ramble
-When the phone can't set itself up with Ramble's server (offline, or the server refuses new setups), it SHALL show "Ramble can't finish setting up right now. It will try again on its own.", keep recording notes as "Waiting to send", and retry each time Ramble opens ([relay-api.md](relay-api.md) owns the daily limit).
+When the phone can't set itself up with Ramble's server (offline, or the server refuses new setups), it SHALL show "Ramble can't finish setting up right now. It will try again on its own." on Home under the status line, keep recording notes as "Waiting to send", and retry each time Ramble opens ([relay-api.md](relay-api.md) owns the daily limit).
 
 #### Scenario: Daily setup limit reached
 - GIVEN the server refuses new setups for the day
@@ -206,6 +206,8 @@ Under the player, the note screen SHALL show one line saying where the note is. 
 | State | Title | Detail | Action |
 |---|---|---|---|
 | Not accepted yet | "Waiting to send" | the last error and "Ramble will try again on its own." | — |
+| Watch note not accepted yet | "Waiting on your watch" | — | — |
+| Webhook send in progress | "Sending to your webhook…" | — | — |
 | Transcribing | "Transcribing…" | "It goes out as soon as the transcript is ready." | — |
 | Held for unlock | "Unlock to transcribe" | "This note is saved. It transcribes as soon as you unlock Ramble." | "Unlock" |
 | Held for fair use | "Usage limit reached" | the detail in [purchase.md](purchase.md) ("… This note will transcribe on Dec 1. If this looks wrong, contact support.") | "Contact support" (an email to support@ramble.watch; purchase.md) |

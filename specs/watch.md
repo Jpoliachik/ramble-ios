@@ -197,7 +197,7 @@ When the server refuses a note's audio for good (relay-api.md), the watch SHALL 
 - THEN the note shows "Couldn't send" under Needs you and the watch stops retrying it
 
 ### Requirement: Status and transcript
-The watch SHALL learn each accepted note's status and transcript from the server: from the upload answer when the transcript is ready within 8 seconds (relay-api.md), otherwise every 10 seconds while the app is open, when it opens, and in background passes.
+The watch SHALL learn each accepted note's status and transcript from the server: from the upload answer when the transcript is ready within 8 seconds (relay-api.md), otherwise every 10 seconds while the app is open, when it opens, and in background passes. When the server no longer lets the watch read an accepted note (its connection was revoked, or the note expired), the watch SHALL stop asking and show the note as Done with no first line.
 
 #### Scenario: Long note
 - GIVEN a 40-minute note was accepted but not yet transcribed

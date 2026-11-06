@@ -177,7 +177,7 @@ The relay SHALL refuse these uploads, storing and counting nothing. Refusals mar
 - THEN the response is `400` with `"reason": "recorded_in_future"`, and the same upload succeeds once its recorded time has passed
 
 ### Requirement: Upload idempotency and retries
-The note UUID SHALL be the idempotency key within an inbox. A repeated upload of an accepted ID without a valid retry (below) SHALL be answered `200` with the note's current state before the body is read, storing and counting nothing. Concurrent uploads of one ID SHALL produce one note, counted once.
+The note UUID SHALL be the idempotency key within an inbox. A repeated upload of an accepted ID without a valid retry (below) SHALL be answered `200` with the note's current state before the body is read, storing and counting nothing. Concurrent uploads of one ID SHALL produce one note, counted once. An upload of an ID this inbox already holds but the uploading credential may not read (a watch reusing a phone note's ID) SHALL get `409` with `"reason": "id_in_use"`, changing nothing.
 
 #### Scenario: Lost response
 - GIVEN a watch upload was accepted but the response never arrived
@@ -225,7 +225,7 @@ Note responses SHALL be `{"id", "source", "status", "result", "recorded_at", "re
 - THEN the response is `404`
 
 ### Requirement: Copy kept for the person's devices
-A note's transcript SHALL stay readable by the person's devices until the phone has acked it and, for a watch note, the watch has received it as done, in an upload response or a `GET /notes/:id`; and at most 30 days after it is ready. Meaning: [delivery.md](delivery.md).
+A note's transcript SHALL stay readable by the person's devices until the phone has acked it and, for a watch note, the watch has received it as done or failed, in an upload response or a `GET /notes/:id`; and at most 30 days after it is ready. Meaning: [delivery.md](delivery.md).
 
 #### Scenario: Phone acks before the watch looks
 - GIVEN the phone acked a watch note whose upload response said `"transcribing"`
@@ -367,7 +367,7 @@ Relay logs SHALL contain no request bodies, transcript text, audio, credentials 
 LEGACY_UNTIL is the retirement date for old builds' paths, set at release (by default 60 days after the first free-notes build ships). Until then, `POST /transcribe` (cloud transcription for early subscribers) and text `POST /inbox` (old builds delivering transcripts to agents) SHALL keep working for old builds, within the rate limits above, under these checks:
 
 - Text `POST /inbox` needs only the old build's inbox secret, as today, and no purchase record, so $4.99 buyers' old builds keep delivering.
-- `POST /transcribe` needs the App Attest checks above and a subscription record that passes the same checks as `POST /entitlement` and has not expired. It SHALL apply the upload size limits above, count audio toward a 100-hour monthly cap per original transaction, and always transcribe with the default provider chain ([transcription.md](transcription.md)), ignoring any model the client asks for. `GET /analytics`, and from LEGACY_UNTIL on those two paths, SHALL answer `410` with `"error": "This version of Ramble is out of date. Update Ramble from the App Store."`, and SHALL transcribe, queue or reveal nothing.
+- `POST /transcribe` needs the App Attest checks above and a subscription record that passes the same checks as `POST /entitlement` and has not expired. It SHALL apply the upload size limits above, count audio toward a 100-hour monthly cap per original transaction (over it, `402` with `"reason": "fair_use"`), and always transcribe with the default provider chain ([transcription.md](transcription.md)), ignoring any model the client asks for. `GET /analytics`, and from LEGACY_UNTIL on those two paths, SHALL answer `410` with `"error": "This version of Ramble is out of date. Update Ramble from the App Store."`, and SHALL transcribe, queue or reveal nothing.
 
 #### Scenario: Old subscriber before and after the date
 - GIVEN an old build with an active subscription and a valid App Attest assertion

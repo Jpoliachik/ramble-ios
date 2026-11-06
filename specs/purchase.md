@@ -146,6 +146,11 @@ The app SHALL show the person the outcome of every purchase attempt, and no outc
 - WHEN the App Store reports the purchase failed
 - THEN the sheet shows "Purchase didn't go through. Try again." and held notes stay held
 
+#### Scenario: Purchase belongs to another setup
+- GIVEN the server refuses the purchase as made for another inbox
+- WHEN the sheet gets the answer
+- THEN it shows "This purchase belongs to another Ramble setup. Contact support@ramble.watch for help." and held notes stay held
+
 #### Scenario: Pending or Ask to Buy
 - GIVEN an account whose purchase needs approval, or a pending payment
 - WHEN the purchase is submitted
