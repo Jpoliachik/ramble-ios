@@ -1,7 +1,7 @@
 # iPhone app
 
 ## Purpose
-What the person sees and does in Ramble on iPhone: first launch, Home, recording, the notes list and note screen, playback, how history from the watch and Ramble's server comes together, Settings, stuck-note alerts, and Siri. Agents and delivery states are in [delivery.md](delivery.md); free notes, the unlock and fair use in [subscription.md](subscription.md); the watch in [watch.md](watch.md); the wire contract in [relay-api.md](relay-api.md).
+What the person sees and does in Ramble on iPhone: first launch, Home, recording, the notes list and note screen, playback, how history from the watch and Ramble's server comes together, Settings, stuck-note alerts, and Siri. Agents and delivery states are in [delivery.md](delivery.md); free notes, the unlock and fair use in [purchase.md](purchase.md); the watch in [watch.md](watch.md); the wire contract in [relay-api.md](relay-api.md).
 
 ## First launch
 
@@ -55,7 +55,7 @@ The status line SHALL show exactly one state, the first that applies below. Pill
 | 1 | Webhook gave up | "1 note didn't send" / "N notes didn't send" · "Fix" (red) | Pill | Newest such note |
 | 2 | Notes held for unlock, on either device | "1 note to unlock" / "N notes to unlock" · "Unlock" | Pill | Unlock screen |
 | 3 | No agent and no webhook | "No agent connected" · "Connect" | Pill | Connect flow |
-| 4 | Free notes nearly used | the line [subscription.md](subscription.md) defines | Pill | Unlock screen |
+| 4 | Free notes nearly used | the line [purchase.md](purchase.md) defines | Pill | Unlock screen |
 | 5 | A note has waited over 12 hours and the agent hasn't checked in within 12 hours | "Your agent hasn't checked in · 3d" (no age if never) | Pill | Your agent |
 | 6 | A note has waited over 12 hours, agent checking in | "N notes waiting for your agent" | Pill | Your agent |
 | 7 | Notes not yet accepted by the server | spinner, "Sending 1 note…" / "Sending N notes…" | Quiet | — |
@@ -108,7 +108,7 @@ The phone SHALL upload each of its own notes under the note's ID, retrying 10 se
 - THEN the row reads "Waiting to send", then "Transcribing…" once the server accepts it, and it is never counted twice
 
 ### Requirement: Held notes wait for their release
-A note refused for unlock SHALL stop retrying until the unlock; one refused for fair use SHALL retry at the time the server gives and whenever Ramble opens; a rate-limited upload SHALL wait the time the server gives ([subscription.md](subscription.md), [relay-api.md](relay-api.md)).
+A note refused for unlock SHALL stop retrying until the unlock; one refused for fair use SHALL retry at the time the server gives and whenever Ramble opens; a rate-limited upload SHALL wait the time the server gives ([purchase.md](purchase.md), [relay-api.md](relay-api.md)).
 
 #### Scenario: Unlock releases held notes
 - GIVEN three phone notes read "Unlock to transcribe"
@@ -146,7 +146,7 @@ The list SHALL group notes by day, newest first, under "Today", "Yesterday", or 
 | Held for unlock (either device) | "Unlock to transcribe" | lock, amber |
 | Held for fair use | "Usage limit reached" | pause, amber |
 | Refused for good | "Too long to transcribe" or "Couldn't send" | warning, red |
-| Failed for good | "Couldn't transcribe" | warning, red |
+| Transcription failed | "Couldn't transcribe" | warning, red |
 | Silent | "No speech detected" | quiet |
 | No agent and no webhook when recorded | "Saved, no agent connected" | tray, grey |
 | Webhook sending | — | spinner |
@@ -194,17 +194,26 @@ Under the player, the note screen SHALL show one line saying where the note is. 
 | Not accepted yet | "Waiting to send" | the last error and "Ramble will try again on its own." | — |
 | Transcribing | "Transcribing…" | "It goes out as soon as the transcript is ready." | — |
 | Held for unlock | "Unlock to transcribe" | "This note is saved. It transcribes as soon as you unlock Ramble." | "Unlock" |
-| Held for fair use | "Usage limit reached" | the detail in [subscription.md](subscription.md) ("… This note will transcribe on Dec 1. If this looks wrong, contact support.") | "Contact support" |
-| Audio unreadable | "Couldn't transcribe" | "Ramble couldn't turn this audio into text." | — |
-| Transcription gave up | "Couldn't transcribe" | "Ramble couldn't reach a transcription service in time." | — |
+| Held for fair use | "Usage limit reached" | the detail in [purchase.md](purchase.md) ("… This note will transcribe on Dec 1. If this looks wrong, contact support.") | "Contact support" |
+| Audio unreadable | "Couldn't transcribe" | "Ramble couldn't turn this audio into text." | "Retry" |
+| Transcription gave up | "Couldn't transcribe" | "Ramble couldn't reach a transcription service in time." | "Retry" |
+| Failed after 3 retries | "Couldn't transcribe" | either detail above, then "Ramble tried 3 more times." | — |
 
 #### Scenario: Unlock from a held note
 - GIVEN a note shows "Unlock to transcribe"
 - WHEN the person taps "Unlock"
-- THEN the unlock screen opens ([subscription.md](subscription.md))
+- THEN the unlock screen opens ([purchase.md](purchase.md))
+
+### Requirement: Retry a failed transcription
+"Retry" and More → "Retry Transcription" SHALL re-upload the note's audio from this iPhone as a retry under the same note ID ([relay-api.md](relay-api.md)), up to 3 times per note; the note then reads "Transcribing…", or is held like any upload ([purchase.md](purchase.md)). When a watch note's audio is still only on the watch, Retry SHALL first fetch it as "Audio on watch" does, or show "Open Ramble on your watch to sync.".
+
+#### Scenario: Third retry fails
+- GIVEN a phone note has failed after 2 retries
+- WHEN the person taps "Retry" and it fails again
+- THEN the line reads "Couldn't transcribe" with "Ramble tried 3 more times." and no Retry button or menu item
 
 ### Requirement: More menu
-The "More" menu SHALL offer "Delete" (confirmed with "Delete Recording" under "Delete this recording?", "This will permanently delete the recording and its transcript."), and "Resend Webhook" (the same delivery as "Retry") when a webhook is set up and the note has a webhook result.
+The "More" menu SHALL offer "Delete" (confirmed with "Delete Recording" under "Delete this recording?", "This will permanently delete the recording and its transcript."), "Retry Transcription" while a "Couldn't transcribe" note has retries left, and "Resend Webhook" (the same delivery as webhook "Retry") when a webhook is set up and the note has a webhook result.
 
 #### Scenario: Resend to the webhook
 - GIVEN a webhook is set up and a note shows "Delivered to webhook"
@@ -252,7 +261,7 @@ The phone SHALL send at most one notification per kind, counting every note in i
 ## Settings
 
 ### Requirement: Settings structure
-Settings SHALL open as a sheet with "Done" and, in order: "Where notes go" ("Your agent", "Webhook"); the free-notes and unlock row ([subscription.md](subscription.md)); "Watch" ("Ramble on Apple Watch": "Installed" with a check, "Not installed yet. Install it from the Watch app." with "Install", or "No Apple Watch paired. You can record on iPhone."); "Transcription"; "App"; and a footer "Ramble <version> (<build>)" with "Privacy Policy" and "Terms of Use". It SHALL NOT offer a choice of transcription model, and release builds SHALL expose no debug screen, developer bypass key, or server address override.
+Settings SHALL open as a sheet with "Done" and, in order: "Where notes go" ("Your agent", "Webhook"); the free-notes and unlock row ([purchase.md](purchase.md)); "Watch" ("Ramble on Apple Watch": "Installed" with a check, "Not installed yet. Install it from the Watch app." with "Install", or "No Apple Watch paired. You can record on iPhone."); "Transcription"; "App"; and a footer "Ramble <version> (<build>)" with "Privacy Policy" and "Terms of Use". It SHALL NOT offer a choice of transcription model, and release builds SHALL expose no debug screen, developer bypass key, or server address override.
 
 #### Scenario: Tapping the version
 - GIVEN a release build

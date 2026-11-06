@@ -37,7 +37,7 @@ The watch SHALL pick at most one bar alert in this order: "Mic off", "Mic busy",
 | "No phone" | The paired iPhone does not have Ramble | "Ramble isn't on your iPhone" | "Your notes are safe on this watch, but they can't reach your agent yet." / "Install Ramble on your iPhone and open it once. Waiting notes will send on their own." |
 | "Set up" | Ramble is on the iPhone, but the watch is not connected to it yet, or the server no longer accepts the watch's connection | "Open Ramble on your iPhone" | "Your notes are safe on this watch, but they can't send yet." / "Open Ramble on your iPhone once. Waiting notes will send on their own." |
 | "Unlock" | A note is held because the free notes are used up | "Unlock to transcribe" | "You've used your free notes. Your notes are safe on this watch." / "Unlock Ramble on your iPhone and they'll transcribe on their own." |
-| "Limit" | A note is held over fair use | "Usage limit reached" | "Your notes are safe on this watch." / "They will transcribe on Dec 1. If this looks wrong, contact support from Ramble on your iPhone." (the date is the reset date the server gives; subscription.md) |
+| "Limit" | A note is held over fair use | "Usage limit reached" | "Your notes are safe on this watch." / "They will transcribe on Dec 1. If this looks wrong, contact support from Ramble on your iPhone." (the date is the reset date the server gives; purchase.md) |
 
 #### Scenario: Highest alert wins
 - GIVEN microphone permission is off and the paired iPhone doesn't have Ramble
@@ -147,7 +147,7 @@ Recent SHALL group notes, newest first, into "Needs you · N", "Waiting · N" an
 | Held: free notes used up | Needs you | red mark | "Unlock to transcribe" |
 | Held: fair use | Waiting | gray dot | "Usage limit reached" |
 | Not yet accepted 6 hours after recording | Needs you | red mark | "Waiting 6 hours", "Waiting 7 hours", … |
-| Transcription failed for good | Needs you | red mark | "Couldn't transcribe" |
+| Transcription failed (a retry from the iPhone updates it) | Needs you | red mark | "Couldn't transcribe" |
 | Audio lost before the server accepted it | Needs you | red mark | "Audio lost" |
 | Refused as over the length limit | Needs you | red mark | "Too long to transcribe" |
 | Refused for good for another reason | Needs you | red mark | "Couldn't send" |
@@ -200,7 +200,7 @@ The watch SHALL learn each accepted note's status and transcript from the server
 - THEN the note moves to "Done" with its first line once the transcript is ready
 
 ### Requirement: Keep audio until it is safe
-The watch SHALL keep a note's audio until both the transcript is done (or transcription failed for good, or the server refused the note) and the iPhone has confirmed it has the audio. If the iPhone never confirms, the audio SHALL be deleted 30 days after the transcript is done.
+The watch SHALL keep a note's audio until both the transcript is done (or transcription failed, or the server refused the note) and the iPhone has confirmed it has the audio. If the iPhone never confirms, the audio SHALL be deleted 30 days after the transcript is done.
 
 #### Scenario: Transcribed, iPhone away
 - GIVEN a note is transcribed while the iPhone is away
@@ -208,7 +208,7 @@ The watch SHALL keep a note's audio until both the transcript is done (or transc
 - THEN the watch sends the audio to the iPhone and deletes it once the iPhone confirms
 
 ### Requirement: Held for unlock
-When the server holds a note because the free notes are used up, the watch SHALL keep the note and its audio, show "Unlock to transcribe", and stop retrying it. It SHOULD upload held notes, oldest first, as soon as the iPhone says Ramble is unlocked or connects the watch again, even with the watch app closed; it SHALL do so at the latest the next time the app opens and the server reports the unlock. The money side is in subscription.md.
+When the server holds a note because the free notes are used up, the watch SHALL keep the note and its audio, show "Unlock to transcribe", and stop retrying it. It SHOULD upload held notes, oldest first, as soon as the iPhone says Ramble is unlocked or connects the watch again, even with the watch app closed; it SHALL do so at the latest the next time the app opens and the server reports the unlock. The money side is in purchase.md.
 
 #### Scenario: Purchase on the iPhone
 - GIVEN two notes on the watch show "Unlock to transcribe"

@@ -1,7 +1,7 @@
 # Relay API
 
 ## Purpose
-The HTTP contract of Ramble's relay: every endpoint, who may call it with which credential, request and response shapes, status codes, idempotency and limits. Its callers are the Ramble iPhone app, the Ramble watch app, the user's agents, and Apple. What results mean to the person is in [transcription.md](transcription.md), [delivery.md](delivery.md) and [subscription.md](subscription.md).
+The HTTP contract of Ramble's relay: every endpoint, who may call it with which credential, request and response shapes, status codes, idempotency and limits. Its callers are the Ramble iPhone app, the Ramble watch app, the user's agents, and Apple. What results mean to the person is in [transcription.md](transcription.md), [delivery.md](delivery.md) and [purchase.md](purchase.md).
 
 ## Endpoints at a glance
 
@@ -18,7 +18,7 @@ The HTTP contract of Ramble's relay: every endpoint, who may call it with which 
 | `POST /pair/exchange` | agent | none (the pairing code) |
 | `GET /inbox`, `POST /inbox/ack`, `GET /agent`, `PATCH /agent` | agent | agent key |
 | `GET /`, `GET /health` | anyone | none |
-| `POST /transcribe`, `POST /inbox`, `GET /analytics` | out-of-date clients | answer `410` |
+| `POST /transcribe`, `POST /inbox`; `GET /analytics` | old builds | work until LEGACY_UNTIL, then `410`; `410` |
 
 ## Basics
 
@@ -85,7 +85,7 @@ Every error SHALL be `{"error": "<sentence>"}`, plus `"reason": "<code>"` wherev
 - THEN the inbox is created, bound to that purchase and unlocked
 
 ### Requirement: Account state
-`GET /account` SHALL return `{"unlocked", "free_notes_total": 25, "free_notes_remaining", "fair_use": {"used_hours", "limit_hours", "resets_at"} | null}`, plus `"account_token"` for the phone. `fair_use` is `null` while no purchase is bound. Meaning and thresholds: [subscription.md](subscription.md).
+`GET /account` SHALL return `{"unlocked", "free_notes_total": 25, "free_notes_remaining", "fair_use": {"used_hours", "limit_hours", "resets_at"} | null}`, plus `"account_token"` for the phone. `fair_use` is `null` while no purchase is bound. Meaning and thresholds: [purchase.md](purchase.md).
 
 #### Scenario: Usage this month
 - GIVEN an unlocked inbox whose purchase used 41 of its 100 hours this month
@@ -93,7 +93,7 @@ Every error SHALL be `{"error": "<sentence>"}`, plus `"reason": "<code>"` wherev
 - THEN `fair_use` is `{"used_hours": 41, "limit_hours": 100, "resets_at": "2026-12-01T00:00:00.000Z"}`
 
 ### Requirement: Submitting a purchase
-`POST /entitlement` with `{"signed_transaction": "<JWS>"}` or, for early buyers, `{"app_transaction": "<JWS>"}` SHALL return `200` with the `GET /account` body once the record is verified: signature chained to Apple's root CA, bundle ID `dev.goodloop.Ramble`, not revoked or refunded, not Sandbox or Xcode on production. A transaction SHALL be for the unlock product; `dev.goodloop.ramble.premium.monthly2` is accepted only as early-buyer proof ([subscription.md](subscription.md)). Re-sending a bound record SHALL return `200` and change nothing.
+`POST /entitlement` with `{"signed_transaction": "<JWS>"}` or, for early buyers, `{"app_transaction": "<JWS>"}` SHALL return `200` with the `GET /account` body once the record is verified: signature chained to Apple's root CA, bundle ID `dev.goodloop.Ramble`, not revoked or refunded, not Sandbox or Xcode on production. A transaction SHALL be for the unlock product; `dev.goodloop.ramble.premium.monthly2` is accepted only as early-buyer proof ([purchase.md](purchase.md)). Re-sending a bound record SHALL return `200` and change nothing.
 
 #### Scenario: Forged or refunded record
 - GIVEN a self-signed JWS, a refunded transaction, or a Sandbox record sent to production
@@ -176,16 +176,23 @@ The relay SHALL refuse these uploads, storing and counting nothing. Refusals mar
 - WHEN it uploads a note
 - THEN the response is `400` with `"reason": "recorded_in_future"`, and the same upload succeeds once its recorded time has passed
 
-### Requirement: Upload idempotency
-The note UUID SHALL be the idempotency key within an inbox. A repeated upload of an accepted ID SHALL be answered `200` with the note's current state before the body is read, storing and counting nothing. Concurrent uploads of one ID SHALL produce one note, counted once.
+### Requirement: Upload idempotency and retries
+The note UUID SHALL be the idempotency key within an inbox. A repeated upload of an accepted ID without a valid retry (below) SHALL be answered `200` with the note's current state before the body is read, storing and counting nothing. Concurrent uploads of one ID SHALL produce one note, counted once.
 
 #### Scenario: Lost response
 - GIVEN a watch upload was accepted but the response never arrived
 - WHEN the watch uploads the same note again
 - THEN the response is `200` with the current status, and the free-note count is unchanged
 
+`PUT /notes/:id` from the phone with `X-Ramble-Retry: 1`, on a note whose `status` is `"failed"` and that has been retried fewer than 3 times, SHALL be checked and held like a first upload (refusals, `402`), then SHALL replace the audio, start a fresh transcription, add one to the note's retry count, list the note again in `GET /notes`, and answer `201` like a first upload; `id`, `source` and `recorded_at` stay. On a note not failed, or from a watch token, the header is ignored. After 3 retries it SHALL get `409` with `"reason": "retry_limit"`, changing nothing. Concurrent retries of one note SHALL start one.
+
+#### Scenario: Fourth retry
+- GIVEN a note that failed again after its third retry
+- WHEN the phone sends `PUT /notes/:id` with `X-Ramble-Retry: 1`
+- THEN the response is `409` with `"reason": "retry_limit"`, and nothing is transcribed or counted
+
 ### Requirement: Held uploads
-An upload the inbox may not transcribe SHALL get `402`, keeping and counting nothing: `{"reason": "free_notes_used", "free_notes_remaining": 0}` when out of free notes and not unlocked, or `{"reason": "fair_use"}` with `Retry-After` set to the seconds until the fair-use reset. Meaning and copy: [subscription.md](subscription.md).
+An upload the inbox may not transcribe SHALL get `402`, keeping and counting nothing: `{"reason": "free_notes_used", "free_notes_remaining": 0}` when out of free notes and not unlocked, or `{"reason": "fair_use"}` with `Retry-After` set to the seconds until the fair-use reset. Meaning and copy: [purchase.md](purchase.md).
 
 #### Scenario: Out of free notes
 - GIVEN 25 notes accepted and no purchase
@@ -328,7 +335,7 @@ Over these limits the relay SHALL answer `429` with `{"reason": "rate_limited"}`
 | `POST /inboxes` | 3 per day per App Attest key, 20 per hour per network address; 2,000 per UTC day overall (then `503`, above) |
 | `POST /pair/code` | 10 per hour per inbox |
 | `POST /pair/exchange` | 100 failed attempts per hour per network address |
-| `PUT /notes/:id` | 120 per hour and 500 per day per inbox, phone and watch together; repeats don't count |
+| `PUT /notes/:id` | 120 per hour and 500 per day per inbox, phone and watch together; repeats don't count, retries do |
 | `GET /notes…`, `POST /notes/ack`, `POST /inbox/status`, `GET /account` | 120 per minute per credential |
 | `GET /inbox`, `POST /inbox/ack`, `GET /agent`; `PATCH /agent` | 60 per minute; 10 per hour; per agent key |
 | `POST /entitlement`, `PUT /settings`; `POST /watch-token` | 20 per hour; 10 per day; per inbox |
@@ -354,12 +361,13 @@ Relay logs SHALL contain no request bodies, transcript text, audio, credentials 
 - WHEN the relay logs the failure
 - THEN at most its first 200 characters are logged, with the hashed inbox ID
 
-## Retired paths answer 410
+## Old app versions
 
-### Requirement: Out-of-date clients are told to update
-`POST /transcribe`, `POST /inbox` and `GET /analytics` SHALL answer `410` with `"error": "This version of Ramble is out of date. Update Ramble from the App Store."`, and SHALL transcribe, queue or reveal nothing.
+### Requirement: Old builds work until LEGACY_UNTIL, then are told to update
+LEGACY_UNTIL is the retirement date for old builds' paths, set at release (by default 60 days after the first free-notes build ships). Until then, `POST /transcribe` (cloud transcription for early subscribers) and text `POST /inbox` (old builds delivering transcripts to agents) SHALL keep working for old builds, only when the subscription record chains to Apple's root CA, the App Attest checks above pass, and within the rate limits above. `GET /analytics`, and from LEGACY_UNTIL on those two paths, SHALL answer `410` with `"error": "This version of Ramble is out of date. Update Ramble from the App Store."`, and SHALL transcribe, queue or reveal nothing.
 
-#### Scenario: Out-of-date app sends text
-- GIVEN an out-of-date Ramble app
-- WHEN it sends `POST /inbox` with a transcript
-- THEN the response is `410` and nothing is queued for any agent
+#### Scenario: Old subscriber before and after the date
+- GIVEN an old build with an active subscription and a valid App Attest assertion
+- WHEN it sends `POST /transcribe` with audio before LEGACY_UNTIL
+- THEN it gets the transcript
+- AND from LEGACY_UNTIL on, that request or a text `POST /inbox` gets `410`, and nothing is transcribed or queued for any agent

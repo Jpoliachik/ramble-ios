@@ -1,7 +1,7 @@
 # Transcription
 
 ## Purpose
-What happens to a note's audio on Ramble's server from the moment an upload is accepted until a transcript exists: which provider transcribes it, the options that shape the text, silence, length, failures, when the audio is deleted, and the cost limits and operator alerts around it. The wire contract is in [relay-api.md](relay-api.md), who receives the transcript is in [delivery.md](delivery.md), and free notes, the unlock and fair use are in [subscription.md](subscription.md).
+What happens to a note's audio on Ramble's server from the moment an upload is accepted until a transcript exists: which provider transcribes it, the options that shape the text, silence, length, failures, when the audio is deleted, and the cost limits and operator alerts around it. The wire contract is in [relay-api.md](relay-api.md), who receives the transcript is in [delivery.md](delivery.md), and free notes, the unlock and fair use are in [purchase.md](purchase.md).
 
 ## Starting transcription
 
@@ -36,14 +36,19 @@ A note SHALL never have two attempts running at once. If an attempt produces no 
 - WHEN 8 minutes have passed since that attempt started
 - THEN a new attempt for that note starts within the next minute
 
-### Requirement: Each note is transcribed once
-The server SHALL produce at most one result per note. A repeated upload of the same note SHALL NOT start another transcription, and no caller can ask for a note to be transcribed again.
+### Requirement: Repeats never re-transcribe; a hand retry of a failed note does
+The server SHALL hold one current result per note. A repeated upload of the same note SHALL NOT start another transcription. Only the person's retry of a permanently failed note, sent from the iPhone ([relay-api.md](relay-api.md)), SHALL transcribe it again, up to 3 times per note. A retry runs the normal provider chain and retry window, with the options in effect when the retry starts.
 
 #### Scenario: Retried upload after success
 - GIVEN a note already has a transcript
 - WHEN the device uploads the same note ID again
 - THEN the server answers with the existing note and its transcript
 - AND no provider is called and nothing more is counted
+
+#### Scenario: Retry of a failed note
+- GIVEN a note failed with "retries_exhausted" and has not been retried
+- WHEN the person taps "Retry" on the iPhone
+- THEN the server transcribes the re-uploaded audio from Groq onward, with a fresh 20-hour window
 
 ## Providers and fallback
 
@@ -93,7 +98,7 @@ The server SHALL send audio only to providers whose API terms exclude training o
 ## Options
 
 ### Requirement: Options set on the iPhone apply to every note
-The person SHALL be able to set three options in the iPhone app (phone.md): Language (default "Auto-detect", with every language in phone.md's Language list), Vocabulary (up to 900 characters, default empty), and "Remove filler words" (default off). They SHALL be kept with the inbox on the server. A note's options SHALL be fixed when its first attempt starts, whichever device recorded it, and every retry SHALL use those same options.
+The person SHALL be able to set three options in the iPhone app (phone.md): Language (default "Auto-detect", with every language in phone.md's Language list), Vocabulary (up to 900 characters, default empty), and "Remove filler words" (default off). They SHALL be kept with the inbox on the server. A note's options SHALL be fixed when its first attempt starts, whichever device recorded it, and every automatic retry SHALL use those same options; a hand retry takes the options in effect when it starts.
 
 #### Scenario: Watch note uses phone settings
 - GIVEN Language is set to Spanish on the iPhone
@@ -163,7 +168,7 @@ The server SHALL finish a note as "No speech detected", with an empty transcript
 - THEN it is a normal transcript and is delivered
 
 ### Requirement: Silent notes go nowhere
-A silent note SHALL use a free note like any other (subscription.md) and SHALL get no agent copy, no wake-up hook and no webhook (delivery.md).
+A silent note SHALL use a free note like any other (purchase.md) and SHALL get no agent copy, no wake-up hook and no webhook (delivery.md).
 
 #### Scenario: Agent connected
 - GIVEN an agent is connected
@@ -196,7 +201,7 @@ The server SHALL take each note's length from the provider's response, or from t
 ## Failures
 
 ### Requirement: Retryable failures keep retrying for 20 hours
-When every allowed provider is overloaded, down, slow, or unavailable to Ramble, the server SHALL wait 1, 2, 5, 10, then 15 minutes between attempts, then 30 minutes between each later attempt, until 20 hours after the upload was accepted. The note then fails permanently. While it waits, the person sees "Transcribing…".
+When every allowed provider is overloaded, down, slow, or unavailable to Ramble, the server SHALL wait 1, 2, 5, 10, then 15 minutes between attempts, then 30 minutes between each later attempt, until 20 hours after the upload (or hand retry) was accepted. The note then fails permanently. While it waits, the person sees "Transcribing…".
 
 #### Scenario: Window ends
 - GIVEN a note has failed every attempt for 20 hours
@@ -204,12 +209,12 @@ When every allowed provider is overloaded, down, slow, or unavailable to Ramble,
 - THEN the note fails permanently, with result "retries_exhausted" (relay-api.md)
 
 ### Requirement: Permanent failures
-A note SHALL fail permanently, with result "audio_rejected", when a provider rejects the audio itself (any 4xx other than 401, 403 and 429), or with result "retries_exhausted" when the retry window ends. The person's devices show "Couldn't transcribe", with no retry, and the reason "Ramble couldn't turn this audio into text." or "Ramble couldn't reach a transcription service in time." respectively. The free note it used is given back (subscription.md). The audio stays wherever each device keeps it (watch.md, phone.md).
+A note SHALL fail permanently, with result "audio_rejected", when a provider rejects the audio itself (any 4xx other than 401, 403 and 429), or with result "retries_exhausted" when the retry window ends. The person's devices show "Couldn't transcribe", with "Retry" on the iPhone while hand retries remain (phone.md), and the reason "Ramble couldn't turn this audio into text." or "Ramble couldn't reach a transcription service in time." respectively. The free note it used is given back (purchase.md). The audio stays wherever each device keeps it (watch.md, phone.md).
 
 #### Scenario: Corrupt audio
 - GIVEN a free note whose audio no provider can decode
 - WHEN Groq answers 400
-- THEN the note shows "Couldn't transcribe" and "Ramble couldn't turn this audio into text.", with no way to retry
+- THEN the note shows "Couldn't transcribe" and "Ramble couldn't turn this audio into text.", with "Retry" on the iPhone
 - AND the person's free-note count goes back up by one
 
 ## Audio retention
@@ -230,7 +235,7 @@ The server SHALL delete a note's audio as soon as the note has a transcript, is 
 ## Cost limits
 
 ### Requirement: Fair use counts measured audio
-Fair use SHALL count each note's measured length against its purchase's monthly allowance (numbers, reset and what the person sees: subscription.md). An upload over the allowance SHALL be refused and nothing kept or counted (relay-api.md). A note already accepted SHALL always be transcribed, even if it takes the purchase over the allowance.
+Fair use SHALL count each note's measured length against its purchase's monthly allowance (numbers, reset and what the person sees: purchase.md). An upload over the allowance SHALL be refused and nothing kept or counted (relay-api.md). A note already accepted SHALL always be transcribed, even if it takes the purchase over the allowance.
 
 #### Scenario: Crossing the line
 - GIVEN a purchase is 10 minutes under its allowance
