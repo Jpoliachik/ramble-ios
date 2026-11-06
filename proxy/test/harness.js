@@ -156,12 +156,14 @@ export function createHarness() {
     await h.settle();
   };
 
+  let keys = 0;
   h.newInbox = async (body) => {
-    const res = await h.call('POST', '/inboxes', { body });
+    const res = await h.call('POST', '/inboxes', { body, headers: { 'X-App-Attest-Key-Id': `key-${++keys}` } });
     assert.equal(res.status, 201, JSON.stringify(res.body));
     return res.body;
   };
   h.inbox = async () => (await h.newInbox()).inbox_secret;
+  h.newInboxWithKey = h.inbox;
 
   h.watchToken = async (secret, replaces) => {
     const res = await h.call('POST', '/watch-token', { auth: secret, body: replaces ? { replaces } : {} });
