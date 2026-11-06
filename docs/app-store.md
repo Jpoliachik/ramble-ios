@@ -35,6 +35,8 @@ Fields marked **TODO: confirm in ASC** haven't been checked against App Store Co
 Ramble: Voice Notes for Watch
 ```
 
+The brand doc avoids "notes," but the name is the field that ranks most heavily in search, and "voice notes" and "watch" are the words people type. Keep it here for discovery and use the brand voice everywhere else.
+
 ## Subtitle [30 / 30]
 
 ```
@@ -46,23 +48,23 @@ Say it. Your agent handles it.
 Commas with no spaces. Don't repeat words that are already in the name or subtitle, because Apple indexes those fields anyway. Don't use competitor or agent brand names, because Apple rejects them.
 
 ```
-ai,assistant,memo,dictation,transcribe,speech,text,wrist,todo,reminder,idea,journal,capture,offline
+ai,assistant,memo,dictation,transcribe,speech,mindful,wrist,todo,reminder,idea,journal,walk,offline
 ```
 
-## Promotional text [142 / 170]
+## Promotional text [147 / 170]
 
 You can change this field without a new app version.
 
 ```
-Stay in the moment. Capture the thought on your Apple Watch and leave your phone behind. Your agent handles it, and you come back to it later.
+Go for a ramble and leave your phone behind. Say the thought to your Apple Watch, let it go, and get back to your day. Your agent handles it later.
 ```
 
 ## Description
 
 ```
-Stay in the moment. Capture the thought on your Apple Watch and leave your phone behind. Your agent handles it, and you come back to it later.
+Stay in the moment. Say the thought to your Apple Watch, let it go, and get back to your day. Your agent picks it up and handles it later.
 
-An idea, a to-do, a note on something you're working on. Messy is fine. There's no reply to wait for: say it and move on. No connection? It waits on your watch and goes out when you reconnect.
+Your best ideas show up on a walk, in the car, halfway through a run. Ramble keeps them without pulling you back to your phone. An idea, a to-do, a reminder. Messy is fine, and there's no reply to wait for. No signal? It waits on your watch and goes out when you reconnect.
 
 SETUP
 In Settings, tap Connect agent to get a short code. Tell your agent "I downloaded Ramble, connect it" and paste the code. That's it.
@@ -74,13 +76,23 @@ PRIVACY
 - Disconnect any time.
 
 TRANSCRIPTION
-Apple Speech transcribes on your iPhone. An optional upgrade adds cloud transcription for sharper results with accents, jargon, or noise.
+Apple Speech transcribes on your iPhone. An optional upgrade adds cloud transcription for more accurate results.
 
 WEBHOOKS
 Ramble can also send each transcript to any HTTPS endpoint.
 
-Ramble is a one-time purchase. Requires an Apple Watch paired with an iPhone to record on the watch.
+Ramble is a one-time purchase, with an optional upgrade for cloud transcription. Requires an Apple Watch paired with an iPhone.
 ```
+
+## Screenshot captions
+
+Short, one thought each, in this order. The first screenshot shows the watch recording, not the phone.
+
+1. Talk to your watch. Your agent handles it.
+2. Leave your phone behind.
+3. Messy is fine. Just say it.
+4. Connect your agent with one code.
+5. Deleted once your agent has it.
 
 ## What's New (1.1.3)
 
