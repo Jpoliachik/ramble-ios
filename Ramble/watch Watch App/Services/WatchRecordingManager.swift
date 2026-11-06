@@ -2,6 +2,10 @@
 //  WatchRecordingManager.swift
 //  watch Watch App
 //
+//  Starts and stops recordings, and hands each saved note on: to the store,
+//  to the relay upload (started at the stop, while the app is in front),
+//  and to the iPhone (details now, audio in the background).
+//
 
 import AVFoundation
 import Combine
@@ -11,25 +15,27 @@ import Foundation
 final class WatchRecordingManager: ObservableObject {
     static let shared = WatchRecordingManager()
 
+    /// From here the timer counts down and one haptic plays.
+    static let warnAt: TimeInterval = 55 * 60
+    static let maxDuration: TimeInterval = WatchAudioRecorderService.maxDuration
+
     @Published private(set) var isRecording = false
     @Published private(set) var currentDuration: TimeInterval = 0
     @Published private(set) var audioLevel: Float = 0
     /// Bumped every time a recording is saved, however it stopped: the
-    /// button, double-tap, Siri, or a call taking the mic. Home shows the
-    /// same check for all of them.
+    /// button, double tap, Siri, the 60-minute cap, or a call taking the
+    /// mic. Home shows the same check for all of them.
     @Published private(set) var stopCount = 0
 
     private let audioRecorder = WatchAudioRecorderService()
-    private let connectivity = WatchConnectivityService.shared
-    private let syncQueue = WatchSyncQueue.shared
-    private var cancellables = Set<AnyCancellable>()
+    private var warnedThisRecording = false
+    private var isStarting = false
 
     private init() {
         observeRecorder()
         audioRecorder.onEndedBySystem = { [weak self] in
-            // A call or Siri took the mic. Keep what was said so far.
-            WatchHapticService.recordStop()
-            self?.stopRecordingAndTransfer()
+            // A call, Siri or the cap took the mic. Keep what was said so far.
+            self?.stopRecording()
         }
     }
 
@@ -41,24 +47,42 @@ final class WatchRecordingManager: ObservableObject {
 
     /// Deletes header-only files from prepared recorders that never ran.
     func removeUnusedPreparedFiles() {
-        audioRecorder.removeUnusedPreparedFiles(keeping: Set(syncQueue.jobs.map(\.audioFileName)))
+        audioRecorder.removeUnusedPreparedFiles(keeping: WatchNoteStore.shared.audioFileNames)
     }
 
     private func observeRecorder() {
         audioRecorder.$isRecording.assign(to: &$isRecording)
-        audioRecorder.$currentDuration.assign(to: &$currentDuration)
         audioRecorder.$audioLevel.assign(to: &$audioLevel)
+        audioRecorder.$currentDuration
+            .sink { [weak self] duration in
+                self?.currentDuration = duration
+                self?.checkCap(duration)
+            }
+            .store(in: &cancellables)
     }
 
-    private var isStarting = false
+    private var cancellables = Set<AnyCancellable>()
 
-    /// True when the user has turned the microphone off for Ramble.
+    /// One notification haptic at 55:00, and a normal stop at 60:00.
+    private func checkCap(_ duration: TimeInterval) {
+        guard isRecording else { return }
+        if duration >= Self.maxDuration {
+            // Off this publisher's callback, since stopping resets it
+            Task { @MainActor in self.stopRecording() }
+        } else if duration >= Self.warnAt, !warnedThisRecording {
+            warnedThisRecording = true
+            WatchHapticService.capWarning()
+        }
+    }
+
+    /// True when the person has turned the microphone off for Ramble.
     var isMicrophoneDenied: Bool {
         AVAudioApplication.shared.recordPermission == .denied
     }
 
-    /// Returns false if recording could not start (e.g. no microphone access).
-    /// Asks for microphone access first if it hasn't been asked yet.
+    /// Starts at once, without waiting on the iPhone, the network or setup.
+    /// Returns false if recording could not start. Asks for microphone
+    /// access first if it hasn't been asked yet. Plays the start haptic.
     @discardableResult
     func startRecording() async -> Bool {
         guard !isRecording, !isStarting else { return isRecording }
@@ -68,9 +92,9 @@ final class WatchRecordingManager: ObservableObject {
         guard await Self.hasMicrophoneAccess() else { return false }
 
         do {
-            // Nothing goes to the phone here: the watch never waits on or
-            // tells the phone anything before it records.
             _ = try audioRecorder.startRecording()
+            warnedThisRecording = false
+            WatchHapticService.recordStart()
             return true
         } catch {
             print("Failed to start recording: \(error)")
@@ -91,28 +115,29 @@ final class WatchRecordingManager: ObservableObject {
         }
     }
 
-    func stopRecordingAndTransfer() {
+    /// Every stop looks and feels the same: saved at once, success haptic,
+    /// and the check on Home.
+    func stopRecording() {
         guard let result = audioRecorder.stopRecording() else { return }
+        WatchHapticService.recordStop()
 
-        // Add to persistent queue FIRST, then attempt transfer
         let audioFileName = result.url.lastPathComponent
-        // createdAt is when the recording started, matching the phone's own recordings
-        let job = syncQueue.addJob(
-            audioFileName: audioFileName,
-            createdAt: Date().addingTimeInterval(-result.duration),
-            duration: result.duration
+        let id = UUID(uuidString: (audioFileName as NSString).deletingPathExtension) ?? UUID()
+        let duration = min(result.duration, Self.maxDuration)
+        let note = WatchNoteRecord(
+            id: id,
+            recordedAt: Date().addingTimeInterval(-result.duration),
+            duration: duration,
+            audioFileName: audioFileName
         )
-
-        // Track in recording history for the list UI
-        WatchRecordingHistory.shared.addEntry(
-            id: job.id,
-            createdAt: job.createdAt,
-            duration: job.duration
-        )
-
+        WatchNoteStore.shared.add(note)
         stopCount += 1
-        connectivity.transferJob(job)
-        WatchStuckNoteAlerts.shared.update()
+
+        // The upload starts now, while the app is still in front.
+        WatchRelayService.shared.noteSaved(note)
+        // The phone lists it before its transcript, and gets the audio later.
+        WatchConnectivityService.shared.sendNoteDetails(note)
+        WatchConnectivityService.shared.sendAudio(note)
 
         // Ready for the next one straight away
         Task { @MainActor in

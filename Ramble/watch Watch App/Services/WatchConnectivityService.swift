@@ -2,38 +2,54 @@
 //  WatchConnectivityService.swift
 //  watch Watch App
 //
+//  The watch <-> iPhone link. Notes no longer travel to the server through
+//  the phone: the watch uploads them itself (WatchRelayService). What's
+//  left here, per the WatchConnectivity contract:
+//
+//  Phone -> watch
+//  - Application context: watchToken, relayBaseURL, unlocked,
+//    deliveryAlertsFastMode (latest wins).
+//  - ["type": "unlocked"] user info, to release held notes in the background.
+//  - ["type": "received", "recordingIds": [...]] receipts for saved audio.
+//  - ["type": "requestAudio", "recordingId": ...] when "Audio on watch" is tapped.
+//
+//  Watch -> phone
+//  - ["type": "note", ...] details at stop and on each hold change.
+//  - ["type": "needsConnection", "replaces": ...] when there's no working token.
+//  - The audio itself, by transferFile, for playback in history.
+//
 
 import Combine
 import Foundation
 import WatchConnectivity
 import WatchKit
 
+/// The application context, read off the main actor.
+nonisolated struct PhoneContext: Sendable {
+    let watchToken: String?
+    let relayBaseURL: String?
+    let unlocked: Bool
+    let fastMode: Bool?
+
+    init?(_ context: [String: Any]) {
+        guard !context.isEmpty else { return nil }
+        watchToken = context["watchToken"] as? String
+        relayBaseURL = context["relayBaseURL"] as? String
+        unlocked = context["unlocked"] as? Bool ?? false
+        fastMode = context["deliveryAlertsFastMode"] as? Bool
+    }
+}
+
 @MainActor
 final class WatchConnectivityService: NSObject, ObservableObject {
     static let shared = WatchConnectivityService()
 
-    /// Recording IDs currently handed to WatchConnectivity and not yet finished.
-    @Published private(set) var inFlightIDs: Set<UUID> = []
     @Published private(set) var isPhoneReachable = false
-    /// False when the paired iPhone doesn't have Ramble, so notes can never
-    /// leave the watch. Starts true so the alert doesn't flash at launch.
+    /// False when the paired iPhone doesn't have Ramble. Starts true so the
+    /// alert doesn't flash at launch.
     @Published private(set) var isCompanionAppInstalled = true
-    /// True when the iPhone restarted and hasn't been unlocked since. It
-    /// stays unreachable until then, so the watch asks for an unlock.
-    @Published private(set) var phoneNeedsUnlock = false
 
-    /// Maps in-flight WCSessionFileTransfer to the job ID so we can update the queue on completion.
-    /// Ephemeral — if the app is killed, jobs stay in the persistent queue and retry on next launch.
-    private var activeTransfers: [WCSessionFileTransfer: UUID] = [:] {
-        didSet {
-            let ids = Set(activeTransfers.values)
-            if ids != inFlightIDs { inFlightIDs = ids }
-        }
-    }
-
-    private let syncQueue = WatchSyncQueue.shared
-    private var retryTask: Task<Void, Never>?
-    private var retryFireDate: Date?
+    private var lastNeedsConnectionAt: Date?
 
     override init() {
         super.init()
@@ -43,304 +59,172 @@ final class WatchConnectivityService: NSObject, ObservableObject {
         }
     }
 
-    struct RecordingMetadata: Codable {
-        let recordingId: String
-        let createdAt: Date
-        let duration: TimeInterval
-        /// Per-hop timing for the phone's activity log. Optional, so either
-        /// side can be on an older build.
-        var firstSentAt: Date?
-        var sentAt: Date?
-        var attempt: Int?
+    private var isActivated: Bool {
+        WCSession.isSupported() && WCSession.default.activationState == .activated
     }
 
-    // MARK: - File Transfer (via persistent queue)
+    // MARK: - Watch -> phone
 
-    /// How long a handed-off recording waits for the phone's receipt before
-    /// it's sent again. The phone ignores duplicates, so resending is safe.
-    /// Most receipts now come back within seconds, in the reply to a wake
-    /// message (see `wakePhone`), so this only covers a phone that got the
-    /// file but couldn't save it.
-    static let receiptTimeout: TimeInterval = 5 * 60
-
-    func transferJob(_ job: WatchSyncJob) {
-        guard WCSession.default.activationState == .activated,
-              !activeTransfers.values.contains(job.id),
-              FileManager.default.fileExists(atPath: job.fileURL.path)
-        else { return }
-        if let handedOffAt = job.handedOffAt,
-           Date().timeIntervalSince(handedOffAt) < Self.receiptTimeout {
-            return // Delivered; waiting for the phone to say it saved it
+    /// The note's ID, recorded time, length and hold state. Sent at the stop
+    /// and whenever a hold starts or ends, so the phone's list matches.
+    func sendNoteDetails(_ note: WatchNoteRecord) {
+        guard isActivated else { return }
+        var payload: [String: Any] = [
+            "type": "note",
+            "id": note.id.uuidString.uppercased(),
+            "recordedAt": note.recordedAtText,
+            "duration": note.duration,
+            "hold": note.holdValue
+        ]
+        if let reason = note.refusedReason {
+            payload["refusedReason"] = reason
         }
-
-        let sent = syncQueue.markSent(jobId: job.id) ?? job
-        let metadata = RecordingMetadata(
-            recordingId: job.id.uuidString,
-            createdAt: job.createdAt,
-            duration: job.duration,
-            firstSentAt: sent.firstSentAt,
-            sentAt: sent.lastSentAt,
-            attempt: sent.sendCount
-        )
-        guard let metadataData = try? JSONEncoder().encode(metadata),
-              let metadataString = String(data: metadataData, encoding: .utf8)
-        else { return }
-
-        let transfer = WCSession.default.transferFile(
-            job.fileURL,
-            metadata: ["recording": metadataString]
-        )
-        activeTransfers[transfer] = job.id
-        // Short notes also ride inside a message, which skips the file
-        // queue's own pacing. The file transfer above stays as the copy that
-        // survives the app being suspended; the phone ignores the duplicate.
-        sendInline(job, metadata: metadataString)
-        // transferFile alone is delivered whenever the system likes, and a
-        // locked iPhone may not hand it to Ramble until it's opened (seen:
-        // 40 minutes). A message wakes Ramble on the phone right away.
-        wakePhone()
-        scheduleBackgroundRetryIfNeeded()
+        Self.deliver(payload)
     }
 
-    // MARK: - Waking the phone
-
-    private var lastWakeAt: Date?
-
-    /// Sends a small message that launches Ramble on the iPhone in the
-    /// background, so a file sitting in WatchConnectivity's queue reaches
-    /// the app now instead of when the phone is next opened. The reply holds
-    /// the ids the phone already saved, which count as receipts.
-    /// Only works while the watch app is running and the phone is in reach;
-    /// otherwise transferFile still gets there on its own schedule.
-    func wakePhone(force: Bool = false) {
+    /// Asks the phone to mint a watch token. Sent when the app opens without
+    /// a working token and after a 401. The phone answers by updating the
+    /// application context.
+    func sendNeedsConnection(replaces token: String?) {
+        guard isActivated else { return }
         let session = WCSession.default
-        guard session.activationState == .activated, session.isReachable else { return }
-        let ids = syncQueue.jobs.map(\.id.uuidString)
-        guard !ids.isEmpty else { return }
-        if !force, let lastWakeAt, Date().timeIntervalSince(lastWakeAt) < 3 { return }
-        lastWakeAt = Date()
-        Self.sendWake(recordingIds: ids)
+        let now = Date()
+        if let lastNeedsConnectionAt, now.timeIntervalSince(lastNeedsConnectionAt) < 30 { return }
+        // One queued request is enough while the phone is away
+        let alreadyQueued = session.outstandingUserInfoTransfers.contains {
+            $0.isTransferring && $0.userInfo["type"] as? String == "needsConnection"
+        }
+        if alreadyQueued && !session.isReachable { return }
+        lastNeedsConnectionAt = now
+        var payload: [String: Any] = ["type": "needsConnection"]
+        if let token { payload["replaces"] = token }
+        Self.deliver(payload)
     }
 
-    /// Nonisolated so the reply and error handlers, which WatchConnectivity
-    /// calls on its own queue, aren't tied to the main actor.
-    private nonisolated static func sendWake(recordingIds: [String]) {
-        WCSession.default.sendMessage(
-            ["type": "wake", "recordingIds": recordingIds],
-            replyHandler: { reply in
-                guard let ids = receiptIDs(in: reply), !ids.isEmpty else { return }
-                Task { @MainActor in
-                    WatchConnectivityService.shared.handleReceipts(ids)
-                }
-            },
-            errorHandler: { error in
-                print("Wake message to iPhone failed: \(error)")
-            }
-        )
+    /// sendMessage wakes the phone app in the background when it's in reach;
+    /// queued user info is the fallback that arrives later.
+    private nonisolated static func deliver(_ payload: [String: Any]) {
+        let session = WCSession.default
+        guard session.isReachable else {
+            session.transferUserInfo(payload)
+            return
+        }
+        session.sendMessage(payload, replyHandler: nil) { error in
+            print("Message to iPhone failed, queuing it instead: \(error)")
+            WCSession.default.transferUserInfo(payload)
+        }
     }
 
-    // MARK: - Inline delivery
+    // MARK: - Audio for the phone's history
 
-    /// Notes up to this size also go as message data while the phone is in
-    /// reach. Apple doesn't document a message size limit, so this stays
-    /// well under what's commonly reported to work. About 12 seconds of
-    /// audio at our 16 kHz AAC settings.
-    static let inlineMaxBytes = 48 * 1024
-
-    /// Sends the audio and its metadata in one message:
-    /// 4-byte big-endian metadata length, metadata JSON, then the audio.
-    /// The phone saves it and replies with a receipt, so a short note is
-    /// usually confirmed within seconds. On any error the file transfer
-    /// still delivers it.
-    private func sendInline(_ job: WatchSyncJob, metadata: String) {
-        guard WCSession.default.isReachable,
-              let audio = try? Data(contentsOf: job.fileURL),
-              audio.count <= Self.inlineMaxBytes
+    /// Queues the note's audio for the phone, unless it's already queued or
+    /// the phone has it. The watch keeps its copy until the receipt.
+    func sendAudio(_ note: WatchNoteRecord) {
+        guard isActivated, !note.phoneHasAudio, !note.audioDeleted,
+              FileManager.default.fileExists(atPath: note.fileURL.path)
         else { return }
-        let metadataBytes = Data(metadata.utf8)
-        var payload = Data()
-        var length = UInt32(metadataBytes.count).bigEndian
-        withUnsafeBytes(of: &length) { payload.append(contentsOf: $0) }
-        payload.append(metadataBytes)
-        payload.append(audio)
-        Self.sendInlineData(payload)
-    }
-
-    private nonisolated static func sendInlineData(_ payload: Data) {
-        WCSession.default.sendMessageData(
-            payload,
-            replyHandler: { replyData in
-                guard let reply = (try? JSONSerialization.jsonObject(with: replyData)) as? [String: Any],
-                      let ids = receiptIDs(in: reply), !ids.isEmpty
-                else { return }
-                Task { @MainActor in
-                    WatchConnectivityService.shared.handleReceipts(ids)
-                }
-            },
-            errorHandler: { error in
-                print("Inline send to iPhone failed, file transfer will deliver it: \(error)")
-            }
-        )
-    }
-
-    // MARK: - Background retry
-
-    static let backgroundRetryTaskID = "dev.goodloop.ramble.watch.retry"
-    private static let backgroundRetryInterval: TimeInterval = 10 * 60
-    private var backgroundRetryDate: Date?
-
-    /// The in-app retry timer is a Task.sleep, which never fires while
-    /// watchOS has the app suspended. A background refresh gives the queue
-    /// another pass (resend after the receipt timeout, pick up receipts)
-    /// even if the app isn't opened again.
-    /// `before` asks for the pass to run no later than that date. The
-    /// stuck-note alert uses it so receipts the phone already sent are read
-    /// before a scheduled "still on your watch" notification fires. watchOS
-    /// keeps one scheduled refresh, so an earlier request replaces a later one.
-    func scheduleBackgroundRetryIfNeeded(before deadline: Date? = nil) {
-        guard !syncQueue.jobs.isEmpty else { return }
-        var date = Date().addingTimeInterval(Self.backgroundRetryInterval)
-        if let deadline { date = min(date, max(deadline, Date().addingTimeInterval(60))) }
-        if let backgroundRetryDate, backgroundRetryDate > Date(), backgroundRetryDate <= date { return }
-        backgroundRetryDate = date
-        WKApplication.shared().scheduleBackgroundRefresh(
-            withPreferredDate: date,
-            userInfo: Self.backgroundRetryTaskID as NSString
-        ) { error in
-            if let error { print("Couldn't schedule watch background retry: \(error)") }
+        let id = note.id
+        let alreadyQueued = WCSession.default.outstandingFileTransfers.contains {
+            $0.isTransferring && Self.recordingId(for: $0) == id
         }
-    }
+        guard !alreadyQueued else { return }
 
-    /// Runs from the app refresh background task (see watchApp).
-    func runBackgroundRetry() async {
-        backgroundRetryDate = nil
-        await waitForPendingContent()
-        syncQueue.pruneOrphanedJobs()
-        retryPendingTransfers()
-        scheduleBackgroundRetryIfNeeded()
-    }
-
-    func retryPendingTransfers() {
-        guard WCSession.default.activationState == .activated else { return }
-
-        // Transfers queued before the app was relaunched are still owned by the
-        // system. Track them again instead of sending a duplicate.
-        for transfer in WCSession.default.outstandingFileTransfers {
-            // Match by recording ID, not object identity: the system may hand back
-            // a different WCSessionFileTransfer instance for the same transfer.
-            guard let jobId = recordingId(for: transfer),
-                  !activeTransfers.values.contains(jobId),
-                  syncQueue.jobs.contains(where: { $0.id == jobId })
-            else { continue }
-            activeTransfers[transfer] = jobId
-        }
-
-        for job in syncQueue.jobs {
-            transferJob(job)
-        }
-        // Files already handed off are skipped above, but the phone may be
-        // holding them unopened. Wake it either way.
-        wakePhone()
-        scheduleBackgroundRetryIfNeeded()
-    }
-
-    private func recordingId(for transfer: WCSessionFileTransfer) -> UUID? {
-        guard let metadataString = transfer.file.metadata?["recording"] as? String,
-              let metadataData = metadataString.data(using: .utf8),
-              let metadata = try? JSONDecoder().decode(RecordingMetadata.self, from: metadataData)
-        else { return nil }
-        return UUID(uuidString: metadata.recordingId)
-    }
-
-    /// Back off after a failed transfer: 10s, 20s, 40s ... capped at 5 minutes.
-    private func scheduleRetry(attempt: Int) {
-        scheduleRetry(afterSeconds: min(5 * pow(2.0, Double(max(attempt, 1))), 300))
-    }
-
-    /// One timer for every job, since a retry pass covers them all. A later
-    /// request never pushes back one that's already sooner.
-    private func scheduleRetry(afterSeconds delay: TimeInterval) {
-        let fireDate = Date().addingTimeInterval(delay)
-        if let retryFireDate, retryFireDate > Date(), retryFireDate <= fireDate { return }
-        retryFireDate = fireDate
-        retryTask?.cancel()
-        retryTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(delay))
-            guard !Task.isCancelled else { return }
-            self?.retryFireDate = nil
-            self?.retryPendingTransfers()
-        }
-    }
-
-    private func handleTransferFinished(_ fileTransfer: WCSessionFileTransfer, error: Error?) {
-        // Fall back to the metadata for transfers started before a relaunch.
-        guard let jobId = activeTransfers.removeValue(forKey: fileTransfer)
-                ?? recordingId(for: fileTransfer),
-              let job = syncQueue.jobs.first(where: { $0.id == jobId })
+        let metadata: [String: Any] = [
+            "id": id.uuidString.uppercased(),
+            "recordedAt": note.recordedAtText,
+            "duration": note.duration
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: metadata),
+              let text = String(data: data, encoding: .utf8)
         else { return }
-        // Drop any other handle tracked for the same recording
-        activeTransfers = activeTransfers.filter { $0.value != jobId }
+        WCSession.default.transferFile(note.fileURL, metadata: ["recording": text])
+    }
 
-        if let error {
-            print("File transfer failed for job \(jobId): \(error)")
-            syncQueue.markFailed(jobId: jobId)
-            scheduleRetry(attempt: job.retryCount + 1)
-        } else {
-            // The file reached the phone, but the phone may still fail to
-            // save it (locked since a restart, out of space). The watch copy
-            // stays until the phone's receipt says it's safe.
-            syncQueue.markHandedOff(jobId: jobId)
-            scheduleRetry(afterSeconds: Self.receiptTimeout + 5)
-            // The file is on the phone now. Wake Ramble there so it saves
-            // it and replies with the receipt, even if the earlier wake
-            // landed before the file did.
-            wakePhone(force: true)
+    /// Each time the app opens: any audio the phone hasn't confirmed.
+    func resendUnconfirmedAudio() {
+        for note in WatchNoteStore.shared.notes.reversed() where !note.phoneHasAudio && !note.audioDeleted {
+            sendAudio(note)
         }
     }
 
-    /// The phone saved this recording. Only now can the watch copy go.
-    private func handleReceipt(_ recordingId: UUID) {
-        guard let job = syncQueue.jobs.first(where: { $0.id == recordingId }) else { return }
-        // A receipt can beat the file (inline send, or a wake reply), so drop
-        // the queued copy instead of sending the phone a duplicate.
-        for transfer in WCSession.default.outstandingFileTransfers
-        where self.recordingId(for: transfer) == recordingId {
+    func cancelAudioTransfers(for id: UUID) {
+        guard isActivated else { return }
+        for transfer in WCSession.default.outstandingFileTransfers where Self.recordingId(for: transfer) == id {
             transfer.cancel()
         }
-        activeTransfers = activeTransfers.filter { $0.value != recordingId }
-        try? FileManager.default.removeItem(at: job.fileURL)
-        syncQueue.markCompleted(jobId: recordingId)
-        WatchStuckNoteAlerts.shared.update()
     }
 
-    private func handleReceipts(_ ids: [String]) {
-        for id in ids.compactMap(UUID.init(uuidString:)) {
-            handleReceipt(id)
+    private nonisolated static func recordingId(for transfer: WCSessionFileTransfer) -> UUID? {
+        guard let text = transfer.file.metadata?["recording"] as? String,
+              let data = text.data(using: .utf8),
+              let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let id = object["id"] as? String
+        else { return nil }
+        return UUID(uuidString: id)
+    }
+
+    // MARK: - Phone -> watch
+
+    private func apply(_ context: PhoneContext) {
+        if let fastMode = context.fastMode {
+            UserDefaults.standard.set(fastMode, forKey: WatchStuckNoteAlerts.fastModeKey)
         }
-    }
-
-    /// Settings the phone passes along, as `["type": "settings", ...]`.
-    private func applySettings(fastAlerts: Bool) {
-        UserDefaults.standard.set(fastAlerts, forKey: WatchStuckNoteAlerts.fastModeKey)
+        let connection = WatchConnection.shared
+        connection.setBaseURL(context.relayBaseURL)
+        let tokenChanged = connection.setToken(context.watchToken)
+        let becameUnlocked = connection.setUnlocked(context.unlocked)
+        if tokenChanged && connection.token != nil {
+            WatchRelayService.shared.connectionReplaced()
+        } else if becameUnlocked {
+            WatchRelayService.shared.accountUnlocked()
+        }
         WatchStuckNoteAlerts.shared.update()
     }
 
-    /// Pulls receipt ids out of a phone payload: `["type": "received", "recordingIds": [...]]`.
-    private nonisolated static func receiptIDs(in payload: [String: Any]) -> [String]? {
-        guard payload["type"] as? String == "received" else { return nil }
-        return payload["recordingIds"] as? [String]
+    /// The phone saved this audio. Only now, once the note is also final,
+    /// can the watch copy go (WatchRelayService.cleanUp).
+    private func handleReceipts(_ ids: [String]) {
+        let store = WatchNoteStore.shared
+        for id in ids.compactMap(UUID.init(uuidString:)) {
+            guard store.note(id) != nil else { continue }
+            cancelAudioTransfers(for: id)
+            store.update(id) { $0.phoneHasAudio = true }
+        }
+        WatchRelayService.shared.cleanUp()
+    }
+
+    private func handleAudioRequest(_ idText: String) {
+        guard let id = UUID(uuidString: idText), let note = WatchNoteStore.shared.note(id) else { return }
+        sendAudio(note)
+    }
+
+    private func handle(type: String?, ids: [String]?, recordingId: String?) {
+        switch type {
+        case "received":
+            if let ids { handleReceipts(ids) }
+        case "requestAudio":
+            if let recordingId { handleAudioRequest(recordingId) }
+        case "unlocked":
+            WatchConnection.shared.setUnlocked(true)
+            WatchRelayService.shared.accountUnlocked()
+        default:
+            // Anything about the phone's own recording state is ignored on
+            // purpose, so a tap on the watch always records.
+            break
+        }
     }
 
     /// For the watchConnectivity background task: give WatchConnectivity
-    /// time to deliver receipts that arrived while the app was asleep.
-    /// Touching `shared` activates the session (see init); this only waits.
+    /// time to deliver what arrived while the app was asleep.
     func waitForPendingContent() async {
         guard WCSession.isSupported() else { return }
         let deadline = Date().addingTimeInterval(10)
         while Date() < deadline,
               WCSession.default.activationState != .activated || WCSession.default.hasContentPending {
-            try? await Task.sleep(for: .milliseconds(200))
+            try? await Task.sleep(nanoseconds: 200_000_000)
         }
+        // Uploads released by an unlock start from here
+        await WatchRelayService.shared.retryPass(force: true)
         WatchStuckNoteAlerts.shared.update()
     }
 }
@@ -358,26 +242,30 @@ extension WatchConnectivityService: WCSessionDelegate {
         guard activationState == .activated else { return }
         let reachable = session.isReachable
         let installed = session.isCompanionAppInstalled
-        let needsUnlock = session.iOSDeviceNeedsUnlockAfterRebootForReachability
+        let context = PhoneContext(session.receivedApplicationContext)
         Task { @MainActor in
             self.isPhoneReachable = reachable
             self.isCompanionAppInstalled = installed
-            self.phoneNeedsUnlock = needsUnlock
-            // Launch-time retries run before activation finishes and are
-            // skipped, so pick up anything still queued now.
-            self.retryPendingTransfers()
+            if let context { self.apply(context) }
+            // Launch-time sends ran before activation finished and were
+            // skipped, so catch up now.
+            if WKApplication.shared().applicationState == .active {
+                if !WatchConnection.shared.isConnected {
+                    self.sendNeedsConnection(replaces: WatchConnection.shared.tokenToReplace)
+                }
+                self.resendUnconfirmedAudio()
+            }
         }
     }
 
     nonisolated func sessionReachabilityDidChange(_ session: WCSession) {
         let reachable = session.isReachable
-        let needsUnlock = session.iOSDeviceNeedsUnlockAfterRebootForReachability
         Task { @MainActor in
             let becameReachable = reachable && !self.isPhoneReachable
             self.isPhoneReachable = reachable
-            self.phoneNeedsUnlock = needsUnlock
-            if becameReachable {
-                self.retryPendingTransfers()
+            if becameReachable, !WatchConnection.shared.isConnected,
+               WKApplication.shared().applicationState == .active {
+                self.sendNeedsConnection(replaces: WatchConnection.shared.tokenToReplace)
             }
         }
     }
@@ -386,44 +274,57 @@ extension WatchConnectivityService: WCSessionDelegate {
         let installed = session.isCompanionAppInstalled
         Task { @MainActor in
             self.isCompanionAppInstalled = installed
-            if installed {
-                self.retryPendingTransfers()
-            }
         }
     }
 
-    /// Only receipts are read. Anything about the phone's own recording
-    /// state is ignored on purpose, so a tap on the watch always records.
+    nonisolated func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String: Any]) {
+        guard let context = PhoneContext(applicationContext) else { return }
+        Task { @MainActor in
+            self.apply(context)
+        }
+    }
+
     nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
-        guard let ids = Self.receiptIDs(in: message) else { return }
+        let type = message["type"] as? String
+        let ids = message["recordingIds"] as? [String]
+        let recordingId = message["recordingId"] as? String
         Task { @MainActor in
-            self.handleReceipts(ids)
-        }
-    }
-
-    /// Receipts come as queued user info, so they arrive even if the watch
-    /// app wasn't running when the phone saved the recording.
-    nonisolated func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any]) {
-        if userInfo["type"] as? String == "settings",
-           let fastAlerts = userInfo["deliveryAlertsFastMode"] as? Bool {
-            Task { @MainActor in
-                self.applySettings(fastAlerts: fastAlerts)
-            }
-            return
-        }
-        guard let ids = Self.receiptIDs(in: userInfo) else { return }
-        Task { @MainActor in
-            self.handleReceipts(ids)
+            self.handle(type: type, ids: ids, recordingId: recordingId)
         }
     }
 
     nonisolated func session(
         _ session: WCSession,
+        didReceiveMessage message: [String: Any],
+        replyHandler: @escaping ([String: Any]) -> Void
+    ) {
+        let type = message["type"] as? String
+        let ids = message["recordingIds"] as? [String]
+        let recordingId = message["recordingId"] as? String
+        replyHandler(["ok": true])
+        Task { @MainActor in
+            self.handle(type: type, ids: ids, recordingId: recordingId)
+        }
+    }
+
+    /// Queued user info arrives even if the watch app wasn't running.
+    nonisolated func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any]) {
+        let type = userInfo["type"] as? String
+        let ids = userInfo["recordingIds"] as? [String]
+        let recordingId = userInfo["recordingId"] as? String
+        Task { @MainActor in
+            self.handle(type: type, ids: ids, recordingId: recordingId)
+        }
+    }
+
+    /// A failed audio transfer is sent again the next time the app opens.
+    nonisolated func session(
+        _ session: WCSession,
         didFinish fileTransfer: WCSessionFileTransfer,
         error: Error?
     ) {
-        Task { @MainActor in
-            self.handleTransferFinished(fileTransfer, error: error)
+        if let error {
+            print("Audio transfer to iPhone failed, will resend on next open: \(error)")
         }
     }
 }
