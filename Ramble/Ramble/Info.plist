@@ -7,10 +7,12 @@
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
 		<string>dev.goodloop.ramble.sync</string>
+		<string>dev.goodloop.ramble.refresh</string>
 	</array>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
+		<string>fetch</string>
 		<string>processing</string>
 	</array>
 	<key>UILaunchScreen</key>

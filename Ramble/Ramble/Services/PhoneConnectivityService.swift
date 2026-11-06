@@ -134,6 +134,18 @@ final class PhoneConnectivityService: NSObject, ObservableObject {
         }
     }
 
+    /// For background launches: wait (up to 8s) for the session to activate
+    /// and for WatchConnectivity to deliver anything it queued while Ramble
+    /// wasn't running.
+    func waitForPendingWatchContent() async {
+        guard WCSession.isSupported() else { return }
+        let deadline = Date().addingTimeInterval(8)
+        while Date() < deadline,
+              WCSession.default.activationState != .activated || WCSession.default.hasContentPending {
+            try? await Task.sleep(nanoseconds: 200_000_000)
+        }
+    }
+
     // MARK: - Delivery timeline
 
     /// The per-hop log for a recording that just arrived from the watch:

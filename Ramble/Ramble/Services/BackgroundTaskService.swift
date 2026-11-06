@@ -10,6 +10,10 @@ import UIKit
 final class BackgroundTaskService {
     static let shared = BackgroundTaskService()
     static let syncTaskIdentifier = "dev.goodloop.ramble.sync"
+    /// Backup for watch notes: a periodic app refresh launches Ramble, which
+    /// activates WatchConnectivity and so collects any files it was holding.
+    static let refreshTaskIdentifier = "dev.goodloop.ramble.refresh"
+    private static let refreshInterval: TimeInterval = 15 * 60
 
     /// Tracks the current UIKit background task (for immediate ~30s execution)
     private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
@@ -22,6 +26,54 @@ final class BackgroundTaskService {
             using: nil
         ) { task in
             self.handleSyncTask(task as! BGProcessingTask)
+        }
+        BGTaskScheduler.shared.register(
+            forTaskWithIdentifier: Self.refreshTaskIdentifier,
+            using: nil
+        ) { task in
+            self.handleRefreshTask(task as! BGAppRefreshTask)
+        }
+    }
+
+    // MARK: - App refresh (backup check for watch notes)
+
+    /// iOS decides when this runs (more often the more Ramble is used), so
+    /// it's a backup to the watch's wake message, not a timer.
+    func scheduleRefreshTask() {
+        let request = BGAppRefreshTaskRequest(identifier: Self.refreshTaskIdentifier)
+        request.earliestBeginDate = Date().addingTimeInterval(Self.refreshInterval)
+        do {
+            try BGTaskScheduler.shared.submit(request)
+        } catch {
+            print("[Background] Failed to schedule app refresh: \(error)")
+        }
+    }
+
+    private func handleRefreshTask(_ task: BGAppRefreshTask) {
+        scheduleRefreshTask()
+
+        let workTask = Task { @MainActor in
+            // Launching activated the session (RambleApp init). Give it a
+            // moment to hand over queued watch files, which start their own
+            // transcription and upload.
+            await PhoneConnectivityService.shared.waitForPendingWatchContent()
+            TranscriptionQueueService.shared.resumePendingJobs()
+            WebhookQueueService.shared.resumePendingJobs()
+            RelayQueueService.shared.resumePendingJobs()
+            let deadline = Date().addingTimeInterval(20)
+            while self.hasActiveWork && Date() < deadline && !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 500_000_000)
+            }
+            DeliveryMonitor.shared.evaluate()
+        }
+
+        task.expirationHandler = {
+            workTask.cancel()
+        }
+
+        Task {
+            _ = await workTask.result
+            task.setTaskCompleted(success: true)
         }
     }
 
