@@ -55,7 +55,7 @@ The status line SHALL show exactly one state, the first that applies below. Pill
 | 1 | Webhook gave up | "1 note didn't send" / "N notes didn't send" · "Fix" (red) | Pill | Newest such note |
 | 2 | Notes held for unlock, on either device | "1 note to unlock" / "N notes to unlock" · "Unlock" | Pill | Unlock screen |
 | 3 | No agent and no webhook | "No agent connected" · "Connect" | Pill | Connect flow |
-| 4 | Free notes nearly used, or fair use near its limit | the line [subscription.md](subscription.md) defines | Pill | Unlock screen or Settings |
+| 4 | Free notes nearly used | the line [subscription.md](subscription.md) defines | Pill | Unlock screen |
 | 5 | A note has waited over 12 hours and the agent hasn't checked in within 12 hours | "Your agent hasn't checked in · 3d" (no age if never) | Pill | Your agent |
 | 6 | A note has waited over 12 hours, agent checking in | "N notes waiting for your agent" | Pill | Your agent |
 | 7 | Notes not yet accepted by the server | spinner, "Sending 1 note…" / "Sending N notes…" | Quiet | — |
@@ -116,7 +116,7 @@ A note refused for unlock SHALL stop retrying until the unlock; one refused for 
 - THEN all three upload, oldest first, with no tap on any note
 
 #### Scenario: Fair use resets
-- GIVEN a phone note reads "Over fair use" with a reset on Dec 1
+- GIVEN a phone note reads "Usage limit reached" with a reset on Dec 1
 - WHEN Ramble opens on Dec 1
 - THEN the note uploads
 
@@ -144,7 +144,7 @@ The list SHALL group notes by day, newest first, under "Today", "Yesterday", or 
 | Watch note not yet accepted | "Waiting on your watch" | tray |
 | Transcribing | spinner, "Transcribing…" | — |
 | Held for unlock (either device) | "Unlock to transcribe" | lock, amber |
-| Held for fair use | "Over fair use" | pause, amber |
+| Held for fair use | "Usage limit reached" | pause, amber |
 | Refused for good | "Too long to transcribe" or "Couldn't send" | warning, red |
 | Failed for good | "Couldn't transcribe" | warning, red |
 | Silent | "No speech detected" | quiet |
@@ -194,7 +194,7 @@ Under the player, the note screen SHALL show one line saying where the note is. 
 | Not accepted yet | "Waiting to send" | the last error and "Ramble will try again on its own." | — |
 | Transcribing | "Transcribing…" | "It goes out as soon as the transcript is ready." | — |
 | Held for unlock | "Unlock to transcribe" | "This note is saved. It transcribes as soon as you unlock Ramble." | "Unlock" |
-| Held for fair use | "Over fair use" | "This note will transcribe on Dec 1." (the reset date) | — |
+| Held for fair use | "Usage limit reached" | the detail in [subscription.md](subscription.md) ("… This note will transcribe on Dec 1. If this looks wrong, contact support.") | "Contact support" |
 | Audio unreadable | "Couldn't transcribe" | "Ramble couldn't turn this audio into text." | — |
 | Transcription gave up | "Couldn't transcribe" | "Ramble couldn't reach a transcription service in time." | — |
 

@@ -37,7 +37,7 @@ The watch SHALL pick at most one bar alert in this order: "Mic off", "Mic busy",
 | "No phone" | The paired iPhone does not have Ramble | "Ramble isn't on your iPhone" | "Your notes are safe on this watch, but they can't reach your agent yet." / "Install Ramble on your iPhone and open it once. Waiting notes will send on their own." |
 | "Set up" | Ramble is on the iPhone, but the watch is not connected to it yet, or the server no longer accepts the watch's connection | "Open Ramble on your iPhone" | "Your notes are safe on this watch, but they can't send yet." / "Open Ramble on your iPhone once. Waiting notes will send on their own." |
 | "Unlock" | A note is held because the free notes are used up | "Unlock to transcribe" | "You've used your free notes. Your notes are safe on this watch." / "Unlock Ramble on your iPhone and they'll transcribe on their own." |
-| "Limit" | A note is held over fair use | "Over fair use" | "Your notes are safe on this watch." / "This note will transcribe on Dec 1." (the date is the reset date the server gives; subscription.md) |
+| "Limit" | A note is held over fair use | "Usage limit reached" | "Your notes are safe on this watch." / "They will transcribe on Dec 1. If this looks wrong, contact support from Ramble on your iPhone." (the date is the reset date the server gives; subscription.md) |
 
 #### Scenario: Highest alert wins
 - GIVEN microphone permission is off and the paired iPhone doesn't have Ramble
@@ -58,7 +58,7 @@ Until the first note is ever saved on this watch, a soft amber ring SHALL breath
 - THEN the breathing ring stops for good
 
 ### Requirement: History badge
-The history button SHALL carry at most one mark, highest first: a red dot if any note needs the person (held, failed, refused, stuck, or lost and not yet opened in Recent); a spinning ring while any note is uploading or being transcribed; a still gray dot if any note is waiting to upload; otherwise nothing. The history button SHALL be hidden while recording.
+The history button SHALL carry at most one mark, highest first: a red dot if any note needs the person (held for unlock, failed, refused, stuck, or lost and not yet opened in Recent); a spinning ring while any note is uploading or being transcribed; a still gray dot if any note is waiting to upload or held over fair use; otherwise nothing. The history button SHALL be hidden while recording.
 
 #### Scenario: Reduce Motion
 - GIVEN Reduce Motion is on and a note is uploading
@@ -145,7 +145,7 @@ Recent SHALL group notes, newest first, into "Needs you · N", "Waiting · N" an
 | Transcribed | Done | gray check | first line of the transcript, cut with an ellipsis |
 | Silent | Done | gray check | "No speech detected" |
 | Held: free notes used up | Needs you | red mark | "Unlock to transcribe" |
-| Held: fair use | Needs you | red mark | "Over fair use" |
+| Held: fair use | Waiting | gray dot | "Usage limit reached" |
 | Not yet accepted 6 hours after recording | Needs you | red mark | "Waiting 6 hours", "Waiting 7 hours", … |
 | Transcription failed for good | Needs you | red mark | "Couldn't transcribe" |
 | Audio lost before the server accepted it | Needs you | red mark | "Audio lost" |
@@ -217,7 +217,7 @@ When the server holds a note because the free notes are used up, the watch SHALL
 - AND the "Unlock" alert goes away
 
 ### Requirement: Held over fair use
-When the server holds a note over fair use, the watch SHALL keep the note and its audio, show "Over fair use", and retry it at the reset time the server gave and on every app open after it.
+When the server holds a note over fair use, the watch SHALL keep the note and its audio, show "Usage limit reached", and retry it at the reset time the server gave and on every app open after it.
 
 #### Scenario: Month resets
 - GIVEN a note has been held over fair use since November 28

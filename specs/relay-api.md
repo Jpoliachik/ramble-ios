@@ -85,12 +85,12 @@ Every error SHALL be `{"error": "<sentence>"}`, plus `"reason": "<code>"` wherev
 - THEN the inbox is created, bound to that purchase and unlocked
 
 ### Requirement: Account state
-`GET /account` SHALL return `{"unlocked", "free_notes_total": 25, "free_notes_remaining", "fair_use": {"used_hours", "limit_hours", "resets_at", "near"} | null}`, plus `"account_token"` for the phone. `fair_use` is `null` while no purchase is bound. Meaning and thresholds: [subscription.md](subscription.md).
+`GET /account` SHALL return `{"unlocked", "free_notes_total": 25, "free_notes_remaining", "fair_use": {"used_hours", "limit_hours", "resets_at"} | null}`, plus `"account_token"` for the phone. `fair_use` is `null` while no purchase is bound. Meaning and thresholds: [subscription.md](subscription.md).
 
-#### Scenario: Close to fair use
-- GIVEN an unlocked inbox whose purchase used 41 of its 50 hours this month
+#### Scenario: Usage this month
+- GIVEN an unlocked inbox whose purchase used 41 of its 100 hours this month
 - WHEN the phone reads `GET /account`
-- THEN `fair_use` is `{"used_hours": 41, "limit_hours": 50, "resets_at": "2026-12-01T00:00:00.000Z", "near": true}`
+- THEN `fair_use` is `{"used_hours": 41, "limit_hours": 100, "resets_at": "2026-12-01T00:00:00.000Z"}`
 
 ### Requirement: Submitting a purchase
 `POST /entitlement` with `{"signed_transaction": "<JWS>"}` or, for early buyers, `{"app_transaction": "<JWS>"}` SHALL return `200` with the `GET /account` body once the record is verified: signature chained to Apple's root CA, bundle ID `dev.goodloop.Ramble`, not revoked or refunded, not Sandbox or Xcode on production. A transaction SHALL be for the unlock product; `dev.goodloop.ramble.premium.monthly2` is accepted only as early-buyer proof ([subscription.md](subscription.md)). Re-sending a bound record SHALL return `200` and change nothing.

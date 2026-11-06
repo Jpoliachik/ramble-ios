@@ -217,30 +217,33 @@ The production server SHALL reject purchase records and server notifications fro
 
 ## Fair use
 
-### Requirement: 50 hours a month per purchase
-An unlocked purchase SHALL include 50 hours of transcribed audio per calendar month (UTC), counted across every inbox bound to it and resetting on the 1st. Duration SHALL be measured by the server from the transcription result, never taken from the device. There SHALL be no separate per-device limit, and before purchase only the 25 free notes apply.
+Fair use is an abuse guard, set far above real use. Exceptions are handled by the operator by hand; the product has no override.
+
+### Requirement: 100 hours a month per purchase
+An unlocked purchase SHALL include 100 hours of transcribed audio per calendar month (UTC), counted across every inbox bound to it and resetting on the 1st. Duration SHALL be measured by the server from the transcription result, never taken from the device. There SHALL be no separate per-device limit, and before purchase only the 25 free notes apply.
 
 #### Scenario: The note that crosses the line
-- GIVEN 49.5 hours used this month
+- GIVEN 99.5 hours used this month
 - WHEN a 60-minute note is accepted
 - THEN it transcribes in full, and only uploads after it are held
 
-### Requirement: Over fair use, notes are held
-When the allowance is used up, the server SHALL refuse uploads with payment required, reason "fair_use", and a retry time equal to the reset, keeping and counting nothing. The device SHALL keep the audio, show the note as "Over fair use" with the detail "This note will transcribe on <Mon D>." (the reset date), retry at the reset time and whenever the app opens, and raise no stuck-note alert.
+### Requirement: Over the usage limit, notes are held
+When the allowance is used up, the server SHALL refuse uploads with payment required, reason "fair_use", and a retry time equal to the reset, keeping and counting nothing, and SHALL alert the operator ([transcription.md](transcription.md)). The device SHALL keep the audio, show the note as "Usage limit reached" with the detail "Ramble pauses transcription after 100 hours in a month to stop abuse. This note will transcribe on <Mon D>. If this looks wrong, contact support." (the reset date), retry at the reset time and whenever the app opens, and raise no stuck-note alert.
 
 #### Scenario: Held until the reset
-- GIVEN a purchase that has used 50 hours in November
+- GIVEN a purchase that has used 100 hours in November
 - WHEN the iPhone uploads 3 notes on November 20
-- THEN each shows "Over fair use" and "This note will transcribe on Dec 1."
+- THEN each shows "Usage limit reached" and "… This note will transcribe on Dec 1. …"
+- AND the operator is alerted
 - AND after December 1 (UTC) the iPhone retries, and the notes upload and transcribe
 
-### Requirement: Fair use shown only when close
-The iPhone app SHALL mention fair use only once 80% (40 hours) is used, with "You've used N of 50 hours this month. Resets <Mon D>." in Settings and on Home. Otherwise fair use appears only in the Terms of Use, the App Store description and the unlock sheet.
+### Requirement: The limit is shown only when reached
+The app SHALL NOT show usage or warn before the limit is reached. Fair use appears only in the Terms of Use, the App Store description, the unlock sheet, and on notes held by it.
 
-#### Scenario: Close to the limit
-- GIVEN 41 hours used in November
-- WHEN the person opens Settings
-- THEN they see "You've used 41 of 50 hours this month. Resets Dec 1."
+#### Scenario: Heavy but normal use
+- GIVEN 85 hours used in November
+- WHEN the person opens Settings and Home
+- THEN neither mentions usage or a limit
 
 ## Early buyers
 
@@ -280,7 +283,7 @@ Apple keeps billing a subscription until the person cancels it. While an unlocke
 ## What Ramble says about price
 
 ### Requirement: One price story everywhere
-The app, website, Terms of Use, Privacy Policy and App Store listing SHALL describe pricing as "Free to download. 25 notes free, then $14.99 once." (the app uses the store's local price), with no monthly price. The Terms of Use and App Store description SHALL state fair use as "50 hours of audio per calendar month" per purchase, and that refunds are handled by Apple.
+The app, website, Terms of Use, Privacy Policy and App Store listing SHALL describe pricing as "Free to download. 25 notes free, then $14.99 once." (the app uses the store's local price), with no monthly price. The Terms of Use and App Store description SHALL state fair use as "100 hours of audio per calendar month" per purchase, and that refunds are handled by Apple.
 
 #### Scenario: Terms page
 - GIVEN the published Terms of Use
@@ -289,7 +292,7 @@ The app, website, Terms of Use, Privacy Policy and App Store listing SHALL descr
 - AND it says nothing about auto-renewal
 
 ### Requirement: Words to avoid
-Copy SHALL NOT call the free notes a "trial", and SHALL NOT say "unlimited" (fair use applies), "premium", "Subscribe", or "per month" or "/month" next to a price. The only monthly wording allowed is the fair-use line "50 hours of audio per calendar month" and the in-app "this month" usage line. "Subscription" SHALL appear only in "No subscription." and in messages to subscribers.
+Copy SHALL NOT call the free notes a "trial", and SHALL NOT say "unlimited" (fair use applies), "premium", "Subscribe", or "per month" or "/month" next to a price. The only monthly wording allowed is the fair-use line "100 hours of audio per calendar month" and the held-note detail. "Subscription" SHALL appear only in "No subscription." and in messages to subscribers.
 
 #### Scenario: Out of free notes
 - GIVEN a person with 0 free notes left

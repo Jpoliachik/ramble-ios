@@ -267,7 +267,7 @@ The server SHALL check every minute and alert the operator when any of these hol
 - any accepted note has waited more than 5 minutes for a result
 - estimated spend across all providers today is over $5.00
 - a provider rejected Ramble's key, or a key is missing
-- a purchase reached 80% of its fair-use allowance
+- a purchase reached 80% of its fair-use allowance, or used it up (a person is being held)
 - the free-tier audio breaker tripped
 - more than 3% of notes finished in the last hour failed permanently, counting only hours with at least 10 finished notes
 
