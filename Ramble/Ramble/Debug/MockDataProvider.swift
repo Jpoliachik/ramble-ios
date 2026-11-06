@@ -27,7 +27,7 @@ enum MockDataProvider {
                 transcription: "Follow-up note from the call with Amber at Vantage. They're interested in the enterprise plan but want to see a SOC 2 report before moving forward. Send it over today, schedule a technical deep-dive for next week, and loop in Dave from security. Mark the deal as stage two in the CRM.",
                 webhookStatus: .delivered,
                 activityLog: [
-                    ActivityEntry("Transcribed via Whisper v3 Turbo", httpStatus: 200),
+                    ActivityEntry("Transcript received"),
                     ActivityEntry("Sent to API", httpStatus: 200),
                 ]
             ),
@@ -38,7 +38,7 @@ enum MockDataProvider {
                 transcription: "Morning walk notes. The park was quiet today, just a few runners. I've been thinking about the API design for webhooks. We should support both JSON and form-encoded payloads. Most automation tools like Zapier and Make expect JSON, but some older systems still use form encoding. Let's default to JSON and add a toggle later if anyone asks. Also need to remember to pick up coffee beans on the way home.",
                 webhookStatus: .delivered,
                 activityLog: [
-                    ActivityEntry("Transcribed via Whisper v3 Turbo", httpStatus: 200),
+                    ActivityEntry("Transcript received"),
                     ActivityEntry("Sent to API", httpStatus: 200),
                 ]
             ),
@@ -51,7 +51,7 @@ enum MockDataProvider {
                 transcription: "Reminder to self: update the privacy policy before submitting to App Store review. Apple requires a valid URL and the current draft still references placeholder company names.",
                 webhookStatus: .delivered,
                 activityLog: [
-                    ActivityEntry("Transcribed via Apple Speech", httpStatus: nil),
+                    ActivityEntry("Transcript received"),
                     ActivityEntry("Sent to API", httpStatus: 200),
                 ]
             ),
@@ -62,7 +62,7 @@ enum MockDataProvider {
                 transcription: "Ramble is private by design. No accounts. No user data on our servers. Your audio and transcripts stay on your device unless you choose to send them somewhere. The transcription proxy is stateless — audio comes in, text goes out, nothing is logged. The entire codebase is open source. Don't take our word for it. Read the code.",
                 webhookStatus: .delivered,
                 activityLog: [
-                    ActivityEntry("Transcribed via Nova-3", httpStatus: 200),
+                    ActivityEntry("Transcript received"),
                     ActivityEntry("Sent to API", httpStatus: 200),
                 ]
             ),
@@ -73,7 +73,7 @@ enum MockDataProvider {
                 transcription: "Quick thought: we should add haptic feedback when the recording starts and stops. A subtle tap, nothing aggressive. It confirms the action without needing to look at the screen — especially useful on Apple Watch.",
                 webhookStatus: .delivered,
                 activityLog: [
-                    ActivityEntry("Transcribed via Whisper v3 Turbo", httpStatus: 200),
+                    ActivityEntry("Transcript received"),
                     ActivityEntry("Sent to API", httpStatus: 200),
                 ]
             ),

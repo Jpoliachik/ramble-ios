@@ -40,7 +40,19 @@ struct OnboardingIntroStep: View {
             OnboardingPrimaryButton(title: "Get started", action: onContinue)
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
-                .padding(.bottom, 24)
+
+            // Tapping "Get started" is the consent (specs/phone.md).
+            (Text("Ramble sends your recordings to a cloud service to turn them into text, then sends the text to your agent. ")
+                + Text("[Privacy](https://ramble.watch/privacy)").foregroundColor(Color.brandAmber))
+                .font(.system(size: 12))
+                .foregroundStyle(Color.obInkFaint)
+                .tint(Color.brandAmber)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 28)
+                .padding(.top, 10)
+                .padding(.bottom, 20)
         }
         .task(id: beat) { await playBeat() }
     }

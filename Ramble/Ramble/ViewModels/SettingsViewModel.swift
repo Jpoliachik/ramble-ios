@@ -9,19 +9,9 @@ import SwiftUI
 
 @MainActor
 final class SettingsViewModel: ObservableObject {
-    /// Hard cap on the custom-vocabulary field, set by the tightest provider
-    /// budget: Whisper's `prompt` accepts ~224 tokens (~900 chars) and
-    /// Deepgram's keyterms ~500 tokens, and beyond that the provider silently
-    /// truncates. We clamp on input so the user sees the limit instead of
-    /// getting silently lossy hints.
+    /// The relay's limit on the vocabulary field (relay-api.md "Transcription settings").
     static let maxVocabularyLength = 900
 
-    @Published var transcriptionProvider: TranscriptionProvider = .appleSpeech {
-        didSet { resetLanguageIfUnsupported() }
-    }
-    @Published var cloudModel: CloudModel = .whisperLargeV3Turbo {
-        didSet { resetLanguageIfUnsupported() }
-    }
     @Published var transcriptionLanguage: TranscriptionLanguage = .auto
     @Published var customVocabulary: String = "" {
         didSet {
@@ -31,7 +21,6 @@ final class SettingsViewModel: ObservableObject {
         }
     }
     @Published var removeFillerWords: Bool = false
-    @Published var showSubscriptionPaywall = false
     @Published var webhookURL: String = ""
     @Published var webhookSecret: String = ""
     @Published var deviceId: String = ""
@@ -47,10 +36,9 @@ final class SettingsViewModel: ObservableObject {
         }
     }
     @Published var webhookURLError: String?
+    #if DEBUG
     @Published var devOverrideKey: String = ""
-
-    /// The cloud model the user tapped before being shown the paywall
-    private var pendingCloudModel: CloudModel?
+    #endif
 
     private let settingsService = SettingsService.shared
     private let storageService = StorageService.shared
@@ -58,15 +46,6 @@ final class SettingsViewModel: ObservableObject {
 
     init() {
         load()
-        // When the paywall dismisses, apply the pending cloud model if the user subscribed
-        $showSubscriptionPaywall
-            .dropFirst()
-            .filter { !$0 }
-            .sink { [weak self] _ in
-                self?.applyPendingCloudModel()
-            }
-            .store(in: &cancellables)
-
         NotificationCenter.default
             .publisher(for: StorageService.recordingsDidChangeNotification)
             .debounce(for: .milliseconds(200), scheduler: DispatchQueue.main)
@@ -78,8 +57,6 @@ final class SettingsViewModel: ObservableObject {
 
     func load() {
         let settings = settingsService.load()
-        transcriptionProvider = settings.transcriptionProvider
-        cloudModel = settings.cloudModel
         transcriptionLanguage = settings.transcriptionLanguage
         customVocabulary = settings.customVocabulary
         removeFillerWords = settings.removeFillerWords
@@ -87,64 +64,45 @@ final class SettingsViewModel: ObservableObject {
         webhookSecret = settings.webhookSecret
         deviceId = settings.deviceId
         appearanceMode = settings.appearanceMode
-        devOverrideKey = UserDefaults.standard.string(forKey: SubscriptionService.devOverrideUserDefaultsKey) ?? ""
+        #if DEBUG
+        devOverrideKey = UserDefaults.standard.string(forKey: Constants.Relay.devBypassKey) ?? ""
+        #endif
         loadStats()
     }
 
+    /// Reads the server's transcription settings into the form.
+    func pullTranscriptionSettings() async {
+        await NoteSyncService.shared.pullTranscriptionSettings()
+        let settings = settingsService.load()
+        transcriptionLanguage = settings.transcriptionLanguage
+        customVocabulary = settings.customVocabulary
+        removeFillerWords = settings.removeFillerWords
+    }
+
     func save() {
-        let settings = Settings(
-            transcriptionProvider: transcriptionProvider,
-            cloudModel: cloudModel,
-            transcriptionLanguage: transcriptionLanguage,
-            customVocabulary: customVocabulary,
-            removeFillerWords: removeFillerWords,
-            webhookURL: webhookURL.isEmpty ? nil : webhookURL,
-            webhookSecret: webhookSecret,
-            deviceId: deviceId,
-            appearanceMode: appearanceMode
-        )
+        let previous = settingsService.load()
+        var settings = previous
+        settings.transcriptionLanguage = transcriptionLanguage
+        settings.customVocabulary = customVocabulary
+        settings.removeFillerWords = removeFillerWords
+        settings.webhookURL = webhookURL.isEmpty ? nil : webhookURL
+        settings.webhookSecret = webhookSecret
+        settings.appearanceMode = appearanceMode
         settingsService.save(settings)
 
+        let transcriptionChanged = previous.transcriptionLanguage != settings.transcriptionLanguage
+            || previous.customVocabulary != settings.customVocabulary
+            || previous.removeFillerWords != settings.removeFillerWords
+        if transcriptionChanged {
+            // Kept with the inbox, so both devices' notes use them.
+            settingsService.transcriptionSettingsDirty = true
+            Task { await NoteSyncService.shared.pushTranscriptionSettingsIfNeeded() }
+        }
+
+        #if DEBUG
         let key = devOverrideKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        SubscriptionService.shared.setDevOverrideKey(key.isEmpty ? nil : key)
-    }
-
-    func selectCloudTranscription() {
-        if SubscriptionService.shared.isPremium {
-            transcriptionProvider = .cloudTranscription
-        } else {
-            showSubscriptionPaywall = true
-        }
-    }
-
-    func selectCloudModel(_ model: CloudModel) {
-        if SubscriptionService.shared.isPremium {
-            transcriptionProvider = .cloudTranscription
-            cloudModel = model
-        } else {
-            pendingCloudModel = model
-            showSubscriptionPaywall = true
-        }
-    }
-
-    /// When the cloud model changes to one that doesn't support the user's
-    /// previously chosen language (e.g. Welsh on Whisper → Nova-3), demote
-    /// the picker back to `.auto` so we never silently send an unsupported hint.
-    private func resetLanguageIfUnsupported() {
-        guard transcriptionLanguage != .auto else { return }
-        guard transcriptionProvider.isCloud else { return }
-        if !cloudModel.supports(transcriptionLanguage) {
-            transcriptionLanguage = .auto
-        }
-    }
-
-    private func applyPendingCloudModel() {
-        guard let model = pendingCloudModel else { return }
-        pendingCloudModel = nil
-        if SubscriptionService.shared.isPremium {
-            transcriptionProvider = .cloudTranscription
-            cloudModel = model
-        }
+        UserDefaults.standard.set(key.isEmpty ? nil : key, forKey: Constants.Relay.devBypassKey)
+        #endif
     }
 
     func validateWebhookURL() {
@@ -163,7 +121,9 @@ final class SettingsViewModel: ObservableObject {
         let recordings = storageService.loadRecordings()
         totalRecordings = recordings.count
         totalDuration = recordings.reduce(0) { $0 + $1.duration }
-        pendingTranscriptions = recordings.filter { [.recorded, .transcribing].contains($0.status) }.count
+        pendingTranscriptions = recordings.filter {
+            ($0.status == .recorded || $0.status == .transcribing) && $0.hold != .tooLong && $0.hold != .couldntSend
+        }.count
         failedTranscriptions = recordings.filter { $0.status == .failed }.count
         webhookHealth = WebhookHealth.compute(from: recordings)
     }
@@ -176,12 +136,14 @@ final class SettingsViewModel: ObservableObject {
 
         guard let data = try? encoder.encode(recordings) else { return nil }
 
-        let exportURL = StorageService.documentsDirectory
+        let exportURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("ramble_export.json")
         try? data.write(to: exportURL)
         return exportURL
     }
 
+    /// Removes every note from this iPhone for good. Agents, their waiting
+    /// copies, the free count and the unlock are untouched.
     func deleteAllData() {
         storageService.deleteAllRecordings()
         loadStats()

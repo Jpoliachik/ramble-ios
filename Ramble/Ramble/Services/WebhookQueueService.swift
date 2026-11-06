@@ -37,12 +37,12 @@ final class WebhookQueueService: ObservableObject {
         guard let webhookURL = settings.webhookURL,
               !webhookURL.isEmpty else { return }
 
-        // Update recording webhook status
+        // Silent notes go nowhere (specs/delivery.md).
         var recordings = storageService.loadRecordings()
-        if let idx = recordings.firstIndex(where: { $0.id == recordingId }) {
-            recordings[idx].webhookStatus = .pending
-            storageService.saveRecordings(recordings)
-        }
+        guard let idx = recordings.firstIndex(where: { $0.id == recordingId }),
+              recordings[idx].hasSpeechTranscript else { return }
+        recordings[idx].webhookStatus = .pending
+        storageService.saveRecordings(recordings)
 
         let job = WebhookJob(recordingId: recordingId)
         queue.append(job)

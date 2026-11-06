@@ -2,6 +2,11 @@
 //  BackgroundTaskService.swift
 //  Ramble
 //
+//  Background time for the phone's own work: uploading its notes, the
+//  check-in with Ramble's server (transcripts, delivery state, account) and
+//  webhooks. Uploads run on URLSession inside a UIKit background task, with
+//  a BGProcessingTask and periodic app refresh as fallbacks.
+//
 
 import BackgroundTasks
 import Foundation
@@ -10,12 +15,11 @@ import UIKit
 final class BackgroundTaskService {
     static let shared = BackgroundTaskService()
     static let syncTaskIdentifier = "dev.goodloop.ramble.sync"
-    /// Backup for watch notes: a periodic app refresh launches Ramble, which
-    /// activates WatchConnectivity and so collects any files it was holding.
+    /// Periodic check-in: collects transcripts of watch notes, and launching
+    /// activates WatchConnectivity, which hands over any queued watch audio.
     static let refreshTaskIdentifier = "dev.goodloop.ramble.refresh"
     private static let refreshInterval: TimeInterval = 15 * 60
 
-    /// Tracks the current UIKit background task (for immediate ~30s execution)
     private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
 
     private init() {}
@@ -35,10 +39,25 @@ final class BackgroundTaskService {
         }
     }
 
-    // MARK: - App refresh (backup check for watch notes)
+    // MARK: - Shared work
 
-    /// iOS decides when this runs (more often the more Ramble is used), so
-    /// it's a backup to the watch's wake message, not a timer.
+    @MainActor
+    private var hasActiveWork: Bool {
+        UploadQueueService.shared.hasActiveWork
+            || WebhookQueueService.shared.hasActiveWork
+            || NoteSyncService.shared.hasActiveWork
+    }
+
+    /// Kick everything once, then check in with the server.
+    @MainActor
+    private func runOnce(appOpened: Bool = false) async {
+        UploadQueueService.shared.resume(appOpened: appOpened)
+        WebhookQueueService.shared.resumePendingJobs()
+        await NoteSyncService.shared.checkIn()
+    }
+
+    // MARK: - App refresh
+
     func scheduleRefreshTask() {
         let request = BGAppRefreshTaskRequest(identifier: Self.refreshTaskIdentifier)
         request.earliestBeginDate = Date().addingTimeInterval(Self.refreshInterval)
@@ -53,13 +72,8 @@ final class BackgroundTaskService {
         scheduleRefreshTask()
 
         let workTask = Task { @MainActor in
-            // Launching activated the session (RambleApp init). Give it a
-            // moment to hand over queued watch files, which start their own
-            // transcription and upload.
             await PhoneConnectivityService.shared.waitForPendingWatchContent()
-            TranscriptionQueueService.shared.resumePendingJobs()
-            WebhookQueueService.shared.resumePendingJobs()
-            RelayQueueService.shared.resumePendingJobs()
+            await self.runOnce()
             let deadline = Date().addingTimeInterval(20)
             while self.hasActiveWork && Date() < deadline && !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 500_000_000)
@@ -83,70 +97,47 @@ final class BackgroundTaskService {
     /// the watch is about to deliver lands while Ramble is still awake.
     private var keepAliveUntil: Date = .distantPast
 
-    private var hasActiveWork: Bool {
-        TranscriptionQueueService.shared.hasActiveWork
-            || WebhookQueueService.shared.hasActiveWork
-            || RelayQueueService.shared.hasActiveWork
-    }
-
-    /// Begin a UIKit background task for immediate execution time (~30s).
-    /// Call this when entering background to finish in-flight transcription + webhook work.
-    /// `keepAliveFor` keeps it running that long even when the queues are
-    /// empty (used when the watch wakes Ramble ahead of a file).
+    /// Begin a UIKit background task (~30s) and run the queues and a
+    /// check-in. Called on entering the background, on unlock, and when the
+    /// watch wakes Ramble. `keepAliveFor` keeps it running that long even
+    /// with nothing queued.
+    @MainActor
     func beginImmediateBackgroundProcessing(keepAliveFor: TimeInterval = 0) {
         if keepAliveFor > 0 {
             keepAliveUntil = max(keepAliveUntil, Date().addingTimeInterval(keepAliveFor))
         }
         guard backgroundTaskID == .invalid else {
-            print("[Background] Immediate background task already active")
+            // Already running; still collect whatever just arrived.
+            Task { @MainActor in await self.runOnce() }
             return
         }
 
         backgroundTaskID = UIApplication.shared.beginBackgroundTask(withName: "RambleSync") {
-            print("[Background] Immediate background task expired")
-            self.endImmediateBackgroundProcessing()
+            // UIKit calls this on the main thread.
+            MainActor.assumeIsolated {
+                self.endImmediateBackgroundProcessing()
+            }
         }
-
-        guard backgroundTaskID != .invalid else {
-            print("[Background] Failed to begin immediate background task")
-            return
-        }
-
-        print("[Background] Immediate background task started (remaining: \(String(format: "%.0f", UIApplication.shared.backgroundTimeRemaining))s)")
+        guard backgroundTaskID != .invalid else { return }
 
         Task { @MainActor in
-            let transcriptionQueue = TranscriptionQueueService.shared
-            let webhookQueue = WebhookQueueService.shared
-            let relayQueue = RelayQueueService.shared
-
-            transcriptionQueue.resumePendingJobs()
-            webhookQueue.resumePendingJobs()
-            relayQueue.resumePendingJobs()
-
-            // Loops again if work arrived while pickups were refreshing,
-            // since a second call returns early while this task is open.
-            var outOfTime = false
-            repeat {
-                while self.hasActiveWork || Date() < self.keepAliveUntil {
-                    let remaining = UIApplication.shared.backgroundTimeRemaining
-                    if remaining < 5 {
-                        print("[Background] Running low on time (\(String(format: "%.0f", remaining))s), stopping")
-                        outOfTime = true
-                        break
-                    }
-                    try? await Task.sleep(nanoseconds: 500_000_000)
-                }
-                if !outOfTime, UIApplication.shared.backgroundTimeRemaining > 10 {
-                    await relayQueue.refreshPickups()
-                }
-                DeliveryMonitor.shared.evaluate()
-            } while !outOfTime && self.hasActiveWork
-
-            print("[Background] Immediate background processing finished")
+            await self.runOnce()
+            while self.hasActiveWork || Date() < self.keepAliveUntil {
+                if UIApplication.shared.backgroundTimeRemaining < 5 { break }
+                try? await Task.sleep(nanoseconds: 500_000_000)
+            }
+            DeliveryMonitor.shared.evaluate()
             self.endImmediateBackgroundProcessing()
         }
     }
 
+    /// Ramble opened or came back to the foreground.
+    @MainActor
+    func appDidOpen() {
+        Task { await runOnce(appOpened: true) }
+    }
+
+    @MainActor
     private func endImmediateBackgroundProcessing() {
         guard backgroundTaskID != .invalid else { return }
         UIApplication.shared.endBackgroundTask(backgroundTaskID)
@@ -159,10 +150,8 @@ final class BackgroundTaskService {
         let request = BGProcessingTaskRequest(identifier: Self.syncTaskIdentifier)
         request.requiresNetworkConnectivity = true
         request.requiresExternalPower = false
-
         do {
             try BGTaskScheduler.shared.submit(request)
-            print("[Background] BGProcessingTask scheduled")
         } catch {
             print("[Background] Failed to schedule BGProcessingTask: \(error)")
         }
@@ -172,19 +161,11 @@ final class BackgroundTaskService {
         scheduleSyncTask()
 
         let workTask = Task { @MainActor in
-            let transcriptionQueue = TranscriptionQueueService.shared
-            let webhookQueue = WebhookQueueService.shared
-            let relayQueue = RelayQueueService.shared
-
-            transcriptionQueue.resumePendingJobs()
-            webhookQueue.resumePendingJobs()
-            relayQueue.resumePendingJobs()
-
+            await self.runOnce()
             let deadline = Date().addingTimeInterval(25)
-            while (transcriptionQueue.hasActiveWork || webhookQueue.hasActiveWork || relayQueue.hasActiveWork) && Date() < deadline {
+            while self.hasActiveWork && Date() < deadline && !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
             }
-            await relayQueue.refreshPickups()
             DeliveryMonitor.shared.evaluate()
         }
 

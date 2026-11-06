@@ -32,14 +32,8 @@ struct RambleApp: App {
         DeliveryMonitor.shared.start()
         HapticService.prepare()
 
-        // Proactively download the speech model so transcription works immediately
-        Task {
-            await TranscriptionQueueService.shared.prepareModelIfNeeded()
-        }
-
-        // Initialize subscription service and fetch products
-        Task {
-            await SubscriptionService.shared.start()
+        Task { @MainActor in
+            await PurchaseService.shared.start()
         }
     }
 
@@ -58,16 +52,16 @@ struct RambleApp: App {
                     OnboardingView()
                         .interactiveDismissDisabled()
                 }
+                .purchaseNotices()
                 .onReceive(
                     NotificationCenter.default.publisher(
                         for: UIApplication.didEnterBackgroundNotification
                     )
                 ) { _ in
-                    // Immediate ~30s background time for in-flight transcription + webhook
+                    NoteSyncService.shared.stopForegroundPolling()
+                    // ~30s to finish uploads and the check-in.
                     BackgroundTaskService.shared.beginImmediateBackgroundProcessing()
-                    // Also schedule deferred BGProcessingTask as fallback
                     BackgroundTaskService.shared.scheduleSyncTask()
-                    // Periodic backup check for watch notes the phone hasn't collected
                     BackgroundTaskService.shared.scheduleRefreshTask()
                     // Hand any stuck-note alerts to the system now, in case
                     // Ramble doesn't run again for a while.
@@ -75,20 +69,12 @@ struct RambleApp: App {
                 }
                 .onReceive(
                     NotificationCenter.default.publisher(
-                        for: UIApplication.willEnterForegroundNotification
-                    )
-                ) { _ in
-                    TranscriptionQueueService.shared.resumePendingJobs()
-                    WebhookQueueService.shared.resumePendingJobs()
-                    RelayQueueService.shared.resumePendingJobs()
-                }
-                .onReceive(
-                    NotificationCenter.default.publisher(
                         for: UIApplication.didBecomeActiveNotification
                     )
                 ) { _ in
-                    // Also covers a cold launch, and asks for notification
-                    // permission once there's a note to protect.
+                    // Also covers a cold launch: upload, then check in.
+                    BackgroundTaskService.shared.appDidOpen()
+                    NoteSyncService.shared.startForegroundPolling()
                     DeliveryMonitor.shared.evaluateSoon()
                 }
         }

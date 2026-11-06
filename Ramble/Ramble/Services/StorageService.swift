@@ -17,6 +17,9 @@ final class StorageService {
     }
 
     private let recordingsFile = documentsDirectory.appendingPathComponent("recordings.json")
+    /// IDs the person deleted, so a later transcript or watch delivery never
+    /// brings the note back (specs/phone.md "Deleting a note").
+    private let deletedFile = documentsDirectory.appendingPathComponent("deleted_recordings.json")
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
@@ -45,6 +48,10 @@ final class StorageService {
         return recordings.sorted { $0.createdAt > $1.createdAt }
     }
 
+    func recording(withId id: UUID) -> Recording? {
+        loadRecordings().first { $0.id == id }
+    }
+
     static let recordingsDidChangeNotification = Notification.Name("recordingsDidChange")
 
     func saveRecordings(_ recordings: [Recording]) {
@@ -53,11 +60,11 @@ final class StorageService {
         NotificationCenter.default.post(name: Self.recordingsDidChangeNotification, object: nil)
     }
 
-    /// Returns false if a recording with this id already exists.
+    /// Returns false if a recording with this id already exists or was deleted.
     @discardableResult
     func addRecording(_ recording: Recording) -> Bool {
+        guard !isDeleted(recording.id) else { return false }
         var recordings = loadRecordings()
-        // The watch can resend a recording after a relaunch; one copy is enough.
         guard !recordings.contains(where: { $0.id == recording.id }) else { return false }
         recordings.insert(recording, at: 0)
         saveRecordings(recordings)
@@ -72,7 +79,18 @@ final class StorageService {
         }
     }
 
+    /// Changes one recording in place. Returns the result, or nil if it's gone.
+    @discardableResult
+    func update(_ id: UUID, _ change: (inout Recording) -> Void) -> Recording? {
+        var recordings = loadRecordings()
+        guard let index = recordings.firstIndex(where: { $0.id == id }) else { return nil }
+        change(&recordings[index])
+        saveRecordings(recordings)
+        return recordings[index]
+    }
+
     func deleteRecording(_ recording: Recording) {
+        markDeleted([recording.id])
         var recordings = loadRecordings()
         recordings.removeAll { $0.id == recording.id }
         saveRecordings(recordings)
@@ -82,9 +100,29 @@ final class StorageService {
 
     func deleteAllRecordings() {
         let recordings = loadRecordings()
+        markDeleted(recordings.map(\.id))
         for recording in recordings {
             try? FileManager.default.removeItem(at: recording.audioFileURL)
         }
         saveRecordings([])
+    }
+
+    // MARK: - Deleted IDs
+
+    func isDeleted(_ id: UUID) -> Bool {
+        deletedIDs().contains(id)
+    }
+
+    func deletedIDs() -> Set<UUID> {
+        guard let data = try? Data(contentsOf: deletedFile),
+              let ids = try? decoder.decode(Set<UUID>.self, from: data) else { return [] }
+        return ids
+    }
+
+    private func markDeleted(_ ids: [UUID]) {
+        guard !ids.isEmpty else { return }
+        let all = deletedIDs().union(ids)
+        guard let data = try? encoder.encode(all) else { return }
+        try? data.write(to: deletedFile)
     }
 }

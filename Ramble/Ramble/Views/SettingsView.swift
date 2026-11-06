@@ -13,7 +13,8 @@ private enum SettingsLinks {
 
 struct SettingsView: View {
     @StateObject private var viewModel = SettingsViewModel()
-    @ObservedObject private var subscriptionService = SubscriptionService.shared
+    @ObservedObject private var purchase = PurchaseService.shared
+    @ObservedObject private var accountService = AccountService.shared
     @ObservedObject private var relay = RelayService.shared
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
@@ -23,11 +24,15 @@ struct SettingsView: View {
     @State private var showDebugSheet = false
     @State private var showConnectAgent = false
     @State private var watchState: WatchInstallState = .checking
+    @State private var showUnlock = false
+    @State private var restoreMessage: String?
+    @State private var restoreIsError = false
 
     var body: some View {
         NavigationStack {
             Form {
                 destinationsSection
+                unlockSection
                 watchSection
                 transcriptionSection
                 appSection
@@ -44,8 +49,13 @@ struct SettingsView: View {
                     }
                 }
             }
+            #if DEBUG
             .sheet(isPresented: $showDebugSheet) {
                 DebugSheet(viewModel: viewModel)
+            }
+            #endif
+            .sheet(isPresented: $showUnlock) {
+                UnlockSheet()
             }
             .sheet(isPresented: $showPrivacyInfo) {
                 PrivacyInfoSheet()
@@ -60,8 +70,12 @@ struct SettingsView: View {
                 watchState = WatchInstallState.current()
                 guard relay.hasInbox else { return }
                 _ = try? await relay.refreshConnections()
+                await accountService.refresh()
+                await viewModel.pullTranscriptionSettings()
             }
         }
+        // Swiping the sheet away keeps edits too.
+        .onDisappear { viewModel.save() }
     }
 
     // MARK: - Where notes go
@@ -119,7 +133,8 @@ struct SettingsView: View {
             }
             return "\(relay.connections.count) agents connected"
         }
-        if AgentHealth(connection) == .quiet, let last = connection.lastPullAt {
+        if AgentHealth(connection) == .quiet {
+            guard let last = connection.lastPullAt else { return "Hasn't checked in" }
             return "Hasn't checked in · \(HomeStatusLine.age(since: last))"
         }
         return AgentHealth.summary(connection)
@@ -148,6 +163,66 @@ struct SettingsView: View {
 
     private var destinationHost: String {
         URL(string: viewModel.webhookURL)?.host ?? viewModel.webhookURL
+    }
+
+    // MARK: - Free notes and unlock
+
+    private var unlockSection: some View {
+        Section {
+            if accountService.isUnlocked {
+                SettingsRow(icon: "checkmark.seal", iconTint: .brandAmber, title: PurchaseCopy.unlocked) {
+                    EmptyView()
+                }
+            } else {
+                SettingsRow(icon: "sparkles", iconTint: .brandAmber, title: freeNotesTitle) {
+                    Button("Unlock") {
+                        HapticService.buttonTap()
+                        showUnlock = true
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .buttonBorderShape(.capsule)
+                    .controlSize(.small)
+                    .tint(Color.brandAmber)
+                }
+            }
+
+            Button {
+                HapticService.buttonTap()
+                restoreMessage = nil
+                Task {
+                    await purchase.restore()
+                    restoreMessage = purchase.state.message
+                    restoreIsError = purchase.state.isError
+                }
+            } label: {
+                SettingsRow(
+                    icon: "arrow.clockwise",
+                    title: "Restore Purchases",
+                    subtitle: restoreMessage,
+                    subtitleColor: restoreIsError ? .red : Color.obInkFaint
+                ) {
+                    if purchase.state.isBusy { ProgressView().controlSize(.small) }
+                }
+            }
+            .buttonStyle(.plain)
+            .disabled(purchase.state.isBusy)
+
+            if purchase.subscriptionStillRenews {
+                Button {
+                    HapticService.buttonTap()
+                    Task { await purchase.manageSubscription() }
+                } label: {
+                    SettingsRow(icon: "creditcard", title: PurchaseCopy.subscriberSettingsRow) { chevron }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    /// "18 of 25 free notes left", as the server last reported.
+    private var freeNotesTitle: String {
+        guard let account = accountService.account else { return "Free notes" }
+        return "\(account.freeNotesRemaining) of \(account.freeNotesTotal) free notes left"
     }
 
     // MARK: - Watch
@@ -207,26 +282,37 @@ struct SettingsView: View {
     private var transcriptionSection: some View {
         Section {
             NavigationLink {
-                TranscriptionSettingsView(viewModel: viewModel)
+                LanguagePickerView(selection: $viewModel.transcriptionLanguage)
+                    .onDisappear { viewModel.save() }
             } label: {
-                SettingsRow(
-                    icon: "waveform",
-                    title: "Model",
-                    subtitle: modelSubtitle
-                ) {
-                    EmptyView()
+                SettingsRow(icon: "globe", title: "Language") {
+                    Text(viewModel.transcriptionLanguage.displayName)
+                        .foregroundStyle(Color.obInkFaint)
                 }
             }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Vocabulary")
+                    .foregroundStyle(Color.obInk)
+                TextField(
+                    "e.g. Goodloop, Ramble, Cloudflare Workers",
+                    text: $viewModel.customVocabulary,
+                    axis: .vertical
+                )
+                .lineLimit(2...5)
+                .textInputAutocapitalization(.words)
+                .autocorrectionDisabled()
+                .onSubmit { viewModel.save() }
+                Text("Names, jargon, and phrases the model might miss. Comma-separated.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Toggle("Remove filler words", isOn: $viewModel.removeFillerWords)
+                .onChange(of: viewModel.removeFillerWords) { _, _ in viewModel.save() }
         } header: {
             SettingsGroupTitle(title: "Transcription")
         }
-    }
-
-    private var modelSubtitle: String {
-        if viewModel.transcriptionProvider.isCloud {
-            return "Cloud · \(viewModel.cloudModel.displayName)"
-        }
-        return "On-device · free"
     }
 
     // MARK: - App
@@ -276,6 +362,7 @@ struct SettingsView: View {
                 Text("Ramble \(version) (\(build))")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+                    #if DEBUG
                     .onTapGesture {
                         versionTapCount += 1
                         if versionTapCount >= 4 {
@@ -283,6 +370,7 @@ struct SettingsView: View {
                             showDebugSheet = true
                         }
                     }
+                    #endif
 
                 HStack(spacing: 16) {
                     Link("Privacy Policy", destination: SettingsLinks.privacy)
@@ -321,6 +409,7 @@ private struct SettingsRow<Trailing: View>: View {
     let title: String
     var subtitle: String? = nil
     var dot: Color? = nil
+    var subtitleColor: Color = Color.obInkFaint
     @ViewBuilder let trailing: () -> Trailing
 
     var body: some View {
@@ -345,168 +434,13 @@ private struct SettingsRow<Trailing: View>: View {
                             .lineLimit(1)
                     }
                     .font(.footnote)
-                    .foregroundStyle(Color.obInkFaint)
+                    .foregroundStyle(subtitleColor)
                 }
             }
             Spacer(minLength: 8)
             trailing()
         }
         .contentShape(Rectangle())
-    }
-}
-
-// MARK: - Transcription model page
-
-/// The model picker, cloud upgrade and cloud tuning, one level down so
-/// people who never change the model never see the price list.
-private struct TranscriptionSettingsView: View {
-    @ObservedObject var viewModel: SettingsViewModel
-    @ObservedObject private var subscriptionService = SubscriptionService.shared
-    @State private var showTranscriptionInfo = false
-
-    private var isSpeechAnalyzerAvailable: Bool {
-        if #available(iOS 26.0, *) { return true }
-        return false
-    }
-
-    var body: some View {
-        Form {
-            freeSection
-            cloudSection
-            tuningSection
-        }
-        .listSectionSpacing(24)
-        .navigationTitle("Model")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    showTranscriptionInfo = true
-                } label: {
-                    Image(systemName: "info.circle")
-                }
-                .accessibilityLabel("About transcription")
-            }
-        }
-        .sheet(isPresented: $showTranscriptionInfo) {
-            TranscriptionInfoSheet()
-        }
-        .sheet(isPresented: $viewModel.showSubscriptionPaywall) {
-            SubscriptionView()
-        }
-        .onDisappear { viewModel.save() }
-    }
-
-    private var freeSection: some View {
-        Section {
-            BrandCard {
-                AppleSpeechRow(
-                    isSelected: viewModel.transcriptionProvider == .appleSpeech,
-                    onTap: { viewModel.transcriptionProvider = .appleSpeech }
-                )
-            }
-            .listRowBackground(Color.clear)
-            .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
-            .listRowSeparator(.hidden)
-
-            if !isSpeechAnalyzerAvailable {
-                HStack(spacing: 10) {
-                    Image(systemName: "sparkles")
-                        .font(.subheadline)
-                        .foregroundStyle(.orange)
-                    Text("Update to iOS 26 for a significantly improved speech model with better accuracy.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.vertical, 4)
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-            }
-        } header: {
-            SettingsSubsectionLabel("Free · on-device")
-        }
-    }
-
-    private var cloudSection: some View {
-        Section {
-            BrandCard {
-                ForEach(Array(CloudModel.allCases.enumerated()), id: \.element.id) { index, model in
-                    CloudModelRow(
-                        model: model,
-                        isSelected: viewModel.transcriptionProvider == .cloudTranscription
-                            && viewModel.cloudModel == model,
-                        isLocked: !subscriptionService.isPremium,
-                        onTap: { viewModel.selectCloudModel(model) }
-                    )
-
-                    if index < CloudModel.allCases.count - 1 {
-                        BrandRowDivider()
-                    }
-                }
-            }
-            .listRowBackground(Color.clear)
-            .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
-            .listRowSeparator(.hidden)
-        } header: {
-            if subscriptionService.isPremium {
-                SettingsSubsectionLabel("Cloud · premium")
-            } else {
-                SettingsSubsectionLabel(title: "Cloud · premium") {
-                    Text("$2.99 / month")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color.obInkFaint)
-                }
-            }
-        } footer: {
-            Text("Cloud transcription sends audio through our proxy to the provider. The proxy doesn't keep the audio or the text.")
-        }
-    }
-
-    private var tuningSection: some View {
-        // Shown always: on Apple Speech it renders as a locked teaser so
-        // the person can see what cloud unlocks.
-        let isCloud = viewModel.transcriptionProvider.isCloud
-        return Section {
-            NavigationLink {
-                LanguagePickerView(
-                    selection: $viewModel.transcriptionLanguage,
-                    supported: viewModel.cloudModel.supportedLanguages
-                )
-            } label: {
-                HStack {
-                    Text("Language")
-                    Spacer()
-                    Text(viewModel.transcriptionLanguage.displayName)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 6) {
-                TextField(
-                    "e.g. Goodloop, Ramble, Cloudflare Workers",
-                    text: $viewModel.customVocabulary,
-                    axis: .vertical
-                )
-                .lineLimit(2...5)
-                .textInputAutocapitalization(.words)
-                .autocorrectionDisabled()
-                Text("Names, jargon, and phrases the model might miss. Comma-separated.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Toggle("Remove filler words", isOn: $viewModel.removeFillerWords)
-        } header: {
-            SettingsSubsectionLabel(title: "Cloud · tuning") {
-                if !isCloud {
-                    Image(systemName: "lock.fill")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(Color.obInkFaint)
-                }
-            }
-        }
-        .disabled(!isCloud)
-        .opacity(isCloud ? 1 : 0.5)
     }
 }
 
@@ -578,54 +512,6 @@ private struct YourDataView: View {
     }
 }
 
-struct TranscriptionInfoSheet: View {
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    VStack(spacing: 16) {
-                        OnboardingIllustration(name: "illustration-transcribe")
-                        OnboardingHeadline(size: 28) {
-                            Text("Voice in, ") + Text("text out.").italic()
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 8)
-
-                    InfoBlock(
-                        icon: "iphone",
-                        title: "Apple Speech",
-                        text: "On-device transcription that never leaves your phone. Free, private, no network required. iOS 26 brings a significantly improved speech model with better accuracy out of the box."
-                    )
-
-                    InfoBlock(
-                        icon: "cloud",
-                        title: "Why cloud?",
-                        text: "Cloud models are more accurate — especially in noisy environments, with accents, or when speaking quickly. They also produce better punctuation, capitalization, and number formatting. Worth it if you rely on clean transcripts."
-                    )
-
-                    InfoBlock(
-                        icon: "lock.shield",
-                        title: "Cloud models are private too",
-                        text: "Cloud transcription sends your audio through our proxy to the provider, and the transcript comes back. The proxy doesn't keep the audio or the text."
-                    )
-
-                }
-                .padding()
-            }
-            .navigationTitle("About Transcription")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
-        }
-    }
-}
-
 struct PrivacyInfoSheet: View {
     @Environment(\.dismiss) private var dismiss
 
@@ -633,38 +519,27 @@ struct PrivacyInfoSheet: View {
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    Text("Your audio belongs to you. Here's exactly where it goes — and where it doesn't.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                    Text(PrivacyCopy.relay)
+                        .font(.body)
+                        .foregroundStyle(Color.obInkSoft)
+                        .fixedSize(horizontal: false, vertical: true)
 
                     InfoBlock(
-                        icon: "applewatch",
-                        title: "Recorded on your devices",
-                        text: "Recordings from your watch and phone are saved on your phone. Audio isn't uploaded anywhere unless you pick a cloud model."
-                    )
-
-                    InfoBlock(
-                        icon: "lock.shield",
-                        title: "On-device transcription stays put",
-                        text: "Apple Speech transcribes audio entirely on your iPhone — nothing leaves the device. It's the default."
-                    )
-
-                    InfoBlock(
-                        icon: "cloud",
-                        title: "Cloud transcription is opt-in",
-                        text: "If you choose a cloud model, audio is sent through our proxy to the provider, transcribed, and the text comes back. The proxy doesn't keep the audio or the transcript."
+                        icon: "waveform",
+                        title: "Transcription",
+                        text: "Recordings from your watch and iPhone go to Ramble's server, which sends the audio to a transcription provider and deletes it as soon as the transcript is ready. The privacy policy names the providers."
                     )
 
                     InfoBlock(
                         icon: "tray.and.arrow.up",
-                        title: "Your agent's inbox is temporary",
-                        text: "When you connect an agent, transcripts wait on the Ramble relay until it picks them up. The text is deleted the moment it does. Anything never picked up is deleted after \(Constants.Relay.unclaimedRetentionDays) days. Audio never goes there. No accounts."
+                        title: "Your agent",
+                        text: "Each connected agent gets its own copy of the transcript, deleted when it picks it up, or after 30 days."
                     )
 
                     InfoBlock(
                         icon: "paperplane",
                         title: "Webhooks go where you point them",
-                        text: "If you configure a webhook, transcripts are POSTed straight from your phone to a URL you control. Nothing is kept on our side."
+                        text: "If you set up a webhook, transcripts go from your iPhone straight to your URL. Ramble's server never sees the URL or the secret."
                     )
 
                     Link(destination: SettingsLinks.privacy) {
@@ -764,6 +639,7 @@ struct InfoBlock: View {
     }
 }
 
+#if DEBUG
 struct DebugSheet: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var viewModel: SettingsViewModel
@@ -784,7 +660,7 @@ struct DebugSheet: View {
                 } header: {
                     Text("Delivery alerts")
                 } footer: {
-                    Text("Thresholds drop from hours to seconds (30s stuck on phone, 5s needs you, 60s not picked up, 60s on the watch) and the cooldown to a minute. Also sent to the watch.")
+                    Text("Thresholds drop from hours to seconds (30s not sent, 60s still waiting, and the watch's) and the cooldown to a minute. Also sent to the watch.")
                 }
 
                 Section("Developer Override") {
@@ -823,7 +699,7 @@ struct DebugSheet: View {
                 } header: {
                     Text("Relay")
                 } footer: {
-                    Text("Point at a `wrangler dev` relay, e.g. http://localhost:8787. Leave empty for the built-in relay. The server bypass key above is sent as the relay's X-Dev-Bypass header.")
+                    Text("Point at a `wrangler dev` relay, e.g. http://localhost:8787. Leave empty for the built-in relay. The server bypass key above is sent as X-Dev-Bypass when creating an inbox, in debug builds only.")
                 }
 
                 Section("App Attest") {
@@ -896,6 +772,8 @@ struct DebugSheet: View {
         }
     }
 }
+
+#endif
 
 struct WebhookDestinationEditSheet: View {
     @ObservedObject var viewModel: SettingsViewModel
@@ -1019,24 +897,14 @@ extension SettingsSubsectionLabel where Trailing == EmptyView {
     }
 }
 
-/// Language picker — only shows the languages supported by the currently
-/// selected transcription path (provider + model). The caller is responsible
-/// for resetting `selection` to `.auto` if the user switches to a path that
-/// doesn't support their previously chosen language.
+/// Language picker: "Auto-detect" first, then every language alphabetically.
 struct LanguagePickerView: View {
     @Binding var selection: TranscriptionLanguage
-    let supported: Set<TranscriptionLanguage>
     @Environment(\.dismiss) private var dismiss
-
-    private var visibleLanguages: [TranscriptionLanguage] {
-        let rest = TranscriptionLanguage.sortedCases
-            .filter { $0 != .auto && supported.contains($0) }
-        return [.auto] + rest
-    }
 
     var body: some View {
         List {
-            ForEach(visibleLanguages) { language in
+            ForEach(TranscriptionLanguage.sortedCases) { language in
                 Button {
                     selection = language
                     dismiss()
