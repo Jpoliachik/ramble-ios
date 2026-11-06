@@ -2,69 +2,68 @@
 //  HomeStatusLine.swift
 //  Ramble
 //
-//  The one line under the Home title, shown whether the list is empty or
-//  full. When everything works it says so quietly; when something needs
-//  the person it becomes a pill they can tap. Only the worst state shows.
-//
-//  Built from what the app already knows (recordings, the cached relay
-//  connections, the webhook setting). It refreshes when Home opens and when
-//  the app comes back to the foreground, with no polling of its own.
+//  The one line under the Home title (specs/phone.md "Status line shows the
+//  single worst state"). Pills ask for the person and open their fix;
+//  quiet states are plain text. Built from what the app already knows.
 //
 
 import SwiftUI
 
 enum HomeStatus: Equatable {
-    /// Notes that failed to transcribe or send.
     case didntSend(count: Int)
+    case toUnlock(count: Int)
     case noAgent
-    /// Notes have waited past the alert threshold and the agent hasn't
-    /// checked in since before then.
+    case freeNotesLow(remaining: Int)
     case agentQuiet(lastCheckIn: Date?)
-    /// Notes have waited past the threshold, but the agent is checking in.
     case waitingLong(count: Int)
-    /// Transcribed notes that were never sent anywhere.
-    case notSent(count: Int)
-    case working(count: Int)
+    case sending(count: Int)
+    case transcribing(count: Int)
     case waiting(count: Int)
     case allGood(lastCheckIn: Date?)
 
-    @MainActor
+    /// Notes waiting longer than this raise a pill.
+    static let longWait: TimeInterval = 12 * 3600
+
     static func compute(
         recordings: [Recording],
         connections: [RelayConnection],
         hasAgent: Bool,
         hasWebhook: Bool,
+        account: RelayAccount?,
         now: Date = Date()
     ) -> HomeStatus {
-        let stages = recordings.map(DeliveryStage.init)
+        let stages = recordings.map { ($0, DeliveryStage($0, hasAgents: hasAgent)) }
+        func count(_ stage: DeliveryStage) -> Int { stages.filter { $0.1 == stage }.count }
 
-        let stuck = stages.filter(\.needsAttention).count
-        if stuck > 0 { return .didntSend(count: stuck) }
+        let failed = count(.didntSend)
+        if failed > 0 { return .didntSend(count: failed) }
+
+        let held = count(.heldForUnlock)
+        if held > 0 { return .toUnlock(count: held) }
 
         if !hasAgent && !hasWebhook { return .noAgent }
 
-        // Same "not picked up" threshold the delivery alerts use.
-        let threshold = DeliveryMonitor.rule(for: .notPickedUp).threshold
-        let waitingSince = recordings
-            .filter(\.isWaitingForAgent)
-            .compactMap(\.relayUploadedAt)
-            .filter { now.timeIntervalSince($0) < RelayQueueService.relayRetention }
-        let lastCheckIn = connections.compactMap(\.lastPullAt).max()
+        if let account, !account.unlocked, account.freeNotesRemaining <= 5 {
+            return .freeNotesLow(remaining: account.freeNotesRemaining)
+        }
 
-        if hasAgent, let oldest = waitingSince.min(), now.timeIntervalSince(oldest) > threshold {
-            if let lastCheckIn, now.timeIntervalSince(lastCheckIn) < threshold {
-                return .waitingLong(count: waitingSince.count)
+        let waiting = stages.filter { $0.1 == .waitingForAgent }.map(\.0)
+        let lastCheckIn = connections.compactMap(\.lastPullAt).max()
+        if hasAgent, let oldest = waiting.map(\.waitingSince).min(), now.timeIntervalSince(oldest) > longWait {
+            if let lastCheckIn, now.timeIntervalSince(lastCheckIn) < longWait {
+                let long = waiting.filter { now.timeIntervalSince($0.waitingSince) > longWait }.count
+                return .waitingLong(count: long)
             }
             return .agentQuiet(lastCheckIn: lastCheckIn)
         }
 
-        let notSent = stages.filter { $0 == .onPhone }.count
-        if notSent > 0 { return .notSent(count: notSent) }
+        let sending = stages.filter { $0.1.isNotYetAccepted }.count
+        if sending > 0 { return .sending(count: sending) }
 
-        let working = stages.filter(\.isInProgress).count
-        if working > 0 { return .working(count: working) }
+        let transcribing = count(.transcribing)
+        if transcribing > 0 { return .transcribing(count: transcribing) }
 
-        if !waitingSince.isEmpty { return .waiting(count: waitingSince.count) }
+        if !waiting.isEmpty { return .waiting(count: waiting.count) }
 
         return .allGood(lastCheckIn: hasAgent ? lastCheckIn : nil)
     }
@@ -72,8 +71,8 @@ enum HomeStatus: Equatable {
     /// Pills ask for attention and stay put on scroll; quiet lines don't.
     var isPill: Bool {
         switch self {
-        case .didntSend, .noAgent, .agentQuiet, .waitingLong, .notSent: return true
-        case .working, .waiting, .allGood: return false
+        case .didntSend, .toUnlock, .noAgent, .freeNotesLow, .agentQuiet, .waitingLong: return true
+        case .sending, .transcribing, .waiting, .allGood: return false
         }
     }
 }
@@ -91,20 +90,21 @@ struct HomeStatusLine: View {
                     HapticService.buttonTap()
                     onTap()
                 } label: {
-                    StatusPill(text: text, dot: dot, action: action)
+                    StatusPill(text: text, dot: dot, action: action, actionColor: actionColor)
                 }
                 .buttonStyle(.plain)
             } else {
                 HStack(spacing: 7) {
-                    if case .working = status {
+                    switch status {
+                    case .sending, .transcribing:
                         ProgressView().controlSize(.mini)
-                    } else {
+                    default:
                         Circle().fill(dot).frame(width: 8, height: 8)
                     }
                     Text(text)
+                        .foregroundStyle(isWaiting ? Color.brandAmber : Color.secondary)
                 }
                 .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .padding(.vertical, 6)
                 .accessibilityElement(children: .combine)
@@ -113,21 +113,30 @@ struct HomeStatusLine: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    private var isWaiting: Bool {
+        if case .waiting = status { return true }
+        return false
+    }
+
     private var text: String {
         switch status {
         case .didntSend(let count):
             return count == 1 ? "1 note didn't send" : "\(count) notes didn't send"
+        case .toUnlock(let count):
+            return count == 1 ? "1 note to unlock" : "\(count) notes to unlock"
         case .noAgent:
             return "No agent connected"
+        case .freeNotesLow(let remaining):
+            return remaining == 1 ? "1 free note left" : "\(remaining) free notes left"
         case .agentQuiet(let lastCheckIn):
             guard let lastCheckIn else { return "Your agent hasn't checked in" }
             return "Your agent hasn't checked in · \(Self.age(since: lastCheckIn))"
         case .waitingLong(let count):
             return count == 1 ? "1 note waiting for your agent" : "\(count) notes waiting for your agent"
-        case .notSent(let count):
-            return count == 1 ? "1 note not sent" : "\(count) notes not sent"
-        case .working(let count):
+        case .sending(let count):
             return count == 1 ? "Sending 1 note…" : "Sending \(count) notes…"
+        case .transcribing(let count):
+            return count == 1 ? "Transcribing 1 note…" : "Transcribing \(count) notes…"
         case .waiting(let count):
             return "\(count) waiting for your agent"
         case .allGood(let lastCheckIn):
@@ -142,17 +151,23 @@ struct HomeStatusLine: View {
 
     private var action: String? {
         switch status {
-        case .didntSend, .notSent: return "Fix"
+        case .didntSend: return "Fix"
+        case .toUnlock: return "Unlock"
         case .noAgent: return "Connect"
         default: return nil
         }
     }
 
+    private var actionColor: Color {
+        if case .didntSend = status { return .red }
+        return .brandAmber
+    }
+
     private var dot: Color {
         switch status {
         case .didntSend: return .red
-        case .noAgent, .agentQuiet, .waitingLong, .notSent, .waiting: return .brandAmber
-        case .working, .allGood: return .green
+        case .toUnlock, .noAgent, .freeNotesLow, .agentQuiet, .waitingLong, .waiting: return .brandAmber
+        case .sending, .transcribing, .allGood: return .green
         }
     }
 
@@ -169,9 +184,9 @@ struct HomeStatusLine: View {
 #Preview {
     VStack(alignment: .leading, spacing: 12) {
         HomeStatusLine(status: .allGood(lastCheckIn: Date().addingTimeInterval(-120)), isEmptyList: false, hasAgent: true) {}
-        HomeStatusLine(status: .working(count: 2), isEmptyList: false, hasAgent: true) {}
+        HomeStatusLine(status: .transcribing(count: 2), isEmptyList: false, hasAgent: true) {}
         HomeStatusLine(status: .noAgent, isEmptyList: true, hasAgent: false) {}
-        HomeStatusLine(status: .agentQuiet(lastCheckIn: Date().addingTimeInterval(-50_000)), isEmptyList: false, hasAgent: true) {}
+        HomeStatusLine(status: .toUnlock(count: 2), isEmptyList: false, hasAgent: true) {}
         HomeStatusLine(status: .didntSend(count: 2), isEmptyList: false, hasAgent: true) {}
     }
     .padding()

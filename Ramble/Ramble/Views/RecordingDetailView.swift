@@ -2,30 +2,41 @@
 //  RecordingDetailView.swift
 //  Ramble
 //
+//  The note screen (specs/phone.md "Note screen"): header, transcript,
+//  playback, the one delivery line, and the More menu.
+//
 
 import SwiftUI
 
 struct RecordingDetailView: View {
     let recordingId: UUID
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
     @State private var recording: Recording?
     @State private var showCopied = false
-    @State private var isRetrying = false
-    @State private var isDownloadingModel = false
     @State private var showDeleteConfirmation = false
     @State private var showDetails = false
     @State private var isTranscriptExpanded = false
     @State private var transcriptFullHeight: CGFloat = 0
     @State private var transcriptLimitedHeight: CGFloat = 0
-    @State private var showConnectAgent = false
+    @State private var showUnlock = false
+    @State private var showSupportAddress = false
+    @State private var audioRequest: AudioRequest = .idle
     @ObservedObject private var relay = RelayService.shared
+    @ObservedObject private var accountService = AccountService.shared
+
+    private enum AudioRequest {
+        case idle
+        case asking
+        /// The watch app isn't open, which only the person can change.
+        case openWatch
+    }
 
     private var isTranscriptTruncated: Bool {
         transcriptFullHeight > transcriptLimitedHeight + 1
     }
 
     private let storageService = StorageService.shared
-    private let transcriptionQueue = TranscriptionQueueService.shared
 
     init(recording: Recording) {
         self.recordingId = recording.id
@@ -70,6 +81,14 @@ struct RecordingDetailView: View {
         } message: {
             Text("This will permanently delete the recording and its transcript.")
         }
+        .alert("Contact support", isPresented: $showSupportAddress) {
+            Button("Copy Address") {
+                UIPasteboard.general.string = Constants.Relay.supportEmail
+            }
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Email \(Constants.Relay.supportEmail) with the subject \u{201C}Usage limit reached\u{201D}.")
+        }
         .overlay(alignment: .top) {
             if showCopied {
                 copiedToast
@@ -77,8 +96,8 @@ struct RecordingDetailView: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: showCopied)
-        .sheet(isPresented: $showConnectAgent) {
-            ConnectAgentView(startPairing: true)
+        .sheet(isPresented: $showUnlock) {
+            UnlockSheet()
         }
         .onAppear { refreshRecording() }
         .onReceive(NotificationCenter.default.publisher(for: StorageService.recordingsDidChangeNotification)) { _ in
@@ -90,8 +109,8 @@ struct RecordingDetailView: View {
         #if DEBUG
         if MockDataProvider.enabled { return }
         #endif
-        let recordings = storageService.loadRecordings()
-        recording = recordings.first { $0.id == recordingId }
+        recording = storageService.recording(withId: recordingId)
+        if recording?.hasAudio == true { audioRequest = .idle }
     }
 
     // MARK: - Header
@@ -113,37 +132,12 @@ struct RecordingDetailView: View {
         }
     }
 
-    // MARK: - Audio
-
-    private func audioSection(_ recording: Recording) -> some View {
-        Section {
-            #if DEBUG
-            if MockDataProvider.enabled {
-                MockAudioPlayerView(recording: recording)
-            } else if FileManager.default.fileExists(atPath: recording.audioFileURL.path) {
-                AudioPlayerView(audioURL: recording.audioFileURL)
-            } else {
-                Label("Audio file not available", systemImage: "waveform.slash")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-            #else
-            if FileManager.default.fileExists(atPath: recording.audioFileURL.path) {
-                AudioPlayerView(audioURL: recording.audioFileURL)
-            } else {
-                Label("Audio file not available", systemImage: "waveform.slash")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-            #endif
-        }
-    }
-
     // MARK: - Transcript
 
     private func transcriptSection(_ recording: Recording) -> some View {
-        Section {
-            if let transcription = recording.transcription, !transcription.isEmpty {
+        let transcript = recording.hasSpeechTranscript ? recording.transcription : nil
+        return Section {
+            if let transcription = transcript {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(transcription)
                         .font(.body)
@@ -175,10 +169,10 @@ struct RecordingDetailView: View {
                         .controlSize(.small)
                     }
                 }
-            } else if recording.status == .transcribing {
+            } else if DeliveryStage(recording) == .transcribing {
                 HStack(spacing: 8) {
                     ProgressView().scaleEffect(0.8)
-                    Text("Transcribing...")
+                    Text("Transcribing…")
                         .foregroundStyle(.secondary)
                 }
             } else {
@@ -190,7 +184,7 @@ struct RecordingDetailView: View {
             HStack {
                 Text("Transcript")
                 Spacer()
-                if let transcription = recording.transcription, !transcription.isEmpty {
+                if let transcription = transcript {
                     Button {
                         HapticService.buttonTap()
                         UIPasteboard.general.string = transcription
@@ -211,16 +205,94 @@ struct RecordingDetailView: View {
         }
     }
 
+    private func transcriptPlaceholder(for recording: Recording) -> String {
+        switch DeliveryStage(recording) {
+        case .waitingToSend: return "Waiting to send"
+        case .noSpeech: return "No speech detected"
+        default: return "No transcript yet."
+        }
+    }
+
+    // MARK: - Audio
+
+    @ViewBuilder
+    private func audioSection(_ recording: Recording) -> some View {
+        Section {
+            #if DEBUG
+            if MockDataProvider.enabled {
+                MockAudioPlayerView(recording: recording)
+            } else {
+                audioContent(recording)
+            }
+            #else
+            audioContent(recording)
+            #endif
+        }
+    }
+
+    @ViewBuilder
+    private func audioContent(_ recording: Recording) -> some View {
+        if recording.hasAudio {
+            AudioPlayerView(audioURL: recording.audioFileURL)
+        } else if recording.isAudioOnWatch {
+            Button {
+                HapticService.buttonTap()
+                askWatchForAudio(recording)
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "applewatch")
+                        .foregroundStyle(Color.brandAmber)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Audio on watch")
+                            .foregroundStyle(Color.primary)
+                        switch audioRequest {
+                        case .asking:
+                            Text("Asking your watch…")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        case .openWatch:
+                            Text("Open Ramble on your watch to sync.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        case .idle:
+                            EmptyView()
+                        }
+                    }
+                    Spacer()
+                    if audioRequest == .asking {
+                        ProgressView().controlSize(.small)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+        } else {
+            Label("Audio file not available", systemImage: "waveform.slash")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    /// True when the request went out.
+    @discardableResult
+    private func askWatchForAudio(_ recording: Recording) -> Bool {
+        if PhoneConnectivityService.shared.requestAudio(for: recording.id) {
+            audioRequest = .asking
+            return true
+        }
+        audioRequest = .openWatch
+        return false
+    }
+
     // MARK: - Delivery
 
     private enum DeliveryAction {
-        case retryTranscription, downloadModel, resend, connect
+        case retryTranscription, resendWebhook, unlock, contactSupport
 
         var title: String {
             switch self {
-            case .retryTranscription, .resend: return "Retry"
-            case .downloadModel: return "Download"
-            case .connect: return "Connect"
+            case .retryTranscription, .resendWebhook: return "Retry"
+            case .unlock: return "Unlock"
+            case .contactSupport: return "Contact support"
             }
         }
     }
@@ -231,64 +303,69 @@ struct RecordingDetailView: View {
         var action: DeliveryAction?
     }
 
-    private var cloudLimitReached: Bool {
-        guard let recording else { return false }
-        return SettingsService.shared.load().transcriptionProvider.isCloud
-            && recording.cloudTranscriptionCount >= TranscriptionJob.maxCloudTranscriptions
-    }
+    /// "Dec 1", in UTC like the reset itself.
+    private static let resetFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        return formatter
+    }()
 
     private func deliveryLine(for recording: Recording) -> DeliveryLine {
-        let sentAt = recording.relayUploadedAt.map { DateFormatters.timeFormatter.string(from: $0) }
-        switch DeliveryStage(recording) {
+        let stage = DeliveryStage(recording)
+        switch stage {
+        case .waitingToSend:
+            let retryNote = "Ramble will try again on its own."
+            if let error = recording.lastError, !error.isEmpty {
+                return DeliveryLine(title: "Waiting to send", detail: "\(error) \(retryNote)")
+            }
+            return DeliveryLine(title: "Waiting to send", detail: retryNote)
+        case .waitingOnWatch:
+            return DeliveryLine(title: "Waiting on your watch")
         case .transcribing:
-            if recording.status == .recorded, let error = recording.lastError, !error.isEmpty {
-                return DeliveryLine(title: "Transcribing…", detail: "\(error) Ramble will try again on its own.")
-            }
             return DeliveryLine(title: "Transcribing…", detail: "It goes out as soon as the transcript is ready.")
-        case .couldntTranscribe(needsModel: true):
+        case .heldForUnlock:
             return DeliveryLine(
-                title: "Speech model needed",
-                detail: "Download the on-device model to transcribe this note.",
-                action: .downloadModel
+                title: "Unlock to transcribe",
+                detail: "This note is saved. It transcribes as soon as you unlock Ramble.",
+                action: .unlock
             )
-        case .couldntTranscribe(needsModel: false):
-            if cloudLimitReached {
-                return DeliveryLine(
-                    title: "Couldn't transcribe",
-                    detail: "Cloud transcription limit reached (\(TranscriptionJob.maxCloudTranscriptions)). Switch to on-device transcription in Settings to continue."
-                )
-            }
-            return DeliveryLine(title: "Couldn't transcribe", detail: recording.lastError, action: .retryTranscription)
-        case .onPhone:
-            if relay.hasConnectedAgents || SettingsService.shared.load().isWebhookConfigured {
-                return DeliveryLine(title: "Not sent", detail: "It was made before anywhere was set up to send it.", action: .resend)
-            }
-            return DeliveryLine(title: "Only on this iPhone", detail: "Connect an agent to send it.", action: .connect)
-        case .sending:
-            return DeliveryLine(title: "Sending…")
-        case .waitingForAgent:
+        case .heldForFairUse:
+            let reset = recording.holdUntil ?? accountService.account?.fairUse?.resetsAt
+            let when = reset.map { " This note will transcribe on \(Self.resetFormatter.string(from: $0))." } ?? ""
             return DeliveryLine(
-                title: "Sent, not picked up yet",
-                detail: [sentAt.map { "Sent \($0)." }, "Your agent picks it up next time it checks."]
-                    .compactMap { $0 }.joined(separator: " ")
+                title: "Usage limit reached",
+                detail: "Ramble pauses transcription after 100 hours in a month to stop abuse.\(when) If this looks wrong, contact support.",
+                action: .contactSupport
             )
+        case .tooLong, .couldntSend:
+            return DeliveryLine(title: stage.label)
+        case .couldntTranscribe:
+            let reason = recording.failureResult == "retries_exhausted"
+                ? "Ramble couldn't reach a transcription service in time."
+                : "Ramble couldn't turn this audio into text."
+            if recording.retriesLeft == 0 {
+                return DeliveryLine(title: "Couldn't transcribe", detail: "\(reason) Ramble tried 3 more times.")
+            }
+            return DeliveryLine(title: "Couldn't transcribe", detail: reason, action: .retryTranscription)
+        case .noSpeech:
+            return DeliveryLine(title: "Nothing to send · no speech detected")
         case .agentHasIt:
-            let pickedUp = recording.pickedUpAt.map { "picked up \(DateFormatters.timeFormatter.string(from: $0))" }
-            let detail = [sentAt.map { "Sent \($0)" }, pickedUp].compactMap { $0 }.joined(separator: " · ")
-            return DeliveryLine(title: "Picked up by your agent", detail: detail.isEmpty ? nil : detail)
-        case .deliveredToWebhook:
-            return DeliveryLine(title: "Delivered to webhook")
-        case .didntSend:
-            let relayFailed = recording.relayStatus == .failed
-            if relayFailed && !relay.hasConnectedAgents {
-                return DeliveryLine(title: "No agent to send it to", detail: "Connect an agent to send it.", action: .connect)
-            }
+            let first = recording.agentDelivery?.firstPickedUpAt
             return DeliveryLine(
-                title: relayFailed ? "Couldn't reach your agent" : "Webhook didn't accept it",
-                detail: recording.lastError,
-                action: .resend
+                title: "Your agent has it",
+                detail: first.map { "Picked up \(DateFormatters.timeFormatter.string(from: $0))" }
             )
+        case .didntSend:
+            return DeliveryLine(title: "Didn't send", detail: lastWebhookFailure(recording), action: .resendWebhook)
+        case .noAgent, .webhookSending, .waitingForAgent, .notPickedUp, .deliveredToWebhook:
+            return DeliveryLine(title: stage.label)
         }
+    }
+
+    /// "Webhook failed after 3 attempts — HTTP 500", from the log.
+    private func lastWebhookFailure(_ recording: Recording) -> String? {
+        recording.activityLog.last { $0.message.hasPrefix("Webhook failed") }?.message
     }
 
     private func deliverySection(_ recording: Recording) -> some View {
@@ -302,6 +379,7 @@ struct RecordingDetailView: View {
                         Text(detail)
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 Spacer(minLength: 8)
@@ -309,18 +387,19 @@ struct RecordingDetailView: View {
                     Button {
                         perform(action, for: recording)
                     } label: {
-                        if isRetrying || isDownloadingModel {
-                            ProgressView().controlSize(.small)
-                        } else {
-                            Text(action.title)
-                        }
+                        Text(action.title)
+                            .lineLimit(1)
                     }
                     .buttonStyle(.bordered)
                     .buttonBorderShape(.capsule)
                     .tint(Color.brandAmber)
                     .controlSize(.small)
-                    .disabled(isRetrying || isDownloadingModel)
                 }
+            }
+            if line.action == .retryTranscription, audioRequest == .openWatch, !recording.hasAudio {
+                Text("Open Ramble on your watch to sync.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -328,55 +407,39 @@ struct RecordingDetailView: View {
     private func perform(_ action: DeliveryAction, for recording: Recording) {
         HapticService.buttonTap()
         switch action {
-        case .connect:
-            showConnectAgent = true
         case .retryTranscription:
             retryTranscription(recording)
-        case .downloadModel:
-            isDownloadingModel = true
-            Task {
-                do {
-                    try await transcriptionQueue.downloadModelAndRetryPending()
-                } catch {
-                    print("Model download failed: \(error)")
-                }
-                refreshRecording()
-                isDownloadingModel = false
-            }
-        case .resend:
-            resend(recording)
-        }
-    }
-
-    private func retryTranscription(_ recording: Recording) {
-        isRetrying = true
-        Task {
-            // Covers recordings made on the Watch, where no phone-side
-            // recording start ever prompted for speech recognition
-            await LegacySpeechTranscriptionService.requestAuthorizationIfNeeded()
-            transcriptionQueue.retry(recordingId: recording.id)
-            try? await Task.sleep(nanoseconds: 500_000_000)
-            refreshRecording()
-            isRetrying = false
-        }
-    }
-
-    /// Sends again to whichever destinations it should go to: the failed
-    /// ones, or every set-up one for a note that was never sent.
-    private func resend(_ recording: Recording) {
-        let neverSent = recording.deliveryStatus == nil
-        let webhookSetUp = SettingsService.shared.load().isWebhookConfigured
-        if webhookSetUp && (recording.webhookStatus == .failed || neverSent) {
+        case .resendWebhook:
             WebhookQueueService.shared.resend(recordingId: recording.id)
+        case .unlock:
+            showUnlock = true
+        case .contactSupport:
+            contactSupport()
         }
-        if relay.hasConnectedAgents && (recording.relayStatus == .failed || neverSent) {
-            RelayQueueService.shared.resend(recordingId: recording.id)
+    }
+
+    /// Re-uploads from this iPhone as a retry. A watch note whose audio is
+    /// only on the watch fetches it first.
+    private func retryTranscription(_ recording: Recording) {
+        guard recording.canRetryTranscription else { return }
+        if !recording.hasAudio {
+            guard askWatchForAudio(recording) else { return }
         }
-        isRetrying = true
-        Task {
-            try? await Task.sleep(nanoseconds: 500_000_000)
-            refreshRecording()
-            isRetrying = false
+        UploadQueueService.shared.retry(recordingId: recording.id)
+        refreshRecording()
+    }
+
+    private func contactSupport() {
+        var components = URLComponents()
+        components.scheme = "mailto"
+        components.path = Constants.Relay.supportEmail
+        components.queryItems = [URLQueryItem(name: "subject", value: "Usage limit reached")]
+        guard let url = components.url else {
+            showSupportAddress = true
+            return
+        }
+        openURL(url) { accepted in
+            if !accepted { showSupportAddress = true }
         }
     }
 
@@ -384,23 +447,12 @@ struct RecordingDetailView: View {
 
     private func moreMenu(_ recording: Recording) -> some View {
         Menu {
-            if !recording.isModelNotInstalled {
+            if recording.canRetryTranscription {
                 Button {
                     HapticService.buttonTap()
                     retryTranscription(recording)
                 } label: {
-                    Label(retryButtonLabel(for: recording), systemImage: "arrow.clockwise")
-                }
-                .disabled(isRetrying || recording.status == .transcribing || cloudLimitReached)
-            }
-
-            if recording.status == .completed && relay.hasConnectedAgents
-                && recording.relayStatus != .sending && recording.relayStatus != .pending {
-                Button {
-                    HapticService.buttonTap()
-                    RelayQueueService.shared.resend(recordingId: recording.id)
-                } label: {
-                    Label(recording.relayStatus == nil ? "Send to Agent" : "Send to Agent Again", systemImage: "arrow.up.circle")
+                    Label("Retry Transcription", systemImage: "arrow.clockwise")
                 }
             }
 
@@ -429,7 +481,7 @@ struct RecordingDetailView: View {
 
     // MARK: - Activity
 
-    /// The raw log, folded away. Handy when something goes wrong.
+    /// Each logged step, folded away. Handy when something goes wrong.
     private func activitySection(_ recording: Recording) -> some View {
         Section {
             DisclosureGroup("Details", isExpanded: $showDetails) {
@@ -459,24 +511,6 @@ struct RecordingDetailView: View {
 
     // MARK: - Helpers
 
-    private func retryButtonLabel(for recording: Recording) -> String {
-        switch recording.status {
-        case .failed: return "Retry Transcription"
-        case .completed: return "Re-transcribe"
-        case .recorded: return "Transcribe"
-        default: return "Transcribing..."
-        }
-    }
-
-    private func transcriptPlaceholder(for recording: Recording) -> String {
-        switch recording.status {
-        case .recorded: return "Waiting to transcribe..."
-        case .transcribing: return "Transcribing..."
-        case .completed: return "No transcription available."
-        case .failed: return "No transcript yet."
-        }
-    }
-
     private func heightReader(_ binding: Binding<CGFloat>) -> some View {
         GeometryReader { proxy in
             Color.clear
@@ -505,7 +539,7 @@ struct RecordingDetailView: View {
             status: .completed,
             transcription: "This is a sample transcription that shows what the text might look like after recording.",
             activityLog: [
-                ActivityEntry("Transcription completed (342 chars)", httpStatus: 200),
+                ActivityEntry("Transcript received", httpStatus: 200),
                 ActivityEntry("Webhook delivered", httpStatus: 200),
             ]
         ))

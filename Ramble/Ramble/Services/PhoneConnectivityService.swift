@@ -273,8 +273,7 @@ final class PhoneConnectivityService: NSObject, ObservableObject {
 
     // MARK: - Audio files
 
-    /// `["recording": <JSON of {id, recordedAt, duration}>]`; older watch
-    /// builds sent {recordingId, createdAt (seconds since 2001), duration}.
+    /// `["recording": <JSON of {id, recordedAt, duration}>]`.
     fileprivate struct AudioMetadata {
         let id: UUID
         let recordedAt: Date
@@ -282,17 +281,10 @@ final class PhoneConnectivityService: NSObject, ObservableObject {
 
         init?(json data: Data) {
             guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let idString = (object["id"] as? String) ?? (object["recordingId"] as? String),
+                  let idString = object["id"] as? String,
                   let id = UUID(uuidString: idString) else { return nil }
             self.id = id
-            if let string = (object["recordedAt"] as? String) ?? (object["createdAt"] as? String),
-               let date = RelayService.parseDate(string) {
-                recordedAt = date
-            } else if let seconds = (object["recordedAt"] as? Double) ?? (object["createdAt"] as? Double) {
-                recordedAt = Date(timeIntervalSinceReferenceDate: seconds)
-            } else {
-                recordedAt = Date()
-            }
+            recordedAt = (object["recordedAt"] as? String).flatMap(RelayService.parseDate) ?? Date()
             duration = (object["duration"] as? Double) ?? 0
         }
     }
@@ -389,27 +381,13 @@ extension PhoneConnectivityService: WCSessionDelegate {
         handleReceivedMessage(message)
     }
 
-    /// The watch's "wake" message (older watch builds) and anything else
-    /// sent with a reply handler. The reply lists which of the watch's
-    /// recordings already have audio here.
     func session(
         _ session: WCSession,
         didReceiveMessage message: [String: Any],
         replyHandler: @escaping ([String: Any]) -> Void
     ) {
-        guard message["type"] as? String == "wake" else {
-            replyHandler([:])
-            handleReceivedMessage(message)
-            return
-        }
-        let asked = Set((message["recordingIds"] as? [String]) ?? [])
-        let saved = storageService.loadRecordings()
-            .filter { asked.contains($0.id.uuidString) && $0.hasAudio }
-            .map(\.id.uuidString)
-        replyHandler(["type": "received", "recordingIds": saved])
-        Task { @MainActor in
-            BackgroundTaskService.shared.beginImmediateBackgroundProcessing(keepAliveFor: 25)
-        }
+        replyHandler(["ok": true])
+        handleReceivedMessage(message)
     }
 
     func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any]) {
@@ -434,32 +412,5 @@ extension PhoneConnectivityService: WCSessionDelegate {
         ingest(metadata, via: "file transfer") { destinationURL in
             try FileManager.default.copyItem(at: file.fileURL, to: destinationURL)
         }
-    }
-
-    /// A short note sent inline by older watch builds: 4-byte big-endian
-    /// metadata length, metadata JSON, then the audio.
-    func session(
-        _ session: WCSession,
-        didReceiveMessageData messageData: Data,
-        replyHandler: @escaping (Data) -> Void
-    ) {
-        let bytes = [UInt8](messageData)
-        guard bytes.count > 4 else { replyHandler(Data()); return }
-        let length = bytes[0..<4].reduce(0) { Int($0) << 8 | Int($1) }
-        guard bytes.count >= 4 + length,
-              let metadata = AudioMetadata(json: Data(bytes[4..<(4 + length)]))
-        else {
-            replyHandler(Data())
-            return
-        }
-        let audio = Data(bytes[(4 + length)...])
-        ingest(metadata, via: "message", writeAudio: { destinationURL in
-            try audio.write(to: destinationURL)
-        }, onSaved: { saved in
-            let reply: [String: Any] = saved
-                ? ["type": "received", "recordingIds": [metadata.id.uuidString]]
-                : [:]
-            replyHandler((try? JSONSerialization.data(withJSONObject: reply)) ?? Data())
-        })
     }
 }
