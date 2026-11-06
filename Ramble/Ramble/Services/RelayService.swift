@@ -339,7 +339,7 @@ final class RelayService: ObservableObject {
         let status = http?.statusCode ?? 0
         if status == 401 { forgetInbox() }
         let body = try? decoder.decode(ErrorBody.self, from: data)
-        let retryAfter = (http?.value(forHTTPHeaderField: "Retry-After")).flatMap(TimeInterval.init)
+        let retryAfter = http?.value(forHTTPHeaderField: "Retry-After").flatMap { TimeInterval($0) }
         let note = (200...299).contains(status) ? try? decoder.decode(RelayNote.self, from: data) : nil
         return UploadResponse(status: status, note: note, reason: body?.reason, message: body?.error, retryAfter: retryAfter)
     }
@@ -411,16 +411,14 @@ final class RelayService: ObservableObject {
         let created = try decoder.decode(CreatedInbox.self, from: data)
         KeychainService.setString(created.inboxSecret, forKey: Self.inboxSecretKey)
         setupProblem = false
-        if let token = created.accountToken {
-            let current = AccountService.shared.account
-            AccountService.shared.apply(RelayAccount(
-                unlocked: current?.unlocked ?? false,
-                freeNotesTotal: current?.freeNotesTotal ?? 25,
-                freeNotesRemaining: current?.freeNotesRemaining ?? 25,
-                fairUse: current?.fairUse,
-                accountToken: token
-            ))
-        }
+        // A new account: the refresh below fills in the real state.
+        AccountService.shared.apply(RelayAccount(
+            unlocked: false,
+            freeNotesTotal: 25,
+            freeNotesRemaining: 25,
+            fairUse: nil,
+            accountToken: created.accountToken
+        ))
         // A fresh inbox needs a fresh watch connection, and the real account state.
         Task {
             await PhoneConnectivityService.shared.connectWatch(force: true, replaces: nil)
