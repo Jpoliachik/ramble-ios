@@ -194,7 +194,7 @@ Under the player, the note screen SHALL show one line saying where the note is. 
 | Not accepted yet | "Waiting to send" | the last error and "Ramble will try again on its own." | — |
 | Transcribing | "Transcribing…" | "It goes out as soon as the transcript is ready." | — |
 | Held for unlock | "Unlock to transcribe" | "This note is saved. It transcribes as soon as you unlock Ramble." | "Unlock" |
-| Held for fair use | "Usage limit reached" | the detail in [purchase.md](purchase.md) ("… This note will transcribe on Dec 1. If this looks wrong, contact support.") | "Contact support" |
+| Held for fair use | "Usage limit reached" | the detail in [purchase.md](purchase.md) ("… This note will transcribe on Dec 1. If this looks wrong, contact support.") | "Contact support" (an email to support@ramble.watch; purchase.md) |
 | Audio unreadable | "Couldn't transcribe" | "Ramble couldn't turn this audio into text." | "Retry" |
 | Transcription gave up | "Couldn't transcribe" | "Ramble couldn't reach a transcription service in time." | "Retry" |
 | Failed after 3 retries | "Couldn't transcribe" | either detail above, then "Ramble tried 3 more times." | — |

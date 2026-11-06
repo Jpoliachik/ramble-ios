@@ -242,6 +242,15 @@ When the allowance is used up, the server SHALL refuse uploads with payment requ
 - AND the operator is alerted
 - AND after December 1 (UTC) the iPhone retries, and the notes upload and transcribe
 
+### Requirement: Contact support goes to the support email
+"Contact support" on a held note SHALL open a new email to support@ramble.watch in the iPhone's mail app, with the subject "Usage limit reached". The person sees and edits the email before sending; the app sends nothing itself. If no mail app is set up, the app SHALL show the address so the person can copy it.
+
+#### Scenario: Person thinks the limit is wrong
+- GIVEN a note showing "Usage limit reached"
+- WHEN the person taps "Contact support"
+- THEN a new email to support@ramble.watch opens with the subject "Usage limit reached"
+- AND nothing is sent until the person sends it
+
 ### Requirement: The limit is shown only when reached
 The app SHALL NOT show usage or warn before the limit is reached. Fair use appears only in the Terms of Use, the App Store description, the unlock sheet, and on notes held by it.
 
