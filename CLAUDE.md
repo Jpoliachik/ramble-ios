@@ -10,6 +10,21 @@ For full brand positioning, audience, tone, and messaging guidelines, see **`doc
 
 For design philosophy and the design system (color, type, spacing, motion, haptics), see **`docs/design.md`**. Read it before any UI work on the watch, iPhone, or website.
 
+## Specs: the source of truth for behavior
+
+**`specs/` describes what Ramble does right now. The code MUST match the specs at all times.** Read `specs/README.md` for what a spec is, its format, and the index of spec files. `docs/` explains why and how; `specs/` states what.
+
+These rules are not optional. They apply to every change, however small:
+
+1. **Read first.** Before changing anything a person, an agent, or another system can observe, read the spec for that area.
+2. **Update the spec in the same commit.** Any change to observable behavior MUST update the affected spec in the same commit as the code. A behavior change without its spec update is not done, and must not be pushed.
+3. **New behavior gets a requirement.** A new feature adds requirements and scenarios to the right spec. If a spec passes about 300 lines, split it and update the index in `specs/README.md`.
+4. **Removed behavior leaves the spec.** Deleting a feature deletes its requirements.
+5. **A mismatch is a bug.** If code and spec disagree and you weren't asked to change that behavior, do not quietly rewrite the spec to match the code, or the code to match the spec. Tell Justin which one looks wrong and let him decide.
+6. **Refactors don't touch specs.** If behavior is unchanged, the spec is unchanged.
+7. **Specs describe the present only.** No history, change logs, plans, or TODOs in specs. Plans go in a thread or in `docs/`.
+8. **Report it.** When you finish a task, say which specs you updated, or say "No spec change" with the reason.
+
 ### Post-v1 — cloud transcription enhancements
 
 These are free features from existing providers (no extra API calls or cost):
