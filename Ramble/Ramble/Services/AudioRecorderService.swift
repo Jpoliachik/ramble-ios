@@ -29,6 +29,11 @@ final class AudioRecorderService: NSObject, ObservableObject {
     private var recordingStartTime: Date?
     private var timer: Timer?
     private var currentRecordingURL: URL?
+    private var interruptionObserver: NSObjectProtocol?
+
+    /// A call, Siri or an alarm took the microphone. The owner saves what
+    /// was captured, like a tapped stop.
+    var onInterrupted: (@MainActor () -> Void)?
 
     func startRecording(to url: URL) throws {
         let session = AVAudioSession.sharedInstance()
@@ -45,7 +50,7 @@ final class AudioRecorderService: NSObject, ObservableObject {
             AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
             AVSampleRateKey: Constants.AudioSettings.sampleRate,
             AVNumberOfChannelsKey: Constants.AudioSettings.numberOfChannels,
-            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+            AVEncoderBitRateKey: Constants.AudioSettings.bitRate
         ]
 
         let recorder = try AVAudioRecorder(url: url, settings: settings)
@@ -66,6 +71,23 @@ final class AudioRecorderService: NSObject, ObservableObject {
         inputSourceName = Self.friendlyInputName(session.currentRoute.inputs.first)
 
         startTimer()
+        observeInterruptions()
+    }
+
+    private func observeInterruptions() {
+        if let interruptionObserver { NotificationCenter.default.removeObserver(interruptionObserver) }
+        interruptionObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance(),
+            queue: .main
+        ) { [weak self] notification in
+            guard let raw = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+                  AVAudioSession.InterruptionType(rawValue: raw) == .began else { return }
+            MainActor.assumeIsolated {
+                guard let self, self.isRecording else { return }
+                self.onInterrupted?()
+            }
+        }
     }
 
     /// Convert port description to user-friendly name
@@ -85,6 +107,10 @@ final class AudioRecorderService: NSObject, ObservableObject {
     }
 
     func stopRecording() -> TimeInterval {
+        if let interruptionObserver {
+            NotificationCenter.default.removeObserver(interruptionObserver)
+            self.interruptionObserver = nil
+        }
         timer?.invalidate()
         timer = nil
 

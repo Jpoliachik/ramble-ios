@@ -16,7 +16,7 @@ enum WebhookHealth {
         switch self {
         case .healthy: return .green
         case .error: return .red
-        case .untested: return .yellow
+        case .untested: return Color(.tertiaryLabel)
         }
     }
 

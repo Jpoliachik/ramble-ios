@@ -2,19 +2,18 @@
 //  DeliveryMonitor.swift
 //  Ramble
 //
-//  Tells the user, with a local notification, when notes are stuck on the
-//  way to their agent. Smart and rare on purpose: one alert per stage, as a
-//  count, with a cooldown, cleared once things move again. The rules live in
-//  DeliveryAlertPolicy; this file decides which stage each note is in.
+//  Stuck-note alerts on the phone (specs/phone.md "Phone alerts for stuck
+//  notes"): one notification per kind, as a count, with a cooldown, cleared
+//  once nothing is left in that kind. The rules live in DeliveryAlertPolicy;
+//  this file decides which kind each note is in.
 //
-//  Stages:
-//  - stuckOnPhone: on this phone but not sent yet (offline, locked, iOS gave
-//    no background time). Opening Ramble usually sends them.
-//  - needsYou: can't go anywhere without the user (no agent connected,
-//    the relay or webhook rejected it, transcription gave up).
-//  - notPickedUp: the relay has it, the agent hasn't taken it.
+//  Kinds:
+//  - notSent: a phone note the server hasn't accepted 6 hours after it was
+//    recorded (or released from a hold). Held and refused notes never count.
+//  - stillWaiting: agent copies still waiting 12 hours after the note
+//    reached the server. Checked only when Ramble runs.
 //
-//  Notes on the watch are covered by the watch's own alert.
+//  Watch notes alert on the watch.
 //
 
 import Foundation
@@ -26,40 +25,38 @@ final class DeliveryMonitor {
     static let shared = DeliveryMonitor()
 
     enum Stage: String, CaseIterable {
-        case stuckOnPhone
-        case needsYou
-        case notPickedUp
+        case notSent
+        case stillWaiting
     }
 
     /// Debug: every threshold in seconds, so an alert can be seen in one sitting.
     static let fastModeKey = "deliveryAlertsFastMode"
     /// Notes made before this build never alert, so an upgrade doesn't
-    /// surface months-old failures.
-    private static let alertsSinceKey = "deliveryAlertsSince"
-    private static let memoryKeyPrefix = "deliveryAlertMemory."
+    /// surface months-old notes.
+    private static let alertsSinceKey = "deliveryAlertsSince.v2"
+    private static let memoryKeyPrefix = "deliveryAlertMemory.v2."
 
     static var isFastMode: Bool {
         get { UserDefaults.standard.bool(forKey: fastModeKey) }
         set {
             UserDefaults.standard.set(newValue, forKey: fastModeKey)
-            PhoneConnectivityService.shared.sendAlertFastMode(newValue)
+            PhoneConnectivityService.shared.pushApplicationContext()
         }
     }
 
-    /// The tunable part. Defaults are a judgment call; adjust from real use.
     static func rule(for stage: Stage) -> DeliveryAlertRule {
         let hour: TimeInterval = 3600
         switch (stage, isFastMode) {
-        case (.stuckOnPhone, false): return DeliveryAlertRule(threshold: 1 * hour, cooldown: 6 * hour)
-        case (.stuckOnPhone, true): return DeliveryAlertRule(threshold: 30, cooldown: 60)
-        // Short wait so a burst of failures becomes one alert.
-        case (.needsYou, false): return DeliveryAlertRule(threshold: 120, cooldown: 6 * hour)
-        case (.needsYou, true): return DeliveryAlertRule(threshold: 5, cooldown: 60)
+        case (.notSent, false): return DeliveryAlertRule(threshold: 6 * hour, cooldown: 6 * hour)
+        case (.notSent, true): return DeliveryAlertRule(threshold: 30, cooldown: 60)
         // Pickup happens on the agent's side, so it's only checked, never scheduled.
-        case (.notPickedUp, false): return DeliveryAlertRule(threshold: 12 * hour, cooldown: 12 * hour, canSchedule: false)
-        case (.notPickedUp, true): return DeliveryAlertRule(threshold: 60, cooldown: 60, canSchedule: false)
+        case (.stillWaiting, false): return DeliveryAlertRule(threshold: 12 * hour, cooldown: 12 * hour, canSchedule: false)
+        case (.stillWaiting, true): return DeliveryAlertRule(threshold: 60, cooldown: 60, canSchedule: false)
         }
     }
+
+    /// How long the relay keeps an agent copy nobody picked up.
+    static let relayRetention: TimeInterval = 30 * 24 * 3600
 
     private let center = UNUserNotificationCenter.current()
     private var debounceTask: Task<Void, Never>?
@@ -95,11 +92,13 @@ final class DeliveryMonitor {
 
     func evaluate(now: Date = Date()) {
         let since = UserDefaults.standard.object(forKey: Self.alertsSinceKey) as? Date ?? now
-        let recordings = StorageService.shared.loadRecordings().filter { $0.createdAt >= since }
+        let all = StorageService.shared.loadRecordings()
+        let recordings = all.filter { $0.createdAt >= since }
+        let hasAgents = RelayService.shared.hasConnectedAgents
 
         var candidates: [Stage: [StuckNoteCandidate]] = [:]
         for recording in recordings {
-            guard let found = Self.stage(of: recording, now: now) else { continue }
+            guard let found = Self.stage(of: recording, hasAgents: hasAgents, now: now) else { continue }
             let (stage, entered) = found
             candidates[stage, default: []].append(StuckNoteCandidate(id: recording.id, since: entered))
         }
@@ -115,26 +114,18 @@ final class DeliveryMonitor {
             apply(plan, for: stage)
         }
 
-        requestPermissionIfUseful(hasRecordings: !recordings.isEmpty)
+        requestPermissionIfUseful(hasRecordings: !all.isEmpty)
     }
 
-    /// Which stage a note is stuck in, and since when. Nil when it's done or
-    /// has nowhere to go (no agent or webhook was ever set up for it).
-    static func stage(of recording: Recording, now: Date) -> (Stage, Date)? {
-        let arrived = recording.receivedAt ?? recording.createdAt.addingTimeInterval(recording.duration)
-        let inFlight: Set<WebhookStatus> = [.pending, .sending]
-
-        if recording.status == .failed || recording.relayStatus == .failed || recording.webhookStatus == .failed {
-            return (.needsYou, recording.activityLog.last?.timestamp ?? arrived)
+    /// Which kind a note is stuck in, and since when.
+    static func stage(of recording: Recording, hasAgents: Bool, now: Date) -> (Stage, Date)? {
+        let stage = DeliveryStage(recording, hasAgents: hasAgents)
+        if stage == .waitingToSend, recording.source == .phone || recording.retryRequested {
+            let ended = recording.createdAt.addingTimeInterval(recording.duration)
+            return (.notSent, max(ended, recording.releasedAt ?? .distantPast))
         }
-        if recording.status == .recorded || recording.status == .transcribing
-            || recording.relayStatus.map({ inFlight.contains($0) }) == true
-            || recording.webhookStatus.map({ inFlight.contains($0) }) == true {
-            return (.stuckOnPhone, arrived)
-        }
-        if recording.isWaitingForAgent, let uploaded = recording.relayUploadedAt,
-           now.timeIntervalSince(uploaded) < RelayQueueService.relayRetention {
-            return (.notPickedUp, uploaded)
+        if stage == .waitingForAgent, now.timeIntervalSince(recording.waitingSince) < relayRetention {
+            return (.stillWaiting, recording.waitingSince)
         }
         return nil
     }
@@ -170,14 +161,11 @@ final class DeliveryMonitor {
         let notes = DeliveryAlertPolicy.noteCount(alert.count)
         let one = alert.count == 1
         switch stage {
-        case .stuckOnPhone:
+        case .notSent:
             content.title = "Not sent yet"
             content.body = "\(notes) \(one ? "hasn't" : "haven't") been sent yet. Open Ramble to send \(one ? "it" : "them")."
-        case .needsYou:
-            content.title = "Couldn't send"
-            content.body = "\(notes) couldn't be sent. Open Ramble to see why."
-        case .notPickedUp:
-            content.title = "Not picked up"
+        case .stillWaiting:
+            content.title = "Still waiting for your agent"
             content.body = "Your agent hasn't picked up \(notes) since \(Self.describe(alert.oldest))."
         }
         content.sound = .default
@@ -195,8 +183,7 @@ final class DeliveryMonitor {
         return date.formatted(.dateTime.weekday(.wide))
     }
 
-    /// Asked in the foreground once there's a note worth protecting, not
-    /// during onboarding.
+    /// Asked once, in the foreground, after onboarding, when the first note exists.
     private func requestPermissionIfUseful(hasRecordings: Bool) {
         guard hasRecordings,
               UIApplication.shared.applicationState == .active,

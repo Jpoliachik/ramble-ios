@@ -51,10 +51,7 @@ final class AppAttestService {
     /// attest with Apple, register attestation with our server.
     /// Safe to call multiple times; no-ops if already attested or unsupported.
     ///
-    /// `server` defaults to the cloud transcription proxy. The relay passes
-    /// its own URL so on-device (Apple Speech) users, who never talk to the
-    /// proxy, can still attest. The hosted relay and proxy share attestation
-    /// storage, so attesting with either covers both.
+    /// `server` defaults to Ramble's relay.
     func attestIfNeeded(server: URL? = nil) async throws {
         guard isSupported else { return }
         switch KeychainService.lookup(forKey: Self.isAttestedKey) {
@@ -63,9 +60,7 @@ final class AppAttestService {
         default: break
         }
 
-        guard let baseURL = server ?? Self.proxyBaseURL(settingsService.load()) else {
-            throw AppAttestError.serverNotConfigured
-        }
+        let baseURL = server ?? Constants.Relay.baseURL
 
         let keyId = try await generateKeyIfNeeded()
 
@@ -127,10 +122,6 @@ final class AppAttestService {
     }
 
     // MARK: - Network Helpers
-
-    private static func proxyBaseURL(_ settings: Settings) -> URL? {
-        settings.transcriptionProvider.baseURL.flatMap(URL.init(string:))
-    }
 
     private func fetchChallenge(baseURL: URL) async throws -> String {
         let settings = settingsService.load()
