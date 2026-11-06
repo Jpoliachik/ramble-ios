@@ -41,7 +41,10 @@ struct OnboardingView: View {
                     switch step {
                     case .intro:
                         OnboardingIntroStep(
-                            onContinue: { advance(to: .destination) }
+                            onContinue: {
+                                giveConsent()
+                                advance(to: .destination)
+                            }
                         )
                     case .destination:
                         OnboardingDestinationStep(
@@ -102,6 +105,22 @@ struct OnboardingView: View {
         direction = next.rawValue > step.rawValue ? .forward : .backward
         withAnimation(.smooth(duration: 0.3)) {
             step = next
+        }
+    }
+
+    /// "Get started" is the consent to cloud transcription. Only now does
+    /// the phone set up with the server, connect the watch and upload.
+    private func giveConsent() {
+        Consent.give()
+        Task { @MainActor in
+            // A new inbox connects the watch itself; a kept one (reinstall)
+            // still gives the watch a fresh token.
+            let hadInbox = RelayService.shared.hasInbox
+            await RelayService.shared.setUpIfNeeded()
+            if hadInbox {
+                await PhoneConnectivityService.shared.connectWatch(force: true, replaces: nil)
+            }
+            BackgroundTaskService.shared.appDidOpen()
         }
     }
 

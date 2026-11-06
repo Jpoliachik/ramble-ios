@@ -45,3 +45,8 @@ enum Constants {
         }
     }
 }
+
+/// The one privacy wording (specs/delivery.md "One privacy wording everywhere").
+enum PrivacyCopy {
+    static let relay = "Ramble's server is a relay, not an archive. Your audio is sent to a transcription provider and deleted as soon as the transcript is ready. Transcripts are deleted when your agent picks them up, or after 30 days. Your full history lives only on your iPhone."
+}

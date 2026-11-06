@@ -108,7 +108,7 @@ struct ConnectAgentView: View {
                     }
                 }
             } message: {
-                Text("Notes your agent hasn't picked up are deleted from the relay. Your agent stays connected, and the copies on this phone stay.")
+                Text("Notes your agent hasn't picked up are deleted from the relay. Notes still being transcribed will still be sent. Your agent stays connected, and the copies on this phone stay.")
             }
         }
     }
@@ -227,7 +227,7 @@ struct ConnectAgentView: View {
                 .tracking(1.0)
                 .foregroundStyle(Color.obInkFaint)
                 .padding(.horizontal, 4)
-            Text("Notes wait on the relay until your agent picks them up, then they're deleted. Anything left is deleted after \(Constants.Relay.unclaimedRetentionDays) days. Audio stays on your phone.")
+            Text(PrivacyCopy.relay)
                 .font(.subheadline)
                 .foregroundStyle(Color.obInkSoft)
                 .fixedSize(horizontal: false, vertical: true)
@@ -294,7 +294,7 @@ enum AgentHealth: Equatable {
 
     @MainActor
     init(_ connection: RelayConnection, now: Date = Date()) {
-        let threshold = DeliveryMonitor.rule(for: .notPickedUp).threshold
+        let threshold = HomeStatus.longWait
         let stale = connection.lastPullAt.map { now.timeIntervalSince($0) > threshold } ?? true
         self = connection.pending > 0 && stale ? .quiet : .connected
     }
