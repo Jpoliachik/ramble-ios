@@ -76,6 +76,7 @@ The agent-facing instructions live on the website, at https://ramble.watch/docs 
 
 - **Separate checking from acting.** Empty checks drive the cost. A cheap watcher (script, hook, scheduled fetch) checks every few minutes and wakes the agent only when `items` isn't empty. If a platform can only schedule full agent runs, hourly or daily is fine.
 - **`created_at` is when recording started**, with the phone's UTC offset; `received_at` is when the relay got it. Relative times are read from `created_at`, and if the moment has passed, the item is overdue.
+- **Notes can arrive late and out of order** (watch out of range, Apple's paced file transfers, limited background time). See "Delivery timing" on the docs page and `docs/sync-architecture.md`.
 - **Only 401 means stop.** 403, 5xx and timeouts are transient. Every call is safe to retry.
 - **Set a User-Agent** (see below).
 

@@ -147,6 +147,17 @@ Use either or both.
 - Relay (this part): the agent pulls. If the phone is offline, Ramble retries the upload until it gets through (hourly after the first half hour); the relay then holds each transcript for up to 30 days until the agent acks it. Nothing is lost if the agent is down for a while. Needs an agent that can make outbound HTTPS calls on a schedule.
 - Webhook (Part 2): the phone POSTs each transcript to your HTTPS URL as soon as it's transcribed. Nothing is stored in between and there's no polling. If the URL is down, Ramble retries 3 times (after 5 s, 30 s, 2 min), then marks it failed; the user can resend it from the recording. Best when the agent has an always-on URL that wakes it.
 
+## Delivery timing
+
+A note goes watch → iPhone → transcription → relay. With the iPhone nearby (even locked in a pocket) that usually takes seconds to a minute. Apple's limits can make it longer:
+
+- iPhone out of range or off: notes wait on the watch and send once the two are back together.
+- Longer notes: watch-to-iPhone file transfers are paced by the system for power, so they can take minutes, occasionally more. https://developer.apple.com/documentation/watchconnectivity/wcsession/transferfile(_:metadata:)
+- iPhone just restarted: nothing moves until it's unlocked once. https://developer.apple.com/documentation/watchconnectivity/wcsession/iosdeviceneedsunlockafterrebootforreachability
+- Limited background time: iOS gives Ramble short, system-scheduled windows to transcribe and upload, so a note can wait for the next one or for the app to open. https://developer.apple.com/documentation/backgroundtasks/choosing-background-strategies-for-your-app
+
+So notes can arrive late and out of order. Go by "created_at", not arrival time, and don't read an empty inbox as "nothing was recorded". A late note isn't lost: the watch keeps each one until the iPhone confirms it has it.
+
 ## Platform notes
 
 Everything above works for any agent. Specifics we know about:
