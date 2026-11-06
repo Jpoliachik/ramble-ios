@@ -105,6 +105,9 @@ final class PhoneConnectivityService: NSObject, ObservableObject {
     func pushApplicationContext() {
         guard WCSession.isSupported(), WCSession.default.activationState == .activated,
               WCSession.default.isPaired else { return }
+        // Before the first unlock after a restart the token can't be read;
+        // a context without it would tell the watch it isn't connected.
+        guard !KeychainService.isLocked else { return }
         var context: [String: Any] = [
             "relayBaseURL": Constants.Relay.baseURL.absoluteString,
             "unlocked": AccountService.shared.isUnlocked,
