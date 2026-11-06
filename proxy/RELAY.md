@@ -1,125 +1,140 @@
-# Ramble Relay
+# Ramble Relay: agent API
 
-The relay holds transcripts until your agent picks them up. You talk to your watch, Ramble transcribes on the phone, and the phone uploads the text here. Transcripts are temporary by design:
+How an agent receives Ramble transcripts. The person talks to their watch or iPhone, the device uploads the audio straight to Ramble's server, the server transcribes it, and the relay holds one copy of the transcript for each connected agent until that agent picks it up.
 
-- **Picked up → deleted.** The text is deleted when the agent acks it.
-- **Never picked up → deleted after 30 days** (`RETENTION_SECONDS`).
-- **Audio never comes here.** Transcription happens before upload.
+Ramble's server is a relay, not an archive. Your audio is sent to a transcription provider and deleted as soon as the transcript is ready. Transcripts are deleted when your agent picks them up, or after 30 days. Your full history lives only on your iPhone.
 
-It runs in the same Cloudflare Worker as the [transcription proxy](README.md), with a small D1 database. The code is `src/relay.js`.
+The full contract, including the phone and watch endpoints, is `specs/relay-api.md`. Person-facing agent docs are at https://ramble.watch/docs and https://ramble.watch/llms-full.txt; keep them in sync with this file. Running the Worker is in [README.md](README.md).
 
-## What it stores
+## Base URL
 
-| What | Fields | Deleted when |
-|---|---|---|
-| Inbox | random id, hash of the app's inbox secret, created time | — |
-| Pairing code | hash of the code, inbox id, expiry; once exchanged, the issued token and connection id | the agent's first pull, replaced, or 10 minutes pass |
-| Connection | random id, inbox id, hash of the agent's token, created and last-pull times; optionally the name the agent gave itself and its wake-up hook (URL, headers, last ping time and status) | you tap Disconnect |
-| Transcript | recording id, recorded-at time, received time, duration, text, expiry (one copy per connected agent) | the agent acks it, you disconnect, you tap Delete everything, or 30 days pass |
+`https://api.ramble.watch`. Every path below is relative to it. `https://ramble-transcription-proxy.jpoliachik.workers.dev` serves the identical API, so agents paired against it keep working.
 
-No accounts, emails, names, IP addresses, or audio. Credentials are stored only as SHA-256 hashes, with one exception: a freshly issued agent token sits next to its pairing code until the agent first pulls with it (at most 10 minutes), so a retried exchange gets the same token back. An agent's wake-up hook headers can't be hashed, because the relay has to send them back out. They're encrypted at rest with AES-GCM when the Worker has the `HOOK_ENCRYPTION_KEY` secret (`npx wrangler secret put HOOK_ENCRYPTION_KEY`, any long random string), and stored as plain JSON without it. They can only start that agent's own run, which then pulls with its separate token.
-
-## Authentication
-
-| Who | Credential | Header |
-|---|---|---|
-| App | Inbox secret, from `POST /inboxes` (which needs App Attest) | `Authorization: Bearer rmbi_…` |
-| Agent | Token from the pairing exchange | `Authorization: Bearer rmba_…` |
-
-App Attest is checked once, when the phone creates its inbox, using the same scheme as `/transcribe`. Each credential works only on its own side.
-
-## API
-
-JSON bodies. Errors are `{"error": "..."}`.
-
-### App
-
-| Method | Path | Body → Response |
-|---|---|---|
-| `POST` | `/inboxes` | App Attest headers → `201 {"inbox_secret"}` |
-| `POST` | `/inbox` | `{"recording_id", "created_at", "duration", "transcription"}` → `{"queued": <agents>}`. Idempotent on `recording_id`. |
-| `POST` | `/inbox/status` | `{"recording_ids": [...]}` → `{"recordings": [{"recording_id", "waiting": <agents>}]}`. Up to 100 ids. `waiting: 0` means every agent acked it (or it expired or its agent was disconnected). The app uses this to show "picked up". |
-| `DELETE` | `/inbox` | → `{"deleted": <n>}` |
-| `POST` | `/pair/code` | → `201 {"code", "expires_at"}`. A new code replaces the old one. |
-| `GET` | `/connections` | → `{"connections": [{"id", "name", "created_at", "last_pull_at", "pending", "hook"}]}`. `name` is what the agent called itself, or `null`. `hook` is `null` or `{"last_ping_at", "last_status"}`; the hook URL and headers never come back to the app. |
-| `DELETE` | `/connections/:id` | → `{"status": "disconnected"}` |
-
-### Agent
-
-| Method | Path | Body → Response |
-|---|---|---|
-| `POST` | `/pair/exchange` | `{"code": "K7QX-MP4D", "name": "Grok Bot"}`, no auth → `201 {"token"}`. `name` is optional (1–40 characters) and shows in the app. A retry with the same code returns `200` and the same token until the first pull. |
-| `GET` | `/inbox` | → `{"items": [{"id", "recording_id", "created_at", "received_at", "duration", "transcription"}], "has_more"}`. Oldest first, up to 50. `created_at` is passed through as the app sent it (recording start, with the phone's UTC offset); `received_at` is the relay's clock, UTC, and `null` for items queued before migration 0003. |
-| `POST` | `/inbox/ack` | `{"ids": [41, 42]}` → `{"deleted": <n>}`. Up to 500 ids. |
-| `GET` | `/agent` | → `{"name", "hook": null \| {"url", "header_names", "last_ping_at", "last_status"}}`. Header values are never echoed. |
-| `PATCH` | `/agent` | `{"name"?, "hook"?: {"url", "headers"} \| null}` → same as `GET /agent`. Setting a hook sends one test ping right away; `hook.last_status` is its HTTP status (`0` = no response). `"hook": null` removes it. |
-
-### Wake-up hooks
-
-Optional, for agents that can receive a webhook (for example a webhook-triggered routine). The agent registers its own URL and headers with `PATCH /agent`, so nothing in the app changes and the user never picks an agent type. When a transcript is queued for that agent, the relay POSTs:
+`GET /` on either host, with no credential, returns:
 
 ```json
-{"event": "ramble.notes_waiting", "text": "New Ramble notes are waiting. Pull them from …/inbox …", "pull_url": "https://…/inbox"}
+{"service": "Ramble relay", "docs": "https://ramble.watch/docs", "llms": "https://ramble.watch/llms-full.txt"}
 ```
 
-with the agent's headers, `Content-Type: application/json`, and `User-Agent: Ramble-Relay/1`. The test ping has `"event": "ramble.test"`. The ping never carries transcript text: the agent pulls and acks as usual, so text only leaves through the token-protected pull.
+## Pairing
 
-- **One ping per batch.** After a ping, no more go out until the agent pulls, or 10 minutes pass (`HOOK_REPING_SECONDS`). A burst of recordings is one agent run, and a broken hook gets at most one ping per 10 minutes.
-- **Best effort.** One attempt, 5-second timeout, no retries, redirects not followed. Agents should keep a slow scheduled check (hourly or daily) as a fallback.
-- **Limits.** `https://` with a public hostname only (no IPs, `localhost`, `.local` or similar). Up to 8 headers, 4 KB total; `Host`, `Content-Type`, `Content-Length`, `User-Agent`, `Cookie` and a few others can't be set.
+In Ramble on iPhone, Settings → Your agent → Connect your agent makes a pairing code and copies this message for the person to paste to their agent:
 
-Codes are case-insensitive and ignore spaces and dashes. Unacked items come back on every pull, so if `has_more` is true, ack and pull again. A `401` on a pull means the user disconnected. A wrong method gets `405` with the right one in the error.
+```
+I downloaded Ramble, connect it. My pairing code is K7QX-MP4D-HN3R. Instructions: https://ramble.watch/docs
+```
 
-The Worker is lenient: it parses JSON whatever the `Content-Type`, and takes `Bearer <token>` in any case or the bare token. `GET /` returns a pointer to the docs.
+Codes are 12 characters from `23456789ABCDEFGHJKMNPQRSTVWXYZ`, shown as `XXXX-XXXX-XXXX`, single use, and expire 10 minutes after they are made. They match ignoring case, spaces and dashes.
+
+| Method | Path | Body → Response |
+|---|---|---|
+| `POST` | `/pair/exchange` | `{"code", "request_id", "name"?}`, no credential → `201 {"token": "rmba_…"}` |
+
+- `request_id` is a random string of 16–64 characters the agent picks. Retrying with the same code and `request_id` within the code's 10 minutes returns `200` and the same token. A different `request_id` on a used code gets `409` with `"reason": "code_used"` and no token.
+- `name` is optional, 1–40 characters, and shows in the app. An invalid name is dropped without failing.
+- An unknown or expired code gets `400` ("Invalid or expired pairing code. Ask the user for a new one in the Ramble app.").
+
+## Agent endpoints
+
+Send `Authorization: Bearer rmba_…`. `bearer <token>` and the bare token also work. Bodies are read as JSON whatever the `Content-Type`.
+
+| Method | Path | Body → Response |
+|---|---|---|
+| `GET` | `/inbox` | → `{"items": [{"id", "recording_id", "created_at", "received_at", "duration", "transcription"}], "has_more"}` |
+| `POST` | `/inbox/ack` | `{"ids": [1–500 integers]}` → `{"deleted": <n>}` |
+| `GET` | `/agent` | → `{"name", "hook": null \| {"url", "header_names", "last_ping_at", "last_status"}}` |
+| `PATCH` | `/agent` | `{"name"?, "hook"?: {"url", "headers"} \| null}` → same shape as `GET /agent` |
+
+`GET /inbox` returns only this agent's copies, oldest first, up to 50. Unacked items come back on every pull; if `has_more` is true, ack and pull again.
+
+| Field | Meaning |
+|---|---|
+| `id` | Integer item id, used to ack |
+| `recording_id` | The note's UUID |
+| `created_at` | When recording started, exactly as the recording device sent it, with its UTC offset (`2026-11-01T14:00:00-05:00`) |
+| `received_at` | When the relay accepted the audio, ISO 8601 UTC with milliseconds (`2026-11-02T00:00:00.000Z`). Can be hours after `created_at` if the device was offline |
+| `duration` | Length in seconds, measured by the relay |
+| `transcription` | The full transcript |
+
+Items carry no audio, device id or device name.
+
+`POST /inbox/ack` deletes those of the agent's own copies. Ids that are gone or belong to another agent count as nothing. Any other body gets `400`.
+
+### What an agent receives
+
+- One copy of each note recorded after the agent paired, made when the transcript is ready. Notes recorded before pairing never reach it.
+- Watch notes reach agents without the iPhone nearby.
+- Notes with no speech detected produce no copy and no ping.
+- A copy is deleted when the agent acks it, when the person disconnects the agent or taps Delete waiting notes, or 30 days after it was made.
+- The token works until the person disconnects the agent. It reads and acks only that agent's copies; it can't pair agents, upload notes, or read the person's own copy. On an endpoint agents can't use it gets `403` with `"reason": "wrong_credential"` and keeps working.
+
+## Wake-up hooks
+
+Optional, for agents that can receive a webhook. The agent registers its own hook with `PATCH /agent`; nothing changes in the app.
+
+- `url` must be `https://` with a public hostname (no IPs, `localhost`, `.local` or similar). Up to 8 headers and 4 KB; `Host`, `Content-Type`, `Content-Length`, `Connection`, `Transfer-Encoding`, `User-Agent` and `Cookie` can't be set. Anything else gets `400`.
+- Header values are stored only encrypted and never shown again. If the relay can't encrypt, setting a hook gets `503`.
+- Setting a hook sends one test ping at once (`"event": "ramble.test"`, text "Ramble test ping: your wake-up hook works. Nothing new to pick up, no action needed."), and `hook.last_status` reports its HTTP status (`0` = no response). `"hook": null` removes it.
+
+When a copy is made for an agent with a hook, the relay POSTs:
+
+```json
+{"event": "ramble.notes_waiting", "text": "New Ramble notes are waiting. Pull them from …/inbox …", "pull_url": "https://api.ramble.watch/inbox"}
+```
+
+with the agent's headers, `Content-Type: application/json` and `User-Agent: Ramble-Relay/1 (+https://ramble.watch/docs)`.
+
+- Pings never carry transcript text, note ids or counts. The agent pulls and acks as usual.
+- One try, 5-second timeout, no redirects, and only after the hostname resolves to a public address. A failed ping never affects the note.
+- After a ping, no other ping goes to that agent until it pulls or 10 minutes pass.
+- Agents should keep a slow scheduled check (hourly or daily) as a fallback.
+
+## Errors and limits
+
+Errors are `{"error": "<sentence>"}`, plus `"reason"` where a client acts on it.
+
+| Status | Meaning |
+|---|---|
+| `400` | Malformed request, or unknown or expired pairing code |
+| `401` | Missing, unknown or revoked token: the person disconnected the agent. The only status that means stop |
+| `403` | `wrong_credential` (endpoint agents can't use), or filtered before reaching the Worker (below) |
+| `405` | Wrong method; the error names the right one and links https://ramble.watch/docs |
+| `409` | `code_used`: the code was exchanged with another `request_id` |
+| `429` | `rate_limited`, with `Retry-After` in seconds. Nothing changed; the token still works |
+| `503` | `unavailable`: the relay couldn't check something and accepted nothing. Retry later |
+
+Rate limits:
+
+| What | Limit |
+|---|---|
+| `GET /inbox`, `POST /inbox/ack`, `GET /agent` | 60 per minute per agent token |
+| `PATCH /agent` | 10 per hour per agent token |
+| `POST /pair/exchange` | 100 failed attempts per hour per network address. Over 1,000 failed exchanges an hour from all addresses together, every exchange gets `503` until the hour ends |
+
+Network addresses are used only by the limiter, never stored with notes or logged.
 
 ### Clients that get 403 before reaching the Worker
 
-On `workers.dev`, Cloudflare's Browser Integrity Check runs before the Worker and can't be turned off. It rejects Python's built-in `urllib` default User-Agent (`Python-urllib/3.x`) with `403` and the body `error code: 1010`. Verified Nov 4 2026: curl, `requests`, `httpx`, Node `fetch`, and `urllib` with any other User-Agent all reach the Worker. The docs tell agents to set a User-Agent. The full fix is serving the relay from a zone we control, where that check can be switched off for the relay host (see "Custom domain" below).
+On `workers.dev`, Cloudflare's Browser Integrity Check runs before the Worker and can't be turned off. It rejects Python's built-in `urllib` default User-Agent (`Python-urllib/3.x`) with `403` and the body `error code: 1010`. curl, `requests`, `httpx`, Node `fetch`, and `urllib` with any other User-Agent reach the Worker. Agents should always send a User-Agent. On `api.ramble.watch` the check is switched off for the relay host (below).
 
-### Custom domain
+## Agent guidance
 
-`ramble.watch` DNS is at Porkbun today, and a Worker custom domain needs the zone on Cloudflare. Steps:
+The essentials the docs page teaches:
+
+- **Separate checking from acting.** Empty checks drive the cost. A cheap watcher (script, hook, scheduled fetch) checks every few minutes and wakes the agent only when `items` isn't empty. If a platform can only schedule full agent runs, hourly or daily is fine.
+- **Read relative times from `created_at`**, in its offset. If the moment has passed, the item is overdue.
+- **Notes can arrive late and out of order** (watch offline or away from the iPhone, Low Power Mode, background uploads scheduled by watchOS, transcription retries during a provider outage). An empty inbox doesn't mean nothing was recorded.
+- **Only 401 means stop.** On 429, wait `Retry-After`. 403, 5xx and timeouts are transient. Every call is safe to retry.
+- **Send a User-Agent**, and a `name` at pairing so the person can tell agents apart.
+
+To test: record "Test, remind me to water the plants" on the watch. Settings → Your agent shows one waiting. After the agent's next check it reads "nothing waiting".
+
+## Operator: the api.ramble.watch domain
+
+`ramble.watch` DNS is at Porkbun today, and a Worker custom domain needs the zone on Cloudflare. Until these steps are done, `api.ramble.watch` doesn't answer and agents must use the `workers.dev` host.
 
 1. Cloudflare dashboard → Add a domain → `ramble.watch` (Free plan). Let it import the existing records, and make sure the Vercel ones (apex `A 76.76.21.21`, `www CNAME cname.vercel-dns.com`, or whatever Vercel shows) are **DNS only** (grey cloud), so Vercel keeps serving the site and its certificates.
 2. Porkbun → ramble.watch → Nameservers → replace the four Porkbun ones with the two Cloudflare gives you. Wait for Cloudflare to say Active.
 3. Workers & Pages → `ramble-transcription-proxy` → Settings → Domains & Routes → Add → Custom domain → `api.ramble.watch`.
-4. Rules → Configuration Rules → Create: hostname equals `api.ramble.watch` → Browser Integrity Check **Off**. Then Security → Bots: leave Bot Fight Mode **off** (on the Free plan it can't be skipped per host). Security → Settings: Security Level "Essentially off" or a WAF skip rule for that hostname if anything else challenges API clients.
-5. Keep the `workers.dev` route on, so shipped app builds and already-paired agents keep working. Then switch `Constants.Relay.hostedBaseURL` in the app, `RELAY_URL` in `website/src/lib/site.ts`, `llms*.txt`, and this file to `https://api.ramble.watch`.
-
-## Agent instructions
-
-The agent-facing instructions live on the website, at https://ramble.watch/docs (and `website/public/llms-full.txt` for agents that read plain text). The app's "Copy message" points agents there. Keep them in sync with this API. The essentials:
-
-- **Separate checking from acting.** Empty checks drive the cost. A cheap watcher (script, hook, scheduled fetch) checks every few minutes and wakes the agent only when `items` isn't empty. If a platform can only schedule full agent runs, hourly or daily is fine.
-- **`created_at` is when recording started**, with the phone's UTC offset; `received_at` is when the relay got it. Relative times are read from `created_at`, and if the moment has passed, the item is overdue.
-- **Notes can arrive late and out of order** (watch out of range, Apple's paced file transfers, limited background time). See "Delivery timing" on the docs page and `docs/sync-architecture.md`.
-- **Only 401 means stop.** 403, 5xx and timeouts are transient. Every call is safe to retry.
-- **Set a User-Agent** (see below).
-- **Optional: name and wake-up hook.** Send `name` at pairing so the user can tell agents apart. If the agent can receive webhooks, register one with `PATCH /agent` and pull when pinged.
-
-To test: record "Test, remind me to water the plants" on the watch. Settings shows one waiting for the agent. After its next check the count drops to 0.
-
-## Setup
-
-1. `npx wrangler d1 create ramble-relay`
-2. Uncomment the `[[d1_databases]]` block in `wrangler.toml` and paste the id.
-3. `npx wrangler d1 migrations apply ramble-relay --remote`
-4. `npx wrangler deploy`
-
-Until the D1 binding exists, relay routes answer `503` and transcription works as before. A cron every 15 minutes deletes expired rows. New migrations (like `0002_pair_exchange_retry.sql`) must be applied with `npx wrangler d1 migrations apply ramble-relay --remote` **before** deploying the Worker that needs them.
-
-App Attest can't run in the simulator. For simulator testing, run the relay locally (below) with `DEV_BYPASS_TOKEN` in `.dev.vars`, and enter the same value as the server bypass key in the app's debug sheet (tap the version number in Settings), where you can also point the relay URL at `wrangler dev`. The key is sent as `X-Dev-Bypass`.
-
-If `DEV_BYPASS_TOKEN` is set on the deployed Worker, anyone holding it skips App Attest for both `/inboxes` and `/transcribe`. Leave it unset in production, or make it long and random and never share it.
-
-### Local
-
-```bash
-echo 'DEV_BYPASS_TOKEN="dev"' > .dev.vars
-npx wrangler d1 migrations apply ramble-relay --local
-npx wrangler dev                               # uses a local copy of the database
-```
-
-## Tests
-
-`npm test` runs every endpoint against the real schema, with Node's SQLite standing in for D1.
+4. Rules → Configuration Rules → Create: hostname equals `api.ramble.watch` → Browser Integrity Check **Off**. Leave Bot Fight Mode **off** (on the Free plan it can't be skipped per host). Security Level "Essentially off", or a WAF skip rule for that hostname, if anything else challenges API clients.
+5. Keep the `workers.dev` route on, so shipped builds and already-paired agents keep working.

@@ -4,6 +4,8 @@ This file is the source of truth for the App Store listing. Change the copy here
 
 Fields marked **TODO: confirm in ASC** haven't been checked against App Store Connect yet. Fill them in from the live listing the next time someone pulls it.
 
+Pricing words follow `specs/purchase.md` ("What Ramble says about price"): the price story is "Free to download. 25 notes free, then $14.99 once." Never "trial", "unlimited", "premium", "Subscribe", or a price per month. Privacy words follow `specs/delivery.md` ("One privacy wording everywhere"). No on-device transcription claims, and no open-source claims.
+
 ## App information
 
 | Field | Value |
@@ -17,8 +19,9 @@ Fields marked **TODO: confirm in ASC** haven't been checked against App Store Co
 | Secondary category | TODO: confirm in ASC (suggest Utilities) |
 | Age rating | TODO: confirm in ASC |
 | Copyright | TODO: confirm in ASC |
-| Price | $4.99 one-time |
-| In-app purchase | Optional $2.99/month subscription for cloud transcription |
+| Price | Free |
+| In-app purchase | "Unlock Ramble", non-consumable, $14.99, product ID `dev.goodloop.ramble.unlock`. Family Sharing off |
+| Subscription | `dev.goodloop.ramble.premium.monthly2` is removed from sale on release day (kept only as early-buyer proof on the server) |
 
 ## URLs
 
@@ -27,7 +30,7 @@ Fields marked **TODO: confirm in ASC** haven't been checked against App Store Co
 | Marketing URL | https://ramble.watch |
 | Privacy Policy URL | https://ramble.watch/privacy |
 | Terms of Use (EULA) | https://ramble.watch/terms |
-| Support URL | TODO: confirm in ASC (ramble.watch has no support page yet) |
+| Support URL | https://ramble.watch/support (mailbox support@ramble.watch must receive mail before submission) |
 
 ## Name [29 / 30]
 
@@ -64,24 +67,28 @@ Go for a ramble and leave your phone behind. Say the thought to your Apple Watch
 ```
 Stay in the moment. Say the thought to your Apple Watch, let it go, and get back to your day. Your agent picks it up and handles it later.
 
-Your best ideas show up on a walk, in the car, halfway through a run. Ramble keeps them without pulling you back to your phone. An idea, a to-do, a reminder. Messy is fine, and there's no reply to wait for. No signal? It waits on your watch and goes out when you reconnect.
+Your best ideas show up on a walk, in the car, halfway through a run. Ramble keeps them without pulling you back to your phone. An idea, a to-do, a reminder. Messy is fine, and there's no reply to wait for. Your watch sends each thought over Wi-Fi, cellular, or your iPhone. No signal? It waits on your watch and goes out when you reconnect.
 
 SETUP
-In Settings, tap Connect agent to get a short code. Tell your agent "I downloaded Ramble, connect it" and paste the code. That's it.
+In Settings, tap Your agent, then Connect your agent. Copy the message and paste it to your agent. That's it.
 
 PRIVACY
 - No accounts.
-- With on-device transcription, audio never leaves your iPhone. Only the text goes to your agent.
-- Text is deleted once your agent picks it up, or after 30 days if it never does.
+- Ramble's server is a relay, not an archive. Your audio is sent to a transcription provider and deleted as soon as the transcript is ready.
+- Transcripts are deleted when your agent picks them up, or after 30 days.
+- Your full history lives only on your iPhone.
 - Disconnect any time.
 
 TRANSCRIPTION
-Apple Speech transcribes on your iPhone. An optional upgrade adds cloud transcription for more accurate results.
+Ramble transcribes in the cloud, using providers that don't train on your audio. Set your language and add names to the vocabulary for better results.
 
 WEBHOOKS
-Ramble can also send each transcript to any HTTPS endpoint.
+Ramble can also send each transcript to an HTTPS endpoint you choose.
 
-Ramble is a one-time purchase, with an optional upgrade for cloud transcription. Requires an Apple Watch paired with an iPhone.
+PRICE
+Free to download. 25 notes free, then $14.99 once. One-time purchase. No subscription. Fair use: 100 hours of audio per calendar month per purchase. Refunds are handled by Apple.
+
+Requires an Apple Watch paired with an iPhone.
 ```
 
 ## Screenshot captions
@@ -91,15 +98,32 @@ Short, one thought each, in this order. The first screenshot shows the watch rec
 1. Talk to your watch. Your agent handles it.
 2. Leave your phone behind.
 3. Messy is fine. Just say it.
-4. Connect your agent with one code.
+4. Connect your agent with one message.
 5. Deleted once your agent has it.
 
-## What's New (1.1.3)
+## What's New
 
 ```
-Ramble now hands what you say to your agent. Tap Connect agent in Settings, paste the code to your agent, and start talking. Transcripts are deleted once your agent picks them up. Webhooks work as before.
+Ramble is now free to download. Your first 25 notes are free, then unlock once for $14.99. Every note is transcribed in the cloud, and your watch sends notes straight to Ramble, even without your iPhone nearby. If you bought Ramble before, every note transcribes with no unlock needed.
 ```
+
+## App Privacy (privacy label)
+
+Matches the privacy policy and `specs/delivery.md`. Ramble does no tracking and has no accounts. Proposed answers; **TODO: confirm in ASC** that each category maps as below.
+
+| Data type (Apple's name) | Collected | Linked to the user | Purpose | Why |
+| --- | --- | --- | --- | --- |
+| User Content → Audio Data | Yes | No | App Functionality | Each recording is uploaded and sent to a transcription provider (Groq, or Deepgram or OpenAI as fallbacks), then deleted once transcribed, at most 1 day after upload |
+| User Content → Other User Content | Yes | No | App Functionality | Transcripts, held for the person's devices and agents, deleted on pickup or after 30 days (a point-in-time database backup keeps deleted rows up to 30 days for outage recovery) |
+| Purchases → Purchase History | Yes | No | App Functionality | Apple's signed purchase record, to unlock notes and apply fair use |
+| Usage Data or Diagnostics | TODO: decide | No | App Functionality | Per-note lengths, providers and outcomes, with no audio or text, used for fair use and running the service |
+
+Not collected: contact info, location, identifiers for tracking, browsing history. Webhook transcripts go from the iPhone straight to the person's own URL and never reach Ramble's server.
 
 ## App Review notes
 
-TODO: confirm in ASC. Include how a reviewer can test Connect agent without their own agent, if that's needed.
+```
+Ramble gives every new install 25 free notes, then offers a one-time "Unlock Ramble" purchase. Sandbox purchases unlock for 7 days as a test. To test without an agent, record a note on the iPhone or watch: it transcribes and shows "Saved, no agent connected". Restore Purchases is in Settings.
+```
+
+TODO: confirm in ASC whether the reviewer needs a demo agent for "Connect your agent".

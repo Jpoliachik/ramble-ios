@@ -25,10 +25,11 @@ const sectionsByPage: Record<DocsPage, Section[]> = {
     { id: "relay-or-webhook", label: "Relay or webhook" },
     { id: "timing", label: "Delivery timing" },
     { id: "platforms", label: "Platform notes" },
+    { id: "privacy", label: "What the relay keeps" },
   ],
   webhooks: [
     { id: "step-1", label: "1. Add a destination" },
-    { id: "step-2", label: "2. Connect a destination" },
+    { id: "step-2", label: "2. Point it somewhere" },
     { id: "platforms", label: "Automation platforms", indent: true },
     { id: "custom", label: "Build your own endpoint", indent: true },
     { id: "step-3", label: "3. Test it" },
@@ -37,6 +38,7 @@ const sectionsByPage: Record<DocsPage, Section[]> = {
     { id: "requirements", label: "Requirements" },
     { id: "watch", label: "Apple Watch" },
     { id: "transcription", label: "Transcription" },
+    { id: "purchase", label: "Purchase" },
     { id: "agent", label: "Your agent" },
   ],
 };

@@ -2,25 +2,27 @@
 
 Talk to your Apple Watch. Your agent handles it.
 
-Tap the watch and talk. The iPhone transcribes it and passes the text to your agent, which picks it up on a schedule and deals with it. No accounts. Audio never leaves the phone for the relay.
+Tap the watch and talk. The watch (or iPhone) sends the recording straight to Ramble's server, which transcribes it and holds the text until your agent picks it up and deals with it. No accounts.
+
+Ramble's server is a relay, not an archive. Your audio is sent to a transcription provider and deleted as soon as the transcript is ready. Transcripts are deleted when your agent picks them up, or after 30 days. Your full history lives only on your iPhone.
 
 # Part 1: Connect your agent
 
 ## Pairing
 
-1. In Ramble on iPhone: Settings → Connect agent → pick the agent. Ramble shows a code like K7QX-MP4D. It connects one agent and expires in 10 minutes.
-2. The user tells the agent "I downloaded Ramble, connect it" and pastes the code.
-3. The agent exchanges the code for a token. The token can only pull and acknowledge this user's transcripts. Disconnect in the app revokes it.
+1. In Ramble on iPhone: Settings → Your agent → Connect your agent. Ramble shows a code like K7QX-MP4D-HN3R. It connects one agent and expires in 10 minutes.
+2. The user taps Copy and pastes the message to the agent: "I downloaded Ramble, connect it. My pairing code is <code>. Instructions: https://ramble.watch/docs".
+3. The agent exchanges the code for a token. The token can only pull and acknowledge that agent's own copies. Disconnect in the app revokes it.
 
 ## The agent loop
 
-Relay: https://ramble-transcription-proxy.jpoliachik.workers.dev
+Relay: https://api.ramble.watch
 
-1. Pair. POST {"code": "<code>", "name": "<your name, like Grok Bot>"} to /pair/exchange and save the returned "token". If the request times out or drops, send the same code again: for 10 minutes (until your first check) it returns the same token. A 400 means the code is wrong or expired; ask the user for a new one. The token is a password to the user's transcripts: anyone who has it can read and delete them. Store it the way your platform stores secrets, and keep it out of chat, memory, and logs.
-2. Separate checking from acting. Most checks find nothing, so the cost of this connection is the empty checks, not the transcripts. Make the check as cheap as you can: a small script, hook, or scheduled HTTP fetch that runs without the model, calls GET /inbox with `Authorization: Bearer <token>`, and wakes the agent only when "items" is not empty. Every 1 to 5 minutes is fine for a check like that. Only if your platform can't run anything without the agent, schedule a full agent run instead. Hourly or even daily is fine, since nothing expires for 30 days. Tell the user how often you'll check. If you can receive webhooks (an HTTPS URL that starts a run), also register a wake-up hook (below) so new notes reach you right away.
+1. Pair. Make up a random request_id (16 to 64 characters) and POST {"code": "<code>", "request_id": "<your request_id>", "name": "<your name, like Grok Bot>"} to /pair/exchange. Save the returned "token". If the request times out or drops, send it again with the same code and the same request_id: for 10 minutes it returns the same token. A 400 means the code is wrong or expired, and a 409 means it was already used; ask the user for a new one. The token is a password to the user's transcripts: anyone who has it can read and delete them. Store it the way your platform stores secrets, and keep it out of chat, memory, and logs.
+2. Separate checking from acting. Most checks find nothing, so the cost of this connection is the empty checks, not the transcripts. Make the check as cheap as you can: a small script, hook, or scheduled HTTP fetch that runs without the model, calls GET /inbox with `Authorization: Bearer <token>`, and wakes the agent only when "items" is not empty. Every 1 to 5 minutes is fine for a check like that. Only if your platform can't run anything without the agent, schedule a full agent run instead. Hourly or even daily is fine, since nothing expires for 30 days. Tell the user how often you'll check. If you can receive webhooks (an HTTPS URL that starts a run), also register a wake-up hook (below) so new notes reach you without frequent checks.
 3. Act. For each item, do what the user asked in "transcription". Read relative times ("in an hour", "tomorrow") from "created_at", the moment recording started, in the user's local offset. If that time has already passed, treat it as overdue and tell the user.
 4. Ack. POST {"ids": [...]} to /inbox/ack with the ids handled. This deletes them. Anything not acked comes back on the next check. If "has_more" is true, check again right away.
-5. Only 401 means stop. A 401 means the user disconnected you: stop checking and tell them. Anything else (403, 5xx, a timeout) is temporary: retry after 2, 5, then 15 seconds and keep your schedule.
+5. Only 401 means stop. A 401 means the user disconnected you: stop checking and tell them. A 429 means slow down: wait the seconds in Retry-After. Anything else (403, 5xx, a timeout) is temporary: retry after 2, 5, then 15 seconds and keep your schedule.
 
 Send a User-Agent header on every request (any name, like my-agent/1.0).
 
@@ -32,7 +34,7 @@ Example watcher, for cron or any scheduler. It prints the inbox only when the ag
 
 ```sh
 #!/bin/sh
-RELAY=https://ramble-transcription-proxy.jpoliachik.workers.dev
+RELAY=https://api.ramble.watch
 
 out=$(curl -sS --retry 3 -A "ramble-watcher/1.0" -w '\n%{http_code}' \
   "$RELAY/inbox" -H "Authorization: Bearer $RAMBLE_TOKEN") || exit 0
@@ -55,31 +57,32 @@ If your platform gives you an HTTPS URL that starts a run (a webhook-triggered r
 PATCH /agent
 Authorization: Bearer rmba_…
 {"hook": {"url": "https://your-platform.example/run/abc", "headers": {"Authorization": "Bearer <your webhook key>"}}}
-→ {"name": "…", "hook": {"url": "…", "header_names": ["Authorization"], "last_ping_at": null, "last_status": 200}}
+→ {"name": "…", "hook": {"url": "…", "header_names": ["Authorization"], "last_ping_at": "…", "last_status": 200}}
 ```
 
-- The relay sends one test ping right away. "last_status" is its HTTP status; 2xx means it worked, 0 means no response. A ping with event "ramble.test" needs no action.
+- The relay sends one test ping right away, with "event": "ramble.test" and the text "Ramble test ping: your wake-up hook works. Nothing new to pick up, no action needed." "last_status" is its HTTP status; 2xx means it worked, 0 means no response.
 - If your webhook key changes, PATCH /agent with the new one.
-- Each ping is a POST with your headers and this JSON body: {"event": "ramble.notes_waiting", "text": "New Ramble notes are waiting. …", "pull_url": "…/inbox"} (the test ping's event is "ramble.test"). It never contains the transcript. When pinged, check the inbox, act, and ack as usual.
+- Each ping is a POST with your headers, `User-Agent: Ramble-Relay/1 (+https://ramble.watch/docs)`, and this JSON body: {"event": "ramble.notes_waiting", "text": "New Ramble notes are waiting. …", "pull_url": "…/inbox"}. It never contains transcript text, note ids, or counts. When pinged, check the inbox, act, and ack as usual.
 - After a ping, the next one waits until you check the inbox (or 10 minutes pass), so a burst of notes is one run.
-- Pings are best effort: one try, no retries. Keep a slow scheduled check (daily is fine) as a backup.
-- Use "headers" for whatever your webhook needs: usually one Authorization header. HTTPS with a public hostname only; up to 8 headers.
-- {"hook": null} removes it. GET /agent shows what's registered (header values are never shown).
+- Pings are best effort: one try, 5-second timeout, no redirects. Keep a slow scheduled check (daily is fine) as a backup.
+- Use "headers" for whatever your webhook needs: usually one Authorization header. `https://` with a public hostname only; up to 8 headers and 4 KB; Host, Content-Type, Content-Length, Connection, Transfer-Encoding, User-Agent and Cookie can't be set. Header values are stored only encrypted and never shown again.
+- {"hook": null} removes it. GET /agent shows what's registered (header names only).
 
 ## API
 
-Relay: https://ramble-transcription-proxy.jpoliachik.workers.dev (every path below is relative to it).
+Relay: https://api.ramble.watch (every path below is relative to it). https://ramble-transcription-proxy.jpoliachik.workers.dev serves the identical API, so agents paired against it keep working. `GET /` on either returns {"service": "Ramble relay", "docs": "https://ramble.watch/docs", "llms": "https://ramble.watch/llms-full.txt"}.
 
 ```
 POST /pair/exchange
-{"code": "K7QX-MP4D", "name": "Grok Bot"}
-→ 201 {"token": "rmba_…"}          (a retry with the same code: 200, same token)
-                                   ("name" is optional, up to 40 characters, shown to the user)
+{"code": "K7QX-MP4D-HN3R", "request_id": "b4c1e0f2a9d84e7c", "name": "Grok Bot"}
+→ 201 {"token": "rmba_…"}          (same code and request_id within 10 minutes: 200, same token)
+                                   (another request_id: 409 "code_used", no token)
+                                   ("name" is optional, 1–40 characters, shown to the user)
 
 GET /inbox
 Authorization: Bearer rmba_…
 → {"items": [{"id": 41, "recording_id": "6F1C…", "created_at": "2026-11-01T14:00:00-05:00",
-              "received_at": "2026-11-01T19:00:04.120Z", "duration": 8.2,
+              "received_at": "2026-11-02T00:00:00.000Z", "duration": 8.2,
               "transcription": "Remind me to book the dentist."}],
    "has_more": false}
 
@@ -88,6 +91,10 @@ Authorization: Bearer rmba_…
 {"ids": [41]}
 → {"deleted": 1}
 
+GET /agent
+Authorization: Bearer rmba_…
+→ {"name": "Grok Bot", "hook": null}
+
 PATCH /agent                       (optional: rename yourself, set or remove a wake-up hook)
 Authorization: Bearer rmba_…
 {"name": "Grok Bot", "hook": {"url": "https://…", "headers": {"Authorization": "Bearer …"}}}
@@ -95,16 +102,19 @@ Authorization: Bearer rmba_…
 ```
 
 - Up to 50 items per check, oldest first.
-- Timestamps: "created_at" (ISO 8601 with the phone's UTC offset, like 2026-11-01T14:00:00-05:00) is when the user started recording, from the watch or phone clock. "received_at" (ISO 8601, UTC) is when the relay got it; the two can be hours apart if the phone was offline. Read relative times from "created_at" in its offset. "duration" is in seconds.
-- Acks: up to 500 integer ids per call. Acking an id that's already gone, or isn't yours, does nothing; "deleted" counts what was actually removed. Anything never acked is deleted after 30 days.
-- Pairing retries: a code makes one connection. Until the agent's first check, or 10 minutes, the same code returns the same token, so a lost response never costs the user a new code.
+- Timestamps: "created_at" (ISO 8601 with the recording device's UTC offset, like 2026-11-01T14:00:00-05:00) is when the user started recording, from the watch or iPhone clock. "received_at" (ISO 8601, UTC, with milliseconds) is when the relay accepted the audio; the two can be hours apart if the watch was offline. Read relative times from "created_at" in its offset.
+- "duration" is the length in seconds, measured by the relay.
+- Acks: 1 to 500 integer ids per call. Acking an id that's already gone, or isn't yours, does nothing; "deleted" counts what was actually removed. Anything never acked is deleted 30 days after it was made.
+- Pairing: codes are 12 characters, shown as XXXX-XXXX-XXXX, and match ignoring case, spaces, and dashes. A code makes one connection. The same code with the same request_id returns the same token for its 10 minutes, so a lost response never costs the user a new code.
+- Credentials: send `Authorization: Bearer <token>`. `bearer <token>` and the bare token also work.
 
 ## Tokens and connections
 
-- The token doesn't expire. It works until the user taps Disconnect in Ramble, which also deletes anything waiting for that agent.
+- The token doesn't expire. It works until the user disconnects the agent in Ramble, which also deletes anything waiting for it.
+- The token reads and acks only your own copies. It can't pair agents, upload notes, or read anything else; calling an endpoint agents can't use gets 403 with "reason": "wrong_credential", and the token keeps working.
 - Each code makes its own connection, so several agents can be connected at once. Each gets its own copy of every transcript; acking deletes only your copy. Pairing a new agent leaves the others alone.
-- The user sees every connected agent in Settings → Connect agent, with its name (if you sent one), when it last checked, and how many transcripts are waiting. They can disconnect each agent on its own.
-- Ramble sends only recordings made while at least one agent is connected.
+- You get notes recorded after you paired. Notes with no speech go to no one. Watch notes reach you without the iPhone nearby.
+- The user sees every connected agent in Settings → Your agent, with its name (if you sent one), when it last checked in, how many notes are waiting, and whether its wake-up hook answers.
 
 ## Making requests
 
@@ -114,18 +124,28 @@ Some HTTP stacks get filtered before they reach the relay. Python's built-in url
 |---|---|---|
 | 401 | Disconnected, or wrong token | Stop checking and tell the user. The only status that means stop. |
 | 400 on /pair/exchange | Code wrong or expired | Ask the user for a new code. |
+| 409 on /pair/exchange | Code already used with another request_id | Ask the user for a new code. |
 | 400 elsewhere | Malformed request | Fix it; the error says what's wrong. |
-| 403 | Filtered before reaching the relay | Set a User-Agent or use another client, then retry. Not a token problem. |
+| 403 | Filtered before reaching the relay, or an endpoint agents can't use | Set a User-Agent or use another client, then retry. Not a token problem. |
 | 405 | Wrong HTTP method | The error names the right one. |
+| 429 | Too many requests | Wait the seconds in Retry-After. The token still works. |
 | 5xx, timeout, dropped connection | Temporary | Retry after 2, 5, then 15 seconds. Keep your schedule. |
 
-Errors are JSON: {"error": "..."}. Every call is safe to retry. There is no rate limit today, but keep checks to once a minute or slower.
+Errors are JSON: {"error": "..."}, plus "reason" where it helps (like "code_used" or "rate_limited"). Every call is safe to retry.
+
+Rate limits (over them: 429 with {"reason": "rate_limited"} and Retry-After in seconds; nothing changes):
+
+| What | Limit |
+|---|---|
+| GET /inbox, POST /inbox/ack, GET /agent | 60 per minute per token |
+| PATCH /agent | 10 per hour per token |
+| POST /pair/exchange | 100 failed attempts per hour per network address |
 
 curl:
 
 ```
-RELAY=https://ramble-transcription-proxy.jpoliachik.workers.dev
-curl -sS --retry 3 -X POST "$RELAY/pair/exchange" -H "Content-Type: application/json" -d '{"code": "K7QX-MP4D"}'
+RELAY=https://api.ramble.watch
+curl -sS --retry 3 -X POST "$RELAY/pair/exchange" -H "Content-Type: application/json" -d '{"code": "K7QX-MP4D-HN3R", "request_id": "b4c1e0f2a9d84e7c"}'
 curl -sS --retry 3 "$RELAY/inbox" -H "Authorization: Bearer $TOKEN"
 curl -sS --retry 3 -X POST "$RELAY/inbox/ack" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"ids": [41]}'
 ```
@@ -133,9 +153,9 @@ curl -sS --retry 3 -X POST "$RELAY/inbox/ack" -H "Authorization: Bearer $TOKEN" 
 Python, standard library only:
 
 ```python
-import json, time, urllib.error, urllib.request
+import json, secrets, time, urllib.error, urllib.request
 
-RELAY = "https://ramble-transcription-proxy.jpoliachik.workers.dev"
+RELAY = "https://api.ramble.watch"
 
 def call(method, path, body=None, token=None):
     # Python's default urllib User-Agent is blocked at the network edge. Set your own.
@@ -149,14 +169,19 @@ def call(method, path, body=None, token=None):
             with urllib.request.urlopen(req, timeout=20) as res:
                 return json.load(res)
         except urllib.error.HTTPError as err:
+            if err.code == 429 and wait is not None:
+                time.sleep(int(err.headers.get("Retry-After", "60")))
+                continue
             if err.code < 500 or wait is None:
-                raise  # 400: bad or expired code. 401: the user disconnected you.
+                raise  # 400/409: bad, expired or used code. 401: the user disconnected you.
         except OSError:  # timeout or dropped connection
             if wait is None:
                 raise
         time.sleep(wait)
 
-token = call("POST", "/pair/exchange", {"code": "K7QX-MP4D"})["token"]  # once; save it
+# Once; save the token. The same request_id makes retries safe.
+pair = {"code": "K7QX-MP4D-HN3R", "request_id": secrets.token_hex(16), "name": "My agent"}
+token = call("POST", "/pair/exchange", pair)["token"]
 
 inbox = call("GET", "/inbox", token=token)
 for item in inbox["items"]:
@@ -169,19 +194,19 @@ if inbox["items"]:
 
 Use either or both.
 
-- Relay (this part): the agent pulls. If the phone is offline, Ramble retries the upload until it gets through (hourly after the first half hour); the relay then holds each transcript for up to 30 days until the agent acks it. Nothing is lost if the agent is down for a while. Needs an agent that can make outbound HTTPS calls on a schedule.
-- Webhook (Part 2): the phone POSTs each transcript to your HTTPS URL as soon as it's transcribed. Nothing is stored in between and there's no polling. If the URL is down, Ramble retries 3 times (after 5 s, 30 s, 2 min), then marks it failed; the user can resend it from the recording. Best when the agent has an always-on URL that wakes it.
+- Relay (this part): the agent pulls. The relay holds each transcript for up to 30 days until the agent acks it, so nothing is lost if the agent is down for a while. Needs an agent that can make outbound HTTPS calls on a schedule, or a wake-up hook.
+- Webhook (Part 2): the iPhone POSTs each transcript to your HTTPS URL once it has it. No polling. If the URL is down, Ramble tries 3 times in total (30 s, then 2 min apart), then marks the note "Didn't send"; the user can retry it. Best when the agent has an always-on URL that wakes it.
 
 ## Delivery timing
 
-A note goes watch → iPhone → transcription → relay. With the iPhone nearby (even locked in a pocket) that usually takes seconds to a minute. Apple's limits can make it longer:
+A note goes from the watch (or iPhone) straight to Ramble's server, is transcribed there, and waits for your agent. The watch sends over the iPhone, Wi-Fi, or cellular, whichever it has. Most notes are ready within seconds of the upload. Some take longer:
 
-- iPhone out of range or off: notes wait on the watch and send once the two are back together.
-- Longer notes: watch-to-iPhone file transfers are paced by the system for power, so they can take minutes, occasionally more. https://developer.apple.com/documentation/watchconnectivity/wcsession/transferfile(_:metadata:)
-- iPhone just restarted: nothing moves until it's unlocked once. https://developer.apple.com/documentation/watchconnectivity/wcsession/iosdeviceneedsunlockafterrebootforreachability
-- Limited background time: iOS gives Ramble short, system-scheduled windows to transcribe and upload, so a note can wait for the next one or for the app to open. https://developer.apple.com/documentation/backgroundtasks/choosing-background-strategies-for-your-app
+- No connection: notes wait on the watch and send once it has one.
+- Away from the iPhone: the watch sends while the app is open or soon after a recording stops. In Low Power Mode, watchOS turns off Wi-Fi and cellular away from the iPhone, so notes wait until the iPhone is back or the app is opened.
+- In the background: watchOS decides when background uploads run, so a note can wait for the next window or for the app to open.
+- Transcription services down: Ramble keeps retrying for up to 20 hours before it gives up on a note.
 
-So notes can arrive late and out of order. Go by "created_at", not arrival time, and don't read an empty inbox as "nothing was recorded". A late note isn't lost: the watch keeps each one until the iPhone confirms it has it.
+So notes can arrive late and out of order. Go by "created_at", not arrival time, and don't read an empty inbox as "nothing was recorded". A late note isn't lost: the watch keeps each one until Ramble's server has it.
 
 ## Platform notes
 
@@ -189,44 +214,42 @@ Everything above works for any agent. Specifics we know about:
 
 - Muse: use a hook (a small script watches the inbox and wakes the agent when something arrives), not a scheduled agent run every few minutes.
 - Grok Bot: add a routine with a webhook trigger and register its URL and key as a wake-up hook (headers {"Authorization": "Bearer <key>"}). Grok shows the URL and key in the routine's Webhook section. The key lets anyone start that routine, so ask the user to give it to you through a secure secret card rather than ordinary chat. Treat each ping only as a cue to check the inbox. Add a daily scheduled check as a backup. Each routine run uses Grok usage, so avoid a schedule every few minutes.
-- Agents in a sandbox with a network allowlist: add ramble-transcription-proxy.jpoliachik.workers.dev to the allowed hosts, or every request fails before it leaves the sandbox.
+- Agents in a sandbox with a network allowlist: add api.ramble.watch to the allowed hosts (and ramble-transcription-proxy.jpoliachik.workers.dev if you paired against it), or every request fails before it leaves the sandbox.
 
 # Part 2: Webhook API
 
-Ramble can also POST every transcript to each HTTPS destination you configure, one or many. This works alongside the agent connection; use either or both. The rest of this document covers building an endpoint that receives Ramble transcripts.
+Ramble can also POST every transcript to one HTTPS destination you configure. This works alongside the agent connection; use either or both. The rest of this part covers building an endpoint that receives Ramble transcripts.
 
 ## Webhook quick start
 
-1. In Ramble, go to **Settings → Send via Webhook** and tap **Add a destination**.
-2. Enter an HTTPS endpoint URL (from an automation platform or your own server). Add as many destinations as you want — every transcript fires to all of them.
-3. Open the destination and tap **Send Test Webhook** to verify it works.
+1. In Ramble on iPhone, go to **Settings → Webhook** and tap **Add destination**.
+2. Enter an HTTPS endpoint URL (from an automation platform or your own server).
+3. Tap **Send test webhook** to verify it works. Ramble shows "Test delivered" or the reason it failed.
 
-The URL must use HTTPS. Localhost, private IPs, and cloud metadata endpoints are blocked.
+The URL must use HTTPS. Localhost, loopback, private and link-local IPv4 addresses, and `.internal` hosts are refused.
 
 ## Automation Platforms
 
-These platforms accept Ramble's webhook out of the box — create a webhook trigger, copy the URL, paste it into Ramble:
+These platforms accept Ramble's webhook out of the box. Create a webhook trigger, copy the URL, paste it into Ramble:
 
 - **Zapier** — Use the "Webhooks by Zapier" Catch Hook trigger. Setup guide: https://help.zapier.com/hc/en-us/articles/8496288690317-Trigger-Zaps-from-webhooks
 - **Make** — Use the Custom Webhook module. Setup guide: https://www.make.com/en/help/tools/webhooks
 - **Airtable** — Use the "When webhook received" automation trigger. Setup guide: https://support.airtable.com/docs/when-webhook-received-trigger
 - **n8n** — Use the Webhook node. Setup guide: https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.webhook/
 
-Notion and IFTTT don't accept incoming webhooks directly — use Zapier or Make as a bridge.
-
-## Custom Endpoint Reference
-
-If you're building your own endpoint, the sections below cover the payload format, signature verification, and retry behavior.
+Notion and IFTTT don't accept incoming webhooks directly. Use Zapier or Make as a bridge.
 
 ## Request Format
 
 **Method:** `POST`
 **Content-Type:** `application/json`
 
+Webhooks go straight from the iPhone to your URL. Ramble's server never sees the URL or the secret.
+
 ### Headers
 
 - `Content-Type`: `application/json`
-- `X-Webhook-Signature`: HMAC-SHA256 digest of the raw request body, keyed with the signing secret. Format: `sha256=<hex digest>`
+- `X-Webhook-Signature`: HMAC-SHA256 of the exact request body, keyed with the signing secret. Format: `sha256=<hex digest>`
 
 ### Payload
 
@@ -242,11 +265,13 @@ If you're building your own endpoint, the sections below cover the payload forma
 
 ### Fields
 
-- `recording_id` (string, UUID v4): Unique identifier for this recording.
-- `created_at` (string, ISO 8601): When the recording was created.
-- `duration` (number): Recording duration in seconds.
-- `transcription` (string): Full transcript text. Empty string if transcription produced no output.
-- `device_id` (string, UUID): Stable per-device identifier. Not tied to any account — useful for distinguishing multiple devices.
+- `recording_id` (string, UUID): Unique identifier for this recording.
+- `created_at` (string, ISO 8601, UTC): When recording started. Unlike the agent item, this is in UTC.
+- `duration` (number): Recording length in seconds.
+- `transcription` (string): Full transcript text.
+- `device_id` (string, UUID): A random ID for this install of Ramble. Not tied to any account.
+
+Notes with no speech detected are not sent.
 
 ## Response
 
@@ -254,17 +279,17 @@ Return any **2xx** status code within **10 seconds** to acknowledge receipt. The
 
 ## Retry Behavior
 
-If the endpoint returns a non-2xx status or the request fails, Ramble retries up to 3 times with exponential backoff:
+If the endpoint returns a non-2xx status or the request fails, Ramble tries 3 times in total:
 
-- 1st retry: ~5 seconds
-- 2nd retry: ~30 seconds
-- 3rd retry: ~120 seconds
+- 1st attempt: when the iPhone has the transcript
+- 2nd attempt: 30 seconds later
+- 3rd attempt: 2 minutes after that
 
-After 3 failed retries, the webhook is marked as failed. The user can manually retry from the recording detail screen. Pending webhooks persist to disk so nothing is lost if the app is closed.
+Then the note is marked "Didn't send". Tapping Retry on the note starts 3 fresh attempts. Pending webhooks survive the app closing and wait while the iPhone is locked.
 
 ## Signature Verification
 
-Every request includes an `X-Webhook-Signature` header — an HMAC-SHA256 digest of the raw request body, keyed with the destination's signing secret (each destination has its own). Copy the secret from the destination's detail screen in **Settings → Send via Webhook**. Always verify this before processing. Use constant-time comparison to prevent timing attacks.
+Every request includes an `X-Webhook-Signature` header: an HMAC-SHA256 digest of the raw request body, keyed with the signing secret. Reveal and copy the secret under **Settings → Webhook → Edit destination**. Always verify this before processing. Use constant-time comparison to prevent timing attacks. If the user taps Regenerate, your endpoint needs the new secret.
 
 ### Verification Function (Node.js)
 
@@ -326,10 +351,11 @@ app.listen(3000, () => console.log("Listening on :3000"));
 
 ## Test Webhooks
 
-Open a destination from **Settings → Send via Webhook** and tap **Send Test Webhook** to fire a test payload at that destination. The test payload is identical to a real one, with two differences:
+Tap **Send test webhook** in **Settings → Webhook** to fire a test payload. It has the same shape as a real one, with:
 
-- `test` is `true`
-- `recording_id` is prefixed with `test-`
+- `test` set to `true`
+- `recording_id` starting with `test-`
+- `duration` 0 and the text "This is a test webhook from Ramble."
 
 Filter on either field to skip test payloads in production.
 
@@ -346,7 +372,7 @@ Filter on either field to skip test payloads in production.
 
 ## Timing
 
-Webhooks fire after transcription completes — not after recording. Transcription timing depends on audio length and network conditions. The webhook queue is independent from transcription — a slow or failing webhook never blocks the UI or other recordings.
+Webhooks fire once the iPhone has the transcript, not when recording stops. For a watch note, that's when the iPhone next pulls the transcript from Ramble's server. A slow or failing webhook never blocks other notes.
 
 # Part 3: Requirements and troubleshooting
 
@@ -356,33 +382,50 @@ Human-readable version: https://ramble.watch/docs/help
 
 - iPhone: iOS 26.2 or later.
 - Apple Watch: watchOS 10.0 or later. That's Apple Watch Series 4 and later, every Apple Watch SE, and every Apple Watch Ultra.
+- A connection now and then. Recording works anywhere; transcription happens in the cloud, so notes send once the watch has Wi-Fi, cellular, or the iPhone nearby.
 - Check versions: iPhone Settings → General → About. For the watch: Watch app on the iPhone → General → About.
 
 ## Apple Watch
 
 - **The iPhone app installed, but the watch app didn't.** Check the watch's watchOS version first. Below 10.0, the App Store installs the iPhone app and silently skips the watch app; update the watch in Watch app → General → Software Update. If the version is fine: Watch app on the iPhone → Available Apps → Install next to Ramble. Turn on Watch app → App Store → Automatic App Install so it happens on its own next time.
-- **"Allow microphone in Settings" on the watch.** On the watch: Settings → Privacy & Security → Microphone → turn on Ramble.
-- **"Saved on watch" or "Sending to iPhone".** Normal when the iPhone isn't nearby. Recordings stay on the watch until the iPhone has them, then send on their own. If one seems stuck with the iPhone close by, open Ramble on the iPhone.
+- **"Set up" on the watch.** The watch isn't connected to Ramble yet. Open Ramble on the iPhone once (tap Get started the first time). The watch connects on its own and waiting notes send. Until then they're safe on the watch.
+- **"No phone" on the watch.** Ramble isn't on the iPhone. Install it and open it once.
+- **"Mic off" on the watch.** On the watch: Settings → Privacy & Security → Microphone → turn on Ramble.
+- **"Unlock to transcribe".** The 25 free notes are used. The note is kept on the device that recorded it. Unlock Ramble in Settings on the iPhone, and held notes transcribe on their own, from the watch too. Already bought it: Settings → Restore Purchases.
+- **"Usage limit reached".** Ramble pauses transcription after 100 hours of audio per calendar month to stop abuse. The note is kept and transcribes on its own on the date shown. If that looks wrong, tap Contact support on the note on the iPhone, or email support@ramble.watch.
+- **Notes waiting on the watch, or "Still on your watch".** The watch sends each note straight to Ramble over Wi-Fi, cellular, or the iPhone. Away from the iPhone it sends while the app is open or soon after a recording stops; in Low Power Mode, notes wait until the iPhone is back. Opening Ramble on the watch sends anything waiting. Nothing is lost.
+- **"Too long to transcribe" or "Couldn't send".** Notes stop at 60 minutes, and Ramble can't take a longer file. "Couldn't send" means the file was damaged. The audio stays on the devices.
 
 ## Transcription
 
-- **On-device transcription fails or asks for permission.** iPhone Settings → Ramble → Speech Recognition → on, then tap Retry on the recording. If the recording says Speech Model Required, tap Download Speech Model & Retry (needs a network connection once).
-- **Cloud transcription doesn't work.** It needs the optional upgrade and a network connection. If Ramble couldn't verify the device with Apple, wait and retry. Apple Speech is always available in Settings.
+- **"Transcribing…" for a long time.** Most notes take seconds. If the transcription services are busy or down, Ramble keeps trying on its own for up to 20 hours.
+- **"Couldn't transcribe".** Open the note on the iPhone and tap Retry (up to 3 times). A note that couldn't transcribe gives its free note back.
+- **"No speech detected".** Nothing to transcribe, like a pocket recording. Nothing is sent to the agent or webhook.
+- **Names or words come out wrong.** Settings → Transcription: set the Language and add names and jargon to Vocabulary.
+- **"Ramble can't finish setting up right now."** The iPhone couldn't reach Ramble, or new setups are paused for the day. Notes wait as "Waiting to send" and setup finishes on a later open.
+
+## Purchase
+
+- **Bought on another iPhone.** Open Ramble with the same Apple ID and it unlocks on its own; otherwise tap Restore Purchases in Settings.
+- **"This purchase is in use on 5 iPhones."** One purchase works on up to 5 iPhones; each fresh start after a reinstall counts as one. A spot opens when one goes 90 days without sending a note.
+- **Refunds.** Apple handles them at https://reportaproblem.apple.com.
 
 ## Your agent
 
-- **The agent isn't getting recordings.** iPhone: Settings → Connect agent shows each agent's last check and how many transcripts are waiting for it. "Hasn't checked in yet" or an old check time: the agent isn't checking; set the check up again from the agent loop in Part 1. Transcripts waiting: they reached the relay; the agent hasn't picked them up yet. Nothing waiting and nothing received: open the recording on the iPhone and tap Send to Agent.
-- **"Not sent · connect your agent" on a recording.** Ramble only sends recordings made while an agent is connected. Connect one, then open the recording and tap Send to Agent.
-- **Pairing code expired or didn't work.** A code works once and expires after 10 minutes. Settings → Connect agent → New code.
-- **401, 403, or connection errors.** 401: the agent was disconnected; pair again with a new code. 403: the HTTP client is filtered; send a User-Agent header. Sandboxed agents need ramble-transcription-proxy.jpoliachik.workers.dev on their network allowlist. See "Making requests" and "Platform notes" in Part 1.
-- **A webhook delivery failed.** Ramble retries 3 times, then marks it failed. Fix the endpoint, open the recording, and tap Resend Webhook.
+- **The agent isn't getting notes.** iPhone: Settings → Your agent shows each agent's last check-in and how many notes are waiting. "Hasn't checked in": the agent isn't checking; tap Connect again and paste the fresh message, or set the check up again from the agent loop in Part 1. "Waiting for your agent": the note is ready and the agent hasn't picked it up yet. "Not picked up": the copy expired after 30 days, was deleted, or its agent was disconnected first.
+- **"Saved, no agent connected" on a note.** An agent receives only notes recorded after it connected. Connect one; the next notes go to it.
+- **Pairing code expired or didn't work.** A code works once and expires after 10 minutes. Tap New code.
+- **401, 403, 429, or connection errors.** 401: the agent was disconnected; pair again with a new code. 403: the HTTP client is filtered; send a User-Agent header. 429: checking too often; wait Retry-After seconds. Sandboxed agents need api.ramble.watch on their network allowlist. See "Making requests" and "Platform notes" in Part 1.
+- **"Didn't send" on a note.** The webhook didn't accept it after 3 tries. Fix the endpoint, open the note, and tap Retry.
+
+Support: support@ramble.watch, https://ramble.watch/support
 
 # About Ramble
 
-- Watch app with an iPhone companion. Record on the watch; the phone transcribes and delivers.
+- Watch app with an iPhone companion. Record on the watch or the iPhone; Ramble's server transcribes and delivers.
+- Transcription: Groq Whisper v3 Turbo first. If Groq is overloaded or down, Deepgram Nova-3, then OpenAI GPT-Transcribe. All three exclude training on the audio under their API terms.
 - Requires iOS 26.2+ and watchOS 10.0+ (Series 4 and later, any SE, any Ultra).
-- One-time purchase: $4.99. Includes on-device transcription, the agent connection, and webhooks.
-- Optional upgrade: cloud transcription for $2.99/month. Never required; cancel any time and everything else keeps working.
-- No accounts. Transcripts pass through the relay and are deleted on delivery, or after 30 days (PLACEHOLDER) at most if never picked up. Audio never goes to the relay.
+- Free to download. 25 notes free, then $14.99 once. No subscription. Fair use: 100 hours of audio per calendar month.
+- No accounts. Ramble's server is a relay, not an archive. Your audio is sent to a transcription provider and deleted as soon as the transcript is ready. Transcripts are deleted when your agent picks them up, or after 30 days. Your full history lives only on your iPhone.
 - Website: https://ramble.watch
 - Docs: https://ramble.watch/docs (agent) and https://ramble.watch/docs/webhooks (webhooks)

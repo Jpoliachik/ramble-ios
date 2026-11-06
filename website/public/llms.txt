@@ -1,19 +1,26 @@
 # Ramble
 
-> Talk to your Apple Watch. Your agent handles it. Your watch is all you need: tap it and talk; the iPhone transcribes it and passes the text to your agent, which picks it up on a schedule. No accounts.
+> Talk to your Apple Watch. Your agent handles it. Tap the watch and talk; the watch sends the recording straight to Ramble's server, which transcribes it and holds the text until your agent picks it up. No accounts.
 
-Pairing: in Ramble on iPhone, Settings → Connect agent gives a single-use code. Tell your agent "I downloaded Ramble, connect it" and paste the code. The agent then pulls new transcripts and acknowledges them, which deletes them. Anything never picked up is deleted after 30 days. Audio never goes to the relay.
+Pairing: in Ramble on iPhone, Settings → Your agent → Connect your agent copies a message with a single-use code like K7QX-MP4D-HN3R. The user pastes it to their agent. The agent exchanges the code for a token, then pulls new transcripts and acknowledges them, which deletes them.
 
-Relay: https://ramble-transcription-proxy.jpoliachik.workers.dev
+Privacy: Ramble's server is a relay, not an archive. Your audio is sent to a transcription provider and deleted as soon as the transcript is ready. Transcripts are deleted when your agent picks them up, or after 30 days. Your full history lives only on your iPhone.
 
-Ramble can also send each transcript to any HTTPS endpoint (webhooks).
+Transcription: Groq Whisper v3 Turbo, with Deepgram Nova-3 and then OpenAI GPT-Transcribe as fallbacks when a provider is overloaded or down.
+
+Price: Free to download. 25 notes free, then $14.99 once. No subscription.
+
+Relay: https://api.ramble.watch (https://ramble-transcription-proxy.jpoliachik.workers.dev serves the identical API)
+
+Ramble can also send each transcript to an HTTPS endpoint (webhook) from the iPhone.
 
 ## Docs
 
-- [Full reference](https://ramble.watch/llms-full.txt): Agent connection, the relay API, and the webhook API.
-- [Connect your agent](https://ramble.watch/docs): Pairing, the agent loop, and the relay API.
+- [Full reference](https://ramble.watch/llms-full.txt): Agent connection, the relay API, the webhook API, and troubleshooting.
+- [Connect your agent](https://ramble.watch/docs): Pairing, the agent loop, wake-up hooks, rate limits, and the relay API.
 - [Webhooks](https://ramble.watch/docs/webhooks): Payload format, signature verification, retries, automation platforms.
-- [Requirements and troubleshooting](https://ramble.watch/docs/help): Minimum iOS and watchOS, and fixes for a missing watch app, recordings stuck on the watch, transcription errors, and an agent that isn't picking up.
+- [Requirements and troubleshooting](https://ramble.watch/docs/help): Minimum iOS and watchOS, and fixes for a missing watch app, notes waiting on the watch, held notes, transcription errors, and an agent that isn't picking up.
+- [Support](https://ramble.watch/support): support@ramble.watch, usage limits, restoring a purchase, refunds.
 
 Requirements: iPhone on iOS 26.2 or later. Apple Watch on watchOS 10.0 or later (Series 4 and later, any SE, any Ultra). If the watch app doesn't appear after installing, the watch is usually on an older watchOS.
 
@@ -22,4 +29,5 @@ Requirements: iPhone on iOS 26.2 or later. Apple Watch on watchOS 10.0 or later 
 - [Website](https://ramble.watch)
 - [Privacy Policy](https://ramble.watch/privacy)
 - [Terms of Use](https://ramble.watch/terms)
+- [Support](https://ramble.watch/support)
 - [App Store](https://apps.apple.com/app/id6761857751)
