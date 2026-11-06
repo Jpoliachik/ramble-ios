@@ -26,6 +26,8 @@ struct ConnectAgentView: View {
     @State private var note: String?
     @State private var showDeleteConfirmation = false
     @State private var showDisconnectConfirmation = false
+    /// The one agent to disconnect, when several are connected.
+    @State private var disconnectTarget: RelayConnection?
 
     init(startPairing: Bool = false) {
         self.startPairing = startPairing
@@ -73,7 +75,24 @@ struct ConnectAgentView: View {
                     }
                 }
             } message: {
-                Text("It loses access immediately, and anything waiting for it is deleted.")
+                Text(relay.connections.count > 1
+                     ? "They lose access immediately, and anything waiting for them is deleted."
+                     : "It loses access immediately, and anything waiting for it is deleted.")
+            }
+            .confirmationDialog(
+                "Disconnect \(disconnectTarget.map(AgentHealth.displayName) ?? "this agent")?",
+                isPresented: Binding(
+                    get: { disconnectTarget != nil },
+                    set: { if !$0 { disconnectTarget = nil } }
+                ),
+                titleVisibility: .visible,
+                presenting: disconnectTarget
+            ) { connection in
+                Button("Disconnect", role: .destructive) {
+                    Task { await run { try await relay.disconnect(connection) } }
+                }
+            } message: { _ in
+                Text("It loses access immediately, and anything waiting for it is deleted. Your other agents stay connected.")
             }
             .confirmationDialog(
                 "Delete waiting notes?",
@@ -109,7 +128,7 @@ struct ConnectAgentView: View {
     private var statusScreen: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Your agent")
+                Text(relay.connections.count > 1 ? "Your agents" : "Your agent")
                     .font(.system(size: 32, design: .serif).weight(.medium))
                     .tracking(-0.3)
                     .foregroundStyle(Color.obInk)
@@ -121,15 +140,33 @@ struct ConnectAgentView: View {
                     notConnected
                 } else {
                     ForEach(relay.connections) { connection in
-                        AgentStatusCard(connection: connection) {
-                            HapticService.buttonTap()
-                            note = nil
-                            isPairing = true
-                        }
+                        AgentStatusCard(
+                            connection: connection,
+                            onConnectAgain: {
+                                HapticService.buttonTap()
+                                note = nil
+                                isPairing = true
+                            },
+                            // With one agent, the Disconnect row below covers it.
+                            onDisconnect: relay.connections.count > 1 ? { disconnectTarget = connection } : nil
+                        )
                     }
                     privacyNote
                         .padding(.top, 14)
                     actions
+                    // Most people use one agent, so this stays a quiet footnote.
+                    Button {
+                        HapticService.buttonTap()
+                        note = nil
+                        isPairing = true
+                    } label: {
+                        Text("Using more than one agent? **Connect another**")
+                            .font(.footnote)
+                            .foregroundStyle(Color.obInkFaint)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 4)
+                    .padding(.top, 10)
                 }
 
                 if let errorMessage {
@@ -223,7 +260,7 @@ struct ConnectAgentView: View {
                 showDisconnectConfirmation = true
             } label: {
                 HStack {
-                    Text("Disconnect")
+                    Text(relay.connections.count > 1 ? "Disconnect all" : "Disconnect")
                     Spacer()
                 }
                 .padding(.horizontal, 16)
@@ -262,12 +299,19 @@ enum AgentHealth: Equatable {
         self = connection.pending > 0 && stale ? .quiet : .connected
     }
 
+    /// The name the agent gave itself at pairing, or a plain fallback.
+    static func displayName(_ connection: RelayConnection) -> String {
+        connection.name ?? "Agent"
+    }
+
     /// "Checked in 2m ago · nothing waiting".
     static func summary(_ connection: RelayConnection) -> String {
         let checked: String
         if let last = connection.lastPullAt {
             let age = HomeStatusLine.age(since: last)
-            checked = age == "now" ? "Checked in just now" : "Checked in \(age) ago"
+            // "Last checked in" under a quiet card's "Hasn't checked in" heading.
+            let verb = connection.pending > 0 && age != "now" ? "Last checked in" : "Checked in"
+            checked = age == "now" ? "Checked in just now" : "\(verb) \(age) ago"
         } else {
             checked = "Hasn't checked in yet"
         }
@@ -281,10 +325,17 @@ enum AgentHealth: Equatable {
 private struct AgentStatusCard: View {
     let connection: RelayConnection
     let onConnectAgain: () -> Void
+    /// Shown only when several agents are connected.
+    var onDisconnect: (() -> Void)? = nil
 
     var body: some View {
         let health = AgentHealth(connection)
         VStack(alignment: .leading, spacing: 6) {
+            if let name = connection.name {
+                Text(name)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color.obInkFaint)
+            }
             HStack(spacing: 8) {
                 Circle()
                     .fill(health == .quiet ? Color.brandAmber : Color.green)
@@ -292,10 +343,26 @@ private struct AgentStatusCard: View {
                 Text(health == .quiet ? "Hasn't checked in" : "Connected")
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(Color.obInk)
+                Spacer(minLength: 8)
+                if let onDisconnect {
+                    // Quiet grey: the confirmation dialog carries the red.
+                    Button("Disconnect", action: onDisconnect)
+                        .font(.system(size: 14))
+                        .buttonStyle(.plain)
+                        .foregroundStyle(Color.obInkFaint)
+                }
             }
             Text(AgentHealth.summary(connection))
                 .font(.system(size: 15))
                 .foregroundStyle(Color.obInkSoft)
+            if let hook = connection.hook {
+                HStack(spacing: 4) {
+                    Image(systemName: hook.isFailing ? "bolt.slash" : "bolt.fill")
+                    Text(hook.isFailing ? "Wake-up hook isn't answering" : "Wakes up when a note arrives")
+                }
+                .font(.system(size: 13))
+                .foregroundStyle(hook.isFailing ? Color.connectAmberText : Color.obInkFaint)
+            }
 
             if health == .quiet {
                 Text("If your agent lost its setup, connect it again with a fresh message.")

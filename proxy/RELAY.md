@@ -14,10 +14,10 @@ It runs in the same Cloudflare Worker as the [transcription proxy](README.md), w
 |---|---|---|
 | Inbox | random id, hash of the app's inbox secret, created time | — |
 | Pairing code | hash of the code, inbox id, expiry; once exchanged, the issued token and connection id | the agent's first pull, replaced, or 10 minutes pass |
-| Connection | random id, inbox id, hash of the agent's token, created and last-pull times | you tap Disconnect |
+| Connection | random id, inbox id, hash of the agent's token, created and last-pull times; optionally the name the agent gave itself and its wake-up hook (URL, headers, last ping time and status) | you tap Disconnect |
 | Transcript | recording id, recorded-at time, received time, duration, text, expiry (one copy per connected agent) | the agent acks it, you disconnect, you tap Delete everything, or 30 days pass |
 
-No accounts, emails, names, IP addresses, or audio. Credentials are stored only as SHA-256 hashes, with one exception: a freshly issued agent token sits next to its pairing code until the agent first pulls with it (at most 10 minutes), so a retried exchange gets the same token back.
+No accounts, emails, names, IP addresses, or audio. Credentials are stored only as SHA-256 hashes, with one exception: a freshly issued agent token sits next to its pairing code until the agent first pulls with it (at most 10 minutes), so a retried exchange gets the same token back. An agent's wake-up hook headers can't be hashed, because the relay has to send them back out. They're encrypted at rest with AES-GCM when the Worker has the `HOOK_ENCRYPTION_KEY` secret (`npx wrangler secret put HOOK_ENCRYPTION_KEY`, any long random string), and stored as plain JSON without it. They can only start that agent's own run, which then pulls with its separate token.
 
 ## Authentication
 
@@ -41,16 +41,32 @@ JSON bodies. Errors are `{"error": "..."}`.
 | `POST` | `/inbox/status` | `{"recording_ids": [...]}` → `{"recordings": [{"recording_id", "waiting": <agents>}]}`. Up to 100 ids. `waiting: 0` means every agent acked it (or it expired or its agent was disconnected). The app uses this to show "picked up". |
 | `DELETE` | `/inbox` | → `{"deleted": <n>}` |
 | `POST` | `/pair/code` | → `201 {"code", "expires_at"}`. A new code replaces the old one. |
-| `GET` | `/connections` | → `{"connections": [{"id", "created_at", "last_pull_at", "pending"}]}` |
+| `GET` | `/connections` | → `{"connections": [{"id", "name", "created_at", "last_pull_at", "pending", "hook"}]}`. `name` is what the agent called itself, or `null`. `hook` is `null` or `{"last_ping_at", "last_status"}`; the hook URL and headers never come back to the app. |
 | `DELETE` | `/connections/:id` | → `{"status": "disconnected"}` |
 
 ### Agent
 
 | Method | Path | Body → Response |
 |---|---|---|
-| `POST` | `/pair/exchange` | `{"code": "K7QX-MP4D"}`, no auth → `201 {"token"}`. A retry with the same code returns `200` and the same token until the first pull. |
+| `POST` | `/pair/exchange` | `{"code": "K7QX-MP4D", "name": "Grok Bot"}`, no auth → `201 {"token"}`. `name` is optional (1–40 characters) and shows in the app. A retry with the same code returns `200` and the same token until the first pull. |
 | `GET` | `/inbox` | → `{"items": [{"id", "recording_id", "created_at", "received_at", "duration", "transcription"}], "has_more"}`. Oldest first, up to 50. `created_at` is passed through as the app sent it (recording start, with the phone's UTC offset); `received_at` is the relay's clock, UTC, and `null` for items queued before migration 0003. |
 | `POST` | `/inbox/ack` | `{"ids": [41, 42]}` → `{"deleted": <n>}`. Up to 500 ids. |
+| `GET` | `/agent` | → `{"name", "hook": null \| {"url", "header_names", "last_ping_at", "last_status"}}`. Header values are never echoed. |
+| `PATCH` | `/agent` | `{"name"?, "hook"?: {"url", "headers"} \| null}` → same as `GET /agent`. Setting a hook sends one test ping right away; `hook.last_status` is its HTTP status (`0` = no response). `"hook": null` removes it. |
+
+### Wake-up hooks
+
+Optional, for agents that can receive a webhook (for example a webhook-triggered routine). The agent registers its own URL and headers with `PATCH /agent`, so nothing in the app changes and the user never picks an agent type. When a transcript is queued for that agent, the relay POSTs:
+
+```json
+{"event": "ramble.notes_waiting", "text": "New Ramble notes are waiting. Pull them from …/inbox …", "pull_url": "https://…/inbox"}
+```
+
+with the agent's headers, `Content-Type: application/json`, and `User-Agent: Ramble-Relay/1`. The test ping has `"event": "ramble.test"`. The ping never carries transcript text: the agent pulls and acks as usual, so text only leaves through the token-protected pull.
+
+- **One ping per batch.** After a ping, no more go out until the agent pulls, or 10 minutes pass (`HOOK_REPING_SECONDS`). A burst of recordings is one agent run, and a broken hook gets at most one ping per 10 minutes.
+- **Best effort.** One attempt, 5-second timeout, no retries, redirects not followed. Agents should keep a slow scheduled check (hourly or daily) as a fallback.
+- **Limits.** `https://` with a public hostname only (no IPs, `localhost`, `.local` or similar). Up to 8 headers, 4 KB total; `Host`, `Content-Type`, `Content-Length`, `User-Agent`, `Cookie` and a few others can't be set.
 
 Codes are case-insensitive and ignore spaces and dashes. Unacked items come back on every pull, so if `has_more` is true, ack and pull again. A `401` on a pull means the user disconnected. A wrong method gets `405` with the right one in the error.
 
@@ -79,6 +95,7 @@ The agent-facing instructions live on the website, at https://ramble.watch/docs 
 - **Notes can arrive late and out of order** (watch out of range, Apple's paced file transfers, limited background time). See "Delivery timing" on the docs page and `docs/sync-architecture.md`.
 - **Only 401 means stop.** 403, 5xx and timeouts are transient. Every call is safe to retry.
 - **Set a User-Agent** (see below).
+- **Optional: name and wake-up hook.** Send `name` at pairing so the user can tell agents apart. If the agent can receive webhooks, register one with `PATCH /agent` and pull when pinged.
 
 To test: record "Test, remind me to water the plants" on the watch. Settings shows one waiting for the agent. After its next check the count drops to 0.
 

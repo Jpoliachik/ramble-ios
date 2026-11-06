@@ -75,7 +75,7 @@ struct SettingsView: View {
                 SettingsRow(
                     icon: "sparkles",
                     iconTint: .brandAmber,
-                    title: "Your agent",
+                    title: relay.connections.count > 1 ? "Your agents" : "Your agent",
                     subtitle: agentSubtitle,
                     dot: agentDot
                 ) {
@@ -111,6 +111,13 @@ struct SettingsView: View {
     private var agentSubtitle: String {
         guard let connection = primaryConnection else {
             return relay.hasConnectedAgents ? "Connected" : "Not connected"
+        }
+        // Several agents: name the one that needs attention, or just count them.
+        if relay.connections.count > 1 {
+            if AgentHealth(connection) == .quiet {
+                return "\(AgentHealth.displayName(connection)) hasn't checked in"
+            }
+            return "\(relay.connections.count) agents connected"
         }
         if AgentHealth(connection) == .quiet, let last = connection.lastPullAt {
             return "Hasn't checked in · \(HomeStatusLine.age(since: last))"

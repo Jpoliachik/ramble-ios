@@ -15,8 +15,9 @@ export const metadata: Metadata = {
 const AGENT_INSTRUCTIONS = `Ramble connection
 Relay: ${RELAY_URL}
 
-1. Pair. When I give you a code like ${PAIR_CODE_EXAMPLE}, POST {"code": "<the code>"}
-   to /pair/exchange and save the returned "token". If that request times out or
+1. Pair. When I give you a code like ${PAIR_CODE_EXAMPLE}, POST
+   {"code": "<the code>", "name": "<your name>"} to /pair/exchange and save the
+   returned "token". The name is optional and shows in my Ramble app. If that request times out or
    drops, send the same code again: for ${PAIR_CODE_TTL} it returns the same token.
    A 400 means the code is wrong or expired, so ask me for a new one.
    The token is a password to my transcripts: anyone who has it can read and
@@ -31,6 +32,10 @@ Relay: ${RELAY_URL}
    like that. Only if your platform can't run anything without you, schedule
    your own run instead. Hourly or even daily is fine (nothing expires for
    ${RETENTION}), and tell me how often you'll check.
+   If you can receive webhooks (an HTTPS URL that starts a run), also register
+   it: PATCH /agent with {"hook": {"url": "<your URL>", "headers":
+   {"Authorization": "<what your webhook needs>"}}}. The relay then pings that
+   URL when a new note is waiting, and you check, act, and ack as usual.
 
 3. Act. For each item, do what I asked in "transcription". "created_at" is when
    I started recording, in my local time, which can be hours before you see it
@@ -50,7 +55,7 @@ Send a User-Agent header on every request (any name, like my-agent/1.0).
 Full reference and examples: ${SITE_URL}/docs`;
 
 const API_EXAMPLE = `POST /pair/exchange
-{"code": "${PAIR_CODE_EXAMPLE}"}
+{"code": "${PAIR_CODE_EXAMPLE}", "name": "My agent"}
 → 201 {"token": "rmba_…"}          (a retry with the same code: 200, same token)
 
 GET /inbox
@@ -64,6 +69,19 @@ POST /inbox/ack
 Authorization: Bearer rmba_…
 {"ids": [41]}
 → {"deleted": 1}`;
+
+const HOOK_EXAMPLE = `PATCH /agent
+Authorization: Bearer rmba_…
+{"hook": {"url": "https://your-platform.example/run/abc",
+          "headers": {"Authorization": "Bearer <your webhook key>"}}}
+→ {"name": "My agent",
+   "hook": {"url": "https://your-platform.example/run/abc", "header_names": ["Authorization"],
+            "last_ping_at": null, "last_status": 200}}
+
+Each ping the relay sends (POST, with your headers):
+{"event": "ramble.notes_waiting",
+ "text": "New Ramble notes are waiting. Pull them from …/inbox …",
+ "pull_url": "${RELAY_URL}/inbox"}`;
 
 const WATCHER_EXAMPLE = `#!/bin/sh
 # Run every few minutes from cron, a hook, or any scheduler. Prints the inbox
@@ -209,18 +227,50 @@ export default function AgentDocs() {
                   or even daily works, since nothing expires for {RETENTION}. Tell the user the interval.
                 </li>
                 <li>
-                  <Strong>No polling at all:</Strong> if your agent has an always-on HTTPS URL that wakes it, a{" "}
-                  <Link href="/docs/webhooks" className="text-brand-text underline-offset-2 hover:underline">
-                    webhook
-                  </Link>{" "}
-                  may suit it better. See{" "}
-                  <a href="#relay-or-webhook" className="text-brand-text underline-offset-2 hover:underline">
-                    relay or webhook
-                  </a>
-                  .
+                  <Strong>No polling at all:</Strong> if your agent has an HTTPS URL that starts a run, register it as
+                  a{" "}
+                  <a href="#wake-up-hook" className="text-brand-text underline-offset-2 hover:underline">
+                    wake-up hook
+                  </a>{" "}
+                  and the relay calls it when something is waiting.
                 </li>
               </ul>
               <CodeBlock filename="watcher.sh">{WATCHER_EXAMPLE}</CodeBlock>
+            </section>
+
+            <section className="space-y-4">
+              <SectionHeader id="wake-up-hook">Wake-up hook (optional)</SectionHeader>
+              <p>
+                If your platform gives the agent a webhook URL (a webhook-triggered routine or automation), the agent
+                can register it once after pairing. The relay then calls it whenever a new note is waiting, so the
+                agent doesn&rsquo;t need frequent checks. The user doesn&rsquo;t set anything up in the app.
+              </p>
+              <CodeBlock>{HOOK_EXAMPLE}</CodeBlock>
+              <ul className="list-disc space-y-2 pl-5">
+                <li>
+                  <Strong>Test ping.</Strong> Registering sends one ping right away with{" "}
+                  <InlineCode>&quot;event&quot;: &quot;ramble.test&quot;</InlineCode>.{" "}
+                  <InlineCode>last_status</InlineCode> is its HTTP status: 2xx means it worked, 0 means no response.
+                  The test ping needs no action. If your webhook key changes, send <InlineCode>PATCH /agent</InlineCode>{" "}
+                  again with the new one.
+                </li>
+                <li>
+                  <Strong>No transcript in the ping.</Strong> When pinged, check the inbox, act, and ack as usual.
+                </li>
+                <li>
+                  <Strong>One ping per batch.</Strong> After a ping, the next waits until the agent checks the inbox,
+                  or 10 minutes pass, so a burst of notes is one run.
+                </li>
+                <li>
+                  <Strong>Best effort.</Strong> One try, no retries. Keep a slow scheduled check (daily is fine) as a
+                  backup.
+                </li>
+                <li>
+                  <Strong>Limits.</Strong> HTTPS with a public hostname, up to 8 headers.{" "}
+                  <InlineCode>{`{"hook": null}`}</InlineCode> removes it, and <InlineCode>GET /agent</InlineCode>{" "}
+                  shows what&rsquo;s registered without header values.
+                </li>
+              </ul>
             </section>
 
             <section className="space-y-4">
@@ -263,8 +313,9 @@ export default function AgentDocs() {
                   alone.
                 </li>
                 <li>
-                  The user sees every connected agent in Settings → Connect agent, with when it last checked and how many
-                  transcripts are waiting for it.
+                  The user sees every connected agent in Settings → Connect agent, with its name (if it sent one), when
+                  it last checked, and how many transcripts are waiting for it. They can disconnect each one on its
+                  own.
                 </li>
                 <li>Ramble sends only recordings made while at least one agent is connected.</li>
               </ul>
@@ -388,6 +439,16 @@ export default function AgentDocs() {
                 <li>
                   <Strong>Muse.</Strong> Use a hook: a small script watches the inbox and wakes the agent when something
                   arrives. Avoid a scheduled agent run every few minutes.
+                </li>
+                <li>
+                  <Strong>Grok Bot.</Strong> Add a routine with a webhook trigger, and register its URL and key as a{" "}
+                  <a href="#wake-up-hook" className="text-brand-text underline-offset-2 hover:underline">
+                    wake-up hook
+                  </a>{" "}
+                  with the header <InlineCode>Authorization: Bearer &lt;key&gt;</InlineCode>. The routine&rsquo;s
+                  Webhook section shows both. The key lets anyone start that routine, so give it to Grok through a
+                  secure secret card rather than ordinary chat. Add a daily scheduled check as a backup. Each routine run uses Grok
+                  usage, so avoid a schedule every few minutes.
                 </li>
                 <li>
                   <Strong>Agents in a sandbox with a network allowlist.</Strong> Add{" "}
