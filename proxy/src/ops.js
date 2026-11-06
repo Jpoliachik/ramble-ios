@@ -33,7 +33,7 @@ export async function recordAttempt(ctx, { attempts = [], fallback = false, brea
     }
   }
   if (fallback) await recordEvent(ctx, 'fallback');
-  if (breakerOpen) await recordEvent(ctx, 'breaker_open');
+  if (breakerOpen || (attempts ?? []).some((a) => a.outcome === 'breaker_open')) await recordEvent(ctx, 'breaker_open');
 }
 
 /**
