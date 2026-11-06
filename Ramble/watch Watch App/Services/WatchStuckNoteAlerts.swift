@@ -2,10 +2,10 @@
 //  WatchStuckNoteAlerts.swift
 //  watch Watch App
 //
-//  One watch notification when notes have been waiting on the watch for a
-//  long time. Waiting is normal (phone left at home, a run), so the bar is
-//  high and it's one alert for the whole backlog. The rules are in
-//  DeliveryAlertPolicy.
+//  One watch notification when a note has gone 6 hours without the server
+//  accepting it. Waiting is normal (phone left at home, a run), so the bar
+//  is high and it's one alert for the whole backlog. Held and refused notes
+//  never count. The rules are in DeliveryAlertPolicy.
 //
 
 import Foundation
@@ -28,16 +28,19 @@ final class WatchStuckNoteAlerts {
     private static let memoryKey = "stuckOnWatchAlertMemory"
     private static let nowID = "delivery.stuckOnWatch"
     private static let laterID = "delivery.stuckOnWatch.scheduled"
+    private static let askedKey = "askedForNotificationPermission"
 
     private let center = UNUserNotificationCenter.current()
 
     private init() {}
 
-    /// Call whenever the watch queue changes or the app wakes.
+    /// Call whenever a note changes or the app wakes.
     func update(now: Date = Date()) {
-        let candidates = WatchSyncQueue.shared.jobs.map {
-            StuckNoteCandidate(id: $0.id, since: $0.savedAt)
-        }
+        // Only notes the server hasn't accepted and isn't holding or refusing.
+        // A released hold counts its 6 hours from the release.
+        let candidates = WatchNoteStore.shared.notes
+            .filter { $0.upload == .waiting }
+            .map { StuckNoteCandidate(id: $0.id, since: $0.waitingSince) }
         let plan = DeliveryAlertPolicy.plan(
             candidates: candidates,
             now: now,
@@ -63,11 +66,10 @@ final class WatchStuckNoteAlerts {
                 repeats: false
             )
             add(Self.laterID, scheduled.alert, trigger: trigger)
-            // The phone's receipts only count once this app reads them, and
-            // it may be asleep with them waiting. Wake a few minutes before
-            // the alert so notes the iPhone already has cancel it, instead
-            // of a false "hasn't reached your iPhone".
-            WatchConnectivityService.shared.scheduleBackgroundRetryIfNeeded(
+            // An upload may finish while the app is asleep. Wake a few
+            // minutes before the alert so a note the server accepted in the
+            // meantime cancels it.
+            WatchRelayService.shared.scheduleBackgroundRefresh(
                 before: scheduled.fireAt.addingTimeInterval(-5 * 60)
             )
         } else {
@@ -79,21 +81,23 @@ final class WatchStuckNoteAlerts {
         let content = UNMutableNotificationContent()
         content.title = "Still on your watch"
         content.body = alert.count == 1
-            ? "1 note hasn't reached your iPhone yet. It'll send when your iPhone is nearby."
-            : "\(alert.count) notes haven't reached your iPhone yet. They'll send when your iPhone is nearby."
+            ? "1 note hasn't reached Ramble yet. It's safe here and will send on its own."
+            : "\(alert.count) notes haven't reached Ramble yet. They're safe here and will send on their own."
         content.sound = .default
         content.threadIdentifier = "delivery"
         center.add(UNNotificationRequest(identifier: id, content: content, trigger: trigger))
     }
 
-    /// Asked once there's a recording to protect, never at first launch.
+    /// Asked once, only while the app is open and a note exists.
     private func requestPermissionIfUseful() {
         guard WKApplication.shared().applicationState == .active,
-              !WatchRecordingHistory.shared.entries.isEmpty
+              !WatchNoteStore.shared.notes.isEmpty,
+              !UserDefaults.standard.bool(forKey: Self.askedKey)
         else { return }
         Task {
             let settings = await center.notificationSettings()
             guard settings.authorizationStatus == .notDetermined else { return }
+            UserDefaults.standard.set(true, forKey: Self.askedKey)
             _ = try? await center.requestAuthorization(options: [.alert, .sound])
         }
     }
