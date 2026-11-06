@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { APP_PRICE, APP_STORE_URL, CLOUD_PRICE, RETENTION } from "@/lib/site";
+import { FAIR_USE, FREE_NOTES, PRICE_STORY, PROVIDERS, RETENTION, SUPPORT_EMAIL } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Terms of Use",
-  description: "Ramble terms of use. Simple terms for a simple app.",
+  description: "Ramble terms of use: price, fair use, refunds, and the relay. Simple terms for a simple app.",
 };
 
 const link = "underline hover:text-stone-900";
 const h2 = "text-base font-semibold text-stone-900";
+const strong = "font-medium text-stone-900";
 
 export default function TermsOfUse() {
   return (
@@ -24,7 +25,7 @@ export default function TermsOfUse() {
           Terms of Use
         </h1>
         <p className="mt-2 text-sm text-stone-500">
-          Last updated: November 1, 2026
+          Last updated: November 6, 2026
         </p>
 
         <div className="mt-10 space-y-8 text-sm leading-relaxed text-stone-600">
@@ -45,44 +46,87 @@ export default function TermsOfUse() {
               provides:
             </p>
             <ul className="mt-2 list-disc pl-5 space-y-1">
-              <li>Audio recording with local storage on your devices</li>
-              <li>On-device transcription via Apple Speech</li>
+              <li>Audio recording, kept on your devices</li>
               <li>
-                Ramble Relay, which holds transcripts until an agent you have
-                connected picks them up
+                Cloud transcription by third-party providers ({PROVIDERS.map((p) => p.name).join(", ")})
               </li>
-              <li>Webhook delivery of transcripts to URLs you configure</li>
               <li>
-                Optional cloud transcription via third-party providers
-                (requires a subscription)
+                Ramble&apos;s relay, which holds transcripts until an agent you
+                have connected picks them up
+              </li>
+              <li>Webhook delivery of transcripts to a URL you configure</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className={h2}>Price</h2>
+            <p className="mt-2">{PRICE_STORY}</p>
+            <ul className="mt-2 list-disc pl-5 space-y-1">
+              <li>
+                <span className={strong}>Free notes.</span> The first{" "}
+                {FREE_NOTES} notes from your inbox transcribe for free. A note
+                that can&apos;t be transcribed gives its free note back. A note
+                with no speech uses one.
+              </li>
+              <li>
+                <span className={strong}>The unlock.</span> &ldquo;Unlock
+                Ramble&rdquo; is a one-time in-app purchase. It transcribes every
+                note from the inboxes it is linked to, with no expiry, within
+                fair use. One-time purchase. No subscription. The price in the
+                app is the App Store&apos;s price for your country.
+              </li>
+              <li>
+                <span className={strong}>Held notes.</span> Notes recorded after
+                your free notes are used are kept on your device as &ldquo;Unlock
+                to transcribe&rdquo; and transcribe once you unlock.
+              </li>
+              <li>
+                <span className={strong}>Devices.</span> One purchase unlocks
+                up to 5 iPhones, counting each iPhone (and each fresh start after
+                a reinstall) linked to it or that sent a note in the last 90
+                days. Family Sharing is not available for the unlock.
+              </li>
+              <li>
+                <span className={strong}>Refunds</span> are handled by Apple
+                under its App Store policies. A refunded purchase no longer
+                unlocks Ramble. Transcripts already made stay.
               </li>
             </ul>
           </section>
 
           <section>
-            <h2 className={h2}>Purchase and subscription</h2>
+            <h2 className={h2}>Fair use</h2>
             <p className="mt-2">
-              Ramble is a one-time purchase of {APP_PRICE} through Apple&apos;s
-              App Store.
+              Each purchase includes {FAIR_USE} (UTC), counted across every
+              iPhone and Apple Watch it unlocks and reset on the 1st. Length is
+              measured by Ramble&apos;s server. Fair use exists to stop abuse
+              and is set far above normal use. Past it, new notes are kept on
+              your device as &ldquo;Usage limit reached&rdquo; and transcribe
+              after the reset. A note that was already accepted is always
+              transcribed in full. If the limit looks wrong, email{" "}
+              <a href={`mailto:${SUPPORT_EMAIL}`} className={link}>
+                {SUPPORT_EMAIL}
+              </a>
+              .
             </p>
+          </section>
+
+          <section>
+            <h2 className={h2}>Early buyers</h2>
             <p className="mt-2">
-              Cloud transcription is an optional subscription at{" "}
-              {CLOUD_PRICE}, billed through Apple&apos;s App Store. It
-              auto-renews unless cancelled at least 24 hours before the end of
-              the current period. Cancel any time in your Apple ID settings;
-              everything else in the App keeps working.
-            </p>
-            <p className="mt-2">
-              Refunds are handled by Apple under its App Store policies.
+              If you bought Ramble before it became free to download, or your
+              cloud subscription was active when it did, every note transcribes
+              with no unlock needed, within fair use. Apple keeps billing a
+              subscription until you cancel it in your Apple ID settings.
             </p>
           </section>
 
           <section>
             <h2 className={h2}>Your data</h2>
             <p className="mt-2">
-              You own your recordings and transcripts. They are stored on your
-              devices. Transcripts you send to an agent pass through the relay
-              and are deleted on delivery. See our{" "}
+              You own your recordings and transcripts. Your full history is
+              kept on your iPhone. Audio is sent to a transcription provider and
+              deleted from Ramble&apos;s server once transcribed. See our{" "}
               <Link href="/privacy" className={link}>
                 Privacy Policy
               </Link>{" "}
@@ -91,22 +135,21 @@ export default function TermsOfUse() {
           </section>
 
           <section>
-            <h2 className={h2}>Ramble Relay</h2>
+            <h2 className={h2}>Ramble&apos;s relay</h2>
             <p className="mt-2">
               The relay is provided on a best-effort basis. Transcripts that
-              your agent has not acknowledged are deleted after {RETENTION} at
-              most.
-              Your agent must pull them within that window. A transcript deleted
-              this way is still on your iPhone, but it will not be delivered to
-              the agent again.
+              your agent has not picked up are deleted after {RETENTION} at
+              most. Your agent must pick them up within that window. A
+              transcript deleted this way is still on your iPhone, but it will
+              not be delivered to the agent again.
             </p>
             <p className="mt-2">
               When you connect an agent, you authorize it to read and
-              acknowledge the transcripts sent to your inbox. You are
-              responsible for choosing which agents to connect and for what
-              they do with your transcripts. You can revoke an agent at any
-              time with Disconnect, and delete everything queued for your
-              agents with Delete everything now.
+              acknowledge the transcripts sent to it. You are responsible for
+              choosing which agents to connect and for what they do with your
+              transcripts. You can cut an agent off at any time with Disconnect,
+              and delete everything waiting for your agents with Delete waiting
+              notes.
             </p>
           </section>
 
@@ -120,9 +163,8 @@ export default function TermsOfUse() {
               agent is subject to its provider&apos;s terms.
             </p>
             <p className="mt-2">
-              Cloud transcription is provided by third-party services (Groq,
-              Deepgram, OpenAI). Your use of cloud transcription is also subject
-              to the respective provider&apos;s terms of service.
+              Transcription is provided by third-party services (
+              {PROVIDERS.map((p) => p.name).join(", ")}).
             </p>
           </section>
 
@@ -134,9 +176,9 @@ export default function TermsOfUse() {
                 Use the App in violation of any applicable laws or regulations
               </li>
               <li>
-                Use the cloud transcription proxy or the hosted relay for
-                purposes other than Ramble&apos;s intended functionality, or
-                interfere with their operation
+                Use Ramble&apos;s server or relay for purposes other than
+                Ramble&apos;s intended functionality, or interfere with their
+                operation
               </li>
               <li>
                 Record others without their knowledge or consent where required
@@ -177,14 +219,9 @@ export default function TermsOfUse() {
           <section>
             <h2 className={h2}>Contact</h2>
             <p className="mt-2">
-              Questions about these terms? Use the support link on{" "}
-              <a
-                href={APP_STORE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={link}
-              >
-                Ramble&apos;s App Store page
+              Questions about these terms? Email{" "}
+              <a href={`mailto:${SUPPORT_EMAIL}`} className={link}>
+                {SUPPORT_EMAIL}
               </a>
               .
             </p>

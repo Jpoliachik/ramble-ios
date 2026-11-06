@@ -67,6 +67,9 @@ export default function RootLayout({
               <Link href="/docs/help" className="hover:text-stone-900 transition-colors">
                 Help
               </Link>
+              <Link href="/support" className="hover:text-stone-900 transition-colors">
+                Support
+              </Link>
               <Link href="/privacy" className="hover:text-stone-900 transition-colors">
                 Privacy
               </Link>
