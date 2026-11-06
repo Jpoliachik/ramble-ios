@@ -5,6 +5,7 @@
 
 import Combine
 import Foundation
+import UIKit
 import WatchConnectivity
 
 final class PhoneConnectivityService: NSObject, ObservableObject {
@@ -35,7 +36,15 @@ final class PhoneConnectivityService: NSObject, ObservableObject {
         let recordingId: String
         let createdAt: Date
         let duration: TimeInterval
+        /// Watch-side timing, missing from older watch builds.
+        var firstSentAt: Date?
+        var sentAt: Date?
+        var attempt: Int?
     }
+
+    /// When the watch last woke Ramble with a "wake" message. Lets the
+    /// activity log say whether a recording came in because of one.
+    private var lastWatchWakeAt: Date?
 
     // MARK: - Recording State Sync
 
@@ -125,6 +134,59 @@ final class PhoneConnectivityService: NSObject, ObservableObject {
         }
     }
 
+    /// For background launches: wait (up to 8s) for the session to activate
+    /// and for WatchConnectivity to deliver anything it queued while Ramble
+    /// wasn't running.
+    func waitForPendingWatchContent() async {
+        guard WCSession.isSupported() else { return }
+        let deadline = Date().addingTimeInterval(8)
+        while Date() < deadline,
+              WCSession.default.activationState != .activated || WCSession.default.hasContentPending {
+            try? await Task.sleep(nanoseconds: 200_000_000)
+        }
+    }
+
+    // MARK: - Delivery timeline
+
+    /// The per-hop log for a recording that just arrived from the watch:
+    /// recorded → watch started sending → reached this phone, with the
+    /// phone's lock and app state at arrival. Transcription and relay steps
+    /// add their own entries after this, so the whole path reads in order.
+    private func arrivalLog(for metadata: RecordingMetadata, receivedAt: Date) -> [ActivityEntry] {
+        let savedAt = metadata.createdAt.addingTimeInterval(metadata.duration)
+        var log = [ActivityEntry("Recorded on Apple Watch", at: metadata.createdAt)]
+
+        if let firstSentAt = metadata.firstSentAt {
+            log.append(ActivityEntry(
+                "Watch started sending, \(DateFormatters.formatGap(from: savedAt, to: firstSentAt)) after it was recorded",
+                at: firstSentAt
+            ))
+        }
+        if let sentAt = metadata.sentAt, let attempt = metadata.attempt, attempt > 1 {
+            log.append(ActivityEntry("Watch sent it again (try \(attempt))", at: sentAt))
+        }
+
+        var arrival = "Reached iPhone, \(DateFormatters.formatGap(from: savedAt, to: receivedAt)) after it was recorded"
+        if let sentAt = metadata.sentAt {
+            arrival += " and \(DateFormatters.formatGap(from: sentAt, to: receivedAt)) after the watch sent it"
+        }
+        log.append(ActivityEntry(arrival + " (\(arrivalContext(receivedAt: receivedAt)))", at: receivedAt))
+        return log
+    }
+
+    /// "iPhone locked, Ramble in background, woken by the watch"
+    private func arrivalContext(receivedAt: Date) -> String {
+        let app = UIApplication.shared
+        var parts = [
+            app.isProtectedDataAvailable ? "iPhone unlocked" : "iPhone locked",
+            app.applicationState == .active ? "Ramble open" : "Ramble in background",
+        ]
+        if let lastWatchWakeAt, receivedAt.timeIntervalSince(lastWatchWakeAt) < 60 {
+            parts.append("woken by the watch")
+        }
+        return parts.joined(separator: ", ")
+    }
+
     private func respondWithCurrentState() {
         var message: [String: Any] = [
             "type": "stateResponse",
@@ -170,6 +232,33 @@ extension PhoneConnectivityService: WCSessionDelegate {
         handleReceivedMessage(message)
     }
 
+    /// The watch's "wake" message. Sending it launches Ramble here in the
+    /// background, which is the point: WatchConnectivity then hands over any
+    /// files it was holding. The reply lists which of the watch's waiting
+    /// recordings are already saved here, so the watch can free them now.
+    func session(
+        _ session: WCSession,
+        didReceiveMessage message: [String: Any],
+        replyHandler: @escaping ([String: Any]) -> Void
+    ) {
+        guard message["type"] as? String == "wake" else {
+            replyHandler([:])
+            handleReceivedMessage(message)
+            return
+        }
+        let asked = Set((message["recordingIds"] as? [String]) ?? [])
+        let saved = storageService.loadRecordings()
+            .map(\.id.uuidString)
+            .filter { asked.contains($0) }
+        replyHandler(["type": "received", "recordingIds": saved])
+        Task { @MainActor in
+            self.lastWatchWakeAt = Date()
+            // Stay up long enough for the file to land, then transcribe and
+            // send it before iOS suspends Ramble again.
+            BackgroundTaskService.shared.beginImmediateBackgroundProcessing(keepAliveFor: 25)
+        }
+    }
+
     func session(
         _ session: WCSession,
         didReceiveApplicationContext applicationContext: [String: Any]
@@ -195,22 +284,33 @@ extension PhoneConnectivityService: WCSessionDelegate {
             }
             try FileManager.default.copyItem(at: file.fileURL, to: destinationURL)
 
-            var received = Recording(
-                id: UUID(uuidString: metadata.recordingId) ?? UUID(),
-                createdAt: metadata.createdAt,
-                duration: metadata.duration,
-                audioFileName: audioFileName
-            )
-            received.receivedAt = Date()
-            let recording = received
+            let receivedAt = Date()
 
             Task { @MainActor in
+                var recording = Recording(
+                    id: UUID(uuidString: metadata.recordingId) ?? UUID(),
+                    createdAt: metadata.createdAt,
+                    duration: metadata.duration,
+                    audioFileName: audioFileName
+                )
+                recording.receivedAt = receivedAt
+                recording.activityLog = self.arrivalLog(for: metadata, receivedAt: receivedAt)
+
                 let isNew = storageService.addRecording(recording)
                 // Confirm only what's really on disk. Before the first unlock
                 // after a restart, saving fails quietly; no receipt then
                 // means the watch keeps its copy and sends it again later.
-                if storageService.loadRecordings().contains(where: { $0.id == recording.id }) {
+                let saved = storageService.loadRecordings().first(where: { $0.id == recording.id })
+                if saved != nil {
                     self.sendReceipt(for: recording.id)
+                }
+                if !isNew, var existing = saved {
+                    // A resend of something already here means a receipt
+                    // went missing. Worth seeing when chasing a delay.
+                    existing.activityLog.append(ActivityEntry(
+                        "Watch sent it again\(metadata.attempt.map { " (try \($0))" } ?? ""); already saved, receipt resent"
+                    ))
+                    storageService.updateRecording(existing)
                 }
                 guard isNew else { return }
                 TranscriptionQueueService.shared.enqueue(recordingId: recording.id)

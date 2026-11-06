@@ -448,7 +448,7 @@ struct RecordingDetailView: View {
                                 .background((status < 300 ? Color.green : Color.red).opacity(0.12))
                                 .clipShape(.rect(cornerRadius: 4))
                         }
-                        Text(DateFormatters.timeFormatter.string(from: entry.timestamp))
+                        Text(DateFormatters.timeWithSecondsFormatter.string(from: entry.timestamp))
                             .font(.caption2.monospacedDigit())
                             .foregroundStyle(.tertiary)
                     }
