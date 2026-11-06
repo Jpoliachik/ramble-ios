@@ -9,26 +9,31 @@ enum Constants {
     enum AudioSettings {
         static let sampleRate: Double = 16000
         static let numberOfChannels: Int = 1
+        /// 32 kbps keeps a 60-minute note under the relay's 20 MB limit
+        /// (specs/transcription.md "60-minute cap").
+        static let bitRate: Int = 32000
     }
 
     enum Recording {
-        /// Duration threshold for a soft "long recording" warning (30 minutes)
-        static let longWarningDuration: TimeInterval = 30 * 60
+        /// One warning haptic and a countdown from here.
+        static let warningDuration: TimeInterval = 55 * 60
+        /// Recordings stop here, like a tapped stop.
+        static let maxDuration: TimeInterval = 60 * 60
     }
 
     enum Relay {
-        /// The hosted Ramble Relay. It's served by the same Worker as cloud
-        /// transcription (proxy/), so it shares that host and its App Attest
-        /// state. Until the Worker's D1 database is set up, relay calls get a
-        /// 503 and the Connect screen shows that error.
+        /// Ramble's relay. Identical API to https://api.ramble.watch, which
+        /// isn't routed yet.
         static let hostedBaseURL = URL(string: "https://ramble-transcription-proxy.jpoliachik.workers.dev")!
 
-        /// UserDefaults key for a developer override (Debug sheet).
+        /// UserDefaults key a staging build sets to point at another relay.
+        /// Only the Debug sheet (debug builds) edits it.
         static let baseURLOverrideKey = "relayBaseURLOverride"
 
-        /// What the relay's RETENTION_SECONDS is set to, in days. Shown in the
-        /// privacy copy; keep in sync with proxy/wrangler.toml.
-        static let unclaimedRetentionDays = 30
+        /// Debug builds only: X-Dev-Bypass for a local `wrangler dev` relay.
+        static let devBypassKey = "devOverrideKey"
+
+        static let supportEmail = "support@ramble.watch"
 
         static var baseURL: URL {
             if let override = UserDefaults.standard.string(forKey: baseURLOverrideKey),
@@ -38,19 +43,5 @@ enum Constants {
             }
             return hostedBaseURL
         }
-    }
-
-    enum Transcription {
-        /// Maximum file size for a single cloud upload (24 MB, under Whisper's 25 MB limit)
-        static let maxSingleUploadSize = 24 * 1024 * 1024
-
-        /// Maximum audio length for a single cloud upload (20 minutes).
-        /// OpenAI caps one request at 25 minutes of audio, and at 16 kHz mono
-        /// AAC that limit arrives long before the 24 MB one — 24 MB is roughly
-        /// an hour and a half of speech. Recordings past this are split.
-        static let maxSingleUploadDuration: Double = 1200
-
-        /// Duration per chunk when splitting large audio files (20 minutes)
-        static let chunkDurationSeconds: Double = 1200
     }
 }
