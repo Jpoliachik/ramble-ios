@@ -17,16 +17,21 @@ enum WatchUploadState: String, Codable {
     case waiting
     /// 402 free_notes_used: held until Ramble is unlocked.
     case heldUnlock
-    /// 402 fair_use: held until the reset time the server gave.
-    case heldFairUse
     /// 413: refused for good as over the length or size limit.
     case refusedTooLong
-    /// 415, or 400 bad_upload: refused for good for another reason.
+    /// 415, 400 bad_upload, or 403 suspended: refused for good for another reason.
     case refusedBadUpload
     /// The server stored the audio and created the note.
     case accepted
     /// The audio went missing before the server accepted it.
     case lost
+
+    /// A state saved by an older build that no longer exists (such as a
+    /// usage-limit hold) reads as waiting, so the note uploads again.
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = WatchUploadState(rawValue: raw) ?? .waiting
+    }
 }
 
 /// The note's `status` on the server, once accepted.
@@ -62,10 +67,8 @@ struct WatchNoteRecord: Codable, Identifiable, Equatable {
     var failureCount: Int
     /// The next backoff retry while the app is open.
     var nextAttemptAt: Date?
-    /// A wait the server asked for (429, fair-use reset, clock ahead).
+    /// A wait the server asked for (429, clock ahead).
     var notBefore: Date?
-    /// The fair-use reset the server gave, for "They will transcribe on…".
-    var fairUseResetsAt: Date?
     /// When the note reached a final state (done, failed, refused, lost).
     var finalAt: Date?
     /// When the watch learned the transcript (or silence) was ready.
@@ -94,7 +97,6 @@ struct WatchNoteRecord: Codable, Identifiable, Equatable {
         self.failureCount = 0
         self.nextAttemptAt = nil
         self.notBefore = nil
-        self.fairUseResetsAt = nil
         self.finalAt = nil
         self.doneAt = nil
         self.firstSeenAt = nil
@@ -116,14 +118,14 @@ struct WatchNoteRecord: Codable, Identifiable, Equatable {
             return true
         case .accepted:
             return status == .done || status == .failed
-        case .waiting, .heldUnlock, .heldFairUse:
+        case .waiting, .heldUnlock:
             return false
         }
     }
 
     /// Still to be accepted by the server (waiting or held).
     var isUnaccepted: Bool {
-        upload == .waiting || upload == .heldUnlock || upload == .heldFairUse
+        upload == .waiting || upload == .heldUnlock
     }
 
     /// Accepted and the watch still needs its final status.
@@ -135,7 +137,6 @@ struct WatchNoteRecord: Codable, Identifiable, Equatable {
     var holdValue: String {
         switch upload {
         case .heldUnlock: return "unlock"
-        case .heldFairUse: return "fairUse"
         case .refusedTooLong, .refusedBadUpload: return "refused"
         default: return "none"
         }
@@ -159,7 +160,6 @@ enum WatchNoteDisplay: Equatable {
     case done(preview: String?)
     case silent
     case heldUnlock
-    case heldFairUse
     case stuck(since: Date)
     case failed
     case lost
@@ -174,7 +174,7 @@ enum WatchNoteDisplay: Equatable {
 
     var section: Section {
         switch self {
-        case .waiting, .uploading, .transcribing, .heldFairUse: return .waiting
+        case .waiting, .uploading, .transcribing: return .waiting
         case .done, .silent: return .done
         case .heldUnlock, .stuck, .failed, .lost, .tooLong, .couldntSend: return .needsYou
         }
@@ -187,7 +187,6 @@ enum WatchNoteDisplay: Equatable {
         case .done(let preview): return preview
         case .silent: return "No speech detected"
         case .heldUnlock: return "Unlock to transcribe"
-        case .heldFairUse: return "Usage limit reached"
         case .stuck(let since): return WatchFormat.waitingReason(since: since)
         case .failed: return "Couldn't transcribe"
         case .lost: return "Audio lost"
@@ -218,8 +217,6 @@ enum WatchNoteDisplay: Equatable {
             return isUploading ? .uploading : .waiting
         case .heldUnlock:
             return .heldUnlock
-        case .heldFairUse:
-            return isUploading ? .uploading : .heldFairUse
         case .refusedTooLong:
             return .tooLong
         case .refusedBadUpload:
@@ -249,7 +246,7 @@ struct WatchNote: Identifiable {
 /// The one mark on the history button. Highest wins.
 enum WatchHistoryBadge: Equatable {
     case none
-    /// Waiting to upload, or held over fair use. A still gray dot.
+    /// Waiting to upload. A still gray dot.
     case waiting
     /// Uploading or being transcribed. A spinning ring.
     case moving
@@ -268,7 +265,7 @@ enum WatchHistoryBadge: Equatable {
                 if note.record.firstSeenAt == nil { return .needsYou }
             case .uploading, .transcribing:
                 badge = .moving
-            case .waiting, .heldFairUse:
+            case .waiting:
                 if badge == .none { badge = .waiting }
             case .done, .silent:
                 break
@@ -285,7 +282,6 @@ enum WatchAlert: String, Identifiable, Hashable {
     case noPhone
     case setUp
     case unlock
-    case limit
 
     var id: String { rawValue }
 
@@ -297,7 +293,6 @@ enum WatchAlert: String, Identifiable, Hashable {
         case .noPhone: return "No phone"
         case .setUp: return "Set up"
         case .unlock: return "Unlock"
-        case .limit: return "Limit"
         }
     }
 
@@ -307,7 +302,6 @@ enum WatchAlert: String, Identifiable, Hashable {
         case .noPhone: return "iphone.slash"
         case .setUp: return "iphone"
         case .unlock: return "lock.fill"
-        case .limit: return "hourglass"
         }
     }
 
@@ -324,12 +318,10 @@ enum WatchAlert: String, Identifiable, Hashable {
         case .noPhone: return "Ramble isn't on your iPhone"
         case .setUp: return "Open Ramble on your iPhone"
         case .unlock: return "Unlock to transcribe"
-        case .limit: return "Usage limit reached"
         }
     }
 
-    /// `resetDate` is the fair-use reset the server gave, for "Limit".
-    func detailBody(resetDate: Date? = nil) -> [String] {
+    var detailBody: [String] {
         switch self {
         case .micOff:
             return [
@@ -353,12 +345,6 @@ enum WatchAlert: String, Identifiable, Hashable {
                 "You've used your free notes. Your notes are safe on this watch.",
                 "Unlock Ramble on your iPhone and they'll transcribe on their own."
             ]
-        case .limit:
-            let when = resetDate.map { "on \(WatchFormat.resetDay($0))" } ?? "when your usage resets"
-            return [
-                "Your notes are safe on this watch.",
-                "They will transcribe \(when). If this looks wrong, contact support from Ramble on your iPhone."
-            ]
         }
     }
 
@@ -367,15 +353,13 @@ enum WatchAlert: String, Identifiable, Hashable {
         micBusy: Bool,
         companionAppInstalled: Bool,
         isConnected: Bool,
-        hasUnlockHold: Bool,
-        hasFairUseHold: Bool
+        hasUnlockHold: Bool
     ) -> WatchAlert? {
         if micDenied { return .micOff }
         if micBusy { return .micBusy }
         if !companionAppInstalled { return .noPhone }
         if !isConnected { return .setUp }
         if hasUnlockHold { return .unlock }
-        if hasFairUseHold { return .limit }
         return nil
     }
 }
@@ -391,14 +375,6 @@ enum WatchDates {
         return formatter.string(from: date)
     }
 
-    /// Reads the relay's times, e.g. "2026-12-01T00:00:00.000Z".
-    static func parse(_ text: String) -> Date? {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = formatter.date(from: text) { return date }
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter.date(from: text)
-    }
 }
 
 enum WatchFormat {
@@ -437,13 +413,6 @@ enum WatchFormat {
         }
         let hours = Int(seconds / 3600)
         return hours == 1 ? "Waiting 1 hour" : "Waiting \(hours) hours"
-    }
-
-    /// "Dec 1". The fair-use reset is midnight UTC, so it's read in UTC.
-    static func resetDay(_ date: Date) -> String {
-        var style = Date.FormatStyle().month(.abbreviated).day()
-        style.timeZone = TimeZone(identifier: "UTC") ?? .current
-        return date.formatted(style)
     }
 
     /// First non-empty line of a transcript, kept short.

@@ -12,12 +12,5 @@ struct RelayAccount: Codable, Equatable {
     var unlocked: Bool
     var freeNotesTotal: Int
     var freeNotesRemaining: Int
-    var fairUse: RelayFairUse?
     var accountToken: String?
-}
-
-struct RelayFairUse: Codable, Equatable {
-    var usedHours: Double
-    var limitHours: Double
-    var resetsAt: Date
 }

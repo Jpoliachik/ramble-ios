@@ -412,7 +412,6 @@ final class RelayService: ObservableObject {
             unlocked: false,
             freeNotesTotal: 25,
             freeNotesRemaining: 25,
-            fairUse: nil,
             accountToken: created.accountToken
         ))
         // A fresh inbox needs a fresh watch connection, and the real account state.

@@ -54,13 +54,12 @@ final class UploadQueueService: ObservableObject {
         processNextIfNeeded()
     }
 
-    /// Ramble opened or woke: try everything now. Fair-use holds retry here
-    /// too; unlock holds wait for the unlock.
+    /// Ramble opened or woke: try everything now. Unlock holds wait for the
+    /// unlock.
     func resume(appOpened: Bool = false) {
         if appOpened {
             backoff = [:]
             saveBackoff()
-            releaseHolds { $0 == .fairUse }
         }
         processNextIfNeeded()
     }
@@ -103,7 +102,6 @@ final class UploadQueueService: ObservableObject {
         guard recording.source == .phone, recording.status == .recorded else { return false }
         switch recording.hold {
         case nil: return recording.hasAudio
-        case .fairUse: return (recording.holdUntil ?? .distantPast) <= now && recording.hasAudio
         case .unlock, .tooLong, .couldntSend: return false
         }
     }
@@ -123,7 +121,6 @@ final class UploadQueueService: ObservableObject {
             guard let hold = recordings[i].hold, matches(hold),
                   recordings[i].source == .phone || recordings[i].retryRequested else { continue }
             recordings[i].hold = nil
-            recordings[i].holdUntil = nil
             recordings[i].releasedAt = now
             changed = true
         }
@@ -139,14 +136,6 @@ final class UploadQueueService: ObservableObject {
         }
         let id = recording.id
         let isRetry = recording.retryRequested
-        if recording.hold == .fairUse {
-            // Its reset time has passed: try again.
-            storage.update(id) {
-                $0.hold = nil
-                $0.holdUntil = nil
-                $0.releasedAt = Date()
-            }
-        }
 
         let response: RelayService.UploadResponse
         do {
@@ -175,7 +164,6 @@ final class UploadQueueService: ObservableObject {
             clearBackoff(id)
             storage.update(id) {
                 $0.hold = nil
-                $0.holdUntil = nil
                 $0.lastError = nil
                 if isRetry {
                     $0.retryRequested = false
@@ -199,26 +187,20 @@ final class UploadQueueService: ObservableObject {
 
         case 402:
             clearBackoff(id)
-            if response.reason == "fair_use" {
-                let wait = response.retryAfter ?? 3600
-                storage.update(id) {
-                    $0.hold = .fairUse
-                    $0.holdUntil = Date().addingTimeInterval(wait)
-                    $0.activityLog.append(ActivityEntry("Held: usage limit reached", httpStatus: 402))
-                }
-                scheduleWake()
-            } else {
-                storage.update(id) {
-                    $0.hold = .unlock
-                    $0.activityLog.append(ActivityEntry("Held until Ramble is unlocked", httpStatus: 402))
-                }
-                AccountService.shared.noteFreeNotesUsed()
+            storage.update(id) {
+                $0.hold = .unlock
+                $0.activityLog.append(ActivityEntry("Held until Ramble is unlocked", httpStatus: 402))
             }
+            AccountService.shared.noteFreeNotesUsed()
 
         case 413:
             refuseForGood(id, as: .tooLong, response)
 
         case 415:
+            refuseForGood(id, as: .couldntSend, response)
+
+        case 403 where response.reason == "suspended":
+            // Uploads from this setup were paused by hand: a plain refusal.
             refuseForGood(id, as: .couldntSend, response)
 
         case 400 where response.reason == "recorded_in_future":
@@ -285,14 +267,11 @@ final class UploadQueueService: ObservableObject {
         saveBackoff()
     }
 
-    /// Re-run when the earliest backoff or fair-use reset ends, while alive.
+    /// Re-run when the earliest backoff ends, while alive.
     private func scheduleWake() {
         wakeTask?.cancel()
         let now = Date()
-        let holds = storage.loadRecordings()
-            .filter { $0.hold == .fairUse && $0.source == .phone }
-            .compactMap(\.holdUntil)
-        guard let next = (backoff.values.map(\.nextAt) + holds).filter({ $0 > now }).min() else { return }
+        guard let next = backoff.values.map(\.nextAt).filter({ $0 > now }).min() else { return }
         let delay = max(1, next.timeIntervalSince(now))
         wakeTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: UInt64(min(delay, 86_400) * 1_000_000_000))

@@ -205,32 +205,118 @@ describe('held uploads', () => {
     assert.equal((await h.upload(secret, noteId(26))).status, 201);
   });
 
-  it('402 fair_use with Retry-After until the 1st, once 100 hours are used', async () => {
+  it('a note with a long measured length transcribes, counts toward usage, and uses no free note when unlocked', async () => {
     const { unlockTx } = await import('./harness.js');
     const { inbox_secret: secret, account_token: token } = await h.newInbox();
     await h.call('POST', '/entitlement', { auth: secret, body: { signed_transaction: unlockTx(token) } });
-    h.db.sqlite.exec(`INSERT INTO fair_use (purchase_id, month, seconds) VALUES ('unlock:otx1', '2026-11', ${100 * 3600})`);
-    const res = await h.upload(secret, noteId(1));
-    assert.equal(res.status, 402);
-    assert.equal(res.body.reason, 'fair_use');
-    assert.equal(res.headers.get('Retry-After'), String((Date.UTC(2026, 11, 1) - T0) / 1000));
-  });
-
-  it('a note crossing the allowance still transcribes, and counts its measured length', async () => {
-    const { unlockTx } = await import('./harness.js');
-    const { inbox_secret: secret, account_token: token } = await h.newInbox();
-    await h.call('POST', '/entitlement', { auth: secret, body: { signed_transaction: unlockTx(token) } });
-    h.db.sqlite.exec(`INSERT INTO fair_use (purchase_id, month, seconds) VALUES ('unlock:otx1', '2026-11', ${100 * 3600 - 600})`);
     h.measured = 59 * 60;
     h.transcribe = async () => ({ result: 'transcript', text: 'x', provider: 'groq', durationSeconds: 5 * 3600 });
     assert.equal((await h.upload(secret, noteId(1))).status, 201);
     await h.settle();
-    const seconds = h.rows('SELECT seconds FROM fair_use')[0].seconds;
-    assert.equal(seconds, 100 * 3600 - 600 + 5 * 3600);
-    assert.equal((await h.upload(secret, noteId(2))).body.reason, 'fair_use');
+    assert.deepEqual(h.rows('SELECT user_id, month, seconds FROM usage').map((r) => ({ ...r })), [
+      { user_id: 'unlock:otx1', month: '2026-11', seconds: 5 * 3600 },
+    ]);
     assert.ok(h.alerts.some((a) => a.includes('61-minute')));
-    // Unlocked notes never use free notes.
     assert.equal(await freeUsed(secret), 25);
+  });
+});
+
+describe('heavy use is monitored, never refused', () => {
+  const heavyAlerts = () => h.alerts.filter((a) => a.includes('100 hours of audio'));
+
+  it('passing 100 hours in a month alerts the operator once, and every note still transcribes', async () => {
+    const { unlockTx } = await import('./harness.js');
+    const { inbox_secret: secret, account_token: token } = await h.newInbox();
+    await h.call('POST', '/entitlement', { auth: secret, body: { signed_transaction: unlockTx(token) } });
+    h.db.sqlite.exec(`INSERT INTO usage (user_id, month, seconds) VALUES ('unlock:otx1', '2026-11', ${100 * 3600 - 600})`);
+    h.measured = 59 * 60;
+    h.transcribe = async () => ({ result: 'transcript', text: 'x', provider: 'groq', durationSeconds: 59 * 60 });
+    assert.equal((await h.upload(secret, noteId(1))).status, 201);
+    await h.settle();
+    assert.equal(heavyAlerts().length, 1);
+    assert.ok(heavyAlerts()[0].includes('unlock:otx1'));
+    assert.ok(heavyAlerts()[0].includes('2026-11'));
+
+    // Past the line, and past the alert cooldown: still accepted, no second alert.
+    h.now += 7 * HOUR;
+    for (let i = 2; i <= 4; i++) {
+      const res = await h.upload(secret, noteId(i));
+      assert.equal(res.status, 201);
+      assert.equal(res.body.status, 'done');
+    }
+    await h.cron();
+    assert.equal(heavyAlerts().length, 1);
+  });
+
+  it('counts an inbox with no purchase by its inbox ID, and only transcribed audio', async () => {
+    const secret = await h.inbox();
+    h.measured = 30;
+    h.transcribe = async () => ({ result: 'transcript', text: 'x', provider: 'groq', durationSeconds: 30 });
+    await h.upload(secret, noteId(1));
+    h.transcribe = async () => {
+      throw new TranscribeError('bad audio', { retryable: false });
+    };
+    await h.upload(secret, noteId(2));
+    await h.settle();
+    const rows = h.rows('SELECT user_id, seconds FROM usage');
+    assert.equal(rows.length, 1);
+    assert.match(rows[0].user_id, /^inb_/);
+    assert.equal(rows[0].seconds, 30);
+  });
+
+  it('starts a new tally each UTC month', async () => {
+    const secret = await h.inbox();
+    await h.upload(secret, noteId(1));
+    h.now = Date.UTC(2026, 11, 1, 0, 5);
+    await h.upload(secret, noteId(2), { recordedAt: new Date(h.now).toISOString() });
+    await h.settle();
+    assert.deepEqual(h.rows('SELECT month FROM usage ORDER BY month').map((r) => r.month), ['2026-11', '2026-12']);
+  });
+});
+
+describe('suspended users', () => {
+  it('a suspended inbox is refused with 403 suspended, storing and counting nothing; others are unaffected', async () => {
+    const secret = await h.inbox();
+    const other = await h.inbox();
+    const watch = await h.watchToken(secret);
+    assert.equal((await h.upload(secret, noteId(1))).status, 201);
+    const [{ id }] = h.rows('SELECT id FROM inboxes ORDER BY created_at, rowid LIMIT 1');
+    h.db.sqlite.exec(`UPDATE inboxes SET suspended = 1 WHERE id = '${id}'`);
+
+    for (const cred of [secret, watch]) {
+      const res = await h.upload(cred, noteId(cred === secret ? 2 : 3));
+      assert.equal(res.status, 403);
+      assert.equal(res.body.reason, 'suspended');
+    }
+    assert.equal(h.rows(`SELECT COUNT(*) AS n FROM notes WHERE inbox_id = '${id}'`)[0].n, 1);
+    assert.equal(h.bucket.objects.size, 0);
+    assert.equal(await freeUsed(secret), 24);
+    // A repeat of a note accepted before still reads its state.
+    assert.equal((await h.call('PUT', `/notes/${noteId(1)}`, { auth: secret, raw: null, headers: {} })).status, 200);
+    // Everyone else uploads as usual.
+    assert.equal((await h.upload(other, noteId(1))).status, 201);
+
+    h.db.sqlite.exec(`UPDATE inboxes SET suspended = 0 WHERE id = '${id}'`);
+    assert.equal((await h.upload(secret, noteId(2))).status, 201);
+  });
+
+  it('a suspended purchase refuses every inbox bound to it', async () => {
+    const { unlockTx } = await import('./harness.js');
+    const first = await h.newInbox();
+    await h.call('POST', '/entitlement', { auth: first.inbox_secret, body: { signed_transaction: unlockTx(first.account_token) } });
+    const second = await h.newInbox();
+    await h.call('POST', '/entitlement', { auth: second.inbox_secret, body: { signed_transaction: unlockTx(first.account_token) } });
+    const stranger = await h.inbox();
+    h.db.sqlite.exec(`UPDATE purchases SET suspended = 1 WHERE id = 'unlock:otx1'`);
+
+    for (const secret of [first.inbox_secret, second.inbox_secret]) {
+      const res = await h.upload(secret, noteId(1));
+      assert.equal(res.status, 403);
+      assert.equal(res.body.reason, 'suspended');
+    }
+    assert.equal((await h.upload(stranger, noteId(1))).status, 201);
+    // GET /account is unchanged by a suspension.
+    assert.equal((await h.call('GET', '/account', { auth: first.inbox_secret })).body.unlocked, true);
   });
 });
 

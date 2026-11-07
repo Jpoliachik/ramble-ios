@@ -28,7 +28,7 @@ itself, and the phone becomes just another reader of the result.
 | --- | --- | --- |
 | Watch → relay (audio) | Background `URLSession` upload task from file, `PUT /notes/:id`, started at Stop while the app is frontmost | Survives suspension; the system routes through the iPhone, then known Wi-Fi, then cellular [N1][N2][K4] |
 | Relay → watch (status, transcript) | Upload response (done within 8 s), then `GET /notes/:id` with a default session: every 10 s while open, on open, in refresh passes | Most notes finish in the upload answer; long ones need a read [N2] |
-| Watch → relay (account) | `GET /account` on open and in passes with held notes | Learns the unlock and the fair-use reset without the phone |
+| Watch → relay (account) | `GET /account` on open and in passes with held notes | Learns the unlock without the phone |
 | iPhone → watch (connection) | `updateApplicationContext` with `watchToken`, `relayBaseURL`, `unlocked`, `deliveryAlertsFastMode`, `sentAt` | Latest value wins, survives relaunch, delivered in the background [A1][W1] |
 | iPhone → watch (unlock) | `transferUserInfo(["type": "unlocked"])` alongside the context | Wakes the watch app in the background so held notes upload without opening it [U1][W1] |
 | Watch → iPhone (note details, holds) | `sendMessage`, falling back to `transferUserInfo` | `sendMessage` wakes the iOS app now [M1][V1]; user info is the queue that survives [U1] |
@@ -74,8 +74,8 @@ The watch never gives up on a note and never deletes audio because uploads
 fail. Network errors and 5xx: 10 s, doubling to 5 min, while the app is open;
 every open; when `NWPathMonitor` reports the path is back [N9]; and when a new
 token arrives. 429 waits `Retry-After`. 402 `free_notes_used` holds until the
-unlock (context, user info, or `GET /account`); 402 `fair_use` holds until the
-reset in `Retry-After`. 413/415/`bad_upload` are final: stop, keep the audio
+unlock (context, user info, or `GET /account`). 413/415/`bad_upload` and 403
+`suspended` are final: stop, keep the audio
 until the phone has it. 401 means the token was replaced or revoked: show "Set
 up", send `needsConnection` with `replaces`, keep reading notes the old token
 uploaded (the relay allows that for 30 days). Exact table: `specs/relay-api.md`.
@@ -87,8 +87,8 @@ uploaded (the relay allows that for 30 days). Exact table: `specs/relay-api.md`.
   for each app with a complication on the active watch face" [K3]; apps with
   a complication or in the Dock get priority and time is "not guaranteed"
   [K4]. Ramble has no complication, so expect fewer.
-- We ask every 15 minutes while notes are waiting, transcribing or held over
-  fair use, earlier for a fair-use reset, and a few minutes before a
+- We ask every 15 minutes while notes are waiting or transcribing, and a few
+  minutes before a
   scheduled stuck-note notification so an acceptance that happened in the
   meantime cancels it. A pass retries uploads, reads transcripts, and reads
   the account when notes are held.

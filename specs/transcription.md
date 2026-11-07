@@ -179,17 +179,17 @@ A note SHALL be at most 60 minutes long. The watch and the iPhone stop recording
 - THEN it is refused as too long and nothing is stored or counted
 
 ### Requirement: Length is measured on the server
-The server SHALL take each note's length from the provider's response, or from the audio file when a provider reports none, and SHALL never use a length reported by a device or by the file's own header. The full measured length SHALL count, with no cap, and a note measured at more than 61 minutes SHALL alert the operator (a file whose header understated its length). This length is what fair use, the free-tier audio breaker, usage numbers and spend estimates count.
+The server SHALL take each note's length from the provider's response, or from the audio file when a provider reports none, and SHALL never use a length reported by a device or by the file's own header. The full measured length SHALL count, with no cap, and a note measured at more than 61 minutes SHALL alert the operator (a file whose header understated its length). This length is what the heavy-use tally (purchase.md), the free-tier audio breaker, usage numbers and spend estimates count.
 
 #### Scenario: Device claims a short note
 - GIVEN a device reports a note as 10 seconds long
 - WHEN Groq reports 42 minutes of audio
-- THEN 42 minutes count toward fair use
+- THEN 42 minutes count toward the month's usage
 
 #### Scenario: Header understates the length
 - GIVEN an accepted upload whose header claims 59 minutes
 - WHEN Groq reports 5 hours of audio
-- THEN 5 hours count toward fair use, and the operator is alerted
+- THEN 5 hours count toward the month's usage, and the operator is alerted
 
 ## Failures
 
@@ -232,13 +232,13 @@ The server SHALL delete a note's audio as soon as the note has a transcript, is 
 
 ## Cost limits
 
-### Requirement: Fair use counts measured audio
-Fair use SHALL count each note's measured length against its purchase's monthly allowance (numbers, reset and what the person sees: purchase.md). An upload over the allowance SHALL be refused and nothing kept or counted (relay-api.md). A note already accepted SHALL always be transcribed, even if it takes the purchase over the allowance. A note that fails for good gives its counted length back.
+### Requirement: Heavy use is monitored, not capped
+The server SHALL add the measured length of each note that finishes (with a transcript or as "No speech detected") to its user's monthly tally and alert the operator once when a user passes 100 hours in a month (purchase.md). No upload SHALL be refused or held for usage; the operator's manual suspension is the only per-user stop (purchase.md). A note that fails for good adds nothing.
 
 #### Scenario: Crossing the line
-- GIVEN a purchase is 10 minutes under its allowance
-- WHEN a 30-minute note is accepted
-- THEN it is transcribed, and the next upload is refused as over fair use
+- GIVEN a purchase is 10 minutes under 100 hours this month
+- WHEN a 30-minute note is transcribed
+- THEN the operator is alerted once, and the next upload is accepted and transcribed as usual
 
 ### Requirement: Free-tier audio breaker
 When free inboxes together reach 200 hours of measured audio in a UTC day, the server SHALL refuse every request to create an inbox until the next UTC day (relay-api.md) and SHALL alert the operator. Notes from existing inboxes SHALL still be transcribed.
@@ -253,7 +253,7 @@ When free inboxes together reach 200 hours of measured audio in a UTC day, the s
 ### Requirement: Daily usage summary
 Once a day, between 14:00 and 14:05 UTC, the server SHALL send the operator a summary of the previous UTC day:
 - active inboxes, notes accepted and audio hours, free versus unlocked
-- new unlocks, and notes refused for free notes used or fair use
+- new unlocks, and notes refused for free notes used or a suspension
 - notes transcribed and estimated Groq spend
 - "No speech detected" count and permanent failures
 - median and 95th-percentile time from upload to transcript
@@ -269,7 +269,6 @@ The server SHALL check every minute and alert the operator when any of these hol
 - any accepted note has waited more than 5 minutes for a result
 - estimated Groq spend today is over $5.00
 - Groq rejected Ramble's key, or the key is missing
-- a purchase reached 80% of its fair-use allowance, or used it up (a person is being held)
 - the free-tier audio breaker tripped
 - more than 3% of notes finished in the last hour failed permanently, counting only hours with at least 10 finished notes
 
@@ -284,7 +283,7 @@ The server SHALL check every minute and alert the operator when any of these hol
 - THEN no stuck-note alert fires, because the server never accepted it
 
 ### Requirement: Alert cooldown
-The same alert, for the same purchase where it applies, SHALL repeat at most once every 6 hours while it still holds.
+The same alert SHALL repeat at most once every 6 hours while it still holds. The heavy-use alert is sent once per user per month (purchase.md).
 
 #### Scenario: Still stuck
 - GIVEN the stuck-note alert fired at 10:00 and the note is still waiting

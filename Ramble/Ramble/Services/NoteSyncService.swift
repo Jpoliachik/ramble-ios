@@ -146,7 +146,6 @@ final class NoteSyncService: ObservableObject {
         // belongs to that retry and stays).
         if !r.retryRequested {
             r.hold = nil
-            r.holdUntil = nil
         }
         if let accepted = note.receivedAt { r.acceptedAt = accepted }
         if let measured = note.duration, measured > 0 { r.duration = measured }

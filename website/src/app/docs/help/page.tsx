@@ -3,7 +3,6 @@ import Link from "next/link";
 import DocsSidebar from "@/components/docs-sidebar";
 import CopyLlmButton from "@/components/copy-llm-button";
 import {
-  FAIR_USE,
   FREE_NOTES,
   MIN_IOS,
   MIN_WATCHOS,
@@ -126,12 +125,6 @@ export default function HelpDocs() {
                   Your {FREE_NOTES} free notes are used. The note is saved on the device that recorded it. Unlock Ramble
                   in Settings on your iPhone, and held notes transcribe on their own, from the watch too. Bought it
                   already? Tap Restore Purchases in Settings.
-                </p>
-              </Question>
-              <Question id="usage-limit" q="A note says “Usage limit reached”">
-                <p>
-                  Ramble pauses transcription after {FAIR_USE} to stop abuse. The note is kept and transcribes on its
-                  own on the date shown. If that looks wrong, tap Contact support on the note on your iPhone.
                 </p>
               </Question>
               <Question id="stuck-on-watch" q="Notes wait on the watch, or “Still on your watch”">

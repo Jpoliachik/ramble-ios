@@ -124,7 +124,7 @@ WatchConnectivity now carries only the watch token and account state (phone → 
 | `UploadQueueService` (phone) | Uploads phone notes, handles holds, refusals, retries and hand retries |
 | `NoteSyncService` (phone) | Check-in: settings, `GET /notes` + ack, delivery status, account |
 | `RelayService` (phone) | Relay HTTP client, inbox creation (App Attest), watch token |
-| `AccountService` (phone) | Last known free notes / unlock / fair use |
+| `AccountService` (phone) | Last known free notes / unlock |
 | `PurchaseService` (phone) | StoreKit 2 unlock, restore, early-buyer proofs |
 | `PhoneConnectivityService` (phone) | WatchConnectivity: application context, note details, audio |
 | `WebhookQueueService` (phone) | Webhook delivery with retry |
@@ -137,7 +137,7 @@ WatchConnectivity now carries only the watch token and account state (phone → 
 
 - `Recording` (phone) — a note: id, createdAt, duration, source, audio, server status and result, transcript, delivery and webhook state
 - `WatchNote` (watch) — a watch note: upload state, holds, server status, first line, audio kept until safe
-- `RelayAccount` — `GET /account`: unlocked, free notes, fair use, account token
+- `RelayAccount` — `GET /account`: unlocked, free notes, account token
 - `WebhookJob` — webhook delivery job with retry
 
 ### Tech Stack
@@ -157,5 +157,5 @@ One provider and model for everyone: Groq Whisper v3 Turbo. There is no fallback
 
 - **Transcript browsing UX for v1:** Just scroll the list. No search, no tags, no folders.
 - **Watch complication:** Not in v1.
-- **Pricing:** Free download, 25 notes free, then $14.99 once. Fair use 100 hours/month per purchase. Early $4.99 buyers and active subscribers are unlocked (`specs/purchase.md`).
+- **Pricing:** Free download, 25 notes free, then $14.99 once. Fair use (100 hours/month per purchase, in the Terms) is monitored, not enforced: one operator alert per user per month past 100 hours, and a manual per-user suspend switch (`proxy/README.md`). Early $4.99 buyers and active subscribers are unlocked (`specs/purchase.md`).
 - **Platform:** Apple only (iPhone + Apple Watch). No Android, no web.

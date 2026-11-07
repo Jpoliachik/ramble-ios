@@ -2,7 +2,7 @@
 //  AccountService.swift
 //  Ramble
 //
-//  Last known account state (free notes, unlock, fair use) from the relay.
+//  Last known account state (free notes, unlock) from the relay.
 //  The server decides; the app shows what it last heard and persists it, so
 //  Settings and Home read sensibly offline.
 //

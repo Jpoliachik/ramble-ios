@@ -82,7 +82,7 @@ describe('old builds', () => {
     assert.deepEqual(await res.json(), { text: 'hello world' });
     assert.equal(h.transcribeCalls[0].opts.language, 'es');
     assert.equal(h.transcribeCalls[0].opts.model, undefined);
-    assert.equal(h.rows('SELECT seconds FROM fair_use')[0].seconds, 12);
+    assert.deepEqual(h.rows('SELECT user_id, seconds FROM usage').map((r) => ({ ...r })), [{ user_id: 'sub:s1', seconds: 12 }]);
   });
 
   it('refuses an expired subscription, a forged one, and no attestation', async () => {
@@ -93,10 +93,24 @@ describe('old builds', () => {
     assert.equal(h.transcribeCalls.length, 0);
   });
 
-  it('caps a subscription at 100 hours a month', async () => {
-    h.db.sqlite.exec(`INSERT INTO fair_use (purchase_id, month, seconds) VALUES ('sub:s1', '2026-11', ${100 * 3600})`);
+  it('never caps a subscription: past 100 hours it alerts once and keeps transcribing', async () => {
+    h.db.sqlite.exec(`INSERT INTO usage (user_id, month, seconds) VALUES ('sub:s1', '2026-11', ${100 * 3600 - 5})`);
+    for (let i = 0; i < 2; i++) {
+      assert.equal((await handleRequest(transcribeRequest(sub()), h.env(), h.deps())).status, 200);
+    }
+    assert.equal(h.alerts.filter((a) => a.includes('sub:s1 passed 100 hours')).length, 1);
+  });
+
+  it('refuses a suspended subscription with 403 suspended', async () => {
+    h.db.sqlite.exec(
+      `INSERT INTO purchases (id, kind, environment, created_at, suspended) VALUES ('sub:s1', 'suspended', 'Production', 0, 1)`,
+    );
     const res = await handleRequest(transcribeRequest(sub()), h.env(), h.deps());
-    assert.equal(res.status, 402);
+    assert.equal(res.status, 403);
+    assert.equal((await res.json()).reason, 'suspended');
+    assert.equal(h.transcribeCalls.length, 0);
+    const other = await handleRequest(transcribeRequest(sub({ originalTransactionId: 's2' })), h.env(), h.deps());
+    assert.equal(other.status, 200);
   });
 
   it('text POST /inbox queues for agents until LEGACY_UNTIL, then both paths answer 410', async () => {
@@ -168,15 +182,12 @@ describe('operator', () => {
     assert.equal(providerAlerts(), n);
   });
 
-  it('alerts when a purchase reaches 80% of fair use', async () => {
-    h.db.sqlite.exec(`INSERT INTO fair_use (purchase_id, month, seconds) VALUES ('unlock:otx1', '2026-11', ${81 * 3600})`);
-    await h.cron();
-    assert.ok(h.alerts.some((a) => a.includes('80% of fair use')));
-  });
-
   it('sends nothing without an alert webhook', async () => {
     h.envExtra = { ALERT_WEBHOOK_URL: undefined };
-    h.db.sqlite.exec(`INSERT INTO fair_use (purchase_id, month, seconds) VALUES ('unlock:otx1', '2026-11', ${100 * 3600})`);
+    const secret = await h.inbox();
+    const [{ id }] = h.rows('SELECT id FROM inboxes');
+    h.db.sqlite.exec(`INSERT INTO usage (user_id, month, seconds) VALUES ('${id}', '2026-11', ${100 * 3600 - 1})`);
+    await h.upload(secret, noteId(1));
     await h.cron();
     assert.equal(h.alerts.length, 0);
   });

@@ -38,11 +38,9 @@ enum NoteSource: String, Codable {
 enum NoteHold: String, Codable {
     /// 402 free_notes_used: waits for the unlock.
     case unlock
-    /// 402 fair_use: waits for the reset (`Recording.holdUntil`).
-    case fairUse
     /// Final refusal: over the length or size limit.
     case tooLong
-    /// Final refusal: anything else (unreadable, unsupported).
+    /// Final refusal: anything else (unreadable, unsupported, suspended).
     case couldntSend
 }
 
@@ -73,9 +71,7 @@ struct Recording: Identifiable, Codable, Hashable {
     /// For failed notes: "audio_rejected" or "retries_exhausted".
     var failureResult: String?
     var hold: NoteHold?
-    /// Fair-use holds: when the server said to try again.
-    var holdUntil: Date?
-    /// When a hold was released (unlock, fair-use reset), for the
+    /// When a hold was released (the unlock), for the
     /// "Not sent yet" alert's clock.
     var releasedAt: Date?
     /// Hand retries already accepted by the server.
@@ -115,7 +111,6 @@ struct Recording: Identifiable, Codable, Hashable {
         self.noSpeech = false
         self.failureResult = nil
         self.hold = nil
-        self.holdUntil = nil
         self.releasedAt = nil
         self.retryCount = 0
         self.retryRequested = false
@@ -160,8 +155,8 @@ struct Recording: Identifiable, Codable, Hashable {
 
         noSpeech = try c.decodeIfPresent(Bool.self, forKey: .noSpeech) ?? false
         failureResult = try c.decodeIfPresent(String.self, forKey: .failureResult)
+        // A hold an older build saved that no longer exists reads as none.
         hold = try? c.decodeIfPresent(NoteHold.self, forKey: .hold)
-        holdUntil = try c.decodeIfPresent(Date.self, forKey: .holdUntil)
         releasedAt = try c.decodeIfPresent(Date.self, forKey: .releasedAt)
         retryCount = try c.decodeIfPresent(Int.self, forKey: .retryCount) ?? 0
         retryRequested = try c.decodeIfPresent(Bool.self, forKey: .retryRequested) ?? false
@@ -204,7 +199,6 @@ struct Recording: Identifiable, Codable, Hashable {
         if noSpeech { try c.encode(noSpeech, forKey: .noSpeech) }
         try c.encodeIfPresent(failureResult, forKey: .failureResult)
         try c.encodeIfPresent(hold, forKey: .hold)
-        try c.encodeIfPresent(holdUntil, forKey: .holdUntil)
         try c.encodeIfPresent(releasedAt, forKey: .releasedAt)
         if retryCount > 0 { try c.encode(retryCount, forKey: .retryCount) }
         if retryRequested { try c.encode(retryRequested, forKey: .retryRequested) }
@@ -219,7 +213,7 @@ struct Recording: Identifiable, Codable, Hashable {
 
     private enum CodingKeys: String, CodingKey {
         case id, createdAt, duration, audioFileName, source, status, transcription
-        case noSpeech, failureResult, hold, holdUntil, releasedAt, retryCount, retryRequested
+        case noSpeech, failureResult, hold, releasedAt, retryCount, retryRequested
         case acceptedAt, finishedAt, webhookStatus, agentDelivery, receivedAt, lastError, activityLog
         // Legacy keys, read for migration only
         case relayStatus, relayUploadedAt, pickedUpAt

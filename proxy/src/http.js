@@ -85,11 +85,6 @@ export function utcMonth(ms) {
   return new Date(ms).toISOString().slice(0, 7);
 }
 
-export function nextMonthStart(ms) {
-  const d = new Date(ms);
-  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1);
-}
-
 export function baseURL(ctx) {
   return (ctx.env.RELAY_BASE_URL || ctx.origin || DEFAULT_BASE_URL).replace(/\/+$/, '');
 }

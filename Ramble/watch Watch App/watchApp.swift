@@ -31,7 +31,7 @@ struct watch_Watch_AppApp: App {
             await RelayUploadSession.shared.waitForEvents()
         }
         // Best-effort passes while the app is closed: retry waiting notes,
-        // read transcripts, retry fair-use holds after the reset.
+        // read transcripts, check the unlock for held notes.
         .backgroundTask(.appRefresh(WatchRelayService.backgroundRefreshTaskID)) {
             await WatchRelayService.shared.backgroundPass()
         }

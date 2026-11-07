@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { FAIR_USE, SUPPORT_EMAIL } from "@/lib/site";
+import { SUPPORT_EMAIL } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Support",
-  description: `Get help with Ramble. Email ${SUPPORT_EMAIL}, or find quick answers on usage limits, restoring a purchase, refunds, and setting up the watch.`,
+  description: `Get help with Ramble. Email ${SUPPORT_EMAIL}, or find quick answers on restoring a purchase, refunds, and setting up the watch.`,
 };
 
 const link = "text-brand-text underline-offset-2 hover:underline";
@@ -27,15 +27,6 @@ export default function Support() {
         </p>
 
         <div className="mt-12 space-y-8 text-sm leading-relaxed text-stone-600">
-          <section>
-            <h2 className={h2}>A note says &ldquo;Usage limit reached&rdquo;</h2>
-            <p className="mt-2">
-              To stop abuse, Ramble pauses transcription after {FAIR_USE}. Your notes are kept, and they transcribe on
-              their own on the date shown on the note. If that looks wrong, tap Contact support on the note, or email
-              us.
-            </p>
-          </section>
-
           <section>
             <h2 className={h2}>Restore your purchase on a new iPhone</h2>
             <p className="mt-2">
