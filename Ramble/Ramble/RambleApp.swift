@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UserNotifications
 
 @main
 struct RambleApp: App {
@@ -30,7 +31,9 @@ struct RambleApp: App {
             }
         }
         _ = PhoneConnectivityService.shared
-        DeliveryMonitor.shared.start()
+        // Ramble posts no notifications. Clear any an older build left.
+        UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+        UNUserNotificationCenter.current().removeAllDeliveredNotifications()
         HapticService.prepare()
 
         Task { @MainActor in
@@ -73,9 +76,6 @@ struct RambleApp: App {
                     BackgroundTaskService.shared.beginImmediateBackgroundProcessing()
                     BackgroundTaskService.shared.scheduleSyncTask()
                     BackgroundTaskService.shared.scheduleRefreshTask()
-                    // Hand any stuck-note alerts to the system now, in case
-                    // Ramble doesn't run again for a while.
-                    DeliveryMonitor.shared.evaluate()
                 }
                 .onReceive(
                     NotificationCenter.default.publisher(
@@ -85,7 +85,6 @@ struct RambleApp: App {
                     // Also covers a cold launch: upload, then check in.
                     BackgroundTaskService.shared.appDidOpen()
                     NoteSyncService.shared.startForegroundPolling()
-                    DeliveryMonitor.shared.evaluateSoon()
                 }
         }
     }

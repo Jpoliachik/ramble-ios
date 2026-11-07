@@ -18,7 +18,7 @@ import WatchKit
 enum WatchRecent {
     static func notes(now: Date = Date()) -> [WatchNote] {
         let uploading = WatchRelayService.shared.uploadingIDs
-        let stuckAfter = WatchStuckNoteAlerts.rule.threshold
+        let stuckAfter: TimeInterval = 6 * 3600
         return WatchNoteStore.shared.recent.map { record in
             WatchNote(
                 record: record,

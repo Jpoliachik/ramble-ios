@@ -67,7 +67,6 @@ final class WatchRelayService: ObservableObject {
         if connection.isConnected {
             startUpload(note)
         }
-        WatchStuckNoteAlerts.shared.update()
         scheduleBackgroundRefresh()
     }
 
@@ -94,7 +93,6 @@ final class WatchRelayService: ObservableObject {
         await pollPass(includeFailed: true, force: true)
         WatchConnectivityService.shared.resendUnconfirmedAudio()
         cleanUp()
-        WatchStuckNoteAlerts.shared.update()
         scheduleBackgroundRefresh()
     }
 
@@ -108,7 +106,6 @@ final class WatchRelayService: ObservableObject {
             await refreshAccount()
         }
         cleanUp()
-        WatchStuckNoteAlerts.shared.update()
         scheduleBackgroundRefresh()
     }
 
@@ -117,14 +114,12 @@ final class WatchRelayService: ObservableObject {
     func connectionReplaced() {
         releaseHolds([.heldUnlock])
         Task { await retryPass(force: true) }
-        WatchStuckNoteAlerts.shared.update()
     }
 
     /// The iPhone or the server says Ramble is unlocked.
     func accountUnlocked() {
         releaseHolds([.heldUnlock])
         Task { await retryPass(force: true) }
-        WatchStuckNoteAlerts.shared.update()
     }
 
     /// The person saw these notes in Recent.
@@ -282,7 +277,6 @@ final class WatchRelayService: ObservableObject {
         if let after = store.note(before.id), after.holdValue != before.holdValue {
             WatchConnectivityService.shared.sendNoteDetails(after)
         }
-        WatchStuckNoteAlerts.shared.update()
         scheduleBackgroundRefresh()
     }
 
@@ -484,7 +478,7 @@ final class WatchRelayService: ObservableObject {
     // MARK: - Background refresh
 
     /// Asks watchOS for a background pass: every 15 minutes while there is
-    /// work, sooner for a stuck-note alert `deadline`.
+    /// work, or by `deadline` when given.
     /// watchOS keeps one request, so an earlier one replaces a later one.
     func scheduleBackgroundRefresh(before deadline: Date? = nil) {
         let now = Date()

@@ -127,7 +127,7 @@ export default function HelpDocs() {
                   already? Tap Restore Purchases in Settings.
                 </p>
               </Question>
-              <Question id="stuck-on-watch" q="Notes wait on the watch, or “Still on your watch”">
+              <Question id="stuck-on-watch" q="Notes wait on the watch">
                 <p>
                   The watch sends each note straight to Ramble over Wi-Fi, cellular, or your iPhone. Away from the
                   iPhone, it sends while the app is open or soon after you stop. In Low Power Mode, watchOS turns off

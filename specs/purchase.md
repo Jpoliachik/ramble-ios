@@ -76,7 +76,7 @@ When an inbox with no free notes left and no unlock uploads a note, the server S
 - AND the note screen's "Unlock" button opens the unlock sheet
 
 ### Requirement: Held notes wait quietly
-A note held for unlock SHALL NOT be retried on a timer, SHALL NOT trigger stuck-note alerts on any device, and SHALL be kept on the recording device until it uploads.
+A note held for unlock SHALL NOT be retried on a timer and SHALL be kept on the recording device until it uploads.
 
 #### Scenario: No alert after days
 - GIVEN a note held as "Unlock to transcribe" for 3 days

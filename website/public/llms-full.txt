@@ -385,7 +385,7 @@ Human-readable version: https://ramble.watch/docs/help
 - **"No phone" on the watch.** Ramble isn't on the iPhone. Install it and open it once.
 - **"Mic off" on the watch.** On the watch: Settings → Privacy & Security → Microphone → turn on Ramble.
 - **"Unlock to transcribe".** The 25 free notes are used. The note is kept on the device that recorded it. Unlock Ramble in Settings on the iPhone, and held notes transcribe on their own, from the watch too. Already bought it: Settings → Restore Purchases.
-- **Notes waiting on the watch, or "Still on your watch".** The watch sends each note straight to Ramble over Wi-Fi, cellular, or the iPhone. Away from the iPhone it sends while the app is open or soon after a recording stops; in Low Power Mode, notes wait until the iPhone is back. Opening Ramble on the watch sends anything waiting. Nothing is lost.
+- **Notes waiting on the watch.** The watch sends each note straight to Ramble over Wi-Fi, cellular, or the iPhone. Away from the iPhone it sends while the app is open or soon after a recording stops; in Low Power Mode, notes wait until the iPhone is back. Opening Ramble on the watch sends anything waiting. Nothing is lost.
 - **"Too long to transcribe" or "Couldn't send".** Notes stop at 60 minutes, and Ramble can't take a longer file. "Couldn't send" means the file was damaged. The audio stays on the devices.
 
 ## Transcription

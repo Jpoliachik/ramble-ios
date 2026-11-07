@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UserNotifications
 
 @main
 struct watch_Watch_AppApp: App {
@@ -15,6 +16,12 @@ struct watch_Watch_AppApp: App {
     private let store = WatchNoteStore.shared
     private let connectivity = WatchConnectivityService.shared
     private let relay = WatchRelayService.shared
+
+    init() {
+        // Ramble posts no notifications. Clear any an older build left.
+        UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+        UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+    }
 
     var body: some Scene {
         WindowGroup {

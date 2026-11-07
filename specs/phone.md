@@ -1,7 +1,7 @@
 # iPhone app
 
 ## Purpose
-What the person sees and does in Ramble on iPhone: first launch, Home, recording, the notes list and note screen, playback, how history from the watch and Ramble's server comes together, Settings, stuck-note alerts, and Siri. Agents and delivery states are in [delivery.md](delivery.md); free notes, the unlock and fair use in [purchase.md](purchase.md); the watch in [watch.md](watch.md); the wire contract in [relay-api.md](relay-api.md).
+What the person sees and does in Ramble on iPhone: first launch, Home, recording, the notes list and note screen, playback, how history from the watch and Ramble's server comes together, Settings, notifications (none), and Siri. Agents and delivery states are in [delivery.md](delivery.md); free notes, the unlock and fair use in [purchase.md](purchase.md); the watch in [watch.md](watch.md); the wire contract in [relay-api.md](relay-api.md).
 
 ## First launch
 
@@ -266,25 +266,15 @@ When Ramble opens or returns to the foreground, periodically in the background a
 - WHEN Ramble runs in the background
 - THEN the transcript is saved to the note and shows next time the person opens the app
 
-## Stuck-note alerts
+## Notifications
 
-### Requirement: Phone alerts for stuck notes
-The phone SHALL send at most one "Not sent yet" notification, counting every note in it, no more than once every 6 hours, cleared when nothing is left; each note alerts once. It fires when a phone note is not accepted 6 hours after recording ended, or 6 hours after its release from a hold. Accepted, held and refused-for-good notes never trigger it, and watch notes are alerted on the watch ([watch.md](watch.md)). The body reads "1 note hasn't been sent yet. Open Ramble to send it." or "N notes haven't been sent yet. Open Ramble to send them." Agent copies left waiting SHALL NOT trigger a notification; they show only in the app (Home status, the agent screen). Notification permission SHALL be asked once, in the foreground, after onboarding, when the first note exists.
+### Requirement: No notifications
+Ramble on iPhone SHALL post no notifications and SHALL NOT ask for notification permission. Notes waiting to send or waiting for an agent show only in the app. At launch it SHALL remove any notification an earlier version posted or scheduled.
 
-#### Scenario: Alert while Ramble is closed
-- GIVEN a phone note can't upload and the person leaves the app
-- WHEN 6 hours pass, even if Ramble never runs again
-- THEN "Not sent yet" appears
-
-#### Scenario: First note
-- GIVEN onboarding is finished and the list is empty
-- WHEN the first note appears while Ramble is open
-- THEN the system notification prompt shows
-
-#### Scenario: Agent hasn't picked up for a day
-- GIVEN a note's agent copy has waited 24 hours
-- WHEN Ramble runs
-- THEN no notification is posted, and Home shows the agent status pill
+#### Scenario: Note stuck overnight
+- GIVEN a phone note has not uploaded for 12 hours
+- WHEN the person has not opened Ramble
+- THEN no notification appears, and the note shows as waiting to send next time Ramble opens
 
 ## Settings
 

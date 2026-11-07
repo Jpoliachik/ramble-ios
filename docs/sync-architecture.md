@@ -94,11 +94,9 @@ relay's clock. Exact table: `specs/relay-api.md`.
   for each app with a complication on the active watch face" [K3]; apps with
   a complication or in the Dock get priority and time is "not guaranteed"
   [K4]. Ramble has no complication, so expect fewer.
-- We ask every 15 minutes while notes are waiting or transcribing, and a few
-  minutes before a
-  scheduled stuck-note notification so an acceptance that happened in the
-  meantime cancels it. A pass retries uploads, reads transcripts, and reads
-  the account when notes are held.
+- We ask every 15 minutes while notes are waiting or transcribing. A pass
+  retries uploads, reads transcripts, and reads the account when notes are
+  held. Ramble posts no notifications on either device.
 
 ## WatchConnectivity (what it still carries)
 
@@ -110,8 +108,7 @@ relay's clock. Exact table: `specs/relay-api.md`.
   activation. The watch token also goes into the watch Keychain
   (`kSecAttrAccessibleAfterFirstUnlock`, so background passes can read it
   [L1]), with the previous token kept only to name in `replaces`.
-- The context carries nothing for debugging: the phone's fast stuck-note
-  alerts exist only in Debug builds and stay on the phone.
+- The context carries nothing for debugging.
 - An empty context is ignored, so a phone that never wrote one can't clear a
   working token.
 

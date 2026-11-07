@@ -172,7 +172,6 @@ final class WatchConnectivityService: NSObject, ObservableObject {
         } else if becameUnlocked {
             WatchRelayService.shared.accountUnlocked()
         }
-        WatchStuckNoteAlerts.shared.update()
     }
 
     /// The phone saved this audio. Only now, once the note is also final,
@@ -219,7 +218,6 @@ final class WatchConnectivityService: NSObject, ObservableObject {
         }
         // Uploads released by an unlock start from here
         await WatchRelayService.shared.retryPass(force: true)
-        WatchStuckNoteAlerts.shared.update()
     }
 }
 

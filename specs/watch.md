@@ -271,38 +271,15 @@ Each time the watch app opens, it SHALL resend any audio the iPhone has not conf
 - WHEN the person taps that row on the iPhone
 - THEN the watch sends that note's audio immediately
 
-## Stuck-note alerts
+## Notifications
 
-### Requirement: One alert for stuck notes
-The watch SHALL post one notification titled "Still on your watch" when one of its notes has gone 6 hours after recording without the server accepting it. Notes the server accepted, held notes and refused notes SHALL never count. The notification SHALL count every note that is not yet accepted and not held or refused:
-
-| Count | Body |
-|---|---|
-| 1 | "1 note hasn't reached Ramble yet. It's safe here and will send on its own." |
-| N | "N notes haven't reached Ramble yet. They're safe here and will send on their own." |
+### Requirement: No notifications
+Ramble on Apple Watch SHALL post no notifications and SHALL NOT ask for notification permission. Notes waiting to reach Ramble show only in the app. At launch it SHALL remove any notification an earlier version posted or scheduled.
 
 #### Scenario: Phone at home all day
-- GIVEN the watch has been offline for 7 hours with four notes not yet accepted, one over 6 hours old
-- WHEN the alert fires
-- THEN one notification says "4 notes haven't reached Ramble yet."
-
-#### Scenario: Held notes only
-- GIVEN five notes have been held as "Unlock to transcribe" for 2 days
-- WHEN the watch checks for stuck notes
-- THEN no notification is posted
-
-### Requirement: Alert limits
-The watch SHALL post at most one stuck-note notification every 6 hours, and each note SHALL trigger one at most once. When no notes are waiting to be accepted, a shown notification SHALL be removed. A note released from a hold SHALL count its 6 hours from the release. The notification SHALL appear on time even if the watch app does not run, and SHOULD NOT appear for notes the server accepted before it was due, unless the watch could not learn of the acceptance in time. The watch SHALL ask for notification permission once, only while the app is open and at least one note exists.
-
-#### Scenario: Note uploaded in the background
-- GIVEN a notification is due at 3 PM for one waiting note
-- WHEN that note is accepted at 2:55 PM in the background
-- THEN no notification appears at 3 PM
-
-#### Scenario: First launch
-- GIVEN the person opens Ramble on the watch for the first time
-- WHEN the home screen appears
-- THEN no notification prompt shows
+- GIVEN the watch has been offline for 7 hours with notes not yet accepted
+- WHEN the person has not opened Ramble on the watch
+- THEN no notification appears, and the notes upload on their own once the watch is online
 
 ## Siri and shortcuts
 

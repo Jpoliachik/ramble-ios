@@ -78,7 +78,6 @@ final class BackgroundTaskService {
             while self.hasActiveWork && Date() < deadline && !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 500_000_000)
             }
-            DeliveryMonitor.shared.evaluate()
         }
 
         task.expirationHandler = {
@@ -126,7 +125,6 @@ final class BackgroundTaskService {
                 if UIApplication.shared.backgroundTimeRemaining < 5 { break }
                 try? await Task.sleep(nanoseconds: 500_000_000)
             }
-            DeliveryMonitor.shared.evaluate()
             self.endImmediateBackgroundProcessing()
         }
     }
@@ -166,7 +164,6 @@ final class BackgroundTaskService {
             while self.hasActiveWork && Date() < deadline && !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
             }
-            DeliveryMonitor.shared.evaluate()
         }
 
         task.expirationHandler = {

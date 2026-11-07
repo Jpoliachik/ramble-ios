@@ -56,7 +56,6 @@ final class NoteSyncService: ObservableObject {
             await refreshDelivery()
             await AccountService.shared.refresh()
         } while syncAgain
-        DeliveryMonitor.shared.evaluateSoon()
     }
 
     /// While Ramble is on screen and a note is transcribing, check every 10
