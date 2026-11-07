@@ -4,13 +4,12 @@
 //
 //  The watch's connection to Ramble's server, as the iPhone hands it over
 //  in the WatchConnectivity application context: a watch token (rmbw_…),
-//  the relay base URL, and whether the account is unlocked. Tokens live in
-//  the Keychain. Tokens the phone has since replaced are kept too, because
-//  they still read the notes they uploaded for 30 days (relay-api.md).
+//  the relay base URL, and whether the account is unlocked. The token lives
+//  in the Keychain. A token the phone replaces is revoked on the server
+//  (relay-api.md); only the last one is kept, to name in `replaces`.
 //
 
 import Combine
-import CryptoKit
 import Foundation
 import Security
 
@@ -31,46 +30,24 @@ final class WatchConnection: ObservableObject {
     /// Can upload right now, as far as the watch knows.
     var isConnected: Bool { token != nil && !tokenRejected }
 
-    var currentRef: String? { token.map(Self.ref) }
-
     /// What to send as `replaces` in needsConnection: the current token, or
     /// the last one the watch had.
     var tokenToReplace: String? { token ?? WatchKeychain.read(Self.lastTokenAccount) }
 
     private static let tokenAccount = "watchToken"
     private static let lastTokenAccount = "lastWatchToken"
+    /// Replaced tokens kept by older builds. Deleted at launch.
     private static let oldTokensAccount = "previousWatchTokens"
     private static let rejectedKey = "watchTokenRejected"
     private static let baseURLKey = "relayBaseURL"
     private static let unlockedKey = "accountUnlocked"
-
-    /// Earlier tokens by ref, for reading notes they uploaded.
-    private var oldTokens: [String: String]
 
     private init() {
         token = WatchKeychain.read(Self.tokenAccount)
         tokenRejected = UserDefaults.standard.bool(forKey: Self.rejectedKey)
         baseURL = UserDefaults.standard.string(forKey: Self.baseURLKey).flatMap(URL.init(string:)) ?? Self.defaultBaseURL
         unlocked = UserDefaults.standard.bool(forKey: Self.unlockedKey)
-        if let data = WatchKeychain.read(Self.oldTokensAccount)?.data(using: .utf8),
-           let decoded = try? JSONDecoder().decode([String: String].self, from: data) {
-            oldTokens = decoded
-        } else {
-            oldTokens = [:]
-        }
-    }
-
-    /// A short hash that names a token without storing it next to notes.
-    static func ref(_ token: String) -> String {
-        let digest = SHA256.hash(data: Data(token.utf8))
-        return digest.prefix(12).map { String(format: "%02x", $0) }.joined()
-    }
-
-    /// The token that uploaded a note, current or replaced.
-    func token(forRef ref: String?) -> String? {
-        guard let ref else { return token }
-        if ref == currentRef { return token }
-        return oldTokens[ref]
+        WatchKeychain.delete(Self.oldTokensAccount)
     }
 
     /// Returns true when the token changed (a new connection).
@@ -80,8 +57,6 @@ final class WatchConnection: ObservableObject {
         let next = (cleaned?.isEmpty ?? true) ? nil : cleaned
         guard next != token else { return false }
         if let previous = token {
-            oldTokens[Self.ref(previous)] = previous
-            saveOldTokens()
             WatchKeychain.write(previous, account: Self.lastTokenAccount)
         }
         token = next
@@ -94,9 +69,10 @@ final class WatchConnection: ObservableObject {
         return true
     }
 
-    /// A 401 for the current token. Older tokens getting 401 change nothing.
-    func markRejected(ref: String?) {
-        guard let ref, ref == currentRef else { return }
+    /// A 401 for the token a request carried. Only the current token's 401
+    /// counts; an answer to a token already replaced changes nothing.
+    func markRejected(token rejected: String?) {
+        guard let rejected, rejected == token else { return }
         setRejected(true)
     }
 
@@ -116,25 +92,10 @@ final class WatchConnection: ObservableObject {
         return value
     }
 
-    /// Forget replaced tokens no unfinished note was uploaded with.
-    func pruneOldTokens(keeping refs: Set<String>) {
-        let kept = oldTokens.filter { refs.contains($0.key) }
-        guard kept.count != oldTokens.count else { return }
-        oldTokens = kept
-        saveOldTokens()
-    }
-
     private func setRejected(_ value: Bool) {
         guard value != tokenRejected else { return }
         tokenRejected = value
         UserDefaults.standard.set(value, forKey: Self.rejectedKey)
-    }
-
-    private func saveOldTokens() {
-        guard let data = try? JSONEncoder().encode(oldTokens),
-              let text = String(data: data, encoding: .utf8)
-        else { return }
-        WatchKeychain.write(text, account: Self.oldTokensAccount)
     }
 }
 

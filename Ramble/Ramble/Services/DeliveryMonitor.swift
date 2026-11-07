@@ -3,17 +3,14 @@
 //  Ramble
 //
 //  Stuck-note alerts on the phone (specs/phone.md "Phone alerts for stuck
-//  notes"): one notification per kind, as a count, with a cooldown, cleared
-//  once nothing is left in that kind. The rules live in DeliveryAlertPolicy;
-//  this file decides which kind each note is in.
+//  notes"): one notification, as a count, with a cooldown, cleared once
+//  nothing is left. The rules live in DeliveryAlertPolicy; this file decides
+//  which notes count.
 //
-//  Kinds:
-//  - notSent: a phone note the server hasn't accepted 6 hours after it was
-//    recorded (or released from a hold). Held and refused notes never count.
-//  - stillWaiting: agent copies still waiting 12 hours after the note
-//    reached the server. Checked only when Ramble runs.
-//
-//  Watch notes alert on the watch.
+//  A phone note counts when the server hasn't accepted it 6 hours after it
+//  was recorded (or released from a hold). Held and refused notes never
+//  count. Watch notes alert on the watch. Agent copies still waiting show
+//  only in the app (the amber card), never as a notification.
 //
 
 import Foundation
@@ -26,37 +23,35 @@ final class DeliveryMonitor {
 
     enum Stage: String, CaseIterable {
         case notSent
-        case stillWaiting
     }
 
-    /// Debug: every threshold in seconds, so an alert can be seen in one sitting.
-    static let fastModeKey = "deliveryAlertsFastMode"
     /// Notes made before this build never alert, so an upgrade doesn't
     /// surface months-old notes.
     private static let alertsSinceKey = "deliveryAlertsSince.v2"
     private static let memoryKeyPrefix = "deliveryAlertMemory.v2."
+    /// The "Still waiting for your agent" notification older builds posted.
+    private static let retiredIDs = ["delivery.stillWaiting", "delivery.stillWaiting.scheduled"]
+
+    #if DEBUG
+    /// Debug sheet only: the threshold in seconds, so an alert can be seen
+    /// in one sitting. Phone only; release builds have no such mode.
+    static let fastModeKey = "deliveryAlertsFastMode"
 
     static var isFastMode: Bool {
         get { UserDefaults.standard.bool(forKey: fastModeKey) }
-        set {
-            UserDefaults.standard.set(newValue, forKey: fastModeKey)
-            PhoneConnectivityService.shared.pushApplicationContext()
-        }
+        set { UserDefaults.standard.set(newValue, forKey: fastModeKey) }
     }
+    #endif
 
     static func rule(for stage: Stage) -> DeliveryAlertRule {
+        #if DEBUG
+        if isFastMode { return DeliveryAlertRule(threshold: 30, cooldown: 60) }
+        #endif
         let hour: TimeInterval = 3600
-        switch (stage, isFastMode) {
-        case (.notSent, false): return DeliveryAlertRule(threshold: 6 * hour, cooldown: 6 * hour)
-        case (.notSent, true): return DeliveryAlertRule(threshold: 30, cooldown: 60)
-        // Pickup happens on the agent's side, so it's only checked, never scheduled.
-        case (.stillWaiting, false): return DeliveryAlertRule(threshold: 12 * hour, cooldown: 12 * hour, canSchedule: false)
-        case (.stillWaiting, true): return DeliveryAlertRule(threshold: 60, cooldown: 60, canSchedule: false)
+        switch stage {
+        case .notSent: return DeliveryAlertRule(threshold: 6 * hour, cooldown: 6 * hour)
         }
     }
-
-    /// How long the relay keeps an agent copy nobody picked up.
-    static let relayRetention: TimeInterval = 30 * 24 * 3600
 
     private let center = UNUserNotificationCenter.current()
     private var debounceTask: Task<Void, Never>?
@@ -68,6 +63,9 @@ final class DeliveryMonitor {
         if UserDefaults.standard.object(forKey: Self.alertsSinceKey) == nil {
             UserDefaults.standard.set(Date(), forKey: Self.alertsSinceKey)
         }
+        center.removeDeliveredNotifications(withIdentifiers: Self.retiredIDs)
+        center.removePendingNotificationRequests(withIdentifiers: Self.retiredIDs)
+        UserDefaults.standard.removeObject(forKey: Self.memoryKeyPrefix + "stillWaiting")
         NotificationCenter.default.addObserver(
             forName: StorageService.recordingsDidChangeNotification,
             object: nil,
@@ -94,11 +92,10 @@ final class DeliveryMonitor {
         let since = UserDefaults.standard.object(forKey: Self.alertsSinceKey) as? Date ?? now
         let all = StorageService.shared.loadRecordings()
         let recordings = all.filter { $0.createdAt >= since }
-        let hasAgents = RelayService.shared.hasConnectedAgents
 
         var candidates: [Stage: [StuckNoteCandidate]] = [:]
         for recording in recordings {
-            guard let found = Self.stage(of: recording, hasAgents: hasAgents, now: now) else { continue }
+            guard let found = Self.stage(of: recording) else { continue }
             let (stage, entered) = found
             candidates[stage, default: []].append(StuckNoteCandidate(id: recording.id, since: entered))
         }
@@ -117,15 +114,12 @@ final class DeliveryMonitor {
         requestPermissionIfUseful(hasRecordings: !all.isEmpty)
     }
 
-    /// Which kind a note is stuck in, and since when.
-    static func stage(of recording: Recording, hasAgents: Bool, now: Date) -> (Stage, Date)? {
-        let stage = DeliveryStage(recording, hasAgents: hasAgents)
+    /// Whether a note counts as not sent, and since when.
+    static func stage(of recording: Recording) -> (Stage, Date)? {
+        let stage = DeliveryStage(recording)
         if stage == .waitingToSend, recording.source == .phone || recording.retryRequested {
             let ended = recording.createdAt.addingTimeInterval(recording.duration)
             return (.notSent, max(ended, recording.releasedAt ?? .distantPast))
-        }
-        if stage == .waitingForAgent, now.timeIntervalSince(recording.waitingSince) < relayRetention {
-            return (.stillWaiting, recording.waitingSince)
         }
         return nil
     }
@@ -164,23 +158,10 @@ final class DeliveryMonitor {
         case .notSent:
             content.title = "Not sent yet"
             content.body = "\(notes) \(one ? "hasn't" : "haven't") been sent yet. Open Ramble to send \(one ? "it" : "them")."
-        case .stillWaiting:
-            content.title = "Still waiting for your agent"
-            content.body = "Your agent hasn't picked up \(notes) since \(Self.describe(alert.oldest))."
         }
         content.sound = .default
         content.threadIdentifier = "delivery"
         center.add(UNNotificationRequest(identifier: id, content: content, trigger: trigger))
-    }
-
-    /// "9:12 AM" today, "yesterday", or "Tuesday".
-    private static func describe(_ date: Date) -> String {
-        let calendar = Calendar.current
-        if calendar.isDateInToday(date) {
-            return date.formatted(date: .omitted, time: .shortened)
-        }
-        if calendar.isDateInYesterday(date) { return "yesterday" }
-        return date.formatted(.dateTime.weekday(.wide))
     }
 
     /// Asked once, in the foreground, after onboarding, when the first note exists.

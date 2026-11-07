@@ -6,7 +6,7 @@ How Ramble is paid for: 25 free notes, then a one-time $14.99 unlock with no sub
 ## Free notes
 
 ### Requirement: 25 free notes per inbox
-Ramble SHALL transcribe the first 25 notes from an inbox for free, counted on the server by distinct note, at the moment an upload is accepted. Repeats of the same upload never count again; an accepted hand retry counts as described below. Notes from the person's watch and iPhone share one count.
+Ramble SHALL transcribe the first 25 notes from an inbox for free, counted on the server by distinct note, at the moment an upload is accepted. Repeats of the same upload never count again, and neither does a hand retry. Notes from the person's watch and iPhone share one count.
 
 #### Scenario: A retried upload never counts twice
 - GIVEN a note that was accepted, but the device never saw the reply
@@ -20,12 +20,12 @@ Ramble SHALL transcribe the first 25 notes from an inbox for free, counted on th
 - AND the other is refused with nothing kept or counted on the server, and is held on its device
 
 ### Requirement: Free note refunded only on permanent failure
-The server SHALL give back a free note when that note's transcription permanently fails ("Couldn't transcribe", transcription.md). A note that transcribes as "No speech detected" SHALL use a free note like any other. A hand retry of a failed note (transcription.md) SHALL count like the original note: before unlock it takes a free note when accepted, is held with "free_notes_used" when none are left, and gets it back if it fails permanently again; after unlock it uses no free note.
+The server SHALL give back a free note when that note's transcription permanently fails ("Couldn't transcribe", transcription.md). A note that transcribes as "No speech detected" SHALL use a free note like any other. A hand retry of a failed note (transcription.md) SHALL use no free note and SHALL never be held for unlock, whether it succeeds or fails.
 
 #### Scenario: Retry with no free notes left
 - GIVEN a locked inbox with 0 free notes left and a note that couldn't transcribe
 - WHEN the person taps "Retry"
-- THEN the server refuses it with reason "free_notes_used" and the note shows "Unlock to transcribe"
+- THEN the note transcribes, and the inbox still has 0 free notes left
 
 #### Scenario: Every provider fails for good
 - GIVEN an inbox with 10 free notes left

@@ -55,7 +55,7 @@ struct AgentDelivery: Codable, Hashable {
 
 struct Recording: Identifiable, Codable, Hashable {
     /// Hand retries of a failed transcription, per note (relay-api.md).
-    static let maxRetries = 3
+    static let maxRetries = 1
     /// How long the watch keeps audio the phone never confirmed (watch.md).
     static let watchAudioRetention: TimeInterval = 30 * 24 * 3600
 

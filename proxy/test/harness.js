@@ -87,7 +87,6 @@ export function createHarness() {
     fetches: [],
     alerts: [],
     pingStatus: 200,
-    hostsPublic: true,
     // Transcriber behavior for the next attempts: a function of the call.
     transcribe: async () => ({ result: 'transcript', text: 'hello world', provider: 'groq', model: 'whisper-large-v3-turbo', durationSeconds: 12 }),
     transcribeCalls: [],
@@ -110,7 +109,6 @@ export function createHarness() {
       if (h.pingStatus === 0) throw new Error('network down');
       return new Response(null, { status: h.pingStatus });
     },
-    resolvesPublic: async () => h.hostsPublic,
     waitUntil: (p) => h.background.push(p),
     rateLimit: h.limiter,
     clientAddress: () => '203.0.113.9',
@@ -173,7 +171,7 @@ export function createHarness() {
 
   h.connect = async (secret, name) => {
     const { code } = (await h.call('POST', '/pair/code', { auth: secret })).body;
-    const res = await h.call('POST', '/pair/exchange', { body: { code, request_id: `req-${Math.random()}-abcdefgh`, name } });
+    const res = await h.call('POST', '/pair/exchange', { body: { code, name } });
     assert.equal(res.status, 201, JSON.stringify(res.body));
     return res.body.token;
   };

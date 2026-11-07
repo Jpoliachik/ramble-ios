@@ -179,7 +179,7 @@ After every stop, the watch SHALL upload the note straight to Ramble's server ov
 - THEN the note waits on the watch and uploads the next time the app is opened or the iPhone is back in reach
 
 ### Requirement: Retry until accepted
-The watch SHALL keep every note the server has not accepted and SHALL never give up on it or delete its audio because uploads fail. It SHALL retry 10 seconds after a failure while the app is open, doubling to every 5 minutes, and whenever the app opens, a connection returns or the watch is set up. It MAY also retry in background passes, as often as watchOS allows; background retries are best effort and not promised. When the server says to wait (rate limit), the watch SHALL wait that long.
+The watch SHALL keep every note the server has not accepted and SHALL never give up on it or delete its audio because uploads fail. It SHALL retry 10 seconds after a failure while the app is open, doubling to every 5 minutes, and whenever the app opens, a connection returns or the watch is set up. It MAY also retry in background passes, as often as watchOS allows; background retries are best effort and not promised. When the server says to wait (rate limit), the watch's timed retry SHALL wait that long. The watch's clock SHALL never hold a note back: the server accepts whatever recorded time the watch sends.
 
 #### Scenario: Answer lost in transit
 - GIVEN the server accepted a note but the watch never got the answer
@@ -200,12 +200,17 @@ When the server refuses a note's audio for good (relay-api.md), the watch SHALL 
 - THEN the note shows "Couldn't send", the watch stops retrying it, and it keeps the audio until the iPhone has it
 
 ### Requirement: Status and transcript
-The watch SHALL learn each accepted note's status and transcript from the server: from the upload answer when the transcript is ready within 8 seconds (relay-api.md), otherwise every 10 seconds while the app is open, when it opens, and in background passes. When the server no longer lets the watch read an accepted note (its connection was revoked, or the note expired), the watch SHALL stop asking and show the note as Done with no first line.
+The watch SHALL learn each accepted note's status and transcript from the server: from the upload answer when the transcript is ready within 8 seconds (relay-api.md), otherwise every 10 seconds while the app is open, when it opens, and in background passes. While the server refuses the watch's connection, the watch SHALL keep the note as it is and read it again once the iPhone connects the watch. When the current connection can't find an accepted note (the iPhone set Ramble up again as a new inbox, or the note expired), the watch SHALL stop asking and show the note as Done with no first line.
 
 #### Scenario: Long note
 - GIVEN a 40-minute note was accepted but not yet transcribed
 - WHEN the person opens the app later
 - THEN the note moves to "Done" with its first line once the transcript is ready
+
+#### Scenario: Note from before a new setup
+- GIVEN a watch note was accepted, and then Ramble on the iPhone was set up again as a new inbox and connected the watch
+- WHEN the watch reads the note
+- THEN the note shows "Done" with no first line, and the watch stops asking about it
 
 ### Requirement: Keep audio until it is safe
 The watch SHALL keep a note's audio until both the transcript is done (or transcription failed, or the server refused the note) and the iPhone has confirmed it has the audio. If the iPhone never confirms, the audio SHALL be deleted 30 days after the note reaches a final state (done, failed for good, or refused for good).
@@ -238,12 +243,17 @@ Until the iPhone has connected the watch, the watch SHALL record and keep notes,
 - THEN the watch is connected and uploads all three notes
 
 ### Requirement: Connection replaced
-When the iPhone connects the watch again, the watch's previous connection SHALL stop uploading (relay-api.md). The watch SHALL keep reading notes the previous connection already uploaded until each is done, upload every note not yet accepted under the current connection, and retry its held notes.
+When the iPhone connects the watch again, the watch's previous connection SHALL stop working (relay-api.md). The watch SHALL read every accepted note with the current connection, upload every note not yet accepted under it, and retry its held notes. An answer meant for the previous connection SHALL NOT mark the current one as refused.
 
-#### Scenario: iPhone reinstalled
+#### Scenario: iPhone reconnects the watch
 - GIVEN the watch has one note accepted but not transcribed and one note waiting
-- WHEN Ramble is reinstalled on the iPhone and connects the watch again
-- THEN the accepted note still moves to "Done", and the waiting note uploads under the current connection
+- WHEN the iPhone connects the watch again with the same Ramble setup
+- THEN the accepted note still moves to "Done" with its first line, and the waiting note uploads under the current connection
+
+#### Scenario: iPhone reinstalled as a new setup
+- GIVEN the watch has one note accepted but not transcribed and one note waiting
+- WHEN Ramble is reinstalled on the iPhone without its old setup and connects the watch
+- THEN the accepted note shows "Done" with no first line, and the waiting note uploads under the new setup
 
 ### Requirement: Tell the iPhone right away
 At each stop, when the iPhone is in reach, the watch SHALL send it the note's ID, recorded time and length at once; the note SHOULD appear in the iPhone's list within 5 seconds when both are awake. The watch SHALL also tell the iPhone whenever a note becomes held for unlock or refused for good, or is released, and SHALL send the audio in the background, as a best effort, for playback.

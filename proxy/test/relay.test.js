@@ -9,7 +9,6 @@ import {
   PAIR_CODE_ALPHABET,
   cleanName,
   generatePairCode,
-  isPublicAddress,
   normalizePairCode,
   openHeaders,
   sealHeaders,
@@ -29,7 +28,7 @@ const pull = async (token) => (await h.call('GET', '/inbox', { auth: token })).b
 const ack = (token, ids) => h.call('POST', '/inbox/ack', { auth: token, body: { ids } });
 const status = (secret, ids) => h.call('POST', '/inbox/status', { auth: secret, body: { recording_ids: ids } });
 
-/** An inbox with one agent paired before the note is recorded. */
+/** An inbox with one agent connected before the note is uploaded. */
 async function setup() {
   const secret = await h.inbox();
   const agent = await h.connect(secret);
@@ -64,14 +63,22 @@ describe('the whole loop', () => {
     assert.equal(h.rows("SELECT COUNT(*) AS n FROM entries WHERE text != ''")[0].n, 0);
   });
 
-  it('copies only to agents paired before the recorded time', async () => {
+  it('copies to agents connected when the server accepted the note, whatever its recorded time', async () => {
     const secret = await h.inbox();
     h.now = T0 + 5 * MINUTE;
-    const late = await h.connect(secret);
-    h.transcribe = async () => ({ result: 'transcript', text: 'x', provider: 'groq' });
+    const early = await h.connect(secret);
+    h.now += MINUTE;
+    const releases = [];
+    h.transcribe = () => new Promise((r) => releases.push(() => r({ result: 'transcript', text: 'x', provider: 'groq' })));
+    // Recorded before the agent paired, and with a clock far ahead: neither matters.
     await h.upload(secret, noteId(1), { recordedAt: new Date(T0).toISOString() });
+    await h.upload(secret, noteId(2), { recordedAt: new Date(T0 + 30 * DAY).toISOString() });
+    h.now += MINUTE;
+    const late = await h.connect(secret);
+    releases.forEach((release) => release());
+    await h.settle();
+    assert.deepEqual((await pull(early)).items.map((i) => i.recording_id).sort(), [noteId(1), noteId(2)].sort());
     assert.equal((await pull(late)).items.length, 0);
-    assert.equal((await status(secret, [noteId(1)])).body.recordings[0].copies, 0);
   });
 
   it('gives each agent its own copy; acking one leaves the other', async () => {
@@ -154,20 +161,18 @@ describe('pairing', () => {
     assert.equal(normalizePairCode(' k7qx-mp4d 2hnv '), 'K7QXMP4D2HNV');
   });
 
-  it('a retried exchange with the same request_id gets the same key; another request_id gets 409', async () => {
+  it('a code makes one connection, once; a second exchange gets 409 and no key', async () => {
     const secret = await h.inbox();
     const { code } = (await h.call('POST', '/pair/code', { auth: secret })).body;
-    const body = { code: code.toLowerCase().replace(/-/g, ' '), request_id: 'r'.repeat(20) };
+    const body = { code: code.toLowerCase().replace(/-/g, ' ') };
     const first = await h.call('POST', '/pair/exchange', { body });
     assert.equal(first.status, 201);
     await pull(first.body.token);
     h.now += 9 * MINUTE;
     const again = await h.call('POST', '/pair/exchange', { body });
-    assert.deepEqual([again.status, again.body.token], [200, first.body.token]);
-    const thief = await h.call('POST', '/pair/exchange', { body: { ...body, request_id: 'x'.repeat(20) } });
-    assert.equal(thief.status, 409);
-    assert.equal(thief.body.reason, 'code_used');
-    assert.equal(thief.body.token, undefined);
+    assert.equal(again.status, 409);
+    assert.equal(again.body.reason, 'code_used');
+    assert.equal(again.body.token, undefined);
     assert.equal((await h.call('GET', '/connections', { auth: secret })).body.connections.length, 1);
     assert.ok(!JSON.stringify(h.rows('SELECT * FROM pair_codes')).includes(first.body.token));
     h.now += 2 * MINUTE;
@@ -178,17 +183,17 @@ describe('pairing', () => {
     const secret = await h.inbox();
     const { code: old } = (await h.call('POST', '/pair/code', { auth: secret })).body;
     const { code } = (await h.call('POST', '/pair/code', { auth: secret })).body;
-    const exchange = (c) => h.call('POST', '/pair/exchange', { body: { code: c, request_id: 'q'.repeat(16) } });
+    const exchange = (c) => h.call('POST', '/pair/exchange', { body: { code: c } });
     assert.equal((await exchange(old)).status, 400);
     h.now += 10 * MINUTE;
     assert.equal((await exchange(code)).status, 400);
   });
 
-  it('needs a request_id, and drops a bad name', async () => {
+  it('needs a code, ignores a request_id, and drops a bad name', async () => {
     const secret = await h.inbox();
     const { code } = (await h.call('POST', '/pair/code', { auth: secret })).body;
-    assert.equal((await h.call('POST', '/pair/exchange', { body: { code } })).status, 400);
-    const res = await h.call('POST', '/pair/exchange', { body: { code, request_id: 'z'.repeat(16), name: 'x'.repeat(41) } });
+    assert.equal((await h.call('POST', '/pair/exchange', { body: { request_id: 'z'.repeat(16) } })).status, 400);
+    const res = await h.call('POST', '/pair/exchange', { body: { code, request_id: 'short', name: 'x'.repeat(41) } });
     assert.equal(res.status, 201);
     assert.equal((await h.call('GET', '/connections', { auth: secret })).body.connections[0].name, null);
   });
@@ -312,17 +317,6 @@ describe('wake-up hooks', () => {
     assert.equal(h.fetches.length, 2);
   });
 
-  it('sends nothing and records 0 when the hostname resolves privately', async () => {
-    const { secret, agent } = await setup();
-    await setHook(agent, hook);
-    h.hostsPublic = false;
-    h.fetches = [];
-    await say(secret, 1);
-    await h.settle();
-    assert.equal(h.fetches.length, 0);
-    assert.equal((await h.call('GET', '/agent', { auth: agent })).body.hook.last_status, 0);
-  });
-
   it('never pings for a silent note', async () => {
     const { secret, agent } = await setup();
     await setHook(agent, hook);
@@ -341,17 +335,10 @@ describe('wake-up hooks', () => {
     assert.ok(!validateHook({ url: 'https://a.example/', headers: { 'X-Key': 'v' } }, 'https://relay.test').error);
   });
 
-  it('classifies addresses', () => {
-    for (const ip of ['10.0.0.1', '127.0.0.1', '192.168.1.5', '172.20.0.1', '169.254.1.1', '100.64.0.1', '::1', 'fd00::1', 'fe80::1', '::ffff:10.0.0.1']) {
-      assert.equal(isPublicAddress(ip), false, ip);
-    }
-    for (const ip of ['93.184.216.34', '2606:4700::1111']) assert.equal(isPublicAddress(ip), true, ip);
-  });
-
-  it('round-trips sealed headers and still reads plain ones', async () => {
+  it('round-trips sealed headers, and reads anything else as no headers', async () => {
     const env = { HOOK_ENCRYPTION_KEY: 'k' };
     assert.deepEqual(await openHeaders(await sealHeaders({ A: 'b' }, env), env), { A: 'b' });
-    assert.deepEqual(await openHeaders('{"A":"b"}', env), { A: 'b' });
+    assert.deepEqual(await openHeaders('{"A":"b"}', env), {});
     assert.deepEqual(await openHeaders('enc:v1:garbage', env), {});
   });
 

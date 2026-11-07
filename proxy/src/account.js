@@ -454,12 +454,9 @@ export async function postWatchToken(request, ctx) {
   const replaces = (await readJSON(request))?.replaces;
   const replacedHash = typeof replaces === 'string' && replaces.startsWith('rmbw_') ? await sha256Hex(replaces) : '';
   const token = `rmbw_${randomToken(32)}`;
+  // A replaced token is simply revoked.
   await ctx.db.batch([
-    ctx.db
-      .prepare(
-        'UPDATE watch_tokens SET replaced_at = ? WHERE replaced_at IS NULL AND (inbox_id = ? OR token_hash = ?)',
-      )
-      .bind(ctx.now, cred.inboxId, replacedHash),
+    ctx.db.prepare('DELETE FROM watch_tokens WHERE inbox_id = ? OR token_hash = ?').bind(cred.inboxId, replacedHash),
     ctx.db
       .prepare('INSERT INTO watch_tokens (token_hash, inbox_id, created_at) VALUES (?, ?, ?)')
       .bind(await sha256Hex(token), cred.inboxId, ctx.now),
@@ -471,15 +468,8 @@ export async function deleteWatchToken(request, ctx) {
   const { cred, response } = await authenticate(request, ctx, ['inbox']);
   if (response) return response;
   const result = await ctx.db
-    .prepare('DELETE FROM watch_tokens WHERE inbox_id = ? AND replaced_at IS NULL')
+    .prepare('DELETE FROM watch_tokens WHERE inbox_id = ?')
     .bind(cred.inboxId)
     .run();
   return json({ revoked: result.meta.changes });
-}
-
-export async function purgeWatchTokens(ctx) {
-  await ctx.db
-    .prepare('DELETE FROM watch_tokens WHERE replaced_at IS NOT NULL AND replaced_at < ?')
-    .bind(ctx.now - 30 * DAY)
-    .run();
 }

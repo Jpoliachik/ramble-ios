@@ -31,7 +31,7 @@ The relay SHALL be served at `https://api.ramble.watch`, and every path here is 
 - THEN it gets `200 {"service": "Ramble relay", "docs": "https://ramble.watch/docs", "llms": "https://ramble.watch/llms-full.txt"}`
 
 ### Requirement: Three credentials
-Calls other than pairing exchange, inbox creation, App Attest registration and Apple notifications SHALL carry `Authorization: Bearer <credential>`: an inbox secret (`rmbi_…`, the phone), a watch token (`rmbw_…`, the watch) or an agent key (`rmba_…`, an agent). Each is 32 random bytes; the relay SHALL keep only a SHA-256 hash, never a readable copy. The one exception is a new agent key during its pairing code's 10 minutes, so a retried exchange gets the same key: it is kept encrypted with a key derived from the exchange's `request_id`, and deleted when the code expires. `bearer <credential>` and the bare credential are accepted. A missing, unknown or revoked credential SHALL get `401` ("Invalid or revoked credentials. Send \"Authorization: Bearer <token>\"."); a valid credential on an endpoint its caller may not use SHALL get `403` with `"reason": "wrong_credential"` and keep working.
+Calls other than pairing exchange, inbox creation, App Attest registration and Apple notifications SHALL carry `Authorization: Bearer <credential>`: an inbox secret (`rmbi_…`, the phone), a watch token (`rmbw_…`, the watch) or an agent key (`rmba_…`, an agent). Each is 32 random bytes; the relay SHALL keep only a SHA-256 hash, never a readable copy. `bearer <credential>` and the bare credential are accepted. A missing, unknown or revoked credential SHALL get `401` ("Invalid or revoked credentials. Send \"Authorization: Bearer <token>\"."); a valid credential on an endpoint its caller may not use SHALL get `403` with `"reason": "wrong_credential"` and keep working.
 
 #### Scenario: Lenient header
 - GIVEN a valid agent key
@@ -135,17 +135,22 @@ A first-time unlock purchase SHALL be accepted only when its app account token e
 - THEN the response is `400`, and `GET /settings` still returns `"language": "haw"`
 
 ### Requirement: Watch token
-`POST /watch-token` with `{"replaces": "<the watch's previous token>"?}` SHALL return `201 {"watch_token": "rmbw_…"}` and replace the token named in `replaces` (even one of an earlier inbox) and any other watch token of this inbox, so an inbox has one. `DELETE /watch-token` SHALL revoke it and return `200 {"revoked": <0 or 1>}`. Neither touches agent connections. A replaced token SHALL get `401` on uploads but SHALL read, by ID, the notes it uploaded for 30 days after it was replaced. When the phone calls these: [phone.md](phone.md).
+`POST /watch-token` with `{"replaces": "<the watch's previous token>"?}` SHALL return `201 {"watch_token": "rmbw_…"}` and revoke the token named in `replaces` (even one of an earlier inbox) and any other watch token of this inbox, so an inbox has one. `DELETE /watch-token` SHALL revoke it and return `200 {"revoked": <0 or 1>}`. Neither touches agent connections. A replaced or revoked token SHALL get `401` on every call, including reads of notes it uploaded. When the phone calls these: [phone.md](phone.md).
 
 #### Scenario: Revoked
 - GIVEN a watch token and one connected agent
 - WHEN the phone calls `DELETE /watch-token`
 - THEN every call with that token gets `401`, and the agent keeps pulling
 
+#### Scenario: Token replaced in the same inbox
+- GIVEN the inbox accepted a watch note that is still transcribing
+- WHEN the phone mints a new watch token
+- THEN the old token gets `401`, and the new token reads that note
+
 #### Scenario: Phone reinstalled with a fresh inbox
 - GIVEN the old inbox accepted a watch note that is still transcribing
 - WHEN the reinstalled phone mints a token with the old one as `replaces`
-- THEN the old token's uploads get `401`, and it still reads that note until it is done
+- THEN the old token gets `401`, and the new token reading that note gets `404`
 
 ## Notes
 
@@ -174,13 +179,14 @@ The relay SHALL refuse these uploads, storing and counting nothing. Refusals mar
 | Not one of the audio types above | `415` | `unsupported_type` | yes |
 | Empty body, body bytes ≠ `Content-Length`, missing or invalid recorded time | `400` | `bad_upload` | yes |
 | The inbox, or the purchase it is bound to, is suspended by the operator ([purchase.md](purchase.md)) | `403` | `suspended` | yes |
-| Recorded time more than 5 minutes in the future | `400` | `recorded_in_future` | no: retry once it isn't ahead |
 | No `Content-Length` (`411`), or body not finished within 30 minutes (`408`) | `411` / `408` | `length_required` / `upload_timeout` | no |
+
+The recorded time is stored and returned as sent and is never checked against the relay's clock.
 
 #### Scenario: Watch clock far ahead
 - GIVEN a watch whose clock is an hour fast
 - WHEN it uploads a note
-- THEN the response is `400` with `"reason": "recorded_in_future"`, and the same upload succeeds once its recorded time has passed
+- THEN the note is accepted like any other, with `recorded_at` as the watch sent it
 
 #### Scenario: Suspended user
 - GIVEN the operator suspended an inbox
@@ -195,12 +201,17 @@ The note UUID SHALL be the idempotency key within an inbox. A repeated upload of
 - WHEN the watch uploads the same note again
 - THEN the response is `200` with the current status, and the free-note count is unchanged
 
-`PUT /notes/:id` from the phone with `X-Ramble-Retry: 1`, on a note whose `status` is `"failed"` and that has been retried fewer than 3 times, SHALL be checked and held like a first upload (refusals, `402`), then SHALL replace the audio, start a fresh transcription, add one to the note's retry count, list the note again in `GET /notes`, and answer `201` like a first upload; `id`, `source` and `recorded_at` stay. On a note not failed, or from a watch token, the header is ignored. After 3 retries it SHALL get `409` with `"reason": "retry_limit"`, changing nothing. Concurrent retries of one note SHALL start one.
+`PUT /notes/:id` from the phone with `X-Ramble-Retry: 1`, on a note whose `status` is `"failed"` and that has not been retried, SHALL be checked like a first upload (refusals, including `suspended`) but never held for free notes and never counted, then SHALL replace the audio, start a fresh transcription, list the note again in `GET /notes`, and answer `201` like a first upload; `id`, `source` and `recorded_at` stay. On a note not failed, or from a watch token, the header is ignored. A note SHALL be retried at most once: a second retry gets `409` with `"reason": "retry_limit"`, changing nothing. Concurrent retries of one note SHALL start one.
 
-#### Scenario: Fourth retry
-- GIVEN a note that failed again after its third retry
+#### Scenario: Second retry
+- GIVEN a note that failed again after its retry
 - WHEN the phone sends `PUT /notes/:id` with `X-Ramble-Retry: 1`
 - THEN the response is `409` with `"reason": "retry_limit"`, and nothing is transcribed or counted
+
+#### Scenario: Retry with no free notes left
+- GIVEN a failed note in an inbox that has used all 25 free notes and is not unlocked
+- WHEN the phone retries it
+- THEN the response is `201`, and the free-note count is unchanged
 
 ### Requirement: Held uploads
 An upload the inbox may not transcribe SHALL get `402` with `{"reason": "free_notes_used", "free_notes_remaining": 0}` when out of free notes and not unlocked, keeping and counting nothing. An unlocked inbox SHALL never be held for how much audio it sends. Meaning and copy: [purchase.md](purchase.md).
@@ -228,7 +239,7 @@ Note responses SHALL be `{"id", "source", "status", "result", "recorded_at", "re
 - THEN `status` is `"done"`, `result` is `"no_speech"` and `transcript` is `""`
 
 ### Requirement: Reading a note by ID
-`GET /notes/:id` SHALL return `200` with the note. The phone reads any note in its inbox; a watch token reads only notes uploaded with a watch token of that inbox, or, once replaced, the notes it uploaded itself. Any other ID SHALL get `404`. Once the copy for the person's devices is gone, the note SHALL read with `"transcript": null` and `"transcript_cleared": true` for 30 more days, then `404`.
+`GET /notes/:id` SHALL return `200` with the note. The phone reads any note in its inbox; the inbox's watch token reads only notes uploaded with a watch token of that inbox, including ones uploaded with a token since replaced. Any other ID SHALL get `404`. Once the copy for the person's devices is gone, the note SHALL read with `"transcript": null` and `"transcript_cleared": true` for 30 more days, then `404`.
 
 #### Scenario: Watch asks for a phone note
 - GIVEN a note recorded on the phone
@@ -270,16 +281,16 @@ A note's transcript SHALL stay readable by the person's devices until the phone 
 - THEN the first code fails to exchange
 
 ### Requirement: Pairing exchange
-`POST /pair/exchange` with `{"code", "request_id", "name"?}` and no credential SHALL return `201 {"token": "rmba_…"}` and create one connection. `request_id` is a random string of 16–64 characters chosen by the agent; `name` is optional, 1–40 characters, and an invalid name is dropped without failing. Codes match ignoring case, spaces and dashes. An unknown or expired code SHALL get `400` ("Invalid or expired pairing code. Ask the user for a new one in the Ramble app."); an exchanged code with a different `request_id`, `409` with `"reason": "code_used"` and no key. Which notes the connection receives: [delivery.md](delivery.md).
+`POST /pair/exchange` with `{"code", "name"?}` and no credential SHALL return `201 {"token": "rmba_…"}` and create one connection. `name` is optional, 1–40 characters, and an invalid name is dropped without failing; any other field, such as a `request_id` older instructions send, is ignored. Codes match ignoring case, spaces and dashes. A code SHALL make one connection and return its key once. An unknown or expired code SHALL get `400` ("Invalid or expired pairing code. Ask the user for a new one in the Ramble app."); a code already exchanged, while it hasn't expired and its connection still exists, `409` with `"reason": "code_used"` and no key. Which notes the connection receives: [delivery.md](delivery.md).
 
-#### Scenario: Retried exchange
-- GIVEN an exchange succeeded but the response was lost
-- WHEN the agent retries with the same code and `request_id` at any time in the code's 10 minutes
-- THEN it gets `200` and the same key
+#### Scenario: Response lost
+- GIVEN an exchange succeeded but the response never reached the agent
+- WHEN the agent sends the same code again
+- THEN the response is `409` with `"reason": "code_used"` and no key, the unused connection shows as "Hasn't checked in yet" ([delivery.md](delivery.md)), and the user makes a new code
 
 #### Scenario: Someone else replays the code
 - GIVEN a code already exchanged
-- WHEN it is sent with a different `request_id`
+- WHEN anyone sends it again
 - THEN the response is `409`, and no key is returned
 
 ### Requirement: Connections
@@ -320,12 +331,12 @@ A note's transcript SHALL stay readable by the person's devices until the phone 
 - THEN the response is `400`
 
 ### Requirement: Wake-up pings
-When a copy is made for an agent with a hook, the relay SHALL POST `{"event": "ramble.notes_waiting", "text", "pull_url"}` with the agent's headers and `User-Agent: Ramble-Relay/1 (+https://ramble.watch/docs)`, once, with a 5-second timeout and no redirects, after checking the hostname resolves to a public address. No further ping goes out until the agent pulls or 10 minutes pass. Pings SHALL never carry transcript text.
+When a copy is made for an agent with a hook, the relay SHALL POST `{"event": "ramble.notes_waiting", "text", "pull_url"}` with the agent's headers and `User-Agent: Ramble-Relay/1 (+https://ramble.watch/docs)`, once, with a 5-second timeout and no redirects. No further ping goes out until the agent pulls or 10 minutes pass. Pings SHALL never carry transcript text. A ping that gets no response records `last_status` `0`.
 
-#### Scenario: Hostname turns private
-- GIVEN a hook whose hostname resolved publicly when it was set
-- WHEN it resolves to a private address at ping time
-- THEN no ping is sent and `last_status` is `0`
+#### Scenario: Burst of notes
+- GIVEN an agent with a hook that hasn't pulled since its last ping 3 minutes ago
+- WHEN another copy is made for it
+- THEN no ping is sent, and the next one can go out once the agent pulls or the 10 minutes pass
 
 ### Requirement: Delete waiting notes
 `DELETE /inbox` (phone) SHALL delete every agent copy still waiting in the inbox and return `{"deleted": <n>}`. It SHALL NOT delete the copy for the person's devices, notes still transcribing, agent connections, the watch token, the free count or the unlock. Meaning: [delivery.md](delivery.md).

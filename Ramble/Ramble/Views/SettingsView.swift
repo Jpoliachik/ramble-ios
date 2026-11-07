@@ -660,7 +660,7 @@ struct DebugSheet: View {
                 } header: {
                     Text("Delivery alerts")
                 } footer: {
-                    Text("Thresholds drop from hours to seconds (30s not sent, 60s still waiting, and the watch's) and the cooldown to a minute. Also sent to the watch.")
+                    Text("The phone's \"Not sent yet\" alert fires after 30 seconds instead of 6 hours, with a 1-minute cooldown. This phone only; the watch keeps its 6 hours.")
                 }
 
                 Section("Developer Override") {

@@ -155,8 +155,8 @@ export default function HelpDocs() {
               <Question id="couldnt-transcribe" q="A note says “Couldn’t transcribe”">
                 <p>
                   Ramble couldn&rsquo;t turn the audio into text, or couldn&rsquo;t reach a transcription service in
-                  time. Open the note on your iPhone and tap Retry. You can retry 3 times. A note that couldn&rsquo;t
-                  transcribe gives its free note back.
+                  time. Open the note on your iPhone and tap Retry. You can retry once, and the retry never uses a free
+                  note. A note that couldn&rsquo;t transcribe gives its free note back.
                 </p>
               </Question>
               <Question id="no-speech" q="A note says “No speech detected”">
@@ -232,7 +232,8 @@ export default function HelpDocs() {
               </Question>
               <Question id="not-sent" q="A note says “Saved, no agent connected”">
                 <p>
-                  An agent receives only notes recorded after it connected. Connect one in Settings → Your agent, and
+                  An agent receives only notes that reach Ramble&rsquo;s server after it connected. Connect one in
+                  Settings → Your agent, and
                   your next notes go to it. Older notes stay on your iPhone.
                 </p>
               </Question>

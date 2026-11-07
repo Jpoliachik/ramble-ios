@@ -2,26 +2,21 @@
 // and "Rate limits".
 //
 //   rmbi_  inbox secret   the phone
-//   rmbw_  watch token    the watch (a replaced one may only read its notes)
+//   rmbw_  watch token    the watch (one per inbox; a replaced one is revoked)
 //   rmba_  agent key      an agent
 
-import { DAY, bearerValue, logId, rateLimited, sha256Hex, unauthorized, wrongCredential } from './http.js';
-
-export const WATCH_REPLACED_READ_MS = 30 * DAY;
+import { bearerValue, logId, rateLimited, sha256Hex, unauthorized, wrongCredential } from './http.js';
 
 /**
  * Looks up the caller's credential and checks it may call this endpoint.
- * `allowed` holds kinds: 'inbox', 'watch', 'watch_replaced', 'agent'.
+ * `allowed` holds kinds: 'inbox', 'watch', 'agent'.
  * Returns { cred } or { response }.
  */
 export async function authenticate(request, ctx, allowed) {
   const value = bearerValue(request);
   const cred = await lookup(value, ctx);
   if (!cred) return { response: unauthorized() };
-  if (!allowed.includes(cred.kind)) {
-    // A replaced watch token is dead except for reading its own notes.
-    return { response: cred.kind === 'watch_replaced' ? unauthorized() : wrongCredential() };
-  }
+  if (!allowed.includes(cred.kind)) return { response: wrongCredential() };
   return { cred };
 }
 
@@ -33,16 +28,8 @@ async function lookup(value, ctx) {
     return inbox ? { kind: 'inbox', inboxId: inbox.id, hash } : null;
   }
   if (value.startsWith('rmbw_')) {
-    const row = await ctx.db
-      .prepare('SELECT inbox_id, replaced_at FROM watch_tokens WHERE token_hash = ?')
-      .bind(hash)
-      .first();
-    if (!row) return null;
-    if (row.replaced_at != null) {
-      if (ctx.now - row.replaced_at > WATCH_REPLACED_READ_MS) return null;
-      return { kind: 'watch_replaced', inboxId: row.inbox_id, hash };
-    }
-    return { kind: 'watch', inboxId: row.inbox_id, hash };
+    const row = await ctx.db.prepare('SELECT inbox_id FROM watch_tokens WHERE token_hash = ?').bind(hash).first();
+    return row ? { kind: 'watch', inboxId: row.inbox_id, hash } : null;
   }
   const connection = await ctx.db
     .prepare(

@@ -32,7 +32,6 @@ import { INLINE_PROVIDER_TIMEOUT_MS, TranscribeError } from './transcribe.js';
 export const AUDIO_TYPES = new Set(['audio/mp4', 'audio/m4a', 'audio/x-m4a', 'audio/aac']);
 export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 export const MAX_SECONDS = 61 * 60;
-export const FUTURE_SLACK_MS = 5 * MINUTE;
 export const BODY_TIMEOUT_MS = 30 * MINUTE;
 export const INLINE_WAIT_MS = 8000;
 export const ATTEMPT_LOST_MS = 8 * MINUTE;
@@ -41,7 +40,7 @@ export const ATTEMPT_LOST_MS = 8 * MINUTE;
 export const INLINE_ATTEMPT_LOST_MS = MINUTE;
 export const RETRY_WINDOW_MS = 20 * HOUR;
 export const BACKOFF_MINUTES = [1, 2, 5, 10, 15, 30];
-export const MAX_HAND_RETRIES = 3;
+export const MAX_HAND_RETRIES = 1;
 export const DEVICE_COPY_MS = 30 * DAY;
 export const CLEARED_KEEP_MS = 30 * DAY;
 export const AUDIO_MAX_AGE_MS = DAY;
@@ -78,12 +77,8 @@ export function noteView(n, now) {
   };
 }
 
-/** The phone sees its inbox; a watch token sees watch notes, or once replaced only its own. */
-function canSee(cred, n) {
-  if (cred.kind === 'inbox') return true;
-  if (cred.kind === 'watch') return n.source === 'watch';
-  return n.watch_token_hash === cred.hash;
-}
+/** The phone sees its inbox; the watch token sees the inbox's watch notes. */
+const canSee = (cred, n) => cred.kind === 'inbox' || n.source === 'watch';
 
 const readNote = (ctx, inboxId, id) =>
   ctx.db.prepare('SELECT * FROM notes WHERE inbox_id = ? AND id = ?').bind(inboxId, id).first();
@@ -120,9 +115,10 @@ async function answerWithNote(ctx, cred, n, status) {
 
 const badUpload = (error) => fail(400, error, 'bad_upload');
 
-function holdFor(account) {
+/** A hand retry uses no free note, so only a suspension holds it. */
+function holdFor(account, retry) {
   if (account.suspended) return { event: 'refused_suspended', response: suspendedResponse() };
-  if (account.unlocked || account.freeRemaining > 0) return null;
+  if (retry || account.unlocked || account.freeRemaining > 0) return null;
   return { event: 'refused_free', response: freeNotesUsed() };
 }
 
@@ -150,9 +146,7 @@ export async function uploadNote(request, rawId, ctx) {
     if (!canSee(cred, existing)) return fail(409, 'This note ID is already in use.', 'id_in_use');
     return answerWithNote(ctx, cred, existing, 200);
   }
-  if (retry && existing.retry_count >= MAX_HAND_RETRIES) {
-    return fail(409, 'This note was already retried 3 times.', 'retry_limit');
-  }
+  if (retry && existing.retry_count >= MAX_HAND_RETRIES) return retryLimit();
 
   const limited = await limit(ctx, ['notes_hour', inboxId], ['notes_day', inboxId]);
   if (limited) return limited;
@@ -173,12 +167,9 @@ export async function uploadNote(request, rawId, ctx) {
   if (!RECORDED_AT_RE.test(recordedAt) || Number.isNaN(recordedMs)) {
     return badUpload('Send X-Ramble-Recorded-At as an ISO 8601 time with its UTC offset.');
   }
-  if (!existing && recordedMs > ctx.now + FUTURE_SLACK_MS) {
-    return fail(400, "The recorded time is in the future. Retry once the device's clock has passed it.", 'recorded_in_future');
-  }
 
   const account = await loadAccount(ctx, inboxId);
-  const hold = holdFor(account);
+  const hold = holdFor(account, retry);
   if (hold) {
     await recordEvent(ctx, hold.event);
     return hold.response;
@@ -228,15 +219,17 @@ export async function uploadNote(request, rawId, ctx) {
   return answerWithNote({ ...ctx, now: ctx.clock() }, cred, fresh, 201);
 }
 
+const retryLimit = () => fail(409, 'This note was already retried once.', 'retry_limit');
+
 /**
- * Creates (or, for a hand retry, resets) the note and counts it, in one
- * batch. Every statement after the first is conditioned on the note holding
- * this upload's audio key, so a lost race changes nothing.
+ * Creates the note and counts it, or for a hand retry resets it (counting
+ * nothing), in one batch. Every statement after the first is conditioned on
+ * the note holding this upload's audio key, so a lost race changes nothing.
  */
 async function acceptNote(ctx, u) {
   const { db, now } = ctx;
   const inboxId = u.cred.inboxId;
-  const free = !u.account.unlocked;
+  const free = !u.retry && !u.account.unlocked;
   // Free notes are claimed in SQL, so two devices can't both take the last one.
   const freeSQL = free ? `(SELECT free_notes_used FROM inboxes WHERE id = ?) < ${FREE_NOTES}` : '1';
   const freeParams = free ? [inboxId] : [];
@@ -248,25 +241,22 @@ async function acceptNote(ctx, u) {
       ? db
           .prepare(
             `UPDATE notes SET status = 'transcribing', result = NULL, transcript = NULL, duration = NULL,
-                provider = NULL, model = NULL, ready_at = NULL, transcript_cleared_at = NULL, phone_acked_at = NULL,
-                watch_received_at = NULL, retry_count = retry_count + 1, attempts = 1, attempt_started_at = ?,
-                next_attempt_at = NULL, options = NULL, accepted_at = ?, content_type = ?, container_duration = ?,
-                audio_key = ?, audio_stored_at = ?, free_note = ?, last_error = NULL
-              WHERE inbox_id = ? AND id = ? AND status = 'failed' AND retry_count < ? AND ${freeSQL}`,
+                ready_at = NULL, transcript_cleared_at = NULL, phone_acked_at = NULL, watch_received_at = NULL,
+                retry_count = retry_count + 1, attempts = 1, attempt_started_at = ?, next_attempt_at = NULL,
+                options = NULL, accepted_at = ?, content_type = ?, container_duration = ?, audio_key = ?,
+                audio_stored_at = ?
+              WHERE inbox_id = ? AND id = ? AND status = 'failed' AND retry_count < ?`,
           )
-          .bind(now, now, u.contentType, u.seconds, u.audioKey, now, free ? 1 : 0,
-            inboxId, u.id, MAX_HAND_RETRIES, ...freeParams)
+          .bind(now, now, u.contentType, u.seconds, u.audioKey, now, inboxId, u.id, MAX_HAND_RETRIES)
       : db
           .prepare(
-            `INSERT INTO notes (inbox_id, id, source, watch_token_hash, status, recorded_at, recorded_ms, received_at,
-                accepted_at, content_type, container_duration, attempts, attempt_started_at, audio_key, audio_stored_at,
-                free_note)
-             SELECT ?, ?, ?, ?, 'transcribing', ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ? WHERE ${freeSQL}
+            `INSERT INTO notes (inbox_id, id, source, status, recorded_at, recorded_ms, received_at, accepted_at,
+                content_type, container_duration, attempts, attempt_started_at, audio_key, audio_stored_at, free_note)
+             SELECT ?, ?, ?, 'transcribing', ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ? WHERE ${freeSQL}
              ON CONFLICT (inbox_id, id) DO NOTHING`,
           )
-          .bind(inboxId, u.id, u.cred.kind === 'inbox' ? 'phone' : 'watch', u.cred.kind === 'inbox' ? null : u.cred.hash,
-            u.recordedAt, u.recordedMs, now, now, u.contentType, u.seconds, now, u.audioKey, now, free ? 1 : 0,
-            ...freeParams),
+          .bind(inboxId, u.id, u.cred.kind === 'inbox' ? 'phone' : 'watch', u.recordedAt, u.recordedMs, now, now,
+            u.contentType, u.seconds, now, u.audioKey, now, free ? 1 : 0, ...freeParams),
     db
       .prepare(
         `UPDATE inboxes SET free_notes_used = free_notes_used + ?, last_upload_at = ? WHERE id = ? AND ${mine}`,
@@ -285,9 +275,7 @@ async function acceptNote(ctx, u) {
     if (!canSee(u.cred, note)) return { response: fail(409, 'This note ID is already in use.', 'id_in_use') };
     return { response: await answerWithNote(ctx, u.cred, note, 200) };
   }
-  if (u.retry && note && note.retry_count >= MAX_HAND_RETRIES) {
-    return { response: fail(409, 'This note was already retried 3 times.', 'retry_limit') };
-  }
+  if (u.retry) return { response: retryLimit() };
   await recordEvent(ctx, 'refused_free');
   return { response: freeNotesUsed() };
 }
@@ -295,7 +283,7 @@ async function acceptNote(ctx, u) {
 // --- Reading -------------------------------------------------------------------------
 
 export async function getNote(request, rawId, ctx) {
-  const { cred, response } = await authenticate(request, ctx, ['inbox', 'watch', 'watch_replaced']);
+  const { cred, response } = await authenticate(request, ctx, ['inbox', 'watch']);
   if (response) return response;
   const limited = await limit(ctx, ['reads', cred.hash]);
   if (limited) return limited;
@@ -552,7 +540,7 @@ export async function sweep(ctx) {
 /**
  * Cron, every minute: agent copies for transcripts done over a minute ago
  * whose copies were never marked made. Insertion is idempotent and keeps the
- * "paired before it was recorded" rule; only new copies ping a hook.
+ * "connected when the note was accepted" rule; only new copies ping a hook.
  */
 export async function sweepCopies(ctx) {
   const { results } = await ctx.db

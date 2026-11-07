@@ -13,12 +13,13 @@ import Foundation
 /// What one finished upload task said. Built off the main actor.
 nonisolated struct RelayUploadOutcome: Sendable {
     let noteID: UUID
-    let tokenRef: String?
+    /// The token the request carried, so a 401 for a token already replaced
+    /// doesn't mark the current one rejected.
+    let token: String?
     /// Nil when the request never got an HTTP answer (offline, timeout).
     let status: Int?
     let body: Data
     let retryAfter: TimeInterval?
-    let serverDate: Date?
     let errorDescription: String?
 }
 
@@ -47,11 +48,11 @@ nonisolated final class RelayUploadSession: NSObject, URLSessionDataDelegate, @u
         session = URLSession(configuration: configuration, delegate: self, delegateQueue: queue)
     }
 
-    /// `taskDescription` carries "<note id>|<token ref>" so a relaunched app
-    /// can match results to notes.
-    func upload(_ request: URLRequest, fromFile fileURL: URL, noteID: UUID, tokenRef: String) {
+    /// `taskDescription` carries the note ID so a relaunched app can match
+    /// results to notes.
+    func upload(_ request: URLRequest, fromFile fileURL: URL, noteID: UUID) {
         let task = session.uploadTask(with: request, fromFile: fileURL)
-        task.taskDescription = "\(noteID.uuidString)|\(tokenRef)"
+        task.taskDescription = noteID.uuidString
         task.resume()
     }
 
@@ -60,7 +61,7 @@ nonisolated final class RelayUploadSession: NSObject, URLSessionDataDelegate, @u
         let tasks = await session.allTasks
         return Set(tasks.compactMap { task in
             guard task.state == .running || task.state == .suspended else { return nil }
-            return Self.parse(task.taskDescription).noteID
+            return Self.noteID(task.taskDescription)
         })
     }
 
@@ -85,12 +86,16 @@ nonisolated final class RelayUploadSession: NSObject, URLSessionDataDelegate, @u
         return finished
     }
 
-    private static func parse(_ description: String?) -> (noteID: UUID?, tokenRef: String?) {
-        guard let description else { return (nil, nil) }
-        let parts = description.split(separator: "|", maxSplits: 1).map(String.init)
-        let id = parts.first.flatMap(UUID.init(uuidString:))
-        let ref = parts.count > 1 ? parts[1] : nil
-        return (id, ref)
+    /// Tasks started by an older build carry "<note id>|<token ref>".
+    private static func noteID(_ description: String?) -> UUID? {
+        guard let description else { return nil }
+        return description.split(separator: "|", maxSplits: 1).first.flatMap { UUID(uuidString: String($0)) }
+    }
+
+    /// The bearer token the request was sent with.
+    private static func token(of task: URLSessionTask) -> String? {
+        guard let header = task.originalRequest?.value(forHTTPHeaderField: "Authorization") else { return nil }
+        return header.hasPrefix("Bearer ") ? String(header.dropFirst("Bearer ".count)) : header
     }
 
     // MARK: - URLSessionDataDelegate
@@ -106,16 +111,14 @@ nonisolated final class RelayUploadSession: NSObject, URLSessionDataDelegate, @u
         let body = buffers.removeValue(forKey: task.taskIdentifier) ?? Data()
         lock.unlock()
 
-        let parsed = Self.parse(task.taskDescription)
-        guard let noteID = parsed.noteID else { return }
+        guard let noteID = Self.noteID(task.taskDescription) else { return }
         let response = task.response as? HTTPURLResponse
         let outcome = RelayUploadOutcome(
             noteID: noteID,
-            tokenRef: parsed.tokenRef,
+            token: Self.token(of: task),
             status: error == nil ? response?.statusCode : nil,
             body: body,
             retryAfter: (response?.value(forHTTPHeaderField: "Retry-After")).flatMap { TimeInterval($0.trimmingCharacters(in: .whitespaces)) },
-            serverDate: (response?.value(forHTTPHeaderField: "Date")).flatMap { Self.httpDate($0) },
             errorDescription: error.map { String(describing: $0) }
         )
         Task { @MainActor in
@@ -127,13 +130,5 @@ nonisolated final class RelayUploadSession: NSObject, URLSessionDataDelegate, @u
         lock.lock()
         finishedEvents = true
         lock.unlock()
-    }
-
-    private static func httpDate(_ text: String) -> Date? {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(identifier: "GMT")
-        formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
-        return formatter.date(from: text)
     }
 }

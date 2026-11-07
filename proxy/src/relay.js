@@ -41,16 +41,17 @@ export function retentionSeconds(env) {
 // --- Agent copies ------------------------------------------------------------
 
 /**
- * One copy per agent connected now and paired before the note was recorded.
- * Pings hooked agents that got a new copy. Silent notes never get here.
+ * One copy per agent connected now that was already connected when the
+ * server accepted the note (or its hand retry). Pings hooked agents that got
+ * a new copy. Silent notes never get here.
  */
 export async function makeAgentCopies(ctx, note) {
   const { results: connections } = await ctx.db
     .prepare(
       `SELECT id, hook_url, hook_headers, hook_pinged_at, last_pull_at FROM connections
-        WHERE inbox_id = ? AND created_at < ?`,
+        WHERE inbox_id = ? AND created_at <= ?`,
     )
-    .bind(note.inbox_id, note.recorded_ms)
+    .bind(note.inbox_id, note.accepted_at)
     .all();
   if (connections.length === 0) return 0;
   return insertCopies(ctx, connections, {
@@ -193,7 +194,7 @@ export async function createPairCode(request, ctx) {
   const code = generatePairCode();
   const expiresAt = ctx.now + PAIR_CODE_TTL_SECONDS * 1000;
   await ctx.db.batch([
-    ctx.db.prepare('DELETE FROM pair_codes WHERE inbox_id = ? AND token IS NULL').bind(cred.inboxId),
+    ctx.db.prepare('DELETE FROM pair_codes WHERE inbox_id = ? AND connection_id IS NULL').bind(cred.inboxId),
     ctx.db
       .prepare('INSERT INTO pair_codes (code_hash, inbox_id, expires_at) VALUES (?, ?, ?)')
       .bind(await sha256Hex(normalizePairCode(code)), cred.inboxId, expiresAt),
@@ -252,9 +253,9 @@ export async function disconnect(request, connectionId, ctx) {
 const INVALID_CODE = 'Invalid or expired pairing code. Ask the user for a new one in the Ramble app.';
 
 /**
- * No credential: the code is the credential. It makes one connection. The new
- * key is kept for the code's 10 minutes encrypted with a key derived from the
- * agent's request_id, so only a retry with the same request_id gets it back.
+ * No credential: the code is the credential. It makes one connection, once;
+ * the key is never kept readable, so a used code returns no key. Older agent
+ * instructions send a request_id; it is ignored.
  */
 export async function exchangePairCode(request, ctx) {
   const addr = address(request, ctx);
@@ -267,17 +268,12 @@ export async function exchangePairCode(request, ctx) {
 
   const body = await readJSON(request);
   const code = body?.code;
-  const requestId = body?.request_id;
   if (typeof code !== 'string' || !code.trim()) {
-    return fail(400, 'Send JSON like {"code": "K7QX-MP4D-2HNV", "request_id": "<16-64 random characters>"} with the code from the Ramble app');
-  }
-  if (typeof requestId !== 'string' || requestId.length < 16 || requestId.length > 64) {
-    return fail(400, '"request_id" must be a random string of 16–64 characters. Reuse it if you retry.');
+    return fail(400, 'Send JSON like {"code": "K7QX-MP4D-2HNV", "name": "My agent"} with the code from the Ramble app');
   }
   // Optional, so the user can tell agents apart. Bad names are dropped.
   const name = cleanName(body?.name);
   const codeHash = await sha256Hex(normalizePairCode(code));
-  const requestHash = await sha256Hex(`ramble-request:${requestId}`);
 
   const failed = async (response) => {
     await countLimit(ctx, 'pair_fail_addr', addr);
@@ -290,11 +286,11 @@ export async function exchangePairCode(request, ctx) {
   const connectionId = `con_${randomToken(12)}`;
   const claimed = await ctx.db
     .prepare(
-      `UPDATE pair_codes SET token = ?, connection_id = ?, request_hash = ?
-        WHERE code_hash = ? AND token IS NULL AND expires_at > ?
+      `UPDATE pair_codes SET connection_id = ?
+        WHERE code_hash = ? AND connection_id IS NULL AND expires_at > ?
         RETURNING inbox_id`,
     )
-    .bind(await sealWithRequest(token, requestId), connectionId, requestHash, codeHash, ctx.now)
+    .bind(connectionId, codeHash, ctx.now)
     .first();
   if (claimed) {
     await ctx.db
@@ -306,40 +302,14 @@ export async function exchangePairCode(request, ctx) {
 
   const row = await ctx.db
     .prepare(
-      `SELECT p.token, p.request_hash, c.id AS live FROM pair_codes p
+      `SELECT c.id AS live FROM pair_codes p
          LEFT JOIN connections c ON c.id = p.connection_id
         WHERE p.code_hash = ? AND p.expires_at > ?`,
     )
     .bind(codeHash, ctx.now)
     .first();
-  if (!row?.token || !row.live) return failed(fail(400, INVALID_CODE));
-  if (row.request_hash !== requestHash) {
-    return failed(fail(409, 'This pairing code was already used. Ask the user for a new one.', 'code_used'));
-  }
-  const replay = await openWithRequest(row.token, requestId);
-  if (!replay) return failed(fail(400, INVALID_CODE));
-  return json({ token: replay }, 200);
-}
-
-async function requestKey(requestId) {
-  const raw = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`ramble-pair-key:${requestId}`));
-  return crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']);
-}
-
-async function sealWithRequest(token, requestId) {
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const data = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await requestKey(requestId), new TextEncoder().encode(token));
-  return `${toB64(iv)}.${toB64(data)}`;
-}
-
-async function openWithRequest(sealed, requestId) {
-  try {
-    const [iv, data] = sealed.split('.');
-    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromB64(iv) }, await requestKey(requestId), fromB64(data));
-    return new TextDecoder().decode(plain);
-  } catch {
-    return null;
-  }
+  if (!row?.live) return failed(fail(400, INVALID_CODE));
+  return failed(fail(409, 'This pairing code was already used. Ask the user for a new one.', 'code_used'));
 }
 
 async function agentCred(request, ctx, rule = 'agent') {
@@ -491,8 +461,7 @@ export function shouldPing(c, now) {
 
 /**
  * One POST, no retries, no redirects, never throws. Carries no transcript
- * text. Sent only when the hostname resolves to public addresses right now.
- * Returns the HTTP status, or 0 if nothing answered.
+ * text. Returns the HTTP status, or 0 if nothing answered.
  */
 export async function pingHook(c, ctx, event = 'ramble.notes_waiting') {
   const pullURL = `${baseURL(ctx)}/inbox`;
@@ -506,20 +475,18 @@ export async function pingHook(c, ctx, event = 'ramble.notes_waiting') {
     if (event !== 'ramble.test') {
       await ctx.db.prepare('UPDATE connections SET hook_pinged_at = ? WHERE id = ?').bind(ctx.now, c.id).run();
     }
-    if (await ctx.resolvesPublic(new URL(c.hook_url).hostname, ctx)) {
-      const res = await ctx.fetch(c.hook_url, {
-        method: 'POST',
-        headers: {
-          ...(await openHeaders(c.hook_headers, ctx.env)),
-          'Content-Type': 'application/json',
-          'User-Agent': 'Ramble-Relay/1 (+https://ramble.watch/docs)',
-        },
-        body: JSON.stringify({ event, text, pull_url: pullURL }),
-        redirect: 'manual',
-        signal: AbortSignal.timeout(HOOK_TIMEOUT_MS),
-      });
-      status = res.status;
-    }
+    const res = await ctx.fetch(c.hook_url, {
+      method: 'POST',
+      headers: {
+        ...(await openHeaders(c.hook_headers, ctx.env)),
+        'Content-Type': 'application/json',
+        'User-Agent': 'Ramble-Relay/1 (+https://ramble.watch/docs)',
+      },
+      body: JSON.stringify({ event, text, pull_url: pullURL }),
+      redirect: 'manual',
+      signal: AbortSignal.timeout(HOOK_TIMEOUT_MS),
+    });
+    status = res.status;
   } catch {
     status = 0;
   }
@@ -531,45 +498,8 @@ export async function pingHook(c, ctx, event = 'ramble.notes_waiting') {
   return status;
 }
 
-/** DNS over HTTPS: true only when every A/AAAA answer is a public address. */
-export async function resolvesPublic(hostname, ctx) {
-  const addresses = [];
-  for (const type of ['A', 'AAAA']) {
-    const res = await ctx.fetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(hostname)}&type=${type}`, {
-      headers: { Accept: 'application/dns-json' },
-      signal: AbortSignal.timeout(3000),
-    });
-    if (!res.ok) return false;
-    const data = await res.json();
-    for (const answer of data.Answer ?? []) {
-      if (answer.type === 1 || answer.type === 28) addresses.push(String(answer.data));
-    }
-  }
-  return addresses.length > 0 && addresses.every(isPublicAddress);
-}
-
-export function isPublicAddress(ip) {
-  const v4 = ip.match(/^(?:::ffff:)?(\d+)\.(\d+)\.(\d+)\.(\d+)$/i);
-  if (v4) {
-    const [a, b] = [Number(v4[1]), Number(v4[2])];
-    return !(
-      a === 0 || a === 10 || a === 127 || a >= 224 ||
-      (a === 100 && b >= 64 && b <= 127) ||
-      (a === 169 && b === 254) ||
-      (a === 172 && b >= 16 && b <= 31) ||
-      (a === 192 && b === 168) ||
-      (a === 192 && b === 0 && Number(v4[3]) === 0) ||
-      (a === 198 && (b === 18 || b === 19))
-    );
-  }
-  const v6 = ip.toLowerCase();
-  if (!v6.includes(':')) return false;
-  return !(v6 === '::' || v6 === '::1' || /^f[cd]/.test(v6) || /^fe[89ab]/.test(v6) || v6.startsWith('ff') || v6.startsWith('::ffff:'));
-}
-
 // Hook headers usually hold a key that starts the agent's runs, so they're
-// encrypted at rest (AES-GCM) with HOOK_ENCRYPTION_KEY. Reads still handle
-// plain JSON stored before encryption was required.
+// encrypted at rest (AES-GCM) with HOOK_ENCRYPTION_KEY.
 const SEALED_PREFIX = 'enc:v1:';
 
 async function hookCryptoKey(env) {
@@ -594,7 +524,7 @@ export async function sealHeaders(headers, env) {
 export async function openHeaders(stored, env) {
   if (!stored) return {};
   try {
-    if (!stored.startsWith(SEALED_PREFIX)) return JSON.parse(stored);
+    if (!stored.startsWith(SEALED_PREFIX)) return {};
     const key = await hookCryptoKey(env);
     if (!key) return {};
     const [iv, data] = stored.slice(SEALED_PREFIX.length).split('.');

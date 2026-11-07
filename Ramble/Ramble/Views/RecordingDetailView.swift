@@ -317,7 +317,7 @@ struct RecordingDetailView: View {
                 ? "Ramble couldn't reach a transcription service in time."
                 : "Ramble couldn't turn this audio into text."
             if recording.retriesLeft == 0 {
-                return DeliveryLine(title: "Couldn't transcribe", detail: "\(reason) Ramble tried 3 more times.")
+                return DeliveryLine(title: "Couldn't transcribe", detail: "\(reason) Ramble tried once more.")
             }
             return DeliveryLine(title: "Couldn't transcribe", detail: reason, action: .retryTranscription)
         case .noSpeech:

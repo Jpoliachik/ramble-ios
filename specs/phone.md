@@ -225,7 +225,7 @@ Under the player, the note screen SHALL show one line saying where the note is. 
 | Held for unlock | "Unlock to transcribe" | "This note is saved. It transcribes as soon as you unlock Ramble." | "Unlock" |
 | Audio unreadable | "Couldn't transcribe" | "Ramble couldn't turn this audio into text." | "Retry" |
 | Transcription gave up | "Couldn't transcribe" | "Ramble couldn't reach a transcription service in time." | "Retry" |
-| Failed after 3 retries | "Couldn't transcribe" | either detail above, then "Ramble tried 3 more times." | — |
+| Failed again after its retry | "Couldn't transcribe" | either detail above, then "Ramble tried once more." | — |
 
 #### Scenario: Unlock from a held note
 - GIVEN a note shows "Unlock to transcribe"
@@ -233,15 +233,15 @@ Under the player, the note screen SHALL show one line saying where the note is. 
 - THEN the unlock screen opens ([purchase.md](purchase.md))
 
 ### Requirement: Retry a failed transcription
-"Retry" and More → "Retry Transcription" SHALL re-upload the note's audio from this iPhone as a retry under the same note ID ([relay-api.md](relay-api.md)), up to 3 times per note; the note then reads "Transcribing…", or is held like any upload ([purchase.md](purchase.md)). When a watch note's audio is still only on the watch, Retry SHALL first fetch it as "Audio on watch" does, or show "Open Ramble on your watch to sync.".
+"Retry" and More → "Retry Transcription" SHALL re-upload the note's audio from this iPhone as a retry under the same note ID ([relay-api.md](relay-api.md)), once per note; the note then reads "Transcribing…". A retry uses no free note and is never held for unlock ([purchase.md](purchase.md)). When a watch note's audio is still only on the watch, Retry SHALL first fetch it as "Audio on watch" does, or show "Open Ramble on your watch to sync.".
 
-#### Scenario: Third retry fails
-- GIVEN a phone note has failed after 2 retries
+#### Scenario: The retry fails too
+- GIVEN a phone note failed and has not been retried
 - WHEN the person taps "Retry" and it fails again
-- THEN the line reads "Couldn't transcribe" with "Ramble tried 3 more times." and no Retry button or menu item
+- THEN the line reads "Couldn't transcribe" with "Ramble tried once more." and no Retry button or menu item
 
 ### Requirement: More menu
-The "More" menu SHALL offer "Delete" (confirmed with "Delete Recording" under "Delete this recording?", "This will permanently delete the recording and its transcript."), "Retry Transcription" while a "Couldn't transcribe" note has retries left, and "Resend Webhook" (the same delivery as webhook "Retry") when a webhook is set up and the note has a webhook result.
+The "More" menu SHALL offer "Delete" (confirmed with "Delete Recording" under "Delete this recording?", "This will permanently delete the recording and its transcript."), "Retry Transcription" while a "Couldn't transcribe" note has not been retried, and "Resend Webhook" (the same delivery as webhook "Retry") when a webhook is set up and the note has a webhook result.
 
 #### Scenario: Resend to the webhook
 - GIVEN a webhook is set up and a note shows "Delivered to webhook"
@@ -269,12 +269,7 @@ When Ramble opens or returns to the foreground, periodically in the background a
 ## Stuck-note alerts
 
 ### Requirement: Phone alerts for stuck notes
-The phone SHALL send at most one notification per kind, counting every note in it, no more than once per cooldown, cleared when nothing is left in that kind; each note alerts once. Accepted, held and refused-for-good notes never trigger "Not sent yet", and watch notes are alerted on the watch ([watch.md](watch.md)). Notification permission SHALL be asked once, in the foreground, after onboarding, when the first note exists.
-
-| Kind | Fires when | Cooldown | Title | Body |
-|---|---|---|---|---|
-| Not sent | A phone note not accepted 6 hours after recording ended, or 6 hours after its release from a hold | 6 hours | "Not sent yet" | "1 note hasn't been sent yet. Open Ramble to send it." / "N notes haven't been sent yet. Open Ramble to send them." |
-| Still waiting | Agent copies still waiting 12 hours after the note reached the server (checked only when Ramble runs) | 12 hours | "Still waiting for your agent" | "Your agent hasn't picked up 1 note since 9:12 AM." ("yesterday" or a weekday when older) |
+The phone SHALL send at most one "Not sent yet" notification, counting every note in it, no more than once every 6 hours, cleared when nothing is left; each note alerts once. It fires when a phone note is not accepted 6 hours after recording ended, or 6 hours after its release from a hold. Accepted, held and refused-for-good notes never trigger it, and watch notes are alerted on the watch ([watch.md](watch.md)). The body reads "1 note hasn't been sent yet. Open Ramble to send it." or "N notes haven't been sent yet. Open Ramble to send them." Agent copies left waiting SHALL NOT trigger a notification; they show only in the app (Home status, the agent screen). Notification permission SHALL be asked once, in the foreground, after onboarding, when the first note exists.
 
 #### Scenario: Alert while Ramble is closed
 - GIVEN a phone note can't upload and the person leaves the app
@@ -285,6 +280,11 @@ The phone SHALL send at most one notification per kind, counting every note in i
 - GIVEN onboarding is finished and the list is empty
 - WHEN the first note appears while Ramble is open
 - THEN the system notification prompt shows
+
+#### Scenario: Agent hasn't picked up for a day
+- GIVEN a note's agent copy has waited 24 hours
+- WHEN Ramble runs
+- THEN no notification is posted, and Home shows the agent status pill
 
 ## Settings
 
