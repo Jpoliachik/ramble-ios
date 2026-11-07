@@ -48,7 +48,7 @@ export default function TermsOfUse() {
             <ul className="mt-2 list-disc pl-5 space-y-1">
               <li>Audio recording, kept on your devices</li>
               <li>
-                Cloud transcription by third-party providers ({PROVIDERS.map((p) => p.name).join(", ")})
+                Cloud transcription by a third-party provider ({PROVIDERS.map((p) => p.name).join(", ")})
               </li>
               <li>
                 Ramble&apos;s relay, which holds transcripts until an agent you
@@ -163,7 +163,7 @@ export default function TermsOfUse() {
               agent is subject to its provider&apos;s terms.
             </p>
             <p className="mt-2">
-              Transcription is provided by third-party services (
+              Transcription is provided by a third-party service (
               {PROVIDERS.map((p) => p.name).join(", ")}).
             </p>
           </section>

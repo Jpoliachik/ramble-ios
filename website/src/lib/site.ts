@@ -24,11 +24,9 @@ export const PRIVACY_WORDING =
 // How long an agent's copy waits if it is never picked up.
 export const RETENTION = "30 days";
 
-// Transcription providers, in fallback order (specs/transcription.md).
+// The one transcription provider (specs/transcription.md).
 export const PROVIDERS = [
   { name: "Groq", model: "Whisper v3 Turbo", privacy: "https://groq.com/privacy-policy/" },
-  { name: "Deepgram", model: "Nova-3", privacy: "https://deepgram.com/privacy" },
-  { name: "OpenAI", model: "GPT-Transcribe", privacy: "https://openai.com/policies/privacy-policy" },
 ] as const;
 
 // Relay base URL (specs/relay-api.md "Base URL"). The workers.dev host serves

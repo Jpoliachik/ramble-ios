@@ -28,7 +28,7 @@ import {
 } from './http.js';
 import { FAIR_USE_SECONDS, alert, recordAttempt, recordEvent } from './ops.js';
 import { makeAgentCopies } from './relay.js';
-import { INLINE_BUDGET_MS, INLINE_PROVIDER_TIMEOUT_MS, TranscribeError } from './transcribe.js';
+import { INLINE_PROVIDER_TIMEOUT_MS, TranscribeError } from './transcribe.js';
 
 export const AUDIO_TYPES = new Set(['audio/mp4', 'audio/m4a', 'audio/x-m4a', 'audio/aac']);
 export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
@@ -230,10 +230,10 @@ export async function uploadNote(request, rawId, ctx) {
   }
 
   // Transcription continues if the client goes away, within the Worker's
-  // waitUntil budget: short provider timeouts, and a short lease (attempt 1).
+  // waitUntil budget: a short Groq timeout, and a short lease (attempt 1).
   const inline = {
     ...ctx,
-    transcribeDeps: { ...ctx.transcribeDeps, timeoutMs: INLINE_PROVIDER_TIMEOUT_MS, budgetMs: INLINE_BUDGET_MS },
+    transcribeDeps: { ...ctx.transcribeDeps, timeoutMs: INLINE_PROVIDER_TIMEOUT_MS },
   };
   const attempt = runAttempt(inline, accepted.note);
   ctx.waitUntil(attempt);

@@ -11,9 +11,8 @@ export const FREE_TIER_DAILY_SECONDS = 200 * 3600;
 export const FAIR_USE_SECONDS = 100 * 3600;
 const EVENT_RETENTION_MS = 3 * DAY;
 
-// Rough list prices per audio hour, for the spend estimate when the
-// transcriber's own spend table isn't available.
-const USD_PER_HOUR = { groq: 0.04, deepgram: 0.26, openai: 0.36 };
+// Groq's list price per audio hour, for the spend estimate.
+const USD_PER_HOUR = 0.04;
 
 /** Never throws: counting must not break the request it describes. */
 export async function recordEvent(ctx, kind, detail = null) {
@@ -24,16 +23,14 @@ export async function recordEvent(ctx, kind, detail = null) {
   }
 }
 
-/** What a transcription attempt says about the providers (see transcribe.js). */
-export async function recordAttempt(ctx, { attempts = [], fallback = false, breakerOpen = false } = {}) {
+/** What a transcription attempt says about Groq (see transcribe.js). */
+export async function recordAttempt(ctx, { attempts = [] } = {}) {
   for (const a of attempts ?? []) {
     if (a.status === 429 && a.provider === 'groq') await recordEvent(ctx, 'groq_429');
     if (a.status === 401 || a.status === 403 || /key/i.test(a.outcome ?? '')) {
       await recordEvent(ctx, 'key_problem', a.provider ?? null);
     }
   }
-  if (fallback) await recordEvent(ctx, 'fallback');
-  if (breakerOpen || (attempts ?? []).some((a) => a.outcome === 'breaker_open')) await recordEvent(ctx, 'breaker_open');
 }
 
 /**
@@ -90,25 +87,16 @@ export async function freeSecondsToday(ctx) {
   return row?.s ?? 0;
 }
 
-/** Estimated spend for one UTC day, from the transcriber's table if it exists. */
+/** Estimated Groq spend for one UTC day, from the measured length of notes finished that day. */
 export async function spendForDay(ctx, dayStart) {
-  const day = new Date(dayStart).toISOString().slice(0, 10);
-  try {
-    const { results } = await ctx.db
-      .prepare('SELECT provider, usd FROM provider_spend WHERE day = ?')
-      .bind(day)
-      .all();
-    return Object.fromEntries(results.map((r) => [r.provider, r.usd]));
-  } catch {
-    const { results } = await ctx.db
-      .prepare(
-        `SELECT provider, SUM(COALESCE(duration, 0)) AS s FROM notes
-          WHERE ready_at >= ? AND ready_at < ? AND provider IS NOT NULL GROUP BY provider`,
-      )
-      .bind(dayStart, dayStart + DAY)
-      .all();
-    return Object.fromEntries(results.map((r) => [r.provider, ((r.s ?? 0) / 3600) * (USD_PER_HOUR[r.provider] ?? 0.4)]));
-  }
+  const row = await ctx.db
+    .prepare(
+      `SELECT SUM(COALESCE(duration, 0)) AS s FROM notes
+        WHERE ready_at >= ? AND ready_at < ? AND provider IS NOT NULL`,
+    )
+    .bind(dayStart, dayStart + DAY)
+    .first();
+  return ((row?.s ?? 0) / 3600) * USD_PER_HOUR;
 }
 
 /** Every minute. Each alert has its own cooldown key. */
@@ -118,18 +106,12 @@ export async function checkAlerts(ctx) {
   const groq429 = await eventsSince(ctx, 'groq_429', hourAgo);
   if (groq429 >= 3) await alert(ctx, 'groq_429', `Groq answered 429 ${groq429} times in the last hour.`);
 
-  const fallbacks = await eventsSince(ctx, 'fallback', hourAgo);
-  if (fallbacks > 0) await alert(ctx, 'fallback', `Fallback providers were used ${fallbacks} times in the last hour.`);
-  if ((await eventsSince(ctx, 'breaker_open', hourAgo)) > 0) {
-    await alert(ctx, 'breaker_open', 'The fallback spend breaker is open: notes Groq cannot take are waiting.');
-  }
-
   const { results: keys } = await ctx.db
     .prepare(`SELECT DISTINCT detail FROM events WHERE kind = 'key_problem' AND at > ?`)
     .bind(hourAgo)
     .all();
   for (const k of keys) {
-    await alert(ctx, `key:${k.detail}`, `${k.detail ?? 'A provider'} rejected Ramble's API key, or the key is missing.`);
+    await alert(ctx, `key:${k.detail}`, `${k.detail ?? 'Groq'} rejected Ramble's API key, or the key is missing.`);
   }
 
   const stuck = await count(
@@ -139,7 +121,7 @@ export async function checkAlerts(ctx) {
   );
   if (stuck > 0) await alert(ctx, 'stuck', `${stuck} accepted notes have waited more than 5 minutes for a transcript.`);
 
-  const spend = Object.values(await spendForDay(ctx, utcDayStart(ctx.now))).reduce((a, b) => a + b, 0);
+  const spend = await spendForDay(ctx, utcDayStart(ctx.now));
   if (spend > SPEND_ALERT_USD) await alert(ctx, 'spend', `Estimated transcription spend today is $${spend.toFixed(2)}.`);
 
   const { results: heavy } = await ctx.db
@@ -204,15 +186,14 @@ export async function dailySummary(ctx, start, end) {
     count(ctx, 'SELECT COUNT(*) AS n FROM events WHERE kind = ? AND at >= ? AND at < ?', kind, start, end);
   const refusedFree = await between('refused_free');
   const refusedFairUse = await between('refused_fair_use');
-  const fallbacks = await between('fallback');
 
-  const { results: providers } = await ctx.db
-    .prepare(
-      `SELECT provider, COUNT(*) AS n FROM notes
-        WHERE ready_at >= ? AND ready_at < ? AND status = 'done' AND provider IS NOT NULL GROUP BY provider`,
-    )
-    .bind(start, end)
-    .all();
+  const transcribed = await count(
+    ctx,
+    `SELECT COUNT(*) AS n FROM notes
+      WHERE ready_at >= ? AND ready_at < ? AND status = 'done' AND provider IS NOT NULL`,
+    start,
+    end,
+  );
   const spend = await spendForDay(ctx, start);
   const outcomes = await ctx.db
     .prepare(
@@ -232,14 +213,12 @@ export async function dailySummary(ctx, start, end) {
   const pct = (p) => (waits.length ? waits[Math.min(waits.length - 1, Math.floor(p * waits.length))].ms / 1000 : 0);
 
   const hours = (s) => ((s ?? 0) / 3600).toFixed(1);
-  const providerLine =
-    providers.map((p) => `${p.provider} ${p.n} notes ~$${(spend[p.provider] ?? 0).toFixed(2)}`).join(', ') || 'none';
   return [
     `Summary for ${day} (UTC)`,
     `Active inboxes: ${accepted.inboxes ?? 0}`,
     `Notes accepted: ${accepted.free_notes ?? 0} free (${hours(accepted.free_s)} h), ${accepted.unlocked_notes ?? 0} unlocked (${hours(accepted.unlocked_s)} h)`,
     `New unlocks: ${unlocks}. Refused: ${refusedFree} free notes used, ${refusedFairUse} fair use`,
-    `Providers: ${providerLine}. Fallbacks: ${fallbacks}`,
+    `Groq: ${transcribed} notes ~$${spend.toFixed(2)}`,
     `No speech: ${outcomes.silent ?? 0}. Permanent failures: ${outcomes.failed ?? 0}`,
     `Upload to transcript: median ${pct(0.5).toFixed(1)} s, p95 ${pct(0.95).toFixed(1)} s`,
   ].join('\n');

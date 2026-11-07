@@ -107,7 +107,7 @@ Use these as written, or start from them.
 Keep claims inside this list. If it isn't here, check the code before writing it.
 
 - Records on the watch with no phone and no connection, and sends later. The watch uploads straight to Ramble's server, through the iPhone, Wi-Fi, or cellular.
-- Transcribes on Ramble's server with Groq Whisper v3 Turbo. If Groq is overloaded or down, it falls back to Deepgram Nova-3, then OpenAI GPT-Transcribe. None of them train on the audio. There is no model to choose.
+- Transcribes on Ramble's server with Groq Whisper v3 Turbo. If Groq is overloaded or down, the note waits and is retried. Groq doesn't train on the audio. There is no model to choose.
 - Connect an agent with a short single-use pairing code (like `K7QX-MP4D-HN3R`, expires in 10 minutes). No API keys or URLs.
 - Copy says "your agent." Muse is the agent we build and test with, so name it where someone needs to know what's tested, and don't headline "works with any agent."
 - No accounts. Privacy, in the words we use everywhere: "Ramble's server is a relay, not an archive. Your audio is sent to a transcription provider and deleted as soon as the transcript is ready. Transcripts are deleted when your agent picks them up, or after 30 days. Your full history lives only on your iPhone." Credentials are stored only as hashes.

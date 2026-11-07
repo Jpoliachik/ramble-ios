@@ -423,7 +423,7 @@ Support: support@ramble.watch, https://ramble.watch/support
 # About Ramble
 
 - Watch app with an iPhone companion. Record on the watch or the iPhone; Ramble's server transcribes and delivers.
-- Transcription: Groq Whisper v3 Turbo first. If Groq is overloaded or down, Deepgram Nova-3, then OpenAI GPT-Transcribe. All three exclude training on the audio under their API terms.
+- Transcription: Groq Whisper v3 Turbo, the only provider. If Groq is overloaded or down, the note waits and is retried for up to 20 hours. Groq's API terms exclude training on the audio.
 - Requires iOS 26.2+ and watchOS 10.0+ (Series 4 and later, any SE, any Ultra).
 - Free to download. 25 notes free, then $14.99 once. No subscription. Fair use: 100 hours of audio per calendar month.
 - No accounts. Ramble's server is a relay, not an archive. Your audio is sent to a transcription provider and deleted as soon as the transcript is ready. Transcripts are deleted when your agent picks them up, or after 30 days. Your full history lives only on your iPhone.

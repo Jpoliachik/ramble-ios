@@ -61,7 +61,7 @@ export default function PrivacyPolicy() {
           &larr; Back to Ramble
         </Link>
         <h1 className="mt-8 text-3xl font-semibold tracking-tight text-stone-900">Privacy Policy</h1>
-        <p className="mt-2 text-sm text-stone-500">Last updated: November 6, 2026</p>
+        <p className="mt-2 text-sm text-stone-500">Last updated: November 7, 2026</p>
 
         <div className="mt-10 space-y-8 text-sm leading-relaxed text-stone-600">
           <section>
@@ -86,22 +86,13 @@ export default function PrivacyPolicy() {
             <h2 className={h2}>Transcription</h2>
             <p className="mt-2">
               All transcription happens in the cloud. Nothing is uploaded until you tap Get started in the app. After
-              that, your watch or iPhone uploads each recording to Ramble&apos;s server, which sends the audio to a
-              transcription provider:
+              that, your watch or iPhone uploads each recording to Ramble&apos;s server, which sends the audio to one
+              transcription provider, <span className={strong}>Groq</span> (Whisper v3 Turbo). No other provider
+              receives your audio.
             </p>
-            <ul className="mt-2 list-disc pl-5 space-y-1">
-              <li>
-                <span className={strong}>Groq</span> (Whisper v3 Turbo) transcribes every note first.
-              </li>
-              <li>
-                <span className={strong}>Deepgram</span> (Nova-3), and then <span className={strong}>OpenAI</span>{" "}
-                (GPT-Transcribe), receive the same audio only when the provider before them is overloaded or down.
-              </li>
-            </ul>
             <p className="mt-2">
-              Ramble uses only providers whose API terms exclude training on your audio, and opts out of
-              Deepgram&apos;s model improvement program on every request. The provider also receives your language
-              and vocabulary settings, if you set them. Ramble deletes the audio as soon as the transcript is ready.
+              Groq&apos;s API terms exclude training on your audio. Groq also receives your language and vocabulary
+              settings, if you set them. Ramble deletes the audio as soon as the transcript is ready.
             </p>
           </section>
 
@@ -190,7 +181,7 @@ export default function PrivacyPolicy() {
 
           <section>
             <h2 className={h2}>Third-party services</h2>
-            <p className="mt-2">Each transcription provider has its own privacy policy:</p>
+            <p className="mt-2">The transcription provider has its own privacy policy:</p>
             <ul className="mt-2 list-disc pl-5 space-y-1">
               {PROVIDERS.map((p) => (
                 <li key={p.name}>

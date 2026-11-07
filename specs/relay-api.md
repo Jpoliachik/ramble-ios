@@ -210,7 +210,7 @@ Note responses SHALL be `{"id", "source", "status", "result", "recorded_at", "re
 | Field | Values |
 |---|---|
 | `status` | `"transcribing"`, `"done"` or `"failed"` |
-| `result` | done: `"transcript"` or `"no_speech"`; failed: `"audio_rejected"` (no provider could transcribe the audio) or `"retries_exhausted"` (it kept failing until the retry window ended); else `null` |
+| `result` | done: `"transcript"` or `"no_speech"`; failed: `"audio_rejected"` (Groq rejected the audio itself) or `"retries_exhausted"` (it kept failing until the retry window ended); else `null` |
 | `recorded_at` | exactly as the device sent it, offset included |
 | `duration` | seconds measured by the relay; `null` until done |
 | `transcript` | the text for `"transcript"`, `""` for `"no_speech"`, else `null` |

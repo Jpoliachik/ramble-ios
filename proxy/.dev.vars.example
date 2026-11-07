@@ -9,10 +9,8 @@
 ENVIRONMENT=development
 DEV_BYPASS_KEY=ramble-local-dev-bypass-key
 
-# Needed for notes to transcribe locally. Fallbacks are optional.
+# Needed for notes to transcribe locally.
 GROQ_API_KEY=your-groq-api-key-here
-DEEPGRAM_API_KEY=
-OPENAI_API_KEY=
 
 # Optional: wake-up hooks and operator alerts.
 HOOK_ENCRYPTION_KEY=

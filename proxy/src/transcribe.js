@@ -1,81 +1,39 @@
-// Transcription providers, fallback and formatting for uploaded notes.
-// Behavior is specs/transcription.md; this file is the one place that talks
-// to Groq, Deepgram and OpenAI.
-
-import { measureDurationSeconds } from './audio.js';
+// Transcription and formatting for uploaded notes. Behavior is
+// specs/transcription.md; this file is the one place that talks to Groq.
 
 export class TranscribeError extends Error {
-  // retryable: true = provider overloaded/down/key rejected/spend breaker; try again later
-  // retryable: false = no provider could transcribe this audio (result "audio_rejected")
+  // retryable: true = Groq overloaded/down/slow/key rejected or missing; try again later
+  // retryable: false = Groq rejected the audio itself (result "audio_rejected")
   constructor(message, { retryable, provider = null, status = null } = {}) {
     super(message);
     this.name = 'TranscribeError';
     this.retryable = retryable;
     this.provider = provider;
     this.status = status;
-    // Filled in by transcribeNote for the caller's alerts and usage records.
+    // Filled in by transcribeNote for the caller's alerts.
     this.attempts = [];
-    this.breakerOpen = false;
   }
 }
 
 // --- Configuration ---
 
-// Provider order. Groq is the one primary for everyone; the rest are
-// fallbacks used only when the one before is overloaded, down, rate limited
-// or rejects Ramble's key.
-export const PROVIDER_CHAIN = ['groq', 'deepgram', 'openai'];
-export const FALLBACK_PROVIDERS = ['deepgram', 'openai'];
+// The one provider and model, for everyone.
+export const PROVIDER = 'groq';
+export const MODEL = 'whisper-large-v3-turbo';
 
-export const MODELS = {
-  groq: 'whisper-large-v3-turbo',
-  deepgram: 'nova-3',
-  openai: 'gpt-transcribe',
-};
-
-// Fallback spend breaker: Deepgram + OpenAI combined, per UTC day.
-export const FALLBACK_DAILY_BUDGET_USD = 5.0;
-
-// OpenAI takes at most 25 minutes of audio per request.
-export const OPENAI_MAX_SECONDS = 25 * 60;
-
-// Each provider call is given up after this long.
+// The Groq call is given up after this long.
 export const PROVIDER_TIMEOUT_MS = 120_000;
 
 // The first attempt runs as the upload is accepted, inside the Worker's
-// waitUntil budget (about 30 seconds after the response): each call gets at
-// most 20 seconds and the whole chain 28, so a slow Groq still leaves time
-// for a fallback. Later attempts, from the cron, keep the long timeout.
+// waitUntil budget (about 30 seconds after the response), so its call gets
+// at most 20 seconds. Later attempts, from the cron, keep the long timeout.
 export const INLINE_PROVIDER_TIMEOUT_MS = 20_000;
-export const INLINE_BUDGET_MS = 28_000;
-// A call with less than this left of the budget isn't started.
-const MIN_CALL_MS = 3_000;
-
-// Estimated list prices in dollars per audio minute. Estimates only: they
-// drive the spend breaker and the operator's numbers, not billing.
-export const COST_PER_MINUTE = {
-  groq: 0.04 / 60, // $0.04 per hour
-  deepgram: 0.0052, // Nova-3 pre-recorded, multilingual rate (the higher one)
-  openai: 0.006,
-};
-// Groq bills every request as at least 10 seconds.
-const GROQ_MIN_BILLED_SECONDS = 10;
-
-// Languages Deepgram Nova-3 takes as a `language=` hint. Anything else gets
-// no hint (`multi`, Deepgram's own detection). Check before expanding:
-//   https://developers.deepgram.com/docs/models-languages-overview
-const DEEPGRAM_NOVA3_LANGUAGES = new Set([
-  'ar','bg','bn','ca','cs','da','de','el','en','es','et','fa','fi','fr','he',
-  'hi','hr','hu','id','it','ja','ko','lt','lv','ms','nl','no','pl','pt','ro',
-  'ru','sk','sv','ta','te','th','tl','tr','uk','ur','vi','zh',
-]);
 
 // Filler words removed when "Remove filler words" is on. Keeps "like" and
 // "you know", which often carry meaning.
 const FILLER_REGEX = /\b(?:um+|uh+|er+|ah+|hmm+|mhm+|uhm+|erm+)\b[\s,.;:!?]*/gi;
 
-// Vocabulary limits. GPT-Transcribe rejects keywords containing `<`, `>` or
-// line breaks, so those are dropped here.
+// Vocabulary limits. `<`, `>` and line breaks inside a term are dropped.
 const MAX_KEYWORDS = 100;
 const MAX_KEYWORD_LENGTH = 100;
 // Whisper's prompt holds about 224 tokens; stay well inside it so Groq never
@@ -108,22 +66,19 @@ const MAX_ERROR_BODY = 200;
 // --- Entry point ---
 
 // audio: ArrayBuffer of the stored note (AAC in MP4/M4A or raw ADTS AAC).
-// opts: { contentType, language, removeFillerWords, vocabulary, durationSeconds }
-// env: GROQ_API_KEY, DEEPGRAM_API_KEY, OPENAI_API_KEY, DB (spend breaker).
-// deps: { fetch, now, timeoutMs, budgetMs }: timeoutMs per call; budgetMs for
-// all calls together (none by default). The first attempt passes the inline values.
+// opts: { contentType, language, removeFillerWords, vocabulary }
+// env: GROQ_API_KEY.
+// deps: { fetch, timeoutMs }: timeoutMs for the call. The first attempt
+// passes the inline value.
 //
 // Resolves { result: 'transcript' | 'no_speech', text, provider, model,
-//            durationSeconds, fallback, attempts }.
-//   durationSeconds: length the provider reported, or null if it gave none.
-//   fallback: true when a provider other than Groq produced the result.
-//   attempts: [{ provider, outcome, status }] in call order, for alerts.
-// Rejects with TranscribeError (also carrying attempts and breakerOpen).
+//            durationSeconds, attempts }.
+//   durationSeconds: length Groq reported, or null if it gave none.
+//   attempts: [{ provider, outcome, status }], for alerts.
+// Rejects with TranscribeError (also carrying attempts).
 export async function transcribeNote(audio, opts = {}, env = {}, deps = {}) {
   const fetchFn = deps.fetch ?? globalThis.fetch;
-  const now = deps.now ?? Date.now;
   const timeoutMs = deps.timeoutMs ?? PROVIDER_TIMEOUT_MS;
-  const budgetEnd = deps.budgetMs != null ? now() + deps.budgetMs : Infinity;
 
   const options = {
     contentType: normalizeContentType(opts.contentType),
@@ -131,115 +86,71 @@ export async function transcribeNote(audio, opts = {}, env = {}, deps = {}) {
     keywords: parseKeywords(opts.vocabulary ?? ''),
     removeFillerWords: opts.removeFillerWords === true,
   };
-  const knownSeconds = opts.durationSeconds ?? safeMeasure(audio);
 
-  const attempts = [];
-  let breakerOpen = false;
-  let breakerChecked = false;
+  const outcome = await callGroq(audio, options, env, fetchFn, timeoutMs);
+  const attempts = [{ provider: PROVIDER, outcome: outcome.kind, status: outcome.status ?? null }];
 
-  for (const provider of PROVIDER_CHAIN) {
-    const isFallback = provider !== 'groq';
-
-    if (provider === 'openai' && !(knownSeconds > 0 && knownSeconds <= OPENAI_MAX_SECONDS)) {
-      // Too long for OpenAI, or a length we can't confirm fits.
-      attempts.push({ provider, outcome: 'skipped_length', status: null });
-      continue;
-    }
-
-    if (isFallback) {
-      if (!breakerChecked) {
-        breakerOpen = await fallbackBreakerOpen(env, now());
-        breakerChecked = true;
-      }
-      if (breakerOpen) {
-        attempts.push({ provider, outcome: 'breaker_open', status: null });
-        break; // every remaining provider is a fallback
-      }
-    }
-
-    const left = budgetEnd - now();
-    if (left < MIN_CALL_MS) {
-      attempts.push({ provider, outcome: 'out_of_time', status: null });
-      break; // the next attempt starts from Groq with the full timeout
-    }
-    const outcome = await callProvider(provider, audio, options, env, fetchFn, Math.min(timeoutMs, left));
-    attempts.push({ provider, outcome: outcome.kind, status: outcome.status ?? null });
-
-    if (outcome.kind === 'ok' || outcome.kind === 'too_short') {
-      const seconds = outcome.seconds ?? null;
-      if (outcome.kind === 'ok') {
-        await recordSpend(env, provider, seconds ?? knownSeconds ?? 0, now());
-      }
-      const text = outcome.kind === 'ok' ? finishText(outcome, provider, options) : '';
-      const silent = outcome.kind === 'too_short' || outcome.allSilent || isSilenceText(text);
-      return {
-        result: silent ? 'no_speech' : 'transcript',
-        text: silent ? '' : text,
-        provider,
-        model: MODELS[provider],
-        durationSeconds: seconds,
-        fallback: isFallback,
-        attempts,
-      };
-    }
-
-    if (outcome.kind === 'audio_rejected') {
-      const err = new TranscribeError(outcome.message, {
-        retryable: false,
-        provider,
-        status: outcome.status,
-      });
-      err.attempts = attempts;
-      throw err;
-    }
-    // Overloaded, down, slow, rate limited, billing, or key trouble: next provider.
+  if (outcome.kind === 'ok' || outcome.kind === 'too_short') {
+    const text = outcome.kind === 'ok' ? finishText(outcome, options) : '';
+    const silent = outcome.kind === 'too_short' || outcome.allSilent || isSilenceText(text);
+    return {
+      result: silent ? 'no_speech' : 'transcript',
+      text: silent ? '' : text,
+      provider: PROVIDER,
+      model: MODEL,
+      durationSeconds: outcome.seconds ?? null,
+      attempts,
+    };
   }
 
-  const last = [...attempts].reverse().find((a) => a.status !== null) ?? attempts[attempts.length - 1];
-  const message = breakerOpen
-    ? 'Groq is unavailable and the fallback spend breaker is open'
-    : 'No transcription provider is available right now';
-  const err = new TranscribeError(message, {
-    retryable: true,
-    provider: last?.provider ?? null,
-    status: last?.status ?? null,
+  // audio_rejected stops for good; anything about load, keys, money or size
+  // waits and is retried.
+  const err = new TranscribeError(outcome.message, {
+    retryable: outcome.kind !== 'audio_rejected',
+    provider: PROVIDER,
+    status: outcome.status ?? null,
   });
   err.attempts = attempts;
-  err.breakerOpen = breakerOpen;
   throw err;
 }
 
-// --- Provider calls ---
+// --- The Groq call ---
 
-// One provider call. Returns one of:
-//   { kind: 'ok', text, segments, timed, seconds, allSilent }
+// Returns one of:
+//   { kind: 'ok', text, timed, seconds, allSilent }
 //   { kind: 'too_short', status }                   audio too short: no speech
-//   { kind: 'audio_rejected', status, message }     stop: nobody can take it
-//   { kind: <fallback outcome>, status, message }   try the next provider
-// Fallback outcomes: key_missing, key_rejected, rate_limited, unavailable,
+//   { kind: 'audio_rejected', status, message }     stop: Groq can't take it
+//   { kind: <retryable outcome>, status, message }  try again later
+// Retryable outcomes: key_missing, key_rejected, rate_limited, unavailable,
 // timeout, billing, too_large, bad_response.
-async function callProvider(provider, audio, options, env, fetchFn, timeoutMs) {
-  const key = env[API_KEY_NAMES[provider]];
+async function callGroq(audio, options, env, fetchFn, timeoutMs) {
+  const key = env.GROQ_API_KEY;
   if (!key) {
-    console.error(`[transcribe] ${provider} key missing`);
-    return { kind: 'key_missing', status: null, message: `${provider} key not configured` };
+    console.error('[transcribe] groq key missing');
+    return { kind: 'key_missing', status: null, message: 'groq key not configured' };
   }
 
-  const request = buildRequest(provider, audio, options, key);
+  const blob = new Blob([audio], { type: options.contentType });
+  const fileName = options.contentType === 'audio/aac' ? 'recording.aac' : 'recording.m4a';
   let res;
   try {
-    res = await fetchFn(request.url, { ...request.init, signal: AbortSignal.timeout(timeoutMs) });
+    res = await fetchFn('https://api.groq.com/openai/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}` },
+      body: buildGroqForm(blob, fileName, options),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
   } catch (err) {
     const timedOut = err?.name === 'TimeoutError' || err?.name === 'AbortError';
-    console.error(`[transcribe] ${provider} ${timedOut ? 'timed out' : 'unreachable'}`);
-    return { kind: timedOut ? 'timeout' : 'unavailable', status: null, message: `${provider} unreachable` };
+    console.error(`[transcribe] groq ${timedOut ? 'timed out' : 'unreachable'}`);
+    return { kind: timedOut ? 'timeout' : 'unavailable', status: null, message: 'groq unreachable' };
   }
 
   if (!res.ok) {
     const body = truncateBody(await safeText(res));
     const kind = classifyHttpFailure(res.status, body);
-    console.error(`[transcribe] ${provider} error ${res.status} (${kind}): ${body}`);
-    return { kind, status: res.status, message: `${provider} answered ${res.status}: ${body}` };
+    console.error(`[transcribe] groq error ${res.status} (${kind}): ${body}`);
+    return { kind, status: res.status, message: `groq answered ${res.status}: ${body}` };
   }
 
   let data;
@@ -248,59 +159,19 @@ async function callProvider(provider, audio, options, env, fetchFn, timeoutMs) {
   } catch {
     data = null;
   }
-  const parsed = data ? PARSERS[provider](data) : null;
+  const parsed = data ? parseGroq(data) : null;
   if (!parsed) {
-    console.error(`[transcribe] ${provider} returned an unreadable response`);
-    return { kind: 'bad_response', status: res.status, message: `${provider} returned no transcript` };
+    console.error('[transcribe] groq returned an unreadable response');
+    return { kind: 'bad_response', status: res.status, message: 'groq returned no transcript' };
   }
   return { kind: 'ok', ...parsed };
-}
-
-const API_KEY_NAMES = {
-  groq: 'GROQ_API_KEY',
-  deepgram: 'DEEPGRAM_API_KEY',
-  openai: 'OPENAI_API_KEY',
-};
-
-function buildRequest(provider, audio, options, key) {
-  const blob = new Blob([audio], { type: options.contentType });
-  const fileName = options.contentType === 'audio/aac' ? 'recording.aac' : 'recording.m4a';
-
-  if (provider === 'groq') {
-    return {
-      url: 'https://api.groq.com/openai/v1/audio/transcriptions',
-      init: {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${key}` },
-        body: buildGroqForm(blob, fileName, options),
-      },
-    };
-  }
-  if (provider === 'deepgram') {
-    return {
-      url: `https://api.deepgram.com/v1/listen?${buildDeepgramParams(options).toString()}`,
-      init: {
-        method: 'POST',
-        headers: { Authorization: `Token ${key}`, 'Content-Type': options.contentType },
-        body: audio,
-      },
-    };
-  }
-  return {
-    url: 'https://api.openai.com/v1/audio/transcriptions',
-    init: {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${key}` },
-      body: buildOpenAIForm(blob, fileName, options),
-    },
-  };
 }
 
 /** Multipart body for Groq's Whisper endpoint. */
 export function buildGroqForm(file, fileName, options) {
   const form = new FormData();
   form.append('file', file, fileName);
-  form.append('model', MODELS.groq);
+  form.append('model', MODEL);
   form.append('response_format', 'verbose_json');
   form.append('temperature', '0');
   if (options.language) form.append('language', options.language);
@@ -309,81 +180,25 @@ export function buildGroqForm(file, fileName, options) {
   return form;
 }
 
-/** Query string for Deepgram's `/v1/listen`. */
-export function buildDeepgramParams(options) {
-  const params = new URLSearchParams({
-    model: MODELS.deepgram,
-    smart_format: 'true',
-    paragraphs: 'true',
-    language: resolveDeepgramLanguage(options.language),
-    // Deepgram drops "um" and "uh" unless told not to, so keeping them is an
-    // explicit opt-in that matches Groq's output.
-    filler_words: options.removeFillerWords ? 'false' : 'true',
-    // Never let Deepgram use the audio to improve its models.
-    mip_opt_out: 'true',
-  });
-  for (const term of options.keywords) params.append('keyterm', term);
-  return params;
-}
-
-/**
- * Multipart body for OpenAI's `/v1/audio/transcriptions`. Array fields repeat
- * with a `[]` suffix, as OpenAI's SDKs send `keywords` and `languages`.
- */
-export function buildOpenAIForm(file, fileName, options) {
-  const form = new FormData();
-  form.append('file', file, fileName);
-  form.append('model', MODELS.openai);
-  // GPT-Transcribe returns JSON only, with no timings.
-  form.append('response_format', 'json');
-  if (options.language) form.append('languages[]', options.language);
-  for (const term of options.keywords) form.append('keywords[]', term);
-  return form;
-}
-
 // --- Response parsing ---
 
-const PARSERS = {
-  groq(data) {
-    if (typeof data.text !== 'string') return null;
-    const segments = Array.isArray(data.segments) ? data.segments : [];
-    return {
-      text: segments.length > 0 ? formatSegmentsIntoParagraphs(segments) : data.text,
-      timed: segments.length > 0,
-      seconds: finiteOrNull(data.duration),
-      allSilent: segments.length > 0 && segments.every(isSilentSegment),
-    };
-  },
-
-  deepgram(data) {
-    const alternative = data.results?.channels?.[0]?.alternatives?.[0];
-    if (!alternative) return null;
-    const seconds = finiteOrNull(data.metadata?.duration);
-    // Sentences carry timings: rebuild paragraphs on the 2-second rule.
-    const sentences = (alternative.paragraphs?.paragraphs ?? []).flatMap((p) => p.sentences ?? []);
-    if (sentences.length > 0) {
-      return { text: formatSegmentsIntoParagraphs(sentences), timed: true, seconds, allSilent: false };
-    }
-    const text = alternative.paragraphs?.transcript ?? alternative.transcript;
-    if (typeof text !== 'string') return null;
-    return { text, timed: false, seconds, allSilent: false };
-  },
-
-  openai(data) {
-    if (typeof data.text !== 'string') return null;
-    const seconds = data.usage?.type === 'duration' ? finiteOrNull(data.usage.seconds) : finiteOrNull(data.duration);
-    return { text: data.text, timed: false, seconds, allSilent: false };
-  },
-};
+function parseGroq(data) {
+  if (typeof data.text !== 'string') return null;
+  const segments = Array.isArray(data.segments) ? data.segments : [];
+  return {
+    text: segments.length > 0 ? formatSegmentsIntoParagraphs(segments) : data.text,
+    timed: segments.length > 0,
+    seconds: finiteOrNull(data.duration),
+    allSilent: segments.length > 0 && segments.every(isSilentSegment),
+  };
+}
 
 // Prompt echo, filler words and paragraphs, in that order.
-function finishText(outcome, provider, options) {
+function finishText(outcome, options) {
   let text = (outcome.text ?? '').trim();
-  if (provider === 'groq') {
-    // Only Whisper gets the vocabulary as a prompt, and only Whisper echoes it.
-    const terms = whisperPromptTerms(options.keywords);
-    if (terms) text = stripPromptEcho(text, terms);
-  }
+  // Whisper gets the vocabulary as a prompt, and sometimes echoes it.
+  const terms = whisperPromptTerms(options.keywords);
+  if (terms) text = stripPromptEcho(text, terms);
   if (options.removeFillerWords) text = stripFillerWords(text);
   if (!outcome.timed) text = formatTextIntoParagraphs(text);
   return (text ?? '').trim();
@@ -395,8 +210,8 @@ const BILLING_PATTERN = /billing|quota|spend|credit|payment|insufficient|balance
 const RATE_PATTERN = /rate.?limit|too many requests/i;
 const TOO_SHORT_PATTERN = /too short/i;
 
-// What a non-2xx answer means. Only a 4xx about the audio itself stops the
-// chain; anything that is about load, keys, money or size moves on.
+// What a non-2xx answer means. Only a 4xx about the audio itself fails the
+// note; anything that is about load, keys, money or size is retried.
 export function classifyHttpFailure(status, body = '') {
   if (status === 429) return 'rate_limited';
   if (status >= 500) return 'unavailable';
@@ -421,52 +236,6 @@ async function safeText(res) {
     return await res.text();
   } catch {
     return '';
-  }
-}
-
-// --- Spend breaker ---
-
-export function utcDay(ms) {
-  return new Date(ms).toISOString().slice(0, 10);
-}
-
-export function estimateCostUSD(provider, seconds) {
-  const billed = provider === 'groq' ? Math.max(seconds, GROQ_MIN_BILLED_SECONDS) : seconds;
-  return (billed / 60) * (COST_PER_MINUTE[provider] ?? 0);
-}
-
-// True when today's Deepgram + OpenAI spend has reached the budget. Fails
-// safe: if spend can't be read, the fallbacks stay closed.
-export async function fallbackBreakerOpen(env, nowMs) {
-  try {
-    const row = await env.DB.prepare(
-      `SELECT COALESCE(SUM(usd), 0) AS usd FROM provider_spend
-       WHERE day = ? AND provider IN ('deepgram', 'openai')`,
-    )
-      .bind(utcDay(nowMs))
-      .first();
-    return Number(row?.usd ?? 0) >= FALLBACK_DAILY_BUDGET_USD;
-  } catch (err) {
-    console.error(`[transcribe] spend breaker unreadable, fallbacks closed: ${err?.message}`);
-    return true;
-  }
-}
-
-// Adds a successful call's estimated cost to today's row. A failed write is
-// logged and never fails the note.
-export async function recordSpend(env, provider, seconds, nowMs) {
-  const safeSeconds = Number.isFinite(seconds) && seconds > 0 ? seconds : 0;
-  const usd = estimateCostUSD(provider, safeSeconds);
-  try {
-    await env.DB.prepare(
-      `INSERT INTO provider_spend (day, provider, usd, seconds, notes) VALUES (?, ?, ?, ?, 1)
-       ON CONFLICT (day, provider) DO UPDATE SET
-         usd = usd + excluded.usd, seconds = seconds + excluded.seconds, notes = notes + 1`,
-    )
-      .bind(utcDay(nowMs), provider, usd, safeSeconds)
-      .run();
-  } catch (err) {
-    console.error(`[transcribe] spend record failed for ${provider}: ${err?.message}`);
   }
 }
 
@@ -573,15 +342,6 @@ export function parseKeywords(vocabulary) {
   return keywords;
 }
 
-/** Deepgram's `language` value: the code if Nova-3 has it, else `multi` (detect). */
-export function resolveDeepgramLanguage(code) {
-  if (!code) return 'multi';
-  if (DEEPGRAM_NOVA3_LANGUAGES.has(code)) return code;
-  const base = code.split('-')[0];
-  if (DEEPGRAM_NOVA3_LANGUAGES.has(base)) return base;
-  return 'multi';
-}
-
 // Terms joined for the Whisper prompt, cut at a term boundary to fit.
 function whisperPromptTerms(keywords) {
   let joined = '';
@@ -643,14 +403,6 @@ function normalizeContentType(type) {
 function normalizeLanguage(language) {
   const code = (language ?? '').trim().toLowerCase();
   return code && code !== 'auto' ? code : null;
-}
-
-function safeMeasure(audio) {
-  try {
-    return measureDurationSeconds(audio instanceof Uint8Array ? audio : new Uint8Array(audio));
-  } catch {
-    return null;
-  }
 }
 
 function finiteOrNull(n) {

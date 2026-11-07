@@ -1,8 +1,8 @@
 // Old builds' cloud transcription for early subscribers: POST /transcribe.
 // Works until LEGACY_UNTIL, then 410 (see the router). Needs App Attest and
 // an unexpired subscription record checked like POST /entitlement, counts
-// toward 100 hours a month per original transaction, and always uses the
-// default provider chain whatever model the old app asks for.
+// toward 100 hours a month per original transaction, and always uses Groq
+// whatever model the old app asks for.
 // See specs/relay-api.md "Old app versions".
 
 import { AppleVerifyError } from './apple.js';

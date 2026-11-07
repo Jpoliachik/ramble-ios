@@ -136,32 +136,36 @@ describe('operator', () => {
     assert.ok(!summaries[0].includes('private words'));
   });
 
-  it('builds a summary with spend from the transcriber table', async () => {
-    h.db.sqlite.exec("INSERT INTO provider_spend (day, provider, usd, seconds, notes) VALUES ('2026-11-01', 'groq', 0.5, 3600, 10)");
+  it('builds a summary with Groq notes and estimated spend', async () => {
+    const secret = await h.inbox();
+    h.transcribe = async () => ({ result: 'transcript', text: 'x', provider: 'groq', durationSeconds: 3600 });
+    await h.upload(secret, noteId(1));
     const text = await dailySummary({ db: h.db, now: T0 }, Date.UTC(2026, 10, 1), Date.UTC(2026, 10, 2));
     assert.match(text, /Summary for 2026-11-01/);
+    assert.match(text, /Groq: 1 notes ~\$0\.04/);
   });
 
-  it('alerts on Groq 429s, fallbacks and key problems reported by the transcriber, with cooldown', async () => {
+  it('alerts on Groq 429s and key problems reported by the transcriber, with cooldown', async () => {
     const secret = await h.inbox();
-    h.transcribe = async () => ({
-      result: 'transcript', text: 'x', provider: 'deepgram', fallback: true,
-      attempts: [{ provider: 'groq', outcome: 'rate_limited', status: 429 }, { provider: 'deepgram', outcome: 'ok', status: 200 }],
-    });
+    const err = (outcome, status) =>
+      Object.assign(new Error('groq down'), { retryable: true, provider: 'groq', status, attempts: [{ provider: 'groq', outcome, status }] });
+    h.transcribe = async () => {
+      throw err('rate_limited', 429);
+    };
     for (let i = 1; i <= 3; i++) await h.upload(secret, noteId(i));
-    h.transcribe = async () => ({
-      result: 'transcript', text: 'x', provider: 'deepgram',
-      attempts: [{ provider: 'groq', outcome: 'key_rejected', status: 401 }],
-    });
+    h.transcribe = async () => {
+      throw err('key_rejected', 401);
+    };
     await h.upload(secret, noteId(4));
     await h.cron();
     assert.ok(h.alerts.some((a) => a.includes('Groq answered 429 3 times')));
-    assert.ok(h.alerts.some((a) => a.includes('Fallback providers')));
-    assert.ok(h.alerts.some((a) => a.includes("rejected Ramble's API key")));
-    const n = h.alerts.length;
+    assert.ok(h.alerts.some((a) => a.includes("groq rejected Ramble's API key")));
+    // Retries keep failing the same way for the next hour: no repeat alerts.
+    const providerAlerts = () => h.alerts.filter((a) => a.includes('Groq answered 429') || a.includes('API key')).length;
+    const n = providerAlerts();
     h.now += HOUR;
     await h.cron();
-    assert.equal(h.alerts.length, n);
+    assert.equal(providerAlerts(), n);
   });
 
   it('alerts when a purchase reaches 80% of fair use', async () => {

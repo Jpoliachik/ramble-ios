@@ -10,7 +10,7 @@ The behavior is specified in [`specs/`](../specs/): the HTTP contract is [`relay
 
 1. The watch or iPhone uploads a note's audio to `PUT /notes/:id` (the note's UUID is the idempotency key).
 2. The relay stores the audio in a private R2 bucket, then accepts the note, counting a free note or fair-use hours.
-3. It transcribes right away: Groq Whisper v3 Turbo first, falling back to Deepgram Nova-3 and OpenAI GPT-Transcribe only when a provider is overloaded or down. Quick transcripts come back in the upload response.
+3. It transcribes right away with Groq Whisper v3 Turbo, the only provider. Quick transcripts come back in the upload response; if Groq is overloaded or down, the note waits for a retry.
 4. The audio is deleted. One copy of the transcript goes to each connected agent, and one is kept for the person's devices until the phone acks it (and, for a watch note, the watch has seen it), at most 30 days.
 5. A cron job every minute retries failed attempts (for up to 20 hours), picks up stalled ones, expires old data, and sends operator alerts.
 
@@ -25,7 +25,7 @@ The behavior is specified in [`specs/`](../specs/): the HTTP contract is [`relay
 | `src/relay.js` | Pairing, agent copies, pull and ack, delivery status, wake-up hooks, old builds' text upload |
 | `src/legacy.js` | Old builds' `POST /transcribe` for early subscribers, until `LEGACY_UNTIL` |
 | `src/ops.js` | Operator alerts and the daily usage summary |
-| `src/transcribe.js`, `src/audio.js` | Providers, fallback, spend breaker, formatting; audio length from the container |
+| `src/transcribe.js`, `src/audio.js` | The Groq call, error classification, formatting; audio length from the container |
 | `src/apple.js`, `src/attest.js`, `src/ratelimit.js`, `src/crypto.js` | Apple-signed records, App Attest, the D1 rate limiter |
 | `migrations/` | D1 schema |
 
@@ -43,14 +43,13 @@ Secrets (`npx wrangler secret put NAME`):
 
 | Secret | What |
 |---|---|
-| `GROQ_API_KEY` | Primary transcription provider |
-| `DEEPGRAM_API_KEY`, `OPENAI_API_KEY` | Fallback providers |
+| `GROQ_API_KEY` | The transcription provider |
 | `HOOK_ENCRYPTION_KEY` | Encrypts agents' wake-up hook headers at rest. Without it, setting a hook answers 503 |
 | `ALERT_WEBHOOK_URL` | Where operator alerts and the daily summary are POSTed as plain text (for example an ntfy topic). Unset: nothing is sent |
 
 Vars (`[vars]`): `RETENTION_SECONDS`, `APPLE_BUNDLE_ID`, `UNLOCK_PRODUCT_ID`, `PREMIUM_PRODUCT_ID`, `APPSTORE_ENVIRONMENT` (`Production`), `RELAY_BASE_URL`, and three set at release: `FIRST_FREE_BUILD` (build number of the first free-notes build), `FREE_RELEASE_AT` (its release time, ISO 8601) and `LEGACY_UNTIL` (when old builds' paths start answering 410). Without `FIRST_FREE_BUILD`/`FREE_RELEASE_AT` nobody counts as an early buyer; without `LEGACY_UNTIL` the old paths keep working.
 
-Production has no developer bypass: never set `ENVIRONMENT` or `DEV_BYPASS_KEY` on the deployed Worker (see Local Development). `DEV_BYPASS_TOKEN` and `ANALYTICS_TOKEN` are no longer read and can be deleted.
+Production has no developer bypass: never set `ENVIRONMENT` or `DEV_BYPASS_KEY` on the deployed Worker (see Local Development). `DEV_BYPASS_TOKEN`, `ANALYTICS_TOKEN`, `DEEPGRAM_API_KEY` and `OPENAI_API_KEY` are no longer read and can be deleted.
 
 Apple: point App Store Server Notifications (version 2) for production at `https://<relay>/appstore/notifications`.
 
@@ -60,7 +59,7 @@ Apple: point App Store Server Notifications (version 2) for production at `https
 - **Notes:** ID, source device, status, recorded time as sent, measured length, and the transcript until the person's devices have it. Audio sits in R2 only until transcription ends, and at most 1 day.
 - **Agent copies:** transcript text until the agent acks it or 30 days pass; afterwards a row without text, so the app can show "picked up" or "not picked up".
 - **Purchases:** Apple's original transaction ID, kind, environment, refund time; fair-use seconds per month.
-- **Operator data:** counted events (refusals, provider trouble) for 3 days, alert cooldowns, rate-limit counters, estimated spend per provider per day.
+- **Operator data:** counted events (refusals, provider trouble) for 3 days, alert cooldowns, rate-limit counters.
 
 Logs carry no request bodies, transcript text, audio, credentials or network addresses; inbox IDs and App Attest key IDs appear only as short hashes, and provider error bodies are cut to 200 characters.
 

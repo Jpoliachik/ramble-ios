@@ -197,7 +197,7 @@ export function createHarness() {
   };
   h.providersDown = () => {
     h.transcribe = async () => {
-      throw new TranscribeError('all providers down', { retryable: true, provider: 'groq', status: 503 });
+      throw new TranscribeError('groq down', { retryable: true, provider: 'groq', status: 503 });
     };
   };
 

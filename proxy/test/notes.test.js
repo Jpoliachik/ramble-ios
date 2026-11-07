@@ -245,7 +245,7 @@ describe('the pipeline', () => {
     assert.equal(row.next_attempt_at, T0 + MINUTE);
     assert.equal(row.attempt_started_at, null);
 
-    h.transcribe = async () => ({ result: 'transcript', text: 'finally', provider: 'deepgram', fallback: true });
+    h.transcribe = async () => ({ result: 'transcript', text: 'finally', provider: 'groq' });
     h.now = T0 + MINUTE;
     await h.cron();
     const read = await h.call('GET', `/notes/${noteId(1)}`, { auth: secret });
@@ -282,11 +282,11 @@ describe('the pipeline', () => {
     assert.equal(h.bucket.objects.size, 0);
   });
 
-  it('gives the upload attempt short provider timeouts, and the sweeper the long ones', async () => {
+  it('gives the upload attempt a short Groq timeout, and the sweeper the long one', async () => {
     const secret = await h.inbox();
     h.providersDown();
     await h.upload(secret, noteId(1));
-    assert.deepEqual(h.transcribeCalls[0].deps, { timeoutMs: 20_000, budgetMs: 28_000 });
+    assert.deepEqual(h.transcribeCalls[0].deps, { timeoutMs: 20_000 });
     h.transcribe = async () => ({ result: 'transcript', text: 'ok', provider: 'groq' });
     h.now = T0 + MINUTE;
     await h.cron();

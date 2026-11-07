@@ -35,7 +35,7 @@ These rules are not optional. They apply to every change, however small:
 ### Release plan
 
 - Free download: 25 notes free, then a $14.99 one-time unlock, no subscription (`specs/purchase.md`)
-- Cloud transcription only (Groq Whisper v3 Turbo with server-side fallback) via the Cloudflare Worker relay
+- Cloud transcription only (Groq Whisper v3 Turbo, retried server-side when Groq is down) via the Cloudflare Worker relay
 - Marketing website on Vercel at https://ramble.watch (source in `website/`, static export)
 - **App Store URL:** https://apps.apple.com/app/id6761857751 (Apple ID: 6761857751)
 
@@ -111,7 +111,7 @@ proxy/                 # Cloudflare Worker: transcription proxy + agent relay (R
 
 1. **Record** — watch or iPhone captures 16kHz mono AAC (60-minute cap)
 2. **Upload** — each device uploads its own notes straight to the relay with `PUT /notes/:id` (watch: background URLSession with a phone-minted watch token; phone: inbox secret). The note ID is the idempotency key.
-3. **Transcribe** — the relay stores audio in R2, transcribes (Groq Whisper v3 Turbo, then Deepgram, then OpenAI as fallbacks), deletes the audio, and copies the transcript to each eligible agent
+3. **Transcribe** — the relay stores audio in R2, transcribes (Groq Whisper v3 Turbo, retried for up to 20 hours if Groq is down), deletes the audio, and copies the transcript to each eligible agent
 4. **History** — the phone pulls transcripts with `GET /notes` and acks them; watch notes merge by ID with details and audio sent over WatchConnectivity
 5. **Webhook** — optional POST from the phone once it has the transcript
 
@@ -151,7 +151,7 @@ The full contract is **`specs/relay-api.md`**; agent-facing docs are `proxy/RELA
 
 ### Transcription
 
-One model for everyone: Groq Whisper v3 Turbo. Deepgram Nova-3, then OpenAI GPT-Transcribe, are fallbacks only when Groq is overloaded or down, behind a daily spend breaker (`specs/transcription.md`). There is no model picker. Don't claim a model is best for noise or accents: no independent benchmark backs that.
+One provider and model for everyone: Groq Whisper v3 Turbo. There is no fallback provider: when Groq is overloaded or down, the note waits and is retried for up to 20 hours (`specs/transcription.md`). There is no model picker. Don't claim a model is best for noise or accents: no independent benchmark backs that.
 
 ## Resolved Questions
 

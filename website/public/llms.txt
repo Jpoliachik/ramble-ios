@@ -6,7 +6,7 @@ Pairing: in Ramble on iPhone, Settings → Your agent → Connect your agent cop
 
 Privacy: Ramble's server is a relay, not an archive. Your audio is sent to a transcription provider and deleted as soon as the transcript is ready. Transcripts are deleted when your agent picks them up, or after 30 days. Your full history lives only on your iPhone.
 
-Transcription: Groq Whisper v3 Turbo, with Deepgram Nova-3 and then OpenAI GPT-Transcribe as fallbacks when a provider is overloaded or down.
+Transcription: Groq Whisper v3 Turbo, the only provider. When Groq is overloaded or down, the note waits and is retried.
 
 Price: Free to download. 25 notes free, then $14.99 once. No subscription.
 
