@@ -68,7 +68,7 @@ Merging to `main` deploys the Worker and applies migrations (`.github/workflows/
    ```bash
    npx wrangler secret put GROQ_API_KEY          # console.groq.com → API Keys
    npx wrangler secret put HOOK_ENCRYPTION_KEY   # paste the output of: openssl rand -base64 32
-   npx wrangler secret put ALERT_WEBHOOK_URL     # e.g. https://ntfy.sh/<long-random-topic>; subscribe to it in the ntfy app
+   npx wrangler secret put ALERT_WEBHOOK_URL     # https://ntfy.sh/ramble-alerts-<openssl rand -hex 12>?email=<you>: each alert arrives by email (or subscribe in the ntfy app). Any plain-text POST URL works
    ```
    Keep `HOOK_ENCRYPTION_KEY` stable: changing it makes stored hook headers unreadable. Only after this version is deployed (the Worker running before it still calls Deepgram and OpenAI), delete the ones no longer read: `npx wrangler secret delete NAME` for `DEEPGRAM_API_KEY`, `OPENAI_API_KEY`, `DEV_BYPASS_TOKEN` and `ANALYTICS_TOKEN`, if they exist (`npx wrangler secret list`).
 4. **Groq spend limit.** In console.groq.com, under billing, set a monthly spend limit (about $50). It is the only global cost cap.
