@@ -296,6 +296,50 @@ describe('the pipeline', () => {
     assert.equal((await h.call('GET', `/notes/${noteId(1)}`, { auth: secret })).body.transcript, 'recovered');
   });
 
+  it('makes agent copies first, and the sweeper makes any that failed, once', async () => {
+    const secret = await h.inbox();
+    const agent = await h.connect(secret);
+    h.now = T0 + MINUTE;
+    // The first copy insertion fails, as if D1 hiccuped mid-pipeline.
+    const batch = h.db.batch;
+    let failures = 1;
+    h.db.batch = async (statements) => {
+      if (failures > 0 && statements.some((s) => /INTO entries/.test(s.sql))) {
+        failures--;
+        throw new Error('D1 hiccup');
+      }
+      return batch(statements);
+    };
+    const res = await h.upload(secret, noteId(1), { recordedAt: new Date(T0 + 30000).toISOString() });
+    await h.settle();
+    assert.equal(res.body.status, 'done');
+    assert.equal(h.bucket.objects.size, 0); // later steps still ran
+    assert.equal(h.rows('SELECT copies_made_at FROM notes')[0].copies_made_at, null);
+    assert.deepEqual((await h.call('GET', '/inbox', { auth: agent })).body.items, []);
+
+    h.now = T0 + 2 * MINUTE;
+    await h.cron();
+    const items = (await h.call('GET', '/inbox', { auth: agent })).body.items;
+    assert.equal(items.length, 1);
+    assert.equal(items[0].transcription, 'hello world');
+    assert.equal(h.rows('SELECT copies_made_at FROM notes')[0].copies_made_at, T0 + 2 * MINUTE);
+
+    // Marked made: later sweeps copy nothing again, even after the agent acked.
+    await h.call('POST', '/inbox/ack', { auth: agent, body: { ids: [items[0].id] } });
+    h.now = T0 + 3 * MINUTE;
+    await h.cron();
+    assert.equal((await h.call('GET', '/inbox', { auth: agent })).body.items.length, 0);
+  });
+
+  it('marks copies made when a note finishes normally', async () => {
+    const secret = await h.inbox();
+    await h.connect(secret);
+    h.now = T0 + MINUTE;
+    await h.upload(secret, noteId(1), { recordedAt: new Date(T0 + 30000).toISOString() });
+    await h.settle();
+    assert.equal(h.rows('SELECT copies_made_at FROM notes')[0].copies_made_at, T0 + MINUTE);
+  });
+
   it('fixes options at the first attempt; retries keep them', async () => {
     const secret = await h.inbox();
     h.providersDown();

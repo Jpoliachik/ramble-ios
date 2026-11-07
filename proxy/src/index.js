@@ -29,7 +29,7 @@ import { measureDurationSeconds } from './audio.js';
 import { address, countLimit, limit, peekLimit } from './auth.js';
 import { DOCS_URL, fail, gone, json, rateLimited, unavailable } from './http.js';
 import { legacyOpen, legacyTranscribe } from './legacy.js';
-import { BODY_TIMEOUT_MS, INLINE_WAIT_MS, ackNotes, getNote, listNotes, purgeNotes, sweep, uploadNote } from './notes.js';
+import { BODY_TIMEOUT_MS, INLINE_WAIT_MS, ackNotes, getNote, listNotes, purgeNotes, sweep, sweepCopies, uploadNote } from './notes.js';
 import { checkAlerts, maybeDailySummary, purgeEvents } from './ops.js';
 import { clientAddress, hit, peek, purgeRateLimits } from './ratelimit.js';
 import {
@@ -168,6 +168,7 @@ export async function runScheduled(env, deps = {}) {
   const ctx = makeContext(null, env, deps);
   const steps = [
     ['sweep', () => sweep(ctx)],
+    ['copies', () => sweepCopies(ctx)],
     ['entries', () => purgeExpired(env.DB, ctx.now)],
     ['notes', () => purgeNotes(ctx)],
     ['watch_tokens', () => purgeWatchTokens(ctx)],

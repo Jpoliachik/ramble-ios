@@ -454,6 +454,9 @@ async function finishDone(ctx, note, out) {
     .bind(result, text, duration, out.provider ?? null, out.model ?? null, ctx.now, note.inbox_id, note.id, note.retry_count)
     .first();
   if (!done) return;
+  // Agents first: if a later step fails or the Worker stops, the sweeper
+  // makes any copies not yet marked made. Silent notes go nowhere.
+  if (result === 'transcript') await copyToAgents(ctx, done);
 
   // Fair use counts the measured length, which may beat the container's.
   if (done.fair_use_purchase && duration > done.fair_use_seconds) {
@@ -472,8 +475,19 @@ async function finishDone(ctx, note, out) {
       `A note measured ${(duration / 60).toFixed(0)} minutes, over the 61-minute cap: its file header understated its length.`);
   }
   await deleteAudio(ctx, done);
-  // Silent notes go nowhere.
-  if (result === 'transcript') await makeAgentCopies(ctx, done);
+}
+
+/** Makes a done note's agent copies (idempotent), then marks them made. Never rejects. */
+async function copyToAgents(ctx, note) {
+  try {
+    await makeAgentCopies(ctx, note);
+    await ctx.db
+      .prepare('UPDATE notes SET copies_made_at = ? WHERE inbox_id = ? AND id = ? AND copies_made_at IS NULL')
+      .bind(ctx.now, note.inbox_id, note.id)
+      .run();
+  } catch (err) {
+    console.error(`[notes] agent copies failed inbox=${await logId(note.inbox_id)}: ${String(err?.message).slice(0, 200)}`);
+  }
 }
 
 async function finishFailed(ctx, note, result, error) {
@@ -568,6 +582,25 @@ export async function sweep(ctx) {
   }
   await Promise.all(running);
   return running.length;
+}
+
+/**
+ * Cron, every minute: agent copies for transcripts done over a minute ago
+ * whose copies were never marked made. Insertion is idempotent and keeps the
+ * "paired before it was recorded" rule; only new copies ping a hook.
+ */
+export async function sweepCopies(ctx) {
+  const { results } = await ctx.db
+    .prepare(
+      `SELECT * FROM notes
+        WHERE status = 'done' AND result = 'transcript' AND copies_made_at IS NULL
+          AND transcript IS NOT NULL AND ready_at <= ?
+        ORDER BY ready_at LIMIT ?`,
+    )
+    .bind(ctx.now - MINUTE, SWEEP_BATCH)
+    .all();
+  for (const n of results) await copyToAgents(ctx, n);
+  return results.length;
 }
 
 /** Cron: device copies after 30 days, old notes, and audio no longer needed. */
