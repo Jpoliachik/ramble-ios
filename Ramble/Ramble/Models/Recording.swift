@@ -71,8 +71,7 @@ struct Recording: Identifiable, Codable, Hashable {
     /// For failed notes: "audio_rejected" or "retries_exhausted".
     var failureResult: String?
     var hold: NoteHold?
-    /// When a hold was released (the unlock), for the
-    /// "Not sent yet" alert's clock.
+    /// When a hold was released (the unlock).
     var releasedAt: Date?
     /// Hand retries already accepted by the server.
     var retryCount: Int
@@ -165,8 +164,11 @@ struct Recording: Identifiable, Codable, Hashable {
 
         if let delivery = try c.decodeIfPresent(AgentDelivery.self, forKey: .agentDelivery) {
             agentDelivery = delivery
-        } else if status == .completed {
-            // Migrate the old relay fields into the new delivery shape.
+        } else if status == .completed,
+                  c.contains(.relayStatus) || (acceptedAt == nil && finishedAt == nil) {
+            // A note saved by an older build: migrate its relay fields into
+            // the new delivery shape. A note this build saved without a
+            // delivery is still waiting for its first delivery check.
             let relayStatus = try c.decodeIfPresent(WebhookStatus.self, forKey: .relayStatus)
             let pickedUpAt = try c.decodeIfPresent(Date.self, forKey: .pickedUpAt)
             let uploadedAt = try c.decodeIfPresent(Date.self, forKey: .relayUploadedAt)
