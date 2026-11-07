@@ -112,16 +112,6 @@ struct OnboardingView: View {
     /// the phone set up with the server, connect the watch and upload.
     private func giveConsent() {
         Consent.give()
-        Task { @MainActor in
-            // A new inbox connects the watch itself; a kept one (reinstall)
-            // still gives the watch a fresh token.
-            let hadInbox = RelayService.shared.hasInbox
-            await RelayService.shared.setUpIfNeeded()
-            if hadInbox {
-                await PhoneConnectivityService.shared.connectWatch(force: true, replaces: nil)
-            }
-            BackgroundTaskService.shared.appDidOpen()
-        }
     }
 
     private func finish() {

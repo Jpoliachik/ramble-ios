@@ -507,15 +507,30 @@ private struct ErrorBody: Decodable {
 
 /// Tapping "Get started" is the person's consent to cloud transcription
 /// (specs/phone.md). Nothing uploads, and the watch isn't connected, before.
+/// Installs that finished onboarding in an earlier, on-device build never
+/// saw the consent line, so they consent on a one-time notice instead
+/// (ConsentNoticeView).
 enum Consent {
-    private static let key = "hasConsentedToCloudTranscription"
+    static let key = "hasConsentedToCloudTranscription"
 
     static var hasConsented: Bool {
-        // Installs that finished onboarding in an earlier build agreed then.
-        UserDefaults.standard.bool(forKey: key) || UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
+        UserDefaults.standard.bool(forKey: key)
     }
 
+    /// Records consent, then sets up with the server, connects the watch
+    /// and uploads whatever was waiting.
+    @MainActor
     static func give() {
         UserDefaults.standard.set(true, forKey: key)
+        Task { @MainActor in
+            // A new inbox connects the watch itself; a kept one (reinstall)
+            // still gives the watch a fresh token.
+            let hadInbox = RelayService.shared.hasInbox
+            await RelayService.shared.setUpIfNeeded()
+            if hadInbox {
+                await PhoneConnectivityService.shared.connectWatch(force: true, replaces: nil)
+            }
+            BackgroundTaskService.shared.appDidOpen()
+        }
     }
 }

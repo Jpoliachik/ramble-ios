@@ -11,6 +11,7 @@ import SwiftUI
 struct RambleApp: App {
     @AppStorage("appearanceMode") private var appearanceMode: String = AppearanceMode.system.rawValue
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
+    @AppStorage(Consent.key) private var hasConsented: Bool = false
 
     init() {
         BackgroundTaskService.shared.registerBackgroundTasks()
@@ -40,6 +41,15 @@ struct RambleApp: App {
     var body: some Scene {
         WindowGroup {
             MainView()
+                // Onboarding done in an earlier build, without the consent
+                // line: ask once before anything uploads (specs/phone.md).
+                .sheet(isPresented: Binding(
+                    get: { hasCompletedOnboarding && !hasConsented },
+                    set: { _ in }
+                )) {
+                    ConsentNoticeView()
+                        .interactiveDismissDisabled()
+                }
                 .preferredColorScheme(
                     AppearanceMode(rawValue: appearanceMode)?.colorScheme
                 )

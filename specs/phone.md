@@ -17,6 +17,15 @@ Directly under "Get started" the intro SHALL show, in small type: "Ramble sends 
 - THEN nothing has been uploaded and the watch still shows "Set up"
 - AND after they tap "Get started", the watch is connected and its two notes upload
 
+### Requirement: Consent for earlier installs
+When this install finished onboarding in an earlier build but never tapped "Get started" under the consent line, the app SHALL show once, as a sheet that cannot be swiped away, "Transcripts now come from the cloud." with the same consent line and "Privacy" link, and a "Continue" button. Tapping "Continue" is the person's consent, exactly like "Get started"; there is no other step. Until it is tapped, the phone SHALL NOT upload any note or connect the watch, and phone notes read "Waiting to send".
+
+#### Scenario: Updating from an earlier build
+- GIVEN the person finished onboarding in an earlier build and has two phone notes not yet sent
+- WHEN they open the updated Ramble
+- THEN the consent sheet shows, nothing uploads and both notes read "Waiting to send"
+- AND after they tap "Continue", the sheet closes for good, the watch is connected and both notes upload
+
 #### Scenario: Skipping the agent
 - GIVEN the person is on "Where should notes go?"
 - WHEN they tap "Set up later", or save a webhook from the "Any webhook" row
@@ -39,7 +48,7 @@ When the phone can't set itself up with Ramble's server (offline, or the server 
 - THEN the message shows, the note reads "Waiting to send", and setup completes on a later open
 
 ### Requirement: The phone connects the watch
-The phone SHALL give the watch a credential that can only upload that watch's notes, read them back and read the account state, after the person taps "Get started" on first run, after a reinstall, when the paired watch changes, and whenever the watch says it has no working connection (no credential, or the server refused it), including when that message wakes the phone app in the background, with no control for the person ([watch.md](watch.md)). A reinstall that still finds the phone's earlier connection SHALL keep it (agents, free count and unlock stay); otherwise it starts fresh and agents must connect again ([delivery.md](delivery.md)).
+The phone SHALL give the watch a credential that can only upload that watch's notes, read them back and read the account state, after the person taps "Get started" on first run (or "Continue" on the consent sheet for earlier installs), after a reinstall, when the paired watch changes, and whenever the watch says it has no working connection (no credential, or the server refused it), including when that message wakes the phone app in the background, with no control for the person ([watch.md](watch.md)). A reinstall that still finds the phone's earlier connection SHALL keep it (agents, free count and unlock stay); otherwise it starts fresh and agents must connect again ([delivery.md](delivery.md)).
 
 #### Scenario: First phone launch
 - GIVEN the watch has recorded notes but the phone app has never run
