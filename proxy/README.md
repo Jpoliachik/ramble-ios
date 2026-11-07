@@ -53,6 +53,30 @@ Production has no developer bypass: never set `ENVIRONMENT` or `DEV_BYPASS_KEY` 
 
 Apple: the relay takes no App Store Server Notifications; leave the App Store Server Notifications URL unset in App Store Connect. Refunds are revoked by hand (Operations, below).
 
+## Before the first deploy of this version
+
+Merging to `main` deploys the Worker and applies migrations (`.github/workflows/deploy-proxy.yml`), so do steps 1–4 first. Run the `npx wrangler` commands from `proxy/`.
+
+1. **CI token.** The `CLOUDFLARE_API_TOKEN` GitHub secret needs, for the account: Workers Scripts Edit, Workers KV Storage Edit, D1 Edit, and now **Workers R2 Storage Edit** (My Profile → API Tokens → edit the token). Without R2 the deploy fails on the `AUDIO` binding.
+2. **R2 bucket.** Create it private (the default) with a 1-day expiry rule as the backstop for failed deletes:
+   ```bash
+   npx wrangler r2 bucket create ramble-audio
+   npx wrangler r2 bucket lifecycle add ramble-audio expire-1-day --expire-days 1
+   ```
+   Don't enable public access or an r2.dev URL. The binding is already in `wrangler.toml`.
+3. **Secrets.** Each command prompts for the value:
+   ```bash
+   npx wrangler secret put GROQ_API_KEY          # console.groq.com → API Keys
+   npx wrangler secret put HOOK_ENCRYPTION_KEY   # paste the output of: openssl rand -base64 32
+   npx wrangler secret put ALERT_WEBHOOK_URL     # e.g. https://ntfy.sh/<long-random-topic>; subscribe to it in the ntfy app
+   ```
+   Keep `HOOK_ENCRYPTION_KEY` stable: changing it makes stored hook headers unreadable. Then delete the ones no longer read: `npx wrangler secret delete NAME` for `DEEPGRAM_API_KEY`, `OPENAI_API_KEY`, `DEV_BYPASS_TOKEN` and `ANALYTICS_TOKEN`, if they exist (`npx wrangler secret list`).
+4. **Groq spend limit.** In console.groq.com, under billing, set a monthly spend limit (about $50). It is the only global cost cap.
+5. **App Store Connect.** Create the in-app purchase: type Non-Consumable, product ID `dev.goodloop.ramble.unlock`, price $14.99, Family Sharing **off** (shared purchases don't unlock). Add it to the app version you submit. Take `dev.goodloop.ramble.premium.monthly2` off sale at launch. Leave the App Store Server Notifications URL empty.
+6. **`FIRST_FREE_BUILD`, at release.** Set it in `wrangler.toml` `[vars]` to the build number of the first free-notes build you ship (Xcode Cloud's build number for it), commit, and let it deploy. Downloads from a lower build are early buyers. Old builds' paths retire on their own on 2027-01-07; there is no `LEGACY_UNTIL` to set.
+7. **`api.ramble.watch`.** The agent docs point agents there. Until it is routed, only the `workers.dev` host answers (the apps use it either way). Steps: [RELAY.md](RELAY.md) "Operator: the api.ramble.watch domain".
+8. **Local relay** (any time): `cp .dev.vars.example .dev.vars`, put your Groq key in `GROQ_API_KEY`, keep `ENVIRONMENT=development` and `DEV_BYPASS_KEY` as they are, then `npx wrangler d1 migrations apply ramble-relay --local` and `npm run dev`.
+
 ## What is stored
 
 - **Inboxes:** a hash of the secret, the free-note count, the bound purchase, the transcription settings, and the operator's `suspended` flag.
