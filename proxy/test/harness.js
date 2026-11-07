@@ -119,8 +119,8 @@ export function createHarness() {
       verifyAppTransaction: async (r) => decode(r),
       verifyNotification: async (r) => decode(r),
     },
-    transcribe: async (audio, opts) => {
-      h.transcribeCalls.push({ bytes: audio.byteLength, opts });
+    transcribe: async (audio, opts, _env, transcribeDeps) => {
+      h.transcribeCalls.push({ bytes: audio.byteLength, opts, deps: transcribeDeps });
       return h.transcribe(audio, opts);
     },
     measureDuration: () => h.measured,

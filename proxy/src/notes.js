@@ -28,7 +28,7 @@ import {
 } from './http.js';
 import { FAIR_USE_SECONDS, alert, recordAttempt, recordEvent } from './ops.js';
 import { makeAgentCopies } from './relay.js';
-import { TranscribeError } from './transcribe.js';
+import { INLINE_BUDGET_MS, INLINE_PROVIDER_TIMEOUT_MS, TranscribeError } from './transcribe.js';
 
 export const AUDIO_TYPES = new Set(['audio/mp4', 'audio/m4a', 'audio/x-m4a', 'audio/aac']);
 export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
@@ -37,6 +37,9 @@ export const FUTURE_SLACK_MS = 5 * MINUTE;
 export const BODY_TIMEOUT_MS = 30 * MINUTE;
 export const INLINE_WAIT_MS = 8000;
 export const ATTEMPT_LOST_MS = 8 * MINUTE;
+// The first attempt (made on upload, attempts = 1) is lost sooner: it fits the
+// Worker's waitUntil budget, so one still running after a minute was cut off.
+export const INLINE_ATTEMPT_LOST_MS = MINUTE;
 export const RETRY_WINDOW_MS = 20 * HOUR;
 export const BACKOFF_MINUTES = [1, 2, 5, 10, 15, 30];
 export const MAX_HAND_RETRIES = 3;
@@ -226,8 +229,13 @@ export async function uploadNote(request, rawId, ctx) {
     return accepted.response;
   }
 
-  // Transcription continues if the client goes away.
-  const attempt = runAttempt(ctx, accepted.note);
+  // Transcription continues if the client goes away, within the Worker's
+  // waitUntil budget: short provider timeouts, and a short lease (attempt 1).
+  const inline = {
+    ...ctx,
+    transcribeDeps: { ...ctx.transcribeDeps, timeoutMs: INLINE_PROVIDER_TIMEOUT_MS, budgetMs: INLINE_BUDGET_MS },
+  };
+  const attempt = runAttempt(inline, accepted.note);
   ctx.waitUntil(attempt);
   await withTimeout(attempt, ctx.inlineWaitMs, null);
   const fresh = await readNote(ctx, inboxId, id);
@@ -555,18 +563,20 @@ async function deleteAudio(ctx, note) {
 }
 
 /**
- * Cron, every minute: start due retries, and attempts lost for 8 minutes.
- * The claim is conditional, so one attempt runs per note.
+ * Cron, every minute: start due retries, and attempts lost (the upload's
+ * first attempt after 1 minute, the cron's after 8). The claim is
+ * conditional, so one attempt runs per note.
  */
 export async function sweep(ctx) {
   const { results } = await ctx.db
     .prepare(
       `SELECT inbox_id, id, attempt_started_at FROM notes
         WHERE status = 'transcribing'
-          AND ((attempt_started_at IS NULL AND next_attempt_at <= ?) OR attempt_started_at <= ?)
+          AND ((attempt_started_at IS NULL AND next_attempt_at <= ?) OR attempt_started_at <= ?
+            OR (attempts = 1 AND attempt_started_at <= ?))
         ORDER BY accepted_at LIMIT ?`,
     )
-    .bind(ctx.now, ctx.now - ATTEMPT_LOST_MS, SWEEP_BATCH)
+    .bind(ctx.now, ctx.now - ATTEMPT_LOST_MS, ctx.now - INLINE_ATTEMPT_LOST_MS, SWEEP_BATCH)
     .all();
   const running = [];
   for (const n of results) {

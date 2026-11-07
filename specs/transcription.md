@@ -29,11 +29,11 @@ When transcription finishes within the inline wait set in relay-api.md (8 second
 - THEN the upload response already carries the transcript
 
 ### Requirement: Stalled attempts are picked up within minutes
-A note SHALL never have two attempts running at once. If an attempt produces no result within 8 minutes of starting, the server SHALL treat it as lost and start the next attempt within 1 minute. Each provider call SHALL be given up after 120 seconds.
+A note SHALL never have two attempts running at once. The attempt started when an upload (or hand retry) is accepted SHALL give each provider call at most 20 seconds and all its calls together at most 28 seconds, starting no call with under 3 seconds left (that attempt then waits like one where every provider was down), and SHALL be treated as lost if it has no result 1 minute after starting. Every later attempt SHALL give each provider call 120 seconds and is lost after 8 minutes. The server SHALL start the next attempt within 1 minute of one being lost.
 
 #### Scenario: Server work cut short
-- GIVEN a note's attempt stopped before the provider answered
-- WHEN 8 minutes have passed since that attempt started
+- GIVEN a note's first attempt stopped before the provider answered
+- WHEN 1 minute has passed since that attempt started (8 minutes, for a later attempt)
 - THEN a new attempt for that note starts within the next minute
 
 ### Requirement: Repeats never re-transcribe; a hand retry of a failed note does
@@ -61,7 +61,7 @@ The server SHALL transcribe every note with Groq Whisper v3 Turbo first, for fre
 - THEN Groq Whisper v3 Turbo produces its transcript
 
 ### Requirement: Fallback only when a provider is overloaded or down
-The server SHALL move to the next provider, in the order Groq → Deepgram Nova-3 → OpenAI GPT-Transcribe, only when the current one answers 5xx or 429, rejects or lacks Ramble's key (the operator is alerted), cannot be reached, or gives no answer within 120 seconds. Any other provider error SHALL NOT trigger a fallback. Notes longer than 25 minutes SHALL skip OpenAI. No note SHALL fail permanently or be marked silent because of Ramble's own configuration.
+The server SHALL move to the next provider, in the order Groq → Deepgram Nova-3 → OpenAI GPT-Transcribe, only when the current one answers 5xx or 429, rejects or lacks Ramble's key (the operator is alerted), cannot be reached, or gives no answer within the attempt's call timeout (20 or 120 seconds, above). Any other provider error SHALL NOT trigger a fallback. Notes longer than 25 minutes SHALL skip OpenAI. No note SHALL fail permanently or be marked silent because of Ramble's own configuration.
 
 #### Scenario: Groq rate-limits
 - GIVEN Groq answers a note with 429

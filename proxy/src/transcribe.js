@@ -42,6 +42,15 @@ export const OPENAI_MAX_SECONDS = 25 * 60;
 // Each provider call is given up after this long.
 export const PROVIDER_TIMEOUT_MS = 120_000;
 
+// The first attempt runs as the upload is accepted, inside the Worker's
+// waitUntil budget (about 30 seconds after the response): each call gets at
+// most 20 seconds and the whole chain 28, so a slow Groq still leaves time
+// for a fallback. Later attempts, from the cron, keep the long timeout.
+export const INLINE_PROVIDER_TIMEOUT_MS = 20_000;
+export const INLINE_BUDGET_MS = 28_000;
+// A call with less than this left of the budget isn't started.
+const MIN_CALL_MS = 3_000;
+
 // Estimated list prices in dollars per audio minute. Estimates only: they
 // drive the spend breaker and the operator's numbers, not billing.
 export const COST_PER_MINUTE = {
@@ -101,7 +110,8 @@ const MAX_ERROR_BODY = 200;
 // audio: ArrayBuffer of the stored note (AAC in MP4/M4A or raw ADTS AAC).
 // opts: { contentType, language, removeFillerWords, vocabulary, durationSeconds }
 // env: GROQ_API_KEY, DEEPGRAM_API_KEY, OPENAI_API_KEY, DB (spend breaker).
-// deps: { fetch, now, timeoutMs } for tests.
+// deps: { fetch, now, timeoutMs, budgetMs }: timeoutMs per call; budgetMs for
+// all calls together (none by default). The first attempt passes the inline values.
 //
 // Resolves { result: 'transcript' | 'no_speech', text, provider, model,
 //            durationSeconds, fallback, attempts }.
@@ -113,6 +123,7 @@ export async function transcribeNote(audio, opts = {}, env = {}, deps = {}) {
   const fetchFn = deps.fetch ?? globalThis.fetch;
   const now = deps.now ?? Date.now;
   const timeoutMs = deps.timeoutMs ?? PROVIDER_TIMEOUT_MS;
+  const budgetEnd = deps.budgetMs != null ? now() + deps.budgetMs : Infinity;
 
   const options = {
     contentType: normalizeContentType(opts.contentType),
@@ -146,7 +157,12 @@ export async function transcribeNote(audio, opts = {}, env = {}, deps = {}) {
       }
     }
 
-    const outcome = await callProvider(provider, audio, options, env, fetchFn, timeoutMs);
+    const left = budgetEnd - now();
+    if (left < MIN_CALL_MS) {
+      attempts.push({ provider, outcome: 'out_of_time', status: null });
+      break; // the next attempt starts from Groq with the full timeout
+    }
+    const outcome = await callProvider(provider, audio, options, env, fetchFn, Math.min(timeoutMs, left));
     attempts.push({ provider, outcome: outcome.kind, status: outcome.status ?? null });
 
     if (outcome.kind === 'ok' || outcome.kind === 'too_short') {
