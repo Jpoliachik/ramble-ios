@@ -4,8 +4,8 @@ import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
 import { handleRequest } from '../src/index.js';
-import { dailySummary } from '../src/ops.js';
-import { DAY, HOUR, MINUTE, PREMIUM, T0, createHarness, jws, noteId } from './harness.js';
+import { LEGACY_RETIRES_AT } from '../src/legacy.js';
+import { DAY, HOUR, PREMIUM, T0, createHarness, jws, noteId } from './harness.js';
 
 let h;
 beforeEach(() => {
@@ -113,21 +113,22 @@ describe('old builds', () => {
     assert.equal(other.status, 200);
   });
 
-  it('text POST /inbox queues for agents until LEGACY_UNTIL, then both paths answer 410', async () => {
+  it('text POST /inbox queues for agents until 2027-01-07, then both paths answer 410', async () => {
+    assert.equal(LEGACY_RETIRES_AT, Date.UTC(2027, 0, 7));
     const secret = await h.inbox();
     const agent = await h.connect(secret);
     const item = { recording_id: noteId(1), created_at: '2026-11-01T11:59:00Z', duration: 3, transcription: 'on device' };
     assert.deepEqual((await h.call('POST', '/inbox', { auth: secret, body: item })).body, { queued: 1 });
     assert.equal((await h.call('GET', '/inbox', { auth: agent })).body.items[0].transcription, 'on device');
 
-    h.envExtra = { LEGACY_UNTIL: new Date(T0).toISOString() };
+    h.now = LEGACY_RETIRES_AT;
     const gone = await h.call('POST', '/inbox', { auth: secret, body: { ...item, recording_id: noteId(2) } });
     assert.equal(gone.status, 410);
     assert.equal(gone.body.error, 'This version of Ramble is out of date. Update Ramble from the App Store.');
     const t = await handleRequest(transcribeRequest(sub()), h.env(), h.deps());
     assert.equal(t.status, 410);
     assert.equal(h.transcribeCalls.length, 0);
-    assert.equal((await h.call('GET', '/inbox', { auth: agent })).body.items.length, 1);
+    assert.equal(h.rows('SELECT COUNT(*) AS n FROM entries')[0].n, 1);
   });
 
   it('GET /analytics is gone', async () => {
@@ -136,50 +137,40 @@ describe('old builds', () => {
 });
 
 describe('operator', () => {
-  it('sends the daily summary once between 14:00 and 14:05 UTC, without transcript text', async () => {
-    const secret = await h.inbox();
-    h.transcribe = async () => ({ result: 'transcript', text: 'private words', provider: 'groq', durationSeconds: 60 });
-    await h.upload(secret, noteId(1));
-    h.now = Date.UTC(2026, 10, 2, 14, 1);
-    await h.cron();
-    h.now += MINUTE;
-    await h.cron();
-    const summaries = h.alerts.filter((a) => a.includes('Summary for 2026-11-01'));
-    assert.equal(summaries.length, 1);
-    assert.match(summaries[0], /Notes accepted: 1 free/);
-    assert.ok(!summaries[0].includes('private words'));
-  });
+  const err = (outcome, status) =>
+    Object.assign(new Error('groq trouble'), { retryable: true, provider: 'groq', status, attempts: [{ provider: 'groq', outcome, status }] });
 
-  it('builds a summary with Groq notes and estimated spend', async () => {
+  it('alerts when Groq rejects the key or it is missing, with cooldown; a 429 alone alerts nothing', async () => {
     const secret = await h.inbox();
-    h.transcribe = async () => ({ result: 'transcript', text: 'x', provider: 'groq', durationSeconds: 3600 });
-    await h.upload(secret, noteId(1));
-    const text = await dailySummary({ db: h.db, now: T0 }, Date.UTC(2026, 10, 1), Date.UTC(2026, 10, 2));
-    assert.match(text, /Summary for 2026-11-01/);
-    assert.match(text, /Groq: 1 notes ~\$0\.04/);
-  });
-
-  it('alerts on Groq 429s and key problems reported by the transcriber, with cooldown', async () => {
-    const secret = await h.inbox();
-    const err = (outcome, status) =>
-      Object.assign(new Error('groq down'), { retryable: true, provider: 'groq', status, attempts: [{ provider: 'groq', outcome, status }] });
     h.transcribe = async () => {
       throw err('rate_limited', 429);
     };
-    for (let i = 1; i <= 3; i++) await h.upload(secret, noteId(i));
+    await h.upload(secret, noteId(1));
+    assert.equal(h.alerts.length, 0);
     h.transcribe = async () => {
       throw err('key_rejected', 401);
     };
-    await h.upload(secret, noteId(4));
-    await h.cron();
-    assert.ok(h.alerts.some((a) => a.includes('Groq answered 429 3 times')));
-    assert.ok(h.alerts.some((a) => a.includes("groq rejected Ramble's API key")));
+    await h.upload(secret, noteId(2));
+    h.transcribe = async () => {
+      throw err('key_missing', null);
+    };
+    await h.upload(secret, noteId(3));
+    const keyAlerts = () => h.alerts.filter((a) => a.includes("groq rejected Ramble's API key, or the key is missing")).length;
+    assert.equal(keyAlerts(), 1);
     // Retries keep failing the same way for the next hour: no repeat alerts.
-    const providerAlerts = () => h.alerts.filter((a) => a.includes('Groq answered 429') || a.includes('API key')).length;
-    const n = providerAlerts();
     h.now += HOUR;
     await h.cron();
-    assert.equal(providerAlerts(), n);
+    assert.equal(keyAlerts(), 1);
+  });
+
+  it('alerts on a permanent failure, once per 6 hours per result', async () => {
+    const secret = await h.inbox();
+    h.rejectAudio();
+    await h.upload(secret, noteId(1));
+    await h.upload(secret, noteId(2));
+    const failed = h.alerts.filter((a) => a.includes('failed permanently (audio_rejected)'));
+    assert.equal(failed.length, 1);
+    assert.ok(!failed[0].includes(secret));
   });
 
   it('sends nothing without an alert webhook', async () => {

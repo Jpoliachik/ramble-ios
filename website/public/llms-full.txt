@@ -131,15 +131,9 @@ Some HTTP stacks get filtered before they reach the relay. Python's built-in url
 | 429 | Too many requests | Wait the seconds in Retry-After. The token still works. |
 | 5xx, timeout, dropped connection | Temporary | Retry after 2, 5, then 15 seconds. Keep your schedule. |
 
-Errors are JSON: {"error": "..."}, plus "reason" where it helps (like "code_used" or "rate_limited"). Every call is safe to retry.
+Errors are JSON: {"error": "..."}, plus "reason" where it helps (like "code_used"). Every call is safe to retry.
 
-Rate limits (over them: 429 with {"reason": "rate_limited"} and Retry-After in seconds; nothing changes):
-
-| What | Limit |
-|---|---|
-| GET /inbox, POST /inbox/ack, GET /agent | 60 per minute per token |
-| PATCH /agent | 10 per hour per token |
-| POST /pair/exchange | 100 failed attempts per hour per network address |
+Agent calls and pairing have no rate limit. If you ever get a 429, wait the seconds in Retry-After.
 
 curl:
 
@@ -414,7 +408,7 @@ Human-readable version: https://ramble.watch/docs/help
 - **The agent isn't getting notes.** iPhone: Settings → Your agent shows each agent's last check-in and how many notes are waiting. "Hasn't checked in": the agent isn't checking; tap Connect again and paste the fresh message, or set the check up again from the agent loop in Part 1. "Waiting for your agent": the note is ready and the agent hasn't picked it up yet. "Not picked up": the copy expired after 30 days, was deleted, or its agent was disconnected first.
 - **"Saved, no agent connected" on a note.** An agent receives only notes recorded after it connected. Connect one; the next notes go to it.
 - **Pairing code expired or didn't work.** A code works once and expires after 10 minutes. Tap New code.
-- **401, 403, 429, or connection errors.** 401: the agent was disconnected; pair again with a new code. 403: the HTTP client is filtered; send a User-Agent header. 429: checking too often; wait Retry-After seconds. Sandboxed agents need api.ramble.watch on their network allowlist. See "Making requests" and "Platform notes" in Part 1.
+- **401, 403, 429, or connection errors.** 401: the agent was disconnected; pair again with a new code. 403: the HTTP client is filtered; send a User-Agent header. 429: agent calls have no rate limit, but wait Retry-After seconds if one comes. Sandboxed agents need api.ramble.watch on their network allowlist. See "Making requests" and "Platform notes" in Part 1.
 - **"Didn't send" on a note.** The webhook didn't accept it after 3 tries. Fix the endpoint, open the note, and tap Retry.
 
 Support: support@ramble.watch, https://ramble.watch/support

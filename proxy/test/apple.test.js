@@ -6,7 +6,6 @@ import {
   AppleVerifyError,
   verifyAppleJWS,
   verifyAppTransaction,
-  verifyNotification,
   verifySignedTransaction,
 } from '../src/apple.js';
 import { ecKey, makeCA, makeCert } from './x509.js';
@@ -179,48 +178,5 @@ describe('verifyAppTransaction', () => {
   it('rejects Xcode receipts and wrong bundle IDs', async () => {
     await rejects(verifyAppTransaction(makeJWS(appTx({ receiptType: 'Xcode' })), env, deps));
     await rejects(verifyAppTransaction(makeJWS(appTx({ bundleId: 'x' })), env, deps));
-  });
-});
-
-describe('verifyNotification', () => {
-  const note = (data, o = {}) => ({
-    notificationType: 'REFUND',
-    notificationUUID: 'b1c2',
-    signedDate: SIGNED_AT,
-    data: { bundleId: 'dev.goodloop.Ramble', environment: 'Production', ...data },
-    ...o,
-  });
-
-  it('returns the type and the verified nested transaction', async () => {
-    const signedTransactionInfo = makeJWS(transaction({ revocationDate: SIGNED_AT }));
-    const n = await verifyNotification(makeJWS(note({ signedTransactionInfo })), env, deps);
-    assert.equal(n.notificationType, 'REFUND');
-    assert.equal(n.subtype, null);
-    assert.equal(n.environment, 'Production');
-    assert.equal(n.transaction.originalTransactionId, '2000000100');
-    assert.equal(n.transaction.revocationDate, SIGNED_AT);
-  });
-
-  it('returns transaction null when there is none', async () => {
-    const n = await verifyNotification(makeJWS(note({}, { notificationType: 'TEST' })), env, deps);
-    assert.equal(n.transaction, null);
-  });
-
-  it('rejects a forged nested transaction', async () => {
-    const otherKey = ecKey('P-256');
-    const selfCert = makeCert({ cn: 'Me', key: otherKey, hash: 'sha256' });
-    const signedTransactionInfo = makeJWS(transaction(), { x5c: [selfCert, selfCert, selfCert], key: otherKey.privateKey });
-    await rejects(verifyNotification(makeJWS(note({ signedTransactionInfo })), env, deps));
-  });
-
-  it('rejects a wrong bundle ID, no data, and a mismatched transaction environment', async () => {
-    await rejects(verifyNotification(makeJWS(note({ bundleId: 'x' })), env, deps), /bundle/);
-    await rejects(verifyNotification(makeJWS({ notificationType: 'REFUND', signedDate: SIGNED_AT }), env, deps));
-    const signedTransactionInfo = makeJWS(transaction({ environment: 'Sandbox' }));
-    await rejects(verifyNotification(makeJWS(note({ signedTransactionInfo })), env, deps), /environment/);
-  });
-
-  it('rejects a notification not chained to Apple', async () => {
-    await rejects(verifyNotification(makeJWS(note({}))), /Apple Root CA - G3/);
   });
 });

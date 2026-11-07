@@ -179,7 +179,7 @@ A note SHALL be at most 60 minutes long. The watch and the iPhone stop recording
 - THEN it is refused as too long and nothing is stored or counted
 
 ### Requirement: Length is measured on the server
-The server SHALL take each note's length from the provider's response, or from the audio file when a provider reports none, and SHALL never use a length reported by a device or by the file's own header. The full measured length SHALL count, with no cap, and a note measured at more than 61 minutes SHALL alert the operator (a file whose header understated its length). This length is what the heavy-use tally (purchase.md), usage numbers and spend estimates count.
+The server SHALL take each note's length from the provider's response, or from the audio file when a provider reports none, and SHALL never use a length reported by a device or by the file's own header. The full measured length SHALL count, with no cap, even for a file whose header understated its length. This length is what the heavy-use tally (purchase.md) counts.
 
 #### Scenario: Device claims a short note
 - GIVEN a device reports a note as 10 seconds long
@@ -189,7 +189,7 @@ The server SHALL take each note's length from the provider's response, or from t
 #### Scenario: Header understates the length
 - GIVEN an accepted upload whose header claims 59 minutes
 - WHEN Groq reports 5 hours of audio
-- THEN 5 hours count toward the month's usage, and the operator is alerted
+- THEN 5 hours count toward the month's usage
 
 ## Failures
 
@@ -242,31 +242,29 @@ The server SHALL add the measured length of each note that finishes (with a tran
 
 ## Operator
 
-### Requirement: Daily usage summary
-Once a day, between 14:00 and 14:05 UTC, the server SHALL send the operator a summary of the previous UTC day:
-- active inboxes, notes accepted and audio hours, free versus unlocked
-- new unlocks, and notes refused for free notes used or a suspension
-- notes transcribed and estimated Groq spend
-- "No speech detected" count and permanent failures
-- median and 95th-percentile time from upload to transcript
+### Requirement: Operator alerts
+The server SHALL alert the operator when:
+- an attempt finds Groq rejected Ramble's key, or the key is missing
+- any accepted note is still transcribing more than 30 minutes after it was accepted (checked every minute)
+- a note fails permanently, naming its result
+- a user passes 100 hours of audio in a month (Cost limits, above)
 
-#### Scenario: Morning summary
-- GIVEN 400 notes were accepted yesterday
-- WHEN 14:00 UTC passes
-- THEN by 14:05 UTC the operator gets one message with yesterday's numbers and no transcript text
-
-### Requirement: Threshold alerts
-The server SHALL check every minute and alert the operator when any of these holds:
-- Groq answered 429 three or more times in the last hour
-- any accepted note has waited more than 5 minutes for a result
-- estimated Groq spend today is over $5.00
-- Groq rejected Ramble's key, or the key is missing
-- more than 3% of notes finished in the last hour failed permanently, counting only hours with at least 10 finished notes
+Besides these, the server SHALL send no alert and no usage summary; the operator reads anything else from Cloudflare's logs and the database. A Groq 429 alone alerts nothing.
 
 #### Scenario: Stuck note
-- GIVEN an accepted note has been transcribing for 6 minutes
+- GIVEN an accepted note has been transcribing for 31 minutes
 - WHEN the next check runs
 - THEN the operator is alerted
+
+#### Scenario: Not yet stuck
+- GIVEN an accepted note has been transcribing for 29 minutes
+- WHEN the next check runs
+- THEN no alert is sent
+
+#### Scenario: Permanent failure
+- GIVEN Groq can't decode a note's audio
+- WHEN the note fails with "audio_rejected"
+- THEN the operator is alerted with that result and no transcript text
 
 #### Scenario: Held notes don't alert
 - GIVEN a note was refused because the person is out of free notes
@@ -274,7 +272,7 @@ The server SHALL check every minute and alert the operator when any of these hol
 - THEN no stuck-note alert fires, because the server never accepted it
 
 ### Requirement: Alert cooldown
-The same alert SHALL repeat at most once every 6 hours while it still holds. The heavy-use alert is sent once per user per month (purchase.md).
+The same alert SHALL repeat at most once every 6 hours while it still holds; permanent failures share one alert per result. The heavy-use alert is sent once per user per month (purchase.md).
 
 #### Scenario: Still stuck
 - GIVEN the stuck-note alert fired at 10:00 and the note is still waiting
@@ -282,7 +280,7 @@ The same alert SHALL repeat at most once every 6 hours while it still holds. The
 - THEN no second stuck-note alert is sent before 16:00
 
 ### Requirement: Alerts go to one external webhook
-The server SHALL POST every summary and alert, including alerts defined in relay-api.md, to one alert webhook outside Ramble, such as a phone push service, configured by the operator. Messages SHALL contain no transcript text and no inbox secrets. When no alert webhook is set, nothing is sent.
+The server SHALL POST every alert, including alerts defined in relay-api.md, to one alert webhook outside Ramble, such as a phone push service, configured by the operator. Messages SHALL contain no transcript text and no inbox secrets. When no alert webhook is set, nothing is sent.
 
 #### Scenario: Webhook set
 - GIVEN the alert webhook is configured

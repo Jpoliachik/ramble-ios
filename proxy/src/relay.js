@@ -7,9 +7,8 @@
 // 30 days pass. After that only a small row without the text stays, so the
 // phone can tell "picked up" from "removed unread".
 
-import { address, authenticate, countLimit, limit, peekLimit } from './auth.js';
+import { authenticate } from './auth.js';
 import { DAY, baseURL, fail, iso, json, randomToken, readJSON, sha256Hex, unavailable, UUID_RE } from './http.js';
-import { alert } from './ops.js';
 
 export const DEFAULT_RETENTION_SECONDS = 30 * 24 * 60 * 60;
 export const PAIR_CODE_TTL_SECONDS = 10 * 60;
@@ -88,8 +87,6 @@ async function insertCopies(ctx, connections, item) {
 export async function legacyTextUpload(request, ctx) {
   const { cred, response } = await authenticate(request, ctx, ['inbox']);
   if (response) return response;
-  const limited = await limit(ctx, ['notes_hour', cred.inboxId], ['notes_day', cred.inboxId]);
-  if (limited) return limited;
 
   const item = validateUpload(await readJSON(request));
   if (item.error) return fail(400, item.error);
@@ -115,8 +112,6 @@ export async function legacyTextUpload(request, ctx) {
 export async function inboxStatus(request, ctx) {
   const { cred, response } = await authenticate(request, ctx, ['inbox']);
   if (response) return response;
-  const limited = await limit(ctx, ['reads', cred.hash]);
-  if (limited) return limited;
 
   const ids = (await readJSON(request))?.recording_ids;
   if (
@@ -179,8 +174,6 @@ export async function purgeInbox(request, ctx) {
 export async function createPairCode(request, ctx) {
   const { cred, response } = await authenticate(request, ctx, ['inbox']);
   if (response) return response;
-  const limited = await limit(ctx, ['pair_code', cred.inboxId]);
-  if (limited) return limited;
 
   const agents = await ctx.db
     .prepare('SELECT COUNT(*) AS n FROM connections WHERE inbox_id = ?')
@@ -257,14 +250,6 @@ const INVALID_CODE = 'Invalid or expired pairing code. Ask the user for a new on
  * agent's request_id, so only a retry with the same request_id gets it back.
  */
 export async function exchangePairCode(request, ctx) {
-  const addr = address(request, ctx);
-  if (!(await peekLimit(ctx, 'pair_fail_all', 'all')).ok) {
-    await alert(ctx, 'pairing_circuit', 'More than 1,000 failed pairing exchanges this hour: pairing is paused.');
-    return unavailable();
-  }
-  const perAddr = await peekLimit(ctx, 'pair_fail_addr', addr);
-  if (!perAddr.ok) return fail(429, 'Too many requests. Try again later.', 'rate_limited', {}, { 'Retry-After': String(Math.ceil(perAddr.retryAfter || 60)) });
-
   const body = await readJSON(request);
   const code = body?.code;
   const requestId = body?.request_id;
@@ -278,12 +263,6 @@ export async function exchangePairCode(request, ctx) {
   const name = cleanName(body?.name);
   const codeHash = await sha256Hex(normalizePairCode(code));
   const requestHash = await sha256Hex(`ramble-request:${requestId}`);
-
-  const failed = async (response) => {
-    await countLimit(ctx, 'pair_fail_addr', addr);
-    await countLimit(ctx, 'pair_fail_all', 'all');
-    return response;
-  };
 
   // Claim the code. The conditional update lets only one exchange win.
   const token = `rmba_${randomToken(32)}`;
@@ -312,12 +291,12 @@ export async function exchangePairCode(request, ctx) {
     )
     .bind(codeHash, ctx.now)
     .first();
-  if (!row?.token || !row.live) return failed(fail(400, INVALID_CODE));
+  if (!row?.token || !row.live) return fail(400, INVALID_CODE);
   if (row.request_hash !== requestHash) {
-    return failed(fail(409, 'This pairing code was already used. Ask the user for a new one.', 'code_used'));
+    return fail(409, 'This pairing code was already used. Ask the user for a new one.', 'code_used');
   }
   const replay = await openWithRequest(row.token, requestId);
-  if (!replay) return failed(fail(400, INVALID_CODE));
+  if (!replay) return fail(400, INVALID_CODE);
   return json({ token: replay }, 200);
 }
 
@@ -342,11 +321,9 @@ async function openWithRequest(sealed, requestId) {
   }
 }
 
-async function agentCred(request, ctx, rule = 'agent') {
+async function agentCred(request, ctx) {
   const { cred, response } = await authenticate(request, ctx, ['agent']);
   if (response) return { response };
-  const limited = await limit(ctx, [rule, cred.connection.id]);
-  if (limited) return { response: limited };
   return { connection: cred.connection };
 }
 
@@ -411,7 +388,7 @@ export async function getAgent(request, ctx) {
  * "hook": null removes it. Setting a hook sends one test ping right away.
  */
 export async function updateAgent(request, ctx) {
-  const { connection, response } = await agentCred(request, ctx, 'agent_patch');
+  const { connection, response } = await agentCred(request, ctx);
   if (response) return response;
 
   const body = await readJSON(request);

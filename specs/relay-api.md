@@ -1,7 +1,7 @@
 # Relay API
 
 ## Purpose
-The HTTP contract of Ramble's relay: every endpoint, who may call it with which credential, request and response shapes, status codes, idempotency and limits. Its callers are the Ramble iPhone app, the Ramble watch app, the user's agents, and Apple. What results mean to the person is in [transcription.md](transcription.md), [delivery.md](delivery.md) and [purchase.md](purchase.md).
+The HTTP contract of Ramble's relay: every endpoint, who may call it with which credential, request and response shapes, status codes, idempotency and limits. Its callers are the Ramble iPhone app, the Ramble watch app and the user's agents. What results mean to the person is in [transcription.md](transcription.md), [delivery.md](delivery.md) and [purchase.md](purchase.md).
 
 ## Endpoints at a glance
 
@@ -11,14 +11,13 @@ The HTTP contract of Ramble's relay: every endpoint, who may call it with which 
 | `POST /inboxes` | phone | App Attest assertion |
 | `GET /account` | phone, watch | inbox secret or watch token |
 | `POST /entitlement` | phone | inbox secret |
-| `POST /appstore/notifications` | Apple | Apple-signed body |
 | `GET /settings`, `PUT /settings`, `POST /watch-token`, `DELETE /watch-token` | phone | inbox secret |
 | `PUT /notes/:id`, `GET /notes/:id` | phone, watch | inbox secret or watch token |
 | `GET /notes`, `POST /notes/ack`, `POST /inbox/status`, `DELETE /inbox`, `POST /pair/code`, `GET /connections`, `DELETE /connections/:id` | phone | inbox secret |
 | `POST /pair/exchange` | agent | none (the pairing code) |
 | `GET /inbox`, `POST /inbox/ack`, `GET /agent`, `PATCH /agent` | agent | agent key |
 | `GET /`, `GET /health` | anyone | none |
-| `POST /transcribe`, `POST /inbox`; `GET /analytics` | old builds | work until LEGACY_UNTIL, then `410`; `410` |
+| `POST /transcribe`, `POST /inbox`; `GET /analytics` | old builds | work until 2027-01-07 00:00 UTC, then `410`; `410` |
 
 ## Basics
 
@@ -31,7 +30,7 @@ The relay SHALL be served at `https://api.ramble.watch`, and every path here is 
 - THEN it gets `200 {"service": "Ramble relay", "docs": "https://ramble.watch/docs", "llms": "https://ramble.watch/llms-full.txt"}`
 
 ### Requirement: Three credentials
-Calls other than pairing exchange, inbox creation, App Attest registration and Apple notifications SHALL carry `Authorization: Bearer <credential>`: an inbox secret (`rmbi_…`, the phone), a watch token (`rmbw_…`, the watch) or an agent key (`rmba_…`, an agent). Each is 32 random bytes; the relay SHALL keep only a SHA-256 hash, never a readable copy. The one exception is a new agent key during its pairing code's 10 minutes, so a retried exchange gets the same key: it is kept encrypted with a key derived from the exchange's `request_id`, and deleted when the code expires. `bearer <credential>` and the bare credential are accepted. A missing, unknown or revoked credential SHALL get `401` ("Invalid or revoked credentials. Send \"Authorization: Bearer <token>\"."); a valid credential on an endpoint its caller may not use SHALL get `403` with `"reason": "wrong_credential"` and keep working.
+Calls other than pairing exchange, inbox creation and App Attest registration SHALL carry `Authorization: Bearer <credential>`: an inbox secret (`rmbi_…`, the phone), a watch token (`rmbw_…`, the watch) or an agent key (`rmba_…`, an agent). Each is 32 random bytes; the relay SHALL keep only a SHA-256 hash, never a readable copy. The one exception is a new agent key during its pairing code's 10 minutes, so a retried exchange gets the same key: it is kept encrypted with a key derived from the exchange's `request_id`, and deleted when the code expires. `bearer <credential>` and the bare credential are accepted. A missing, unknown or revoked credential SHALL get `401` ("Invalid or revoked credentials. Send \"Authorization: Bearer <token>\"."); a valid credential on an endpoint its caller may not use SHALL get `403` with `"reason": "wrong_credential"` and keep working.
 
 #### Scenario: Lenient header
 - GIVEN a valid agent key
@@ -103,12 +102,12 @@ Any inbox MAY submit a purchase, whichever inbox it was bought from. A purchase 
 - WHEN an eleventh inbox submits it
 - THEN the response is `403` with `"reason": "too_many_inboxes"`
 
-### Requirement: Apple refund notifications
-`POST /appstore/notifications` SHALL accept App Store Server Notifications (version 2) whose signature chains to Apple's root CA and whose environment matches the relay's, answer `200`, and return every inbox bound to a refunded or revoked purchase to the free state with its used free-note count unchanged. Any other body SHALL get `400` and change nothing.
+### Requirement: Revoked purchases
+The relay SHALL NOT receive App Store Server Notifications. A purchase the operator marks revoked by hand ([proxy/README.md](../proxy/README.md) "Operations") SHALL return every inbox bound to it to the free state, with its used free-note count unchanged, and SHALL be refused as `invalid_transaction` when submitted again.
 
-#### Scenario: Refund
+#### Scenario: Refund revoked by hand
 - GIVEN a purchase bound to 2 inboxes that used all 25 free notes before unlocking
-- WHEN Apple sends a signed refund notification for it
+- WHEN the operator marks it revoked
 - THEN both inboxes read `"unlocked": false, "free_notes_remaining": 0`, and their next uploads get `402` with `"reason": "free_notes_used"`
 
 ### Requirement: Transcription settings
@@ -323,31 +322,22 @@ When a copy is made for an agent with a hook, the relay SHALL POST `{"event": "r
 ## Limits
 
 ### Requirement: Rate limits
-Over these limits the relay SHALL answer `429` with `{"reason": "rate_limited"}` and `Retry-After` in seconds, and change nothing. Network addresses are used only by the limiter for its window, never stored with notes or logged.
+Over these limits the relay SHALL answer `429` with `{"reason": "rate_limited"}` and `Retry-After` in seconds, and change nothing. No other endpoint is rate-limited: agents, uploads, reads and pairing have no per-caller limit. Network addresses are used only by the limiter for its window, never stored with notes or logged.
 
 | What | Limit |
 |---|---|
 | `POST /attest/challenge`; `POST /attest` | 20 per hour; 5 key registrations per day; per network address |
 | `POST /inboxes` | 3 per day per App Attest key, 20 per hour per network address |
-| `POST /pair/code` | 10 per hour per inbox |
-| `POST /pair/exchange` | 100 failed attempts per hour per network address |
-| `PUT /notes/:id` | 120 per hour and 500 per day per inbox, phone and watch together; repeats don't count, retries do |
-| `GET /notes…`, `POST /notes/ack`, `POST /inbox/status`, `GET /account` | 120 per minute per credential |
-| `GET /inbox`, `POST /inbox/ack`, `GET /agent`; `PATCH /agent` | 60 per minute; 10 per hour; per agent key |
-| `POST /entitlement`, `PUT /settings`; `POST /watch-token` | 20 per hour; 10 per day; per inbox |
 
-#### Scenario: Agent checking too often
+#### Scenario: Agent checking often
 - GIVEN an agent pulling every second
-- WHEN it passes 60 calls in a minute
-- THEN it gets `429` with `Retry-After`, and its key still works afterwards
+- WHEN it passes 100 calls in a minute
+- THEN every pull succeeds
 
-### Requirement: Pairing failure circuit
-When failed pairing exchanges from all addresses together exceed 1,000 in an hour, every exchange SHALL get `503` with `"reason": "unavailable"` until that hour ends, and the operator SHALL be alerted.
-
-#### Scenario: Spread-out guessing
-- GIVEN 1,001 failed exchanges this hour from many addresses
+#### Scenario: Failed pairing exchanges
+- GIVEN 150 failed exchanges this hour from one address
 - WHEN an agent sends a valid code
-- THEN it gets `503`, and the code still works once the hour ends, if it hasn't expired
+- THEN it gets `201` and a key
 
 ### Requirement: Logs
 Relay logs SHALL contain no request bodies, transcript text, audio, credentials or network addresses, SHALL record inbox IDs and App Attest key IDs only as hashes, and SHALL keep at most 200 characters of a provider error body.
@@ -359,24 +349,24 @@ Relay logs SHALL contain no request bodies, transcript text, audio, credentials 
 
 ## Old app versions
 
-### Requirement: Old builds work until LEGACY_UNTIL, then are told to update
-LEGACY_UNTIL is the retirement date for old builds' paths, set at release (by default 60 days after the first free-notes build ships). Until then, `POST /transcribe` (cloud transcription for early subscribers) and text `POST /inbox` (old builds delivering transcripts to agents) SHALL keep working for old builds, within the rate limits above, under these checks:
+### Requirement: Old builds work until 2027-01-07, then are told to update
+Old builds' paths retire at a fixed date, 2027-01-07 00:00 UTC, fixed in the relay's code. Until then, `POST /transcribe` (cloud transcription for early subscribers) and text `POST /inbox` (old builds delivering transcripts to agents) SHALL keep working for old builds, under these checks:
 
 - Text `POST /inbox` needs only the old build's inbox secret, as today, and no purchase record, so $4.99 buyers' old builds keep delivering.
-- `POST /transcribe` needs the App Attest checks above and a subscription record that passes the same checks as `POST /entitlement` and has not expired. It SHALL apply the upload size limits above, add transcribed audio to the monthly usage tally of its original transaction (monitoring only, never a cap; [purchase.md](purchase.md)), refuse with `403` and `"reason": "suspended"` when the operator suspended that transaction, and always transcribe with Groq ([transcription.md](transcription.md)), ignoring any model the client asks for. `GET /analytics`, and from LEGACY_UNTIL on those two paths, SHALL answer `410` with `"error": "This version of Ramble is out of date. Update Ramble from the App Store."`, and SHALL transcribe, queue or reveal nothing.
+- `POST /transcribe` needs the App Attest checks above and a subscription record that passes the same checks as `POST /entitlement` and has not expired. It SHALL apply the upload size limits above, add transcribed audio to the monthly usage tally of its original transaction (monitoring only, never a cap; [purchase.md](purchase.md)), refuse with `403` and `"reason": "suspended"` when the operator suspended that transaction, and always transcribe with Groq ([transcription.md](transcription.md)), ignoring any model the client asks for. `GET /analytics`, and from 2027-01-07 00:00 UTC on those two paths, SHALL answer `410` with `"error": "This version of Ramble is out of date. Update Ramble from the App Store."`, and SHALL transcribe, queue or reveal nothing.
 
 #### Scenario: Old subscriber before and after the date
 - GIVEN an old build with an active subscription and a valid App Attest assertion
-- WHEN it sends `POST /transcribe` with audio before LEGACY_UNTIL
+- WHEN it sends `POST /transcribe` with audio before 2027-01-07
 - THEN it gets the transcript
-- AND from LEGACY_UNTIL on, that request or a text `POST /inbox` gets `410`, and nothing is transcribed or queued for any agent
+- AND from 2027-01-07 00:00 UTC on, that request or a text `POST /inbox` gets `410`, and nothing is transcribed or queued for any agent
 
 #### Scenario: Old $4.99 build delivers text
 - GIVEN an old build of a $4.99 buyer with no subscription, transcribing on device
-- WHEN it sends a text `POST /inbox` before LEGACY_UNTIL
+- WHEN it sends a text `POST /inbox` before 2027-01-07
 - THEN the transcript is queued for its agents as before
 
 #### Scenario: Expired subscription on the old path
 - GIVEN an old build whose subscription record expired last month
-- WHEN it sends `POST /transcribe` before LEGACY_UNTIL
+- WHEN it sends `POST /transcribe` before 2027-01-07
 - THEN the response is `403`, and nothing is transcribed

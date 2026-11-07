@@ -1,5 +1,5 @@
-// Verifies Apple-signed App Store records: signed transactions, app
-// transactions and App Store Server Notifications v2. Each is a JWS whose
+// Verifies Apple-signed App Store records: signed transactions and app
+// transactions. Each is a JWS whose
 // x5c header carries [leaf, intermediate, root]; the root must be Apple Root
 // CA - G3, each certificate must be signed by the next, every certificate must
 // be valid at the signing time, and the leaf must sign the JWS (ES256).
@@ -121,26 +121,4 @@ export async function verifyAppTransaction(jws, env, deps = {}) {
   const environment = payload.environment ?? payload.receiptType;
   checkBundleAndEnvironment(payload.bundleId, environment, env);
   return { ...payload, environment };
-}
-
-// body.signedPayload of an App Store Server Notification v2.
-export async function verifyNotification(signedPayload, env, deps = {}) {
-  const payload = await verifyAppleJWS(signedPayload, deps);
-  const data = payload.data;
-  if (!data || typeof data !== 'object') fail('Notification has no app data');
-  checkBundleAndEnvironment(data.bundleId, data.environment, env);
-
-  let transaction = null;
-  if (data.signedTransactionInfo) {
-    transaction = await verifySignedTransaction(data.signedTransactionInfo, env, deps);
-    if (transaction.environment !== data.environment) fail('Transaction environment differs from notification');
-  }
-
-  return {
-    notificationType: payload.notificationType,
-    subtype: payload.subtype ?? null,
-    notificationUUID: payload.notificationUUID ?? null,
-    environment: data.environment,
-    transaction,
-  };
 }

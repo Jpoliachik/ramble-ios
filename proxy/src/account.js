@@ -1,5 +1,5 @@
 // Inboxes as accounts: creation, free notes, the unlock and its binding,
-// refunds, usage monitoring and suspension, transcription settings and the
+// revoked purchases, usage monitoring and suspension, transcription settings and the
 // watch token. See specs/purchase.md and specs/relay-api.md "Phone setup and purchase".
 
 import { AppleVerifyError } from './apple.js';
@@ -97,8 +97,6 @@ export async function usageUser(ctx, inboxId) {
 export async function getAccount(request, ctx) {
   const { cred, response } = await authenticate(request, ctx, ['inbox', 'watch']);
   if (response) return response;
-  const limited = await limit(ctx, ['reads', cred.hash]);
-  if (limited) return limited;
   return json(accountView(await loadAccount(ctx, cred.inboxId)));
 }
 
@@ -254,48 +252,12 @@ export async function bindPurchase(ctx, inboxId, proof) {
 export async function postEntitlement(request, ctx) {
   const { cred, response } = await authenticate(request, ctx, ['inbox']);
   if (response) return response;
-  const limited = await limit(ctx, ['entitlement', cred.inboxId]);
-  if (limited) return limited;
 
   const verified = await verifyProof(ctx, await readJSON(request));
   if (verified.response) return verified.response;
   const refused = await bindPurchase(ctx, cred.inboxId, verified.proof);
   if (refused) return refused;
   return json(accountView(await loadAccount(ctx, cred.inboxId)));
-}
-
-/** App Store Server Notifications v2: refunds and revocations lock inboxes. */
-export async function appStoreNotification(request, ctx) {
-  const body = await readJSON(request);
-  if (typeof body?.signedPayload !== 'string') return fail(400, 'Expected an App Store server notification.');
-  let note;
-  try {
-    note = await ctx.apple.verifyNotification(body.signedPayload, ctx.env, ctx.appleDeps);
-  } catch (err) {
-    if (err instanceof AppleVerifyError && err.reason !== 'unavailable') {
-      return fail(400, "This notification couldn't be verified.");
-    }
-    return unavailable();
-  }
-  if (note.environment !== (ctx.env.APPSTORE_ENVIRONMENT || 'Production')) {
-    return fail(400, 'This notification is for another App Store environment.');
-  }
-
-  const tx = note.transaction;
-  if ((note.notificationType === 'REFUND' || note.notificationType === 'REVOKE') && tx?.originalTransactionId) {
-    const unlock = tx.productId === (ctx.env.UNLOCK_PRODUCT_ID || DEFAULT_UNLOCK_PRODUCT);
-    const id = `${unlock ? 'unlock' : 'sub'}:${tx.originalTransactionId}`;
-    // Insert when unknown too, so the record is refused if it's sent later.
-    await ctx.db
-      .prepare(
-        `INSERT INTO purchases (id, kind, environment, revoked_at, created_at) VALUES (?, ?, ?, ?, ?)
-           ON CONFLICT (id) DO UPDATE SET revoked_at = COALESCE(purchases.revoked_at, excluded.revoked_at)`,
-      )
-      .bind(id, unlock ? 'unlock' : 'subscriber', note.environment, ctx.now, ctx.now)
-      .run();
-    console.log(`[account] ${note.notificationType} for purchase ${await logId(id)}`);
-  }
-  return json({ status: 'ok' });
 }
 
 // --- Settings ----------------------------------------------------------------------
@@ -317,8 +279,6 @@ export async function getSettings(request, ctx) {
 export async function putSettings(request, ctx) {
   const { cred, response } = await authenticate(request, ctx, ['inbox']);
   if (response) return response;
-  const limited = await limit(ctx, ['settings', cred.inboxId]);
-  if (limited) return limited;
 
   const body = await readJSON(request);
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
@@ -347,8 +307,6 @@ export async function putSettings(request, ctx) {
 export async function postWatchToken(request, ctx) {
   const { cred, response } = await authenticate(request, ctx, ['inbox']);
   if (response) return response;
-  const limited = await limit(ctx, ['watch_token', cred.inboxId]);
-  if (limited) return limited;
 
   const replaces = (await readJSON(request))?.replaces;
   const replacedHash = typeof replaces === 'string' && replaces.startsWith('rmbw_') ? await sha256Hex(replaces) : '';

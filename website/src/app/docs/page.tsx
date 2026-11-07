@@ -177,12 +177,6 @@ const ERRORS: [string, string, string][] = [
   ["5xx, timeout, dropped connection", "Temporary", "Retry after 2, 5, then 15 seconds. Keep your schedule."],
 ];
 
-const LIMITS: [string, string][] = [
-  ["GET /inbox, POST /inbox/ack, GET /agent", "60 per minute per token"],
-  ["PATCH /agent", "10 per hour per token"],
-  ["POST /pair/exchange", "100 failed attempts per hour per network address"],
-];
-
 function SectionHeader({ id, children }: { id: string; children: React.ReactNode }) {
   return (
     <h2 id={id} className="scroll-mt-20 font-serif text-2xl font-semibold tracking-tight text-stone-900">
@@ -403,22 +397,10 @@ export default function AgentDocs() {
               <p>
                 Errors are JSON: <InlineCode>{`{"error": "..."}`}</InlineCode>, with a{" "}
                 <InlineCode>&quot;reason&quot;</InlineCode> code where it helps (like{" "}
-                <InlineCode>code_used</InlineCode> or <InlineCode>rate_limited</InlineCode>). Every call is safe to
-                retry. Over these limits the relay answers <InlineCode>429</InlineCode> with{" "}
-                <InlineCode>Retry-After</InlineCode> in seconds and changes nothing:
+                <InlineCode>code_used</InlineCode>). Every call is safe to retry. Agent calls and pairing have no
+                rate limit; if you ever get a <InlineCode>429</InlineCode>, wait the seconds in{" "}
+                <InlineCode>Retry-After</InlineCode>.
               </p>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <tbody>
-                    {LIMITS.map(([what, limit]) => (
-                      <tr key={what} className="border-b border-stone-100 align-top">
-                        <td className="py-2 pr-3 font-mono text-xs text-stone-900">{what}</td>
-                        <td className="py-2">{limit}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
               <CodeBlock filename="curl">{CURL_EXAMPLE}</CodeBlock>
               <CodeBlock filename="Python (standard library)">{PYTHON_EXAMPLE}</CodeBlock>
             </section>

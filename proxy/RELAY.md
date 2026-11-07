@@ -103,15 +103,7 @@ Errors are `{"error": "<sentence>"}`, plus `"reason"` where a client acts on it.
 | `429` | `rate_limited`, with `Retry-After` in seconds. Nothing changed; the token still works |
 | `503` | `unavailable`: the relay couldn't check something and accepted nothing. Retry later |
 
-Rate limits:
-
-| What | Limit |
-|---|---|
-| `GET /inbox`, `POST /inbox/ack`, `GET /agent` | 60 per minute per agent token |
-| `PATCH /agent` | 10 per hour per agent token |
-| `POST /pair/exchange` | 100 failed attempts per hour per network address. Over 1,000 failed exchanges an hour from all addresses together, every exchange gets `503` until the hour ends |
-
-Network addresses are used only by the limiter, never stored with notes or logged.
+Agent endpoints and pairing have no rate limit. Only App Attest registration and inbox creation (phone calls) are limited, per network address and App Attest key; network addresses are used only by that limiter, never stored with notes or logged. Agents should still treat a `429` as "wait `Retry-After`".
 
 ### Clients that get 403 before reaching the Worker
 

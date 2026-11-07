@@ -147,12 +147,12 @@ describe('upload refusals store and count nothing', () => {
 
   it('fails closed when the database is down', async () => {
     const secret = await h.inbox();
-    h.limiter.down = true;
+    h.db.sqlite.exec('DROP TABLE purchases');
     const res = await h.upload(secret, noteId(1));
     assert.equal(res.status, 503);
     assert.equal(res.body.reason, 'unavailable');
-    h.limiter.down = false;
     assert.equal(h.rows('SELECT COUNT(*) AS n FROM notes')[0].n, 0);
+    assert.equal(h.bucket.objects.size, 0);
   });
 });
 
@@ -216,7 +216,6 @@ describe('held uploads', () => {
     assert.deepEqual(h.rows('SELECT user_id, month, seconds FROM usage').map((r) => ({ ...r })), [
       { user_id: 'unlock:otx1', month: '2026-11', seconds: 5 * 3600 },
     ]);
-    assert.ok(h.alerts.some((a) => a.includes('61-minute')));
     assert.equal(await freeUsed(secret), 25);
   });
 });
@@ -465,17 +464,21 @@ describe('the pipeline', () => {
     assert.equal(h.transcribeCalls[1].opts.removeFillerWords, false);
   });
 
-  it('alerts the operator about a stuck note once per 6 hours', async () => {
+  it('alerts the operator about a note stuck for 30 minutes, once per 6 hours', async () => {
     const secret = await h.inbox();
     h.transcribe = async () => {
       throw new TranscribeError('slow', { retryable: true, provider: 'groq', status: 503 });
     };
     await h.upload(secret, noteId(1));
-    h.now = T0 + 6 * MINUTE;
+    const stuck = () => h.alerts.filter((a) => a.includes('waited more than 30 minutes')).length;
+    h.now = T0 + 29 * MINUTE;
     await h.cron();
-    h.now = T0 + 7 * MINUTE;
+    assert.equal(stuck(), 0);
+    h.now = T0 + 31 * MINUTE;
     await h.cron();
-    assert.equal(h.alerts.filter((a) => a.includes('waited more than 5 minutes')).length, 1);
+    h.now = T0 + 32 * MINUTE;
+    await h.cron();
+    assert.equal(stuck(), 1);
   });
 });
 
@@ -659,17 +662,10 @@ describe('watch token', () => {
   });
 });
 
-describe('upload rate limit', () => {
-  it('120 an hour per inbox; repeats do not count', async () => {
-    const secret = await h.inbox();
-    h.db.sqlite.exec('UPDATE inboxes SET free_notes_used = -1000');
-    for (let i = 1; i <= 120; i++) assert.equal((await h.upload(secret, noteId(i))).status, 201);
-    assert.equal((await h.upload(secret, noteId(1))).status, 200);
-    const over = await h.upload(secret, noteId(121));
-    assert.equal(over.status, 429);
-    assert.equal(over.body.reason, 'rate_limited');
-    assert.ok(Number(over.headers.get('Retry-After')) > 0);
-  });
+it('uploads are not rate-limited', async () => {
+  const secret = await h.inbox();
+  h.db.sqlite.exec('UPDATE inboxes SET free_notes_used = -1000');
+  for (let i = 1; i <= 130; i++) assert.equal((await h.upload(secret, noteId(i))).status, 201);
 });
 
 it('a TranscribeError without retryable=false is retried', () => {

@@ -249,8 +249,8 @@ export default function HelpDocs() {
               <Question id="agent-errors" q="My agent gets 401, 403, 429, or connection errors">
                 <p>
                   401 means the agent was disconnected; connect it again with a new code. 403 usually means its HTTP
-                  client is filtered, and it should send a User-Agent header. 429 means it&rsquo;s checking too often
-                  and should wait the seconds in Retry-After. Agents in a sandbox need the relay host on their network
+                  client is filtered, and it should send a User-Agent header. Agent calls have no rate limit, but on a
+                  429 it should wait the seconds in Retry-After. Agents in a sandbox need the relay host on their network
                   allowlist. Details are in{" "}
                   <Link href="/docs#requests" className={linkClass}>
                     making requests
