@@ -34,8 +34,12 @@ export default function Support() {
               open Settings in Ramble and tap Restore Purchases.
             </p>
             <p className="mt-2">
-              One purchase works on up to 5 iPhones. Each fresh start after a reinstall counts as one, and a spot opens
-              when one of them goes 90 days without sending a note.
+              One purchase works on up to 10 iPhones. Each fresh start after a reinstall counts as one. If you need
+              more, email{" "}
+              <a href={`mailto:${SUPPORT_EMAIL}`} className={link}>
+                {SUPPORT_EMAIL}
+              </a>
+              .
             </p>
           </section>
 

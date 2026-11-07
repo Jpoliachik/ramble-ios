@@ -47,7 +47,7 @@ Secrets (`npx wrangler secret put NAME`):
 | `HOOK_ENCRYPTION_KEY` | Encrypts agents' wake-up hook headers at rest. Without it, setting a hook answers 503 |
 | `ALERT_WEBHOOK_URL` | Where operator alerts and the daily summary are POSTed as plain text (for example an ntfy topic). Unset: nothing is sent |
 
-Vars (`[vars]`): `RETENTION_SECONDS`, `APPLE_BUNDLE_ID`, `UNLOCK_PRODUCT_ID`, `PREMIUM_PRODUCT_ID`, `APPSTORE_ENVIRONMENT` (`Production`), `RELAY_BASE_URL`, and three set at release: `FIRST_FREE_BUILD` (build number of the first free-notes build), `FREE_RELEASE_AT` (its release time, ISO 8601) and `LEGACY_UNTIL` (when old builds' paths start answering 410). Without `FIRST_FREE_BUILD`/`FREE_RELEASE_AT` nobody counts as an early buyer; without `LEGACY_UNTIL` the old paths keep working.
+Vars (`[vars]`): `RETENTION_SECONDS`, `APPLE_BUNDLE_ID`, `UNLOCK_PRODUCT_ID`, `PREMIUM_PRODUCT_ID`, `APPSTORE_ENVIRONMENT` (`Production`), `RELAY_BASE_URL`, and two set at release: `FIRST_FREE_BUILD` (build number of the first free-notes build) and `LEGACY_UNTIL` (when old builds' paths start answering 410). Without `FIRST_FREE_BUILD` no paid download counts as an early buyer (old subscribers still do); without `LEGACY_UNTIL` the old paths keep working.
 
 Production has no developer bypass: never set `ENVIRONMENT` or `DEV_BYPASS_KEY` on the deployed Worker (see Local Development). `DEV_BYPASS_TOKEN`, `ANALYTICS_TOKEN`, `DEEPGRAM_API_KEY` and `OPENAI_API_KEY` are no longer read and can be deleted.
 
@@ -55,10 +55,10 @@ Apple: point App Store Server Notifications (version 2) for production at `https
 
 ## What is stored
 
-- **Inboxes:** a hash of the secret, the account token, the free-note count, the bound purchase, the transcription settings, and the operator's `suspended` flag.
+- **Inboxes:** a hash of the secret, the free-note count, the bound purchase, the transcription settings, and the operator's `suspended` flag.
 - **Notes:** ID, source device, status, recorded time as sent, measured length, and the transcript until the person's devices have it. Audio sits in R2 only until transcription ends, and at most 1 day.
 - **Agent copies:** transcript text until the agent acks it or 30 days pass; afterwards a row without text, so the app can show "picked up" or "not picked up".
-- **Purchases:** Apple's original transaction ID, kind, environment, refund time, and the operator's `suspended` flag.
+- **Purchases:** Apple's original transaction ID, kind, environment, refund time, the operator's `inbox_cap` (empty means 10) and `suspended` flag.
 - **Usage:** transcribed audio seconds per user (purchase, or inbox without one) per UTC month, for monitoring only.
 - **Operator data:** counted events (refusals, provider trouble) for 3 days, alert cooldowns, rate-limit counters.
 
@@ -95,6 +95,18 @@ npx wrangler d1 execute ramble-relay --remote --command "SELECT 'purchase' AS ki
 The `UPDATE` reports `changes: 1` when it found the purchase. The old-build subscriber command adds a row only when the `sub:` ID isn't known yet; that row is dated 1970, so it never counts as a new unlock. Notes the apps marked "Couldn't send" while suspended don't upload again by themselves after an unsuspend; new notes do.
 
 Logs carry no request bodies, transcript text, audio, credentials or network addresses; inbox IDs and App Attest key IDs appear only as short hashes, and provider error bodies are cut to 200 characters.
+
+## Operations: a purchase on more than 10 iPhones
+
+One purchase unlocks at most 10 inboxes ever (each fresh start after a reinstall is a new inbox), and time frees no spot. The 11th gets `403` `too_many_inboxes`, and the app asks the person to contact support. To check and raise one purchase's cap (the person then taps "Restore Purchases"):
+
+```bash
+# How many inboxes it is bound to, and its cap (empty means 10)
+npx wrangler d1 execute ramble-relay --remote --command "SELECT p.id, p.inbox_cap, COUNT(i.id) AS inboxes FROM purchases p LEFT JOIN inboxes i ON i.purchase_id = p.id WHERE p.id = 'unlock:2000000123456789' GROUP BY p.id"
+
+# Raise its cap
+npx wrangler d1 execute ramble-relay --remote --command "UPDATE purchases SET inbox_cap = 15 WHERE id = 'unlock:2000000123456789'"
+```
 
 ## App Attest Implementation Notes
 

@@ -40,10 +40,10 @@ The watch step SHALL read "Now, put it on your watch." with "Open the Watch app"
 - THEN Continue stays disabled, rechecked every 2 seconds, and enables once the install lands
 
 ### Requirement: Setup can't reach Ramble
-When the phone can't set itself up with Ramble's server (offline, or the server refuses new setups), it SHALL show "Ramble can't finish setting up right now. It will try again on its own." on Home under the status line, keep recording notes as "Waiting to send", and retry each time Ramble opens ([relay-api.md](relay-api.md) owns the daily limit).
+When the phone can't set itself up with Ramble's server (offline, or the server refuses the setup for now), it SHALL show "Ramble can't finish setting up right now. It will try again on its own." on Home under the status line, keep recording notes as "Waiting to send", and retry each time Ramble opens ([relay-api.md](relay-api.md) owns the limits).
 
-#### Scenario: Daily setup limit reached
-- GIVEN the server refuses new setups for the day
+#### Scenario: Setup limit reached
+- GIVEN the server refuses this iPhone's setup for the day (relay-api.md "Rate limits")
 - WHEN the person finishes onboarding and records a note
 - THEN the message shows, the note reads "Waiting to send", and setup completes on a later open
 

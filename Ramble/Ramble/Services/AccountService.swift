@@ -37,9 +37,7 @@ final class AccountService: ObservableObject {
     /// Store, publish, and tell the watch when `unlocked` changes. Safe to
     /// call more than once with the same state.
     func apply(_ newAccount: RelayAccount) {
-        var merged = newAccount
-        // GET /account always carries it for the phone; keep it if a reply didn't.
-        if merged.accountToken == nil { merged.accountToken = account?.accountToken }
+        let merged = newAccount
         let previous = account
         guard merged != previous else { return }
         account = merged

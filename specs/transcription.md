@@ -179,7 +179,7 @@ A note SHALL be at most 60 minutes long. The watch and the iPhone stop recording
 - THEN it is refused as too long and nothing is stored or counted
 
 ### Requirement: Length is measured on the server
-The server SHALL take each note's length from the provider's response, or from the audio file when a provider reports none, and SHALL never use a length reported by a device or by the file's own header. The full measured length SHALL count, with no cap, and a note measured at more than 61 minutes SHALL alert the operator (a file whose header understated its length). This length is what the heavy-use tally (purchase.md), the free-tier audio breaker, usage numbers and spend estimates count.
+The server SHALL take each note's length from the provider's response, or from the audio file when a provider reports none, and SHALL never use a length reported by a device or by the file's own header. The full measured length SHALL count, with no cap, and a note measured at more than 61 minutes SHALL alert the operator (a file whose header understated its length). This length is what the heavy-use tally (purchase.md), usage numbers and spend estimates count.
 
 #### Scenario: Device claims a short note
 - GIVEN a device reports a note as 10 seconds long
@@ -240,14 +240,6 @@ The server SHALL add the measured length of each note that finishes (with a tran
 - WHEN a 30-minute note is transcribed
 - THEN the operator is alerted once, and the next upload is accepted and transcribed as usual
 
-### Requirement: Free-tier audio breaker
-When free inboxes together reach 200 hours of measured audio in a UTC day, the server SHALL refuse every request to create an inbox until the next UTC day (relay-api.md) and SHALL alert the operator. Notes from existing inboxes SHALL still be transcribed.
-
-#### Scenario: Scripted signups
-- GIVEN free inboxes have used 200 hours of audio today
-- WHEN another iPhone tries to set up Ramble
-- THEN its setup is refused for now (phone.md shows what the person sees), the operator is alerted, and existing inboxes still get transcripts
-
 ## Operator
 
 ### Requirement: Daily usage summary
@@ -269,7 +261,6 @@ The server SHALL check every minute and alert the operator when any of these hol
 - any accepted note has waited more than 5 minutes for a result
 - estimated Groq spend today is over $5.00
 - Groq rejected Ramble's key, or the key is missing
-- the free-tier audio breaker tripped
 - more than 3% of notes finished in the last hour failed permanently, counting only hours with at least 10 finished notes
 
 #### Scenario: Stuck note

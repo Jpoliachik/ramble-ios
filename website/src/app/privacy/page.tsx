@@ -15,7 +15,7 @@ const strong = "font-medium text-stone-900";
 const stored: [string, string, string][] = [
   [
     "Inbox",
-    "Random id, hash of the app's inbox secret, a random account token for linking a purchase, your transcription settings (language, vocabulary, filler words), the free-note count and whether it is unlocked",
+    "Random id, hash of the app's inbox secret, your transcription settings (language, vocabulary, filler words), the free-note count and whether it is unlocked",
     "Kept while you use Ramble",
   ],
   ["Watch connection", "Hash of the watch's token", "Replaced when the iPhone connects the watch again, or revoked"],

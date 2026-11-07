@@ -15,16 +15,15 @@ const account = async (auth) => (await h.call('GET', '/account', { auth })).body
 const entitle = (auth, body) => h.call('POST', '/entitlement', { auth, body });
 
 describe('creating an inbox', () => {
-  it('needs an assertion, and returns a secret and an account token', async () => {
+  it('needs an assertion, and returns a secret', async () => {
     assert.equal((await h.call('POST', '/inboxes', { headers: { 'X-App-Attest': '' } })).status, 403);
     h.attestOK = false;
     const failed = await h.call('POST', '/inboxes');
     assert.equal(failed.status, 403);
     assert.equal(failed.body.error, 'App attestation failed');
     h.attestOK = true;
-    const { inbox_secret, account_token } = await h.newInbox();
+    const { inbox_secret } = await h.newInbox();
     assert.match(inbox_secret, /^rmbi_/);
-    assert.match(account_token, /^[0-9a-f-]{36}$/);
     assert.ok(!JSON.stringify(h.rows('SELECT * FROM inboxes')).includes(inbox_secret));
   });
 
@@ -49,88 +48,16 @@ describe('creating an inbox', () => {
     assert.match(res.body.inbox_secret, /^rmbi_/);
   });
 
-  it('answers 503 once 2,000 inboxes were made today, except for a buyer', async () => {
-    const insert = h.db.sqlite.prepare('INSERT INTO inboxes (id, secret_hash, created_at) VALUES (?, ?, ?)');
-    for (let i = 0; i < 2000; i++) insert.run(`inb_${i}`, `h${i}`, T0);
-    const capped = await h.call('POST', '/inboxes', { headers: { 'X-App-Attest-Key-Id': 'k2' } });
-    assert.equal(capped.status, 503);
-    assert.equal(capped.body.reason, 'unavailable');
-    assert.ok(h.alerts.some((a) => a.includes('2000 inboxes')));
-
-    // A buyer restoring on a new iPhone: the purchase is already known.
-    const first = h.db.sqlite.prepare("INSERT INTO purchases (id, kind, environment, created_at) VALUES ('unlock:otx1', 'unlock', 'Production', ?)");
-    first.run(T0);
-    const buyer = await h.call('POST', '/inboxes', {
-      headers: { 'X-App-Attest-Key-Id': 'k3' },
-      body: { signed_transaction: unlockTx('someone-elses-token') },
-    });
-    assert.equal(buyer.status, 201);
-    assert.equal((await account(buyer.body.inbox_secret)).unlocked, true);
-
-    // Not early-buyer proof: still capped, never a 403.
-    const plain = await h.call('POST', '/inboxes', {
-      headers: { 'X-App-Attest-Key-Id': 'k4' },
-      body: { app_transaction: jws({ receiptType: 'Production', appTransactionId: 'a1', originalApplicationVersion: '90' }) },
-    });
-    assert.equal(plain.status, 503);
-  });
-
-  it('a verified proof that will not bind is capped like any request, and creates nothing', async () => {
-    const insert = h.db.sqlite.prepare('INSERT INTO inboxes (id, secret_hash, created_at) VALUES (?, ?, ?)');
-    for (let i = 0; i < 2000; i++) insert.run(`inb_${i}`, `h${i}`, T0);
-    const count = () => h.rows('SELECT COUNT(*) AS n FROM inboxes')[0].n;
-
-    // A first-time unlock bought for another inbox: wrong_account.
-    const wrong = await h.call('POST', '/inboxes', {
-      headers: { 'X-App-Attest-Key-Id': 'k2' },
-      body: { signed_transaction: unlockTx('someone-elses-token') },
-    });
-    assert.equal(wrong.status, 503);
-    assert.equal(wrong.body.reason, 'unavailable');
-    assert.equal(count(), 2000);
-
-    // A known purchase already on 5 iPhones: too_many_inboxes.
-    h.db.sqlite.prepare("INSERT INTO purchases (id, kind, environment, created_at) VALUES ('unlock:otx1', 'unlock', 'Production', ?)").run(T0);
-    h.db.sqlite.exec("UPDATE inboxes SET purchase_id = 'unlock:otx1', bound_at = created_at WHERE id IN ('inb_0', 'inb_1', 'inb_2', 'inb_3', 'inb_4')");
-    const full = await h.call('POST', '/inboxes', {
-      headers: { 'X-App-Attest-Key-Id': 'k3' },
-      body: { signed_transaction: unlockTx('someone-elses-token') },
-    });
-    assert.equal(full.status, 503);
-    assert.equal(count(), 2000);
-  });
-
-  it('a proof that will not bind under the cap gets a normal free inbox', async () => {
+  it('starts every inbox free, whatever the body carries', async () => {
     const res = await h.call('POST', '/inboxes', {
       headers: { 'X-App-Attest-Key-Id': 'k2' },
-      body: { signed_transaction: unlockTx('someone-elses-token') },
+      body: { signed_transaction: unlockTx() },
     });
     assert.equal(res.status, 201);
+    assert.deepEqual(Object.keys(res.body), ['inbox_secret']);
     const a = await account(res.body.inbox_secret);
     assert.equal(a.unlocked, false);
     assert.equal(a.free_notes_remaining, 25);
-  });
-
-  it('a proof that will not bind is refused while the free-tier breaker is tripped', async () => {
-    await h.inbox();
-    h.db.sqlite.exec(`INSERT INTO notes (inbox_id, id, source, status, recorded_at, recorded_ms, received_at, accepted_at, content_type, duration, free_note)
-      SELECT id, 'X', 'phone', 'done', '', 0, ${T0}, ${T0}, 'audio/mp4', ${200 * 3600}, 1 FROM inboxes`);
-    const res = await h.call('POST', '/inboxes', {
-      headers: { 'X-App-Attest-Key-Id': 'k2' },
-      body: { signed_transaction: unlockTx('someone-elses-token') },
-    });
-    assert.equal(res.status, 503);
-    assert.equal(h.rows('SELECT COUNT(*) AS n FROM inboxes')[0].n, 1);
-  });
-
-  it('answers 503 once free inboxes used 200 hours today', async () => {
-    const secret = await h.inbox();
-    h.db.sqlite.exec(`INSERT INTO notes (inbox_id, id, source, status, recorded_at, recorded_ms, received_at, accepted_at, content_type, duration, free_note)
-      SELECT id, 'X', 'phone', 'done', '', 0, ${T0}, ${T0}, 'audio/mp4', ${200 * 3600}, 1 FROM inboxes`);
-    const res = await h.call('POST', '/inboxes', { headers: { 'X-App-Attest-Key-Id': 'k2' } });
-    assert.equal(res.status, 503);
-    assert.ok(h.alerts.some((a) => a.includes('200 hours')));
-    assert.ok(secret);
   });
 
   it('limits 3 a day per App Attest key', async () => {
@@ -142,55 +69,39 @@ describe('creating an inbox', () => {
 });
 
 describe('account state', () => {
-  it('starts with 25 free notes; the watch gets no account token', async () => {
-    const { inbox_secret: secret, account_token } = await h.newInbox();
-    assert.deepEqual(await account(secret), {
-      unlocked: false,
-      free_notes_total: 25,
-      free_notes_remaining: 25,
-      account_token,
-    });
-    const watch = await h.watchToken(secret);
-    assert.equal((await account(watch)).account_token, undefined);
+  it('starts with 25 free notes, the same for phone and watch', async () => {
+    const secret = await h.inbox();
+    const expected = { unlocked: false, free_notes_total: 25, free_notes_remaining: 25 };
+    assert.deepEqual(await account(secret), expected);
+    assert.deepEqual(await account(await h.watchToken(secret)), expected);
   });
 
   it('shows no usage for an unlocked inbox', async () => {
-    const { inbox_secret: secret, account_token: token } = await h.newInbox();
-    await entitle(secret, { signed_transaction: unlockTx(token) });
-    h.db.sqlite.exec(`INSERT INTO usage (user_id, month, seconds) VALUES ('unlock:otx1', '2026-11', ${141 * 3600})`);
-    assert.deepEqual(await account(secret), {
-      unlocked: true,
-      free_notes_total: 25,
-      free_notes_remaining: 25,
-      account_token: token,
-    });
-  });
-
-  it('gives old inboxes an account token on first read', async () => {
     const secret = await h.inbox();
-    h.db.sqlite.exec('UPDATE inboxes SET account_token = NULL');
-    assert.match((await account(secret)).account_token, /^[0-9a-f-]{36}$/);
+    await entitle(secret, { signed_transaction: unlockTx() });
+    h.db.sqlite.exec(`INSERT INTO usage (user_id, month, seconds) VALUES ('unlock:otx1', '2026-11', ${141 * 3600})`);
+    assert.deepEqual(await account(secret), { unlocked: true, free_notes_total: 25, free_notes_remaining: 25 });
   });
 });
 
 describe('purchases', () => {
   it('unlocks with a verified unlock purchase; re-sending changes nothing', async () => {
-    const { inbox_secret: secret, account_token: token } = await h.newInbox();
-    const res = await entitle(secret, { signed_transaction: unlockTx(token.toUpperCase()) });
+    const secret = await h.inbox();
+    const res = await entitle(secret, { signed_transaction: unlockTx() });
     assert.equal(res.status, 200);
     assert.equal(res.body.unlocked, true);
-    assert.equal((await entitle(secret, { signed_transaction: unlockTx(token) })).status, 200);
+    assert.equal((await entitle(secret, { signed_transaction: unlockTx() })).status, 200);
     assert.equal(h.rows('SELECT COUNT(*) AS n FROM purchases')[0].n, 1);
   });
 
   it('rejects forged, refunded, Xcode, family-shared and other products as invalid_transaction', async () => {
-    const { inbox_secret: secret, account_token: token } = await h.newInbox();
+    const secret = await h.inbox();
     for (const record of [
       'forged',
-      unlockTx(token, { revocationDate: T0 }),
-      unlockTx(token, { environment: 'Xcode' }),
-      unlockTx(token, { inAppOwnershipType: 'FAMILY_SHARED' }),
-      unlockTx(token, { productId: 'dev.goodloop.something' }),
+      unlockTx({ revocationDate: T0 }),
+      unlockTx({ environment: 'Xcode' }),
+      unlockTx({ inAppOwnershipType: 'FAMILY_SHARED' }),
+      unlockTx({ productId: 'dev.goodloop.something' }),
     ]) {
       const res = await entitle(secret, { signed_transaction: record });
       assert.equal(res.status, 403);
@@ -199,36 +110,25 @@ describe('purchases', () => {
     assert.equal((await account(secret)).unlocked, false);
   });
 
-  it('a first purchase made for another inbox is wrong_account; a restore is fine', async () => {
-    const a = await h.newInbox();
-    const b = await h.newInbox();
-    const wrong = await entitle(b.inbox_secret, { signed_transaction: unlockTx(a.account_token) });
-    assert.equal(wrong.status, 403);
-    assert.equal(wrong.body.reason, 'wrong_account');
-    assert.equal((await entitle(a.inbox_secret, { signed_transaction: unlockTx(a.account_token) })).status, 200);
-    assert.equal((await entitle(b.inbox_secret, { signed_transaction: unlockTx(a.account_token) })).status, 200);
-  });
-
-  it('unlocks at most 5 inboxes per purchase, counting fresh bindings, freeing a spot after 90 days', async () => {
-    const first = await h.newInbox();
-    await entitle(first.inbox_secret, { signed_transaction: unlockTx(first.account_token) });
-    for (let i = 0; i < 4; i++) {
-      h.now += 1000;
-      const restore = await h.newInboxWithKey(i);
-      assert.equal((await entitle(restore, { signed_transaction: unlockTx(first.account_token) })).status, 200);
+  it('unlocks at most 10 inboxes ever per purchase, from any inbox, until the operator raises its cap', async () => {
+    for (let i = 0; i < 10; i++) {
+      assert.equal((await entitle(await h.inbox(), { signed_transaction: unlockTx() })).status, 200);
     }
-    const sixth = await h.newInboxWithKey(9);
-    const refused = await entitle(sixth, { signed_transaction: unlockTx(first.account_token) });
+    const eleventh = await h.inbox();
+    const refused = await entitle(eleventh, { signed_transaction: unlockTx() });
     assert.equal(refused.status, 403);
     assert.equal(refused.body.reason, 'too_many_inboxes');
 
-    h.now = T0 + 91 * DAY;
-    assert.equal((await entitle(sixth, { signed_transaction: unlockTx(first.account_token) })).status, 200);
+    // Time frees nothing; the operator's inbox_cap does.
+    h.now = T0 + 365 * DAY;
+    assert.equal((await entitle(eleventh, { signed_transaction: unlockTx() })).status, 403);
+    h.db.sqlite.exec("UPDATE purchases SET inbox_cap = 11 WHERE id = 'unlock:otx1'");
+    assert.equal((await entitle(eleventh, { signed_transaction: unlockTx() })).status, 200);
   });
 
   it('a sandbox purchase (TestFlight, App Review) unlocks for good', async () => {
-    const { inbox_secret: secret, account_token: token } = await h.newInbox();
-    await entitle(secret, { signed_transaction: unlockTx(token, { environment: 'Sandbox' }) });
+    const secret = await h.inbox();
+    await entitle(secret, { signed_transaction: unlockTx({ environment: 'Sandbox' }) });
     assert.equal((await account(secret)).unlocked, true);
     h.now = T0 + 60 * DAY;
     assert.equal((await account(secret)).unlocked, true);
@@ -248,14 +148,15 @@ describe('purchases', () => {
     assert.equal(ok.body.unlocked, true);
   });
 
-  it('early subscribers: active at FREE_RELEASE_AT unlocks; lapsed does not', async () => {
-    const release = Date.UTC(2026, 10, 10);
-    h.envExtra = { FREE_RELEASE_AT: new Date(release).toISOString() };
+  it('early subscribers: any production record of the old subscription unlocks, lapsed or not; sandbox does not', async () => {
+    const sub = (extra) =>
+      jws({ productId: PREMIUM, originalTransactionId: 's1', environment: 'Production', expiresDate: T0 - 300 * DAY, ...extra });
     const secret = await h.inbox();
-    const sub = (expiresDate) =>
-      jws({ productId: PREMIUM, originalTransactionId: 's1', environment: 'Production', originalPurchaseDate: release - 100 * DAY, expiresDate });
-    assert.equal((await entitle(secret, { signed_transaction: sub(release - 30 * DAY) })).status, 403);
-    assert.equal((await entitle(secret, { signed_transaction: sub(release + 20 * DAY) })).body.unlocked, true);
+    const sandbox = await entitle(secret, { signed_transaction: sub({ environment: 'Sandbox' }) });
+    assert.equal(sandbox.status, 403);
+    assert.equal(sandbox.body.reason, 'invalid_transaction');
+    assert.equal((await entitle(secret, { signed_transaction: sub({ revocationDate: T0 }) })).status, 403);
+    assert.equal((await entitle(secret, { signed_transaction: sub() })).body.unlocked, true);
   });
 });
 

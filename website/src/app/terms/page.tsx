@@ -82,9 +82,9 @@ export default function TermsOfUse() {
               </li>
               <li>
                 <span className={strong}>Devices.</span> One purchase unlocks
-                up to 5 iPhones, counting each iPhone (and each fresh start after
-                a reinstall) linked to it or that sent a note in the last 90
-                days. Family Sharing is not available for the unlock.
+                up to 10 iPhones, counting each iPhone (and each fresh start
+                after a reinstall) it was ever linked to. Contact support to add
+                more. Family Sharing is not available for the unlock.
               </li>
               <li>
                 <span className={strong}>Refunds</span> are handled by Apple
@@ -113,8 +113,8 @@ export default function TermsOfUse() {
           <section>
             <h2 className={h2}>Early buyers</h2>
             <p className="mt-2">
-              If you bought Ramble before it became free to download, or your
-              cloud subscription was active when it did, every note transcribes
+              If you bought Ramble before it became free to download, or ever
+              subscribed to its old cloud subscription, every note transcribes
               with no unlock needed, within fair use. Apple keeps billing a
               subscription until you cancel it in your Apple ID settings.
             </p>

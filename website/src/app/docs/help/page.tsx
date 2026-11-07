@@ -187,10 +187,14 @@ export default function HelpDocs() {
                   Purchases in Settings.
                 </p>
               </Question>
-              <Question id="five-iphones" q="“This purchase is in use on 5 iPhones”">
+              <Question id="ten-iphones" q="“This purchase is in use on 10 iPhones”">
                 <p>
-                  One purchase works on up to 5 iPhones. Each fresh start after a reinstall counts as one. A spot opens
-                  when one of them goes 90 days without sending a note.
+                  One purchase works on up to 10 iPhones. Each fresh start after a reinstall counts as one. If you need
+                  more, email{" "}
+                  <a href={`mailto:${SUPPORT_EMAIL}`} className={linkClass}>
+                    {SUPPORT_EMAIL}
+                  </a>
+                  .
                 </p>
               </Question>
               <Question id="refund" q="I want a refund">

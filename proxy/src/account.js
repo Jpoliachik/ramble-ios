@@ -4,25 +4,14 @@
 
 import { AppleVerifyError } from './apple.js';
 import { address, authenticate, limit } from './auth.js';
-import {
-  DAY,
-  fail,
-  json,
-  logId,
-  randomToken,
-  readJSON,
-  sha256Hex,
-  unavailable,
-  utcDayStart,
-  utcMonth,
-} from './http.js';
-import { FREE_TIER_DAILY_SECONDS, alert, freeSecondsToday } from './ops.js';
+import { DAY, fail, json, logId, randomToken, readJSON, sha256Hex, unavailable, utcMonth } from './http.js';
+import { alert } from './ops.js';
 
 export const FREE_NOTES = 25;
 export const HEAVY_USE_SECONDS = 100 * 3600;
-export const INBOX_DAILY_CAP = 2000;
-export const MAX_INBOXES_PER_PURCHASE = 5;
-export const BINDING_ACTIVE_MS = 90 * DAY;
+// Inboxes one purchase may ever be bound to, unless the operator raised its
+// inbox_cap by hand (proxy/README.md "Operations").
+export const MAX_INBOXES_PER_PURCHASE = 10;
 export const MAX_VOCABULARY = 900;
 const DEFAULT_UNLOCK_PRODUCT = 'dev.goodloop.ramble.unlock';
 const DEFAULT_PREMIUM_PRODUCT = 'dev.goodloop.ramble.premium.monthly2';
@@ -33,7 +22,7 @@ const DEFAULT_PREMIUM_PRODUCT = 'dev.goodloop.ramble.premium.monthly2';
 export async function loadAccount(ctx, inboxId) {
   const row = await ctx.db
     .prepare(
-      `SELECT i.id, i.account_token, i.free_notes_used, i.purchase_id, i.language, i.remove_filler_words,
+      `SELECT i.id, i.free_notes_used, i.purchase_id, i.language, i.remove_filler_words,
               i.vocabulary, p.kind AS purchase_kind, p.revoked_at,
               (i.suspended != 0 OR COALESCE(p.suspended, 0) != 0) AS suspended
          FROM inboxes i LEFT JOIN purchases p ON p.id = i.purchase_id WHERE i.id = ?`,
@@ -51,14 +40,12 @@ export async function loadAccount(ctx, inboxId) {
   };
 }
 
-export function accountView(account, { includeToken }) {
-  const view = {
+export function accountView(account) {
+  return {
     unlocked: account.unlocked,
     free_notes_total: FREE_NOTES,
     free_notes_remaining: account.freeRemaining,
   };
-  if (includeToken) view.account_token = account.account_token;
-  return view;
 }
 
 // --- Usage monitoring and suspension -------------------------------------------
@@ -107,25 +94,12 @@ export async function usageUser(ctx, inboxId) {
   }
 }
 
-/** Inboxes made before accounts existed get their token on first read. */
-async function ensureAccountToken(ctx, account) {
-  if (account.account_token) return account;
-  const token = crypto.randomUUID();
-  await ctx.db
-    .prepare('UPDATE inboxes SET account_token = ? WHERE id = ? AND account_token IS NULL')
-    .bind(token, account.id)
-    .run();
-  return loadAccount(ctx, account.id);
-}
-
 export async function getAccount(request, ctx) {
   const { cred, response } = await authenticate(request, ctx, ['inbox', 'watch']);
   if (response) return response;
   const limited = await limit(ctx, ['reads', cred.hash]);
   if (limited) return limited;
-  let account = await loadAccount(ctx, cred.inboxId);
-  if (cred.kind === 'inbox') account = await ensureAccountToken(ctx, account);
-  return json(accountView(account, { includeToken: cred.kind === 'inbox' }));
+  return json(accountView(await loadAccount(ctx, cred.inboxId)));
 }
 
 // --- Creating an inbox -------------------------------------------------------
@@ -162,68 +136,12 @@ export async function createInbox(request, ctx) {
     if (keyLimited) return keyLimited;
   }
 
-  // A buyer on a new iPhone skips the cap and the breaker. A proof that
-  // doesn't verify or bind just means a normal, capped inbox.
-  let proof = null;
-  let parsed = null;
-  try {
-    parsed = body.byteLength ? JSON.parse(new TextDecoder().decode(body)) : null;
-  } catch {
-    parsed = null;
-  }
-  if (parsed && (parsed.signed_transaction || parsed.app_transaction)) {
-    const verified = await verifyProof(ctx, parsed);
-    if (verified.proof) proof = verified.proof;
-  }
-
-  if (!proof && (await freeTierBreakerTripped(ctx))) return unavailable();
-
-  const id = `inb_${randomToken(12)}`;
   const secret = `rmbi_${randomToken(32)}`;
-  const accountToken = crypto.randomUUID();
-  const insert = await ctx.db
-    .prepare(
-      `INSERT INTO inboxes (id, secret_hash, created_at, account_token)
-       SELECT ?, ?, ?, ? WHERE ? OR (SELECT COUNT(*) FROM inboxes WHERE created_at >= ?) < ?`,
-    )
-    .bind(id, await sha256Hex(secret), ctx.now, accountToken, proof ? 1 : 0, utcDayStart(ctx.now), INBOX_DAILY_CAP)
+  await ctx.db
+    .prepare('INSERT INTO inboxes (id, secret_hash, created_at) VALUES (?, ?, ?)')
+    .bind(`inb_${randomToken(12)}`, await sha256Hex(secret), ctx.now)
     .run();
-  if (insert.meta.changes === 0) return inboxCapReached(ctx);
-  if (proof) {
-    // Only a proof that binds skips the cap and the breaker. Unbound, this is
-    // a normal free inbox: it stays only if a capped request would be let in.
-    let refused;
-    try {
-      refused = await bindPurchase(ctx, id, proof);
-    } catch (err) {
-      console.error(`[account] new inbox bind failed: ${String(err?.message).slice(0, 200)}`);
-      refused = { status: 503 };
-    }
-    if (refused) {
-      console.log(`[account] new inbox proof not bound: ${refused.status}`);
-      const others = await ctx.db
-        .prepare('SELECT COUNT(*) AS n FROM inboxes WHERE created_at >= ? AND id != ?')
-        .bind(utcDayStart(ctx.now), id)
-        .first();
-      const capped = others.n >= INBOX_DAILY_CAP;
-      if (capped || (await freeTierBreakerTripped(ctx))) {
-        await ctx.db.prepare('DELETE FROM inboxes WHERE id = ? AND purchase_id IS NULL').bind(id).run();
-        return capped ? inboxCapReached(ctx) : unavailable();
-      }
-    }
-  }
-  return json({ inbox_secret: secret, account_token: accountToken }, 201);
-}
-
-async function inboxCapReached(ctx) {
-  await alert(ctx, 'inbox_cap', `${INBOX_DAILY_CAP} inboxes were created today: new inboxes are refused until tomorrow (UTC).`);
-  return unavailable();
-}
-
-async function freeTierBreakerTripped(ctx) {
-  if ((await freeSecondsToday(ctx)) < FREE_TIER_DAILY_SECONDS) return false;
-  await alert(ctx, 'free_tier_breaker', 'Free inboxes reached 200 hours of audio today: new inboxes are refused until tomorrow (UTC).');
-  return true;
+  return json({ inbox_secret: secret }, 201);
 }
 
 // --- Purchases -----------------------------------------------------------------
@@ -240,7 +158,7 @@ function appleFailure(err) {
 
 /**
  * Checks a purchase or early-buyer proof and says which purchase it is.
- * Returns { proof: { id, kind, environment, appAccountToken } } or { response }.
+ * Returns { proof: { id, kind, environment } } or { response }.
  */
 export async function verifyProof(ctx, body) {
   const env = ctx.env;
@@ -257,27 +175,15 @@ export async function verifyProof(ctx, body) {
     if (!tx.originalTransactionId) return invalid();
 
     if (tx.productId === (env.UNLOCK_PRODUCT_ID || DEFAULT_UNLOCK_PRODUCT)) {
-      return {
-        proof: {
-          id: `unlock:${tx.originalTransactionId}`,
-          kind: 'unlock',
-          environment: tx.environment,
-          appAccountToken: tx.appAccountToken ?? null,
-        },
-      };
+      return { proof: { id: `unlock:${tx.originalTransactionId}`, kind: 'unlock', environment: tx.environment } };
     }
     if (tx.productId === (env.PREMIUM_PRODUCT_ID || DEFAULT_PREMIUM_PRODUCT)) {
-      // Early subscriber: active when the first free build was released.
-      const releasedAt = Date.parse(env.FREE_RELEASE_AT ?? '');
-      if (
-        tx.environment === 'Production' &&
-        Number.isFinite(releasedAt) &&
-        Number(tx.originalPurchaseDate) < releasedAt &&
-        Number(tx.expiresDate) > releasedAt
-      ) {
+      // Early subscriber: the old subscription was only ever sold before
+      // Ramble became free, so any real record of it counts, lapsed or not.
+      if (tx.environment === 'Production') {
         return { proof: { id: `sub:${tx.originalTransactionId}`, kind: 'subscriber', environment: 'Production' } };
       }
-      return invalid('This subscription was not active when Ramble became free to download.');
+      return invalid();
     }
     return invalid();
   }
@@ -309,8 +215,10 @@ export async function verifyProof(ctx, body) {
 }
 
 /**
- * Binds a verified purchase to an inbox, within the 5-inbox cap. Returns null
- * on success (or when nothing needed changing), else the refusal response.
+ * Binds a verified purchase to an inbox, within its inbox cap (10 unless the
+ * operator raised it). Bindings are never released, so the cap counts every
+ * inbox the purchase was ever bound to. Returns null on success (or when
+ * nothing needed changing), else the refusal response.
  */
 export async function bindPurchase(ctx, inboxId, proof) {
   const existing = await ctx.db.prepare('SELECT revoked_at FROM purchases WHERE id = ?').bind(proof.id).first();
@@ -321,31 +229,23 @@ export async function bindPurchase(ctx, inboxId, proof) {
   // Already unlocked by another record: nothing to change.
   if (account.unlocked) return null;
 
-  // A first-time unlock must be bought from this inbox; a restore may not be.
-  if (proof.kind === 'unlock' && !existing) {
-    const token = String(proof.appAccountToken ?? '').toLowerCase();
-    if (!token || token !== String(account.account_token ?? '').toLowerCase()) {
-      return fail(403, 'This purchase was made for another Ramble inbox.', 'wrong_account');
-    }
-  }
-
   // Sandbox (TestFlight, App Review) unlocks like a real purchase; it is kept
   // out of revenue counts by its environment.
-  const since = ctx.now - BINDING_ACTIVE_MS;
   const [, bound] = await ctx.db.batch([
     ctx.db
       .prepare('INSERT OR IGNORE INTO purchases (id, kind, environment, created_at) VALUES (?, ?, ?, ?)')
       .bind(proof.id, proof.kind, proof.environment, ctx.now),
-    // Conditional, so two inboxes binding at once can't both take the 5th spot.
+    // Conditional, so two inboxes binding at once can't both take the last spot.
     ctx.db
       .prepare(
-        `UPDATE inboxes SET purchase_id = ?, bound_at = ? WHERE id = ? AND
-           (SELECT COUNT(*) FROM inboxes WHERE purchase_id = ? AND id != ? AND (bound_at > ? OR last_upload_at > ?)) < ?`,
+        `UPDATE inboxes SET purchase_id = ? WHERE id = ? AND
+           (SELECT COUNT(*) FROM inboxes WHERE purchase_id = ? AND id != ?) <
+           COALESCE((SELECT inbox_cap FROM purchases WHERE id = ?), ?)`,
       )
-      .bind(proof.id, ctx.now, inboxId, proof.id, inboxId, since, since, MAX_INBOXES_PER_PURCHASE),
+      .bind(proof.id, inboxId, proof.id, inboxId, proof.id, MAX_INBOXES_PER_PURCHASE),
   ]);
   if (bound.meta.changes === 0) {
-    return fail(403, `This purchase is in use on ${MAX_INBOXES_PER_PURCHASE} iPhones.`, 'too_many_inboxes');
+    return fail(403, 'This purchase has reached its limit of iPhones.', 'too_many_inboxes');
   }
   console.log(`[account] bound ${proof.kind} (${proof.environment}) inbox=${await logId(inboxId)}`);
   return null;
@@ -361,8 +261,7 @@ export async function postEntitlement(request, ctx) {
   if (verified.response) return verified.response;
   const refused = await bindPurchase(ctx, cred.inboxId, verified.proof);
   if (refused) return refused;
-  const account = await ensureAccountToken(ctx, await loadAccount(ctx, cred.inboxId));
-  return json(accountView(account, { includeToken: true }));
+  return json(accountView(await loadAccount(ctx, cred.inboxId)));
 }
 
 /** App Store Server Notifications v2: refunds and revocations lock inboxes. */

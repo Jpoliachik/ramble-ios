@@ -12,5 +12,4 @@ struct RelayAccount: Codable, Equatable {
     var unlocked: Bool
     var freeNotesTotal: Int
     var freeNotesRemaining: Int
-    var accountToken: String?
 }

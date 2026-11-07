@@ -20,12 +20,9 @@ APPSTORE_ENVIRONMENT = "Production"
 # Set at release (see specs/purchase.md "Early buyers"):
 #   FIRST_FREE_BUILD  build number of the first free-notes build, e.g. "120".
 #                     Downloads from a lower build are early buyers.
-#   FREE_RELEASE_AT   ISO time that build was released; subscriptions active
-#                     then are early buyers.
 #   LEGACY_UNTIL      ISO date old builds' POST /transcribe and text POST /inbox
 #                     stop working (410), by default 60 days after release.
 # FIRST_FREE_BUILD = ""
-# FREE_RELEASE_AT = ""
 # LEGACY_UNTIL = ""
 # Public base URL used in hook pings' pull_url when no request is in flight.
 RELAY_BASE_URL = "https://ramble-transcription-proxy.jpoliachik.workers.dev"

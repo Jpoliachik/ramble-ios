@@ -2,28 +2,28 @@
 -- Additive: existing inboxes, connections and queued entries keep working.
 -- See specs/relay-api.md, transcription.md, delivery.md and purchase.md.
 
--- Inboxes become accounts: the token StoreKit binds a purchase to, the free
--- note count, the bound purchase, and the transcription settings.
-ALTER TABLE inboxes ADD COLUMN account_token TEXT;
+-- Inboxes become accounts: the free note count, the bound purchase, and the
+-- transcription settings.
 ALTER TABLE inboxes ADD COLUMN free_notes_used INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE inboxes ADD COLUMN purchase_id TEXT;
-ALTER TABLE inboxes ADD COLUMN bound_at INTEGER;
 ALTER TABLE inboxes ADD COLUMN last_upload_at INTEGER;
 ALTER TABLE inboxes ADD COLUMN language TEXT;
 ALTER TABLE inboxes ADD COLUMN remove_filler_words INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE inboxes ADD COLUMN vocabulary TEXT NOT NULL DEFAULT '';
-CREATE INDEX IF NOT EXISTS inboxes_created ON inboxes (created_at);
 CREATE INDEX IF NOT EXISTS inboxes_purchase ON inboxes (purchase_id);
 
 -- One row per purchase, keyed on Apple's original transaction ID (or the app
 -- transaction ID for early buyers): "unlock:<id>", "sub:<id>", "app:<id>".
 -- Inboxes point at it through inboxes.purchase_id. A refund sets revoked_at,
 -- which locks every bound inbox and rejects the record from then on.
+-- inbox_cap is how many inboxes it may ever be bound to; NULL means the
+-- default (10). The operator raises it by hand (proxy/README.md).
 CREATE TABLE IF NOT EXISTS purchases (
   id TEXT PRIMARY KEY,
   kind TEXT NOT NULL,
   environment TEXT NOT NULL,
   revoked_at INTEGER,
+  inbox_cap INTEGER,
   created_at INTEGER NOT NULL
 );
 

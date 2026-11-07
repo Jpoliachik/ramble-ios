@@ -7,7 +7,6 @@ import { DAY, HOUR, MINUTE, utcDayStart } from './http.js';
 
 export const ALERT_COOLDOWN_MS = 6 * HOUR;
 export const SPEND_ALERT_USD = 5;
-export const FREE_TIER_DAILY_SECONDS = 200 * 3600;
 const EVENT_RETENTION_MS = 3 * DAY;
 
 // Groq's list price per audio hour, for the spend estimate.
@@ -74,18 +73,6 @@ const count = async (ctx, sql, ...params) => (await ctx.db.prepare(sql).bind(...
 const eventsSince = (ctx, kind, since) =>
   count(ctx, 'SELECT COUNT(*) AS n FROM events WHERE kind = ? AND at > ?', kind, since);
 
-/** Measured audio from free notes accepted this UTC day (the breaker's count). */
-export async function freeSecondsToday(ctx) {
-  const row = await ctx.db
-    .prepare(
-      `SELECT COALESCE(SUM(COALESCE(duration, container_duration, 0)), 0) AS s FROM notes
-        WHERE free_note != 0 AND accepted_at >= ?`,
-    )
-    .bind(utcDayStart(ctx.now))
-    .first();
-  return row?.s ?? 0;
-}
-
 /** Estimated Groq spend for one UTC day, from the measured length of notes finished that day. */
 export async function spendForDay(ctx, dayStart) {
   const row = await ctx.db
@@ -122,10 +109,6 @@ export async function checkAlerts(ctx) {
 
   const spend = await spendForDay(ctx, utcDayStart(ctx.now));
   if (spend > SPEND_ALERT_USD) await alert(ctx, 'spend', `Estimated transcription spend today is $${spend.toFixed(2)}.`);
-
-  if ((await freeSecondsToday(ctx)) >= FREE_TIER_DAILY_SECONDS) {
-    await alert(ctx, 'free_tier_breaker', 'Free inboxes reached 200 hours of audio today: new inboxes are refused until tomorrow (UTC).');
-  }
 
   const finished = await ctx.db
     .prepare(

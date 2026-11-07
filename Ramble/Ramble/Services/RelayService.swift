@@ -370,12 +370,9 @@ final class RelayService: ObservableObject {
     private var inboxTask: Task<String, Error>?
 
     private func createInbox() async throws -> String {
-        // A buyer on a new iPhone brings their purchase, so the daily cap
-        // doesn't apply and the inbox starts unlocked.
-        var body = Data()
-        if let proof = await PurchaseService.shared.inboxCreationProof() {
-            body = (try? JSONSerialization.data(withJSONObject: proof)) ?? Data()
-        }
+        // Empty body: the assertion covers it. A buyer's purchase is sent
+        // afterwards with POST /entitlement (PurchaseService).
+        let body = Data()
 
         var headers: [String: String] = [:]
         let bypass = Constants.Relay.devBypass
@@ -398,7 +395,7 @@ final class RelayService: ObservableObject {
 
         let data: Data
         do {
-            data = try await send("POST", "inboxes", body: body.isEmpty ? nil : body, headers: headers)
+            data = try await send("POST", "inboxes", headers: headers)
         } catch {
             setupProblem = true
             if (error as? RelayError)?.status == 403 { throw RelayError.attestationUnavailable }
@@ -407,12 +404,13 @@ final class RelayService: ObservableObject {
         let created = try decoder.decode(CreatedInbox.self, from: data)
         KeychainService.setString(created.inboxSecret, forKey: Self.inboxSecretKey)
         setupProblem = false
-        // A new account: the refresh below fills in the real state.
+        // A new account: the refresh below fills in the real state, and the
+        // account change sends any purchase on this Apple ID.
+        PurchaseService.shared.inboxCreated()
         AccountService.shared.apply(RelayAccount(
             unlocked: false,
             freeNotesTotal: 25,
-            freeNotesRemaining: 25,
-            accountToken: created.accountToken
+            freeNotesRemaining: 25
         ))
         // A fresh inbox needs a fresh watch connection, and the real account state.
         Task {
@@ -488,7 +486,6 @@ final class RelayService: ObservableObject {
 
 private struct CreatedInbox: Decodable {
     let inboxSecret: String
-    let accountToken: String?
 }
 private struct ConnectionList: Decodable { let connections: [RelayConnection] }
 private struct DeletedCount: Decodable { let deleted: Int }

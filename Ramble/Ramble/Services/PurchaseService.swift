@@ -4,7 +4,7 @@
 //
 //  The one-time unlock (specs/purchase.md). The relay decides who is unlocked;
 //  this service gets Apple's signed records to it: the unlock purchase, an
-//  early buyer's app purchase record, or an active subscriber's transaction.
+//  early buyer's app purchase record, or a record of the old subscription.
 //  Unlock transactions are finished only after the relay accepted them (or
 //  rejected them for good), so a purchase the relay never heard about is
 //  delivered again on the next launch.
@@ -58,9 +58,7 @@ enum PurchaseCopy {
     static let pending = "Waiting for approval. Your notes are kept and will transcribe once it's approved."
     static let finishing = "Purchase complete. Finishing setup. Your notes will transcribe shortly."
     static let nothingToRestore = "No purchase found for this Apple ID."
-    static let tooManyInboxes = "This purchase is in use on 5 iPhones. Each fresh start after a reinstall counts as one. A spot opens when one of them goes 90 days without sending a note."
-    // Not worded in the spec: a first purchase made for another inbox.
-    static let wrongAccount = "This purchase belongs to another Ramble setup. Contact support@ramble.watch for help."
+    static let tooManyInboxes = "This purchase is in use on 10 iPhones. Each fresh start after a reinstall counts as one. Contact support@ramble.watch to add more."
     static let earlyBuyerTitle = "You're all set."
     static let earlyBuyerBody = "You bought Ramble early, so every note transcribes. No unlock needed."
     static let subscriberTitle = "Cloud transcription is now included for everyone."
@@ -94,9 +92,10 @@ final class PurchaseService: ObservableObject {
     @Published private(set) var showEarlyBuyerNotice = false
 
     private enum Keys {
-        static let checkedAccountTokens = "purchase.checkedAccountTokens"
+        /// This inbox has had the Apple ID's proofs checked. Cleared when a new
+        /// inbox is created.
+        static let proofsChecked = "purchase.proofsChecked"
         static let retryProofs = "purchase.retryProofs"
-        static let earlyBuyerProofSent = "purchase.earlyBuyerProofSent"
         static let earlyBuyerNoticeShown = "purchase.earlyBuyerNoticeShown"
         static let subscriberNoticeDismissed = "purchase.subscriberNoticeDismissed"
     }
@@ -115,13 +114,12 @@ final class PurchaseService: ObservableObject {
     }
 
     /// 403 reasons that won't change by sending the same record again.
-    private static let finalReasons: Set<String> = ["invalid_transaction", "wrong_account", "too_many_inboxes"]
+    private static let finalReasons: Set<String> = ["invalid_transaction", "too_many_inboxes"]
 
     private let defaults = UserDefaults.standard
     private var started = false
     private var isChecking = false
     private var updatesTask: Task<Void, Never>?
-    private var retryTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
 
     private init() {}
@@ -182,18 +180,9 @@ final class PurchaseService: ObservableObject {
 
         state = .purchasing
 
-        if AccountService.shared.account?.accountToken == nil {
-            await AccountService.shared.refresh()
-        }
-        guard let token = AccountService.shared.account?.accountToken,
-              let accountToken = UUID(uuidString: token) else {
-            state = .failed(PurchaseCopy.failed)
-            return
-        }
-
         let result: Product.PurchaseResult
         do {
-            result = try await product.purchase(options: [.appAccountToken(accountToken)])
+            result = try await product.purchase()
         } catch {
             state = Self.isUserCancelled(error) ? .idle : .failed(PurchaseCopy.failed)
             return
@@ -212,7 +201,6 @@ final class PurchaseService: ObservableObject {
                 state = .failed(Self.copy(forReason: reason, restoring: false))
             case .retryLater:
                 state = .finishing
-                scheduleRetry()
             }
         case .userCancelled:
             state = .idle
@@ -264,7 +252,6 @@ final class PurchaseService: ObservableObject {
             markProofsChecked()
             if !unfinishedClear {
                 state = .finishing
-                scheduleRetry()
             } else if storeUnreachable {
                 state = .failed(PurchaseCopy.storeUnreachable)
             } else {
@@ -273,7 +260,6 @@ final class PurchaseService: ObservableObject {
         case .retryLater:
             defaults.set(true, forKey: Keys.retryProofs)
             state = .finishing
-            scheduleRetry()
         }
 
         await refreshSubscriptionStatus()
@@ -290,21 +276,10 @@ final class PurchaseService: ObservableObject {
 
     // MARK: - Inbox creation
 
-    /// Proof to include in POST /inboxes when the phone creates an inbox (buyer
-    /// on a new iPhone). Returns ["signed_transaction": jws] or
-    /// ["app_transaction": jws] or nil.
-    func inboxCreationProof() async -> [String: String]? {
-        if let jws = await currentUnlockJWS(skipXcode: true) {
-            return ["signed_transaction": jws]
-        }
-        if let subscription = await activeSubscription(), !subscription.isXcode {
-            return ["signed_transaction": subscription.jws]
-        }
-        if let jws = await appTransactionJWS() {
-            defaults.set(true, forKey: Keys.earlyBuyerProofSent)
-            return ["app_transaction": jws]
-        }
-        return nil
+    /// A new inbox starts free: check the Apple ID's proofs for it on the next
+    /// account change (a buyer on a new iPhone is unlocked without a tap).
+    func inboxCreated() {
+        defaults.set(false, forKey: Keys.proofsChecked)
     }
 
     // MARK: - Subscriber notice
@@ -340,11 +315,6 @@ final class PurchaseService: ObservableObject {
     // MARK: - Events
 
     private func accountDidChange(_ account: RelayAccount) async {
-        if defaults.bool(forKey: Keys.earlyBuyerProofSent) {
-            // First account after creating the inbox with an app purchase record.
-            defaults.set(false, forKey: Keys.earlyBuyerProofSent)
-            if account.unlocked { presentEarlyBuyerNotice() }
-        }
         updateSubscriberNotice(unlocked: account.unlocked)
         await runBackgroundCheck()
     }
@@ -380,39 +350,30 @@ final class PurchaseService: ObservableObject {
             if Self.isWaiting(state) { state = .failed(Self.copy(forReason: reason, restoring: false)) }
         case .retryLater:
             if state == .pending { state = .finishing }
-            scheduleRetry()
         }
     }
 
     // MARK: - Confirming with the relay
 
+    /// Unfinished unlock transactions, then (once per inbox, or until a retry
+    /// succeeds) the Apple ID's proofs. Runs at launch, on each account change
+    /// and on each return to the foreground; there is no timer of its own.
     private func runBackgroundCheck() async {
         guard !isChecking else { return }
         isChecking = true
         defer { isChecking = false }
 
-        if !(await confirmPendingWork()) {
-            scheduleRetry()
-        }
-    }
+        _ = await confirmUnfinished()
 
-    /// Unfinished unlock transactions, then (once per inbox, or until a retry
-    /// succeeds) the Apple ID's proofs. Returns true when nothing is left to retry.
-    private func confirmPendingWork() async -> Bool {
-        var clear = await confirmUnfinished()
-
-        guard let account = AccountService.shared.account,
-              !account.unlocked,
-              let token = account.accountToken else {
+        guard let account = AccountService.shared.account, !account.unlocked else {
             if AccountService.shared.account?.unlocked == true {
                 defaults.set(false, forKey: Keys.retryProofs)
             }
-            return clear
+            return
         }
 
-        let checked = defaults.stringArray(forKey: Keys.checkedAccountTokens) ?? []
-        let due = defaults.bool(forKey: Keys.retryProofs) || !checked.contains(token)
-        guard due else { return clear }
+        let due = defaults.bool(forKey: Keys.retryProofs) || !defaults.bool(forKey: Keys.proofsChecked)
+        guard due else { return }
 
         switch await submitProofs() {
         case .unlocked:
@@ -425,9 +386,7 @@ final class PurchaseService: ObservableObject {
             markProofsChecked()
         case .retryLater:
             defaults.set(true, forKey: Keys.retryProofs)
-            clear = false
         }
-        return clear
     }
 
     /// Sends every unfinished unlock transaction. Returns false if any must be retried.
@@ -468,15 +427,15 @@ final class PurchaseService: ObservableObject {
         return outcome
     }
 
-    /// Unlock purchase, then active subscription, then app purchase record.
+    /// Unlock purchase, then old subscription, then app purchase record.
     private func submitProofs() async -> ProofOutcome {
         let wasUnlocked = AccountService.shared.account?.unlocked == true
 
         var proofs: [(body: [String: String], isAppTransaction: Bool)] = []
-        if let jws = await currentUnlockJWS(skipXcode: false) {
+        if let jws = await currentUnlockJWS() {
             proofs.append((body: ["signed_transaction": jws], isAppTransaction: false))
         }
-        if let subscription = await activeSubscription() {
+        if let subscription = await legacySubscription() {
             proofs.append((body: ["signed_transaction": subscription.jws], isAppTransaction: false))
         }
         if let jws = await appTransactionJWS() {
@@ -521,73 +480,35 @@ final class PurchaseService: ObservableObject {
 
     private func markProofsChecked() {
         defaults.set(false, forKey: Keys.retryProofs)
-        guard let token = AccountService.shared.account?.accountToken else { return }
-        var checked = defaults.stringArray(forKey: Keys.checkedAccountTokens) ?? []
-        if !checked.contains(token) {
-            checked.append(token)
-            defaults.set(checked, forKey: Keys.checkedAccountTokens)
-        }
-    }
-
-    /// Keeps trying while the app runs: 15s, 30s, 60s ... up to 5 minutes.
-    /// Each launch and each return to the foreground also tries again.
-    private func scheduleRetry() {
-        guard retryTask == nil else { return }
-        retryTask = Task { [weak self] in
-            var delay: Double = 15
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(delay))
-                guard let self else { return }
-                if self.isChecking {
-                    delay = min(delay * 2, 300)
-                    continue
-                }
-                self.isChecking = true
-                let clear = await self.confirmPendingWork()
-                self.isChecking = false
-                if clear { break }
-                delay = min(delay * 2, 300)
-            }
-            self?.retryTask = nil
-        }
+        defaults.set(true, forKey: Keys.proofsChecked)
     }
 
     // MARK: - Records on this Apple ID
 
-    private func currentUnlockJWS(skipXcode: Bool) async -> String? {
+    private func currentUnlockJWS() async -> String? {
         for await result in StoreKit.Transaction.currentEntitlements {
             guard case .verified(let transaction) = result,
                   transaction.productID == Self.unlockProductId,
                   transaction.revocationDate == nil,
                   transaction.ownershipType == .purchased else { continue }
-            if skipXcode && transaction.environment == .xcode { continue }
             return result.jwsRepresentation
         }
         return nil
     }
 
-    /// The old subscription while active or in its grace period.
-    private func activeSubscription() async -> (jws: String, willRenew: Bool, isXcode: Bool)? {
-        for await result in StoreKit.Transaction.currentEntitlements {
-            guard case .verified(let transaction) = result,
-                  transaction.productID == Self.legacySubscriptionProductId,
-                  transaction.revocationDate == nil else { continue }
-
-            var willRenew = false
-            if let groupID = transaction.subscriptionGroupID,
-               let statuses = try? await Product.SubscriptionInfo.status(for: groupID) {
-                for status in statuses {
-                    guard status.state == .subscribed
-                            || status.state == .inGracePeriod
-                            || status.state == .inBillingRetryPeriod else { continue }
-                    if case .verified(let renewal) = status.renewalInfo, renewal.willAutoRenew {
-                        willRenew = true
-                    }
-                }
-            }
-            return (result.jwsRepresentation, willRenew, transaction.environment == .xcode)
+    /// The latest record of the old subscription, active or lapsed: any real
+    /// one is early-subscriber proof. `willRenew` is whether Apple still bills it.
+    private func legacySubscription() async -> (jws: String, willRenew: Bool)? {
+        guard let result = await StoreKit.Transaction.latest(for: Self.legacySubscriptionProductId),
+              case .verified(let transaction) = result,
+              transaction.revocationDate == nil else { return nil }
+        var willRenew = false
+        if let status = await transaction.subscriptionStatus,
+           status.state != .expired,
+           case .verified(let renewal) = status.renewalInfo {
+            willRenew = renewal.willAutoRenew
         }
-        return nil
+        return (result.jwsRepresentation, willRenew)
     }
 
     private func appTransactionJWS() async -> String? {
@@ -598,7 +519,7 @@ final class PurchaseService: ObservableObject {
     }
 
     private func refreshSubscriptionStatus() async {
-        subscriptionStillRenews = await activeSubscription()?.willRenew ?? false
+        subscriptionStillRenews = await legacySubscription()?.willRenew ?? false
         updateSubscriberNotice(unlocked: AccountService.shared.account?.unlocked == true)
     }
 
@@ -629,8 +550,7 @@ final class PurchaseService: ObservableObject {
     /// The most useful rejection to show when several proofs were refused.
     private static func rank(_ reason: String) -> Int {
         switch reason {
-        case "too_many_inboxes": return 3
-        case "wrong_account": return 2
+        case "too_many_inboxes": return 2
         default: return 1
         }
     }
@@ -638,7 +558,6 @@ final class PurchaseService: ObservableObject {
     private static func copy(forReason reason: String, restoring: Bool) -> String {
         switch reason {
         case "too_many_inboxes": return PurchaseCopy.tooManyInboxes
-        case "wrong_account": return PurchaseCopy.wrongAccount
         default: return restoring ? PurchaseCopy.nothingToRestore : PurchaseCopy.failed
         }
     }

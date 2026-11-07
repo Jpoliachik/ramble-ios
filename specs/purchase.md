@@ -13,12 +13,6 @@ Ramble SHALL transcribe the first 25 notes from an inbox for free, counted on th
 - WHEN the device uploads the same note again
 - THEN the server treats it as the same note and the free count does not change
 
-#### Scenario: Watch and iPhone race for the last free note
-- GIVEN an inbox with 1 free note left
-- WHEN the watch and the iPhone each upload a different note at the same moment
-- THEN exactly one note is accepted
-- AND the other is refused with nothing kept or counted on the server, and is held on its device
-
 ### Requirement: Free note refunded only on permanent failure
 The server SHALL give back a free note when that note's transcription permanently fails ("Couldn't transcribe", transcription.md). A note that transcribes as "No speech detected" SHALL use a free note like any other. A hand retry of a failed note (transcription.md) SHALL count like the original note: before unlock it takes a free note when accepted, is held with "free_notes_used" when none are left, and gets it back if it fails permanently again; after unlock it uses no free note.
 
@@ -146,11 +140,6 @@ The app SHALL show the person the outcome of every purchase attempt, and no outc
 - WHEN the App Store reports the purchase failed
 - THEN the sheet shows "Purchase didn't go through. Try again." and held notes stay held
 
-#### Scenario: Purchase belongs to another setup
-- GIVEN the server refuses the purchase as made for another inbox
-- WHEN the sheet gets the answer
-- THEN it shows "This purchase belongs to another Ramble setup. Contact support@ramble.watch for help." and held notes stay held
-
 #### Scenario: Pending or Ask to Buy
 - GIVEN an account whose purchase needs approval, or a pending payment
 - WHEN the purchase is submitted
@@ -165,10 +154,10 @@ The app SHALL show the person the outcome of every purchase attempt, and no outc
 - GIVEN the App Store purchase succeeded
 - WHEN the app cannot confirm it with the server
 - THEN the sheet shows "Purchase complete. Finishing setup. Your notes will transcribe shortly."
-- AND the app retries confirming each time it opens or comes online until the server confirms
+- AND the app retries confirming each time it launches or returns to the foreground, and when Apple redelivers the purchase, until the server confirms; it runs no retry timer of its own
 
 ### Requirement: Restore Purchases
-"Restore Purchases" SHALL be in Settings and on the unlock sheet, and SHALL confirm the Apple ID's unlock (or early-buyer proof) with the server for the current inbox. On first launch the app SHALL do the same on its own when the Apple ID already holds a purchase.
+"Restore Purchases" SHALL be in Settings and on the unlock sheet, and SHALL confirm the Apple ID's unlock (or early-buyer proof) with the server for the current inbox. Once each new inbox exists, the app SHALL do the same on its own when the Apple ID already holds a purchase. Every inbox SHALL start free; a purchase reaches it only this way.
 
 #### Scenario: New iPhone
 - GIVEN a person who bought the unlock on another iPhone
@@ -190,23 +179,18 @@ The unlock SHALL live on the server, attached to inboxes. The iPhone SHALL send 
 - WHEN it is sent to the server
 - THEN the server rejects it and the inbox stays locked
 
-### Requirement: Purchase bound to inboxes, at most 5
-A first purchase SHALL carry the account token the server gave the inbox it was bought from. A restore MAY come from a different inbox, including a fresh inbox after a reinstall, and counts toward the cap. One purchase SHALL unlock at most 5 inboxes, counting every inbox it was bound to or that uploaded a note in the last 90 days (a newly bound inbox counts at once, before it uploads anything), keyed on the purchase's original transaction (or the app purchase record for early buyers).
+### Requirement: Purchase bound to inboxes, at most 10
+A purchase MAY be sent from any inbox, including a fresh inbox after a reinstall; each inbox it unlocks is bound to it for good. One purchase SHALL unlock at most 10 inboxes ever, keyed on the purchase's original transaction (or the app purchase record for early buyers). Time SHALL free no spot. The operator MAY raise one purchase's cap by hand with one database command (proxy/README.md).
 
-#### Scenario: First purchase from the wrong inbox
-- GIVEN a first purchase whose account token does not match the inbox sending it
-- WHEN it is sent to the server
-- THEN the server rejects it
+#### Scenario: Eleventh iPhone
+- GIVEN a purchase bound to 10 inboxes, however long ago
+- WHEN it is restored on an eleventh inbox
+- THEN the server refuses, and the app shows "This purchase is in use on 10 iPhones. Each fresh start after a reinstall counts as one. Contact support@ramble.watch to add more."
 
-#### Scenario: Sixth iPhone
-- GIVEN a purchase bound to 5 inboxes in the last 90 days
-- WHEN it is restored on a sixth inbox
-- THEN the server refuses, and the app shows "This purchase is in use on 5 iPhones. Each fresh start after a reinstall counts as one. A spot opens when one of them goes 90 days without sending a note."
-
-#### Scenario: Binding fresh inboxes before they upload
-- GIVEN a purchase bound to 5 fresh inboxes in the last hour, none of which has uploaded
-- WHEN it is sent from a sixth inbox
-- THEN the server refuses it the same way
+#### Scenario: Operator raises the cap
+- GIVEN that refused purchase
+- WHEN the operator raises its cap to 11 and the person taps "Restore Purchases" on the eleventh inbox
+- THEN the inbox is unlocked
 
 ### Requirement: Refunds remove the unlock
 When Apple reports a refund or revocation through its server notifications (endpoint in relay-api.md), the server SHALL remove the unlock from every inbox bound to that purchase and SHALL reject that purchase record from then on. Each inbox SHALL return to the free state with its used free-note count unchanged (notes accepted while unlocked never use free notes). Notes accepted before the refund SHALL still be transcribed, and transcripts already made stay.
@@ -223,7 +207,7 @@ When Apple reports a refund or revocation through its server notifications (endp
 - THEN the inbox has 22 free notes left
 
 ### Requirement: Sandbox purchases unlock like real ones
-TestFlight testers and App Review buy with sandbox purchases against the production server. The server SHALL verify a sandbox unlock purchase against Apple's root CA like any other and unlock the inbox for good, with the same binding, 5-inbox cap and heavy-use monitoring. A sandbox unlock SHALL NOT count in revenue or purchase counts. Records from Xcode testing SHALL be rejected, and the production server SHALL accept no developer bypass key. Early-buyer proof (below) SHALL count only when Apple marks the record as Production.
+TestFlight testers and App Review buy with sandbox purchases against the production server. The server SHALL verify a sandbox unlock purchase against Apple's root CA like any other and unlock the inbox for good, with the same binding, inbox cap and heavy-use monitoring. A sandbox unlock SHALL NOT count in revenue or purchase counts. Records from Xcode testing SHALL be rejected, and the production server SHALL accept no developer bypass key. Early-buyer proof (below) SHALL count only when Apple marks the record as Production.
 
 #### Scenario: TestFlight tester buys the unlock
 - GIVEN a TestFlight build with 0 free notes left
@@ -293,7 +277,7 @@ The website SHALL have a page at https://ramble.watch/support that shows support
 The first free build is the first build that offers free notes; its build number is FIRST_FREE_BUILD, set at release. A person's "first free-notes launch" is the first time they open a build at or above it.
 
 ### Requirement: Paid-download buyers are unlocked
-A person whose first download of Ramble was a build below FIRST_FREE_BUILD SHALL be treated as unlocked, proved by Apple's signed app purchase record from the Production environment. The server SHALL read its original app version as a whole number and compare it numerically with FIRST_FREE_BUILD; a value that is not a whole number SHALL NOT count. Build numbers SHALL stay one increasing whole number shared by the iPhone and watch targets, never reset. The app SHALL send it on its own at first launch and on "Restore Purchases". The 5-inbox cap and heavy-use monitoring apply.
+A person whose first download of Ramble was a build below FIRST_FREE_BUILD SHALL be treated as unlocked, proved by Apple's signed app purchase record from the Production environment. The server SHALL read its original app version as a whole number and compare it numerically with FIRST_FREE_BUILD; a value that is not a whole number SHALL NOT count. Build numbers SHALL stay one increasing whole number shared by the iPhone and watch targets, never reset. The app SHALL send it on its own at first launch and on "Restore Purchases". The inbox cap and heavy-use monitoring apply.
 
 #### Scenario: Paid buyer's first free-notes launch
 - GIVEN a person who bought Ramble for $4.99
@@ -301,13 +285,18 @@ A person whose first download of Ramble was a build below FIRST_FREE_BUILD SHALL
 - THEN the inbox is unlocked with no purchase
 - AND the app shows once: "You're all set. You bought Ramble early, so every note transcribes. No unlock needed."
 
-### Requirement: Active subscribers are unlocked
-A person whose monthly cloud subscription was active when the first free build was released SHALL be treated as unlocked permanently. The server SHALL decide this from the signed subscription transaction alone: its original purchase date is before FREE_RELEASE_AT (the first free build's release time, set at release) and its expiry date is after it. A subscription that lapsed before release SHALL NOT unlock. The subscription product SHALL be accepted only as this proof, and SHALL be removed from sale on release day.
+### Requirement: Subscribers are unlocked
+A person who ever subscribed to the old monthly cloud subscription SHALL be treated as unlocked permanently, whether the subscription is still active or lapsed. The server SHALL decide this from the signed subscription transaction alone: any record of that product from the Production environment that was not refunded or revoked counts. The subscription product SHALL be accepted only as this proof, and SHALL be removed from sale on release day.
 
 #### Scenario: Lapsed subscriber
 - GIVEN a person whose subscription ended months earlier
 - WHEN they reach their first free-notes launch
-- THEN they get the 25 free notes like everyone else
+- THEN the inbox is unlocked with no purchase
+
+#### Scenario: Sandbox subscription
+- GIVEN a subscription record from the sandbox
+- WHEN the app sends it
+- THEN the server rejects it with reason "invalid_transaction"
 
 ### Requirement: Subscribers are told how to stop billing
 Apple keeps billing a subscription until the person cancels it. While an unlocked subscriber's subscription is still set to renew, the app SHALL show a one-time notice and keep a row in Settings, until it no longer renews.

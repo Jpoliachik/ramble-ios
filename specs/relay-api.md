@@ -72,30 +72,20 @@ Every error SHALL be `{"error": "<sentence>"}`, plus `"reason": "<code>"` wherev
 - THEN the response is `409` and the stored key is unchanged
 
 ### Requirement: Creating an inbox
-`POST /inboxes` SHALL require `X-App-Attest-Key-Id` and `X-App-Attest` (an assertion over the exact body, which may be empty) and return `201 {"inbox_secret": "rmbi_…", "account_token": "<UUID>"}`. A missing assertion gets `403` "App attestation required"; a failing one, or one reusing a counter, `403` "App attestation failed". After that only the inbox secret is checked. A local development relay, and never production, SHALL also accept its configured developer key in `X-Dev-Bypass` in place of the assertion, on this endpoint only. A phone that still holds its inbox secret after a reinstall SHALL keep using that inbox. The daily inbox cap and the free-tier breaker SHALL NOT apply to a request whose body carries a verified purchase or early-buyer proof (`{"signed_transaction"}` or `{"app_transaction"}`, checked as in "Submitting a purchase") that binds to the new inbox; that inbox is created already bound and unlocked. A proof that verifies but cannot bind (a first-time unlock bought for another inbox, a purchase already on 5 iPhones, a revoked purchase) SHALL get a normal free inbox, under the cap and the breaker like any other request.
+`POST /inboxes` SHALL require `X-App-Attest-Key-Id` and `X-App-Attest` (an assertion over the exact body, which may be empty) and return `201 {"inbox_secret": "rmbi_…"}`. A missing assertion gets `403` "App attestation required"; a failing one, or one reusing a counter, `403` "App attestation failed". After that only the inbox secret is checked. A local development relay, and never production, SHALL also accept its configured developer key in `X-Dev-Bypass` in place of the assertion, on this endpoint only. A phone that still holds its inbox secret after a reinstall SHALL keep using that inbox. Every new inbox SHALL start locked with 25 free notes, whatever the body carries; a purchase is bound afterwards with `POST /entitlement`. There SHALL be no daily cap on inboxes overall, only the per-key and per-address limits ("Rate limits").
 
-#### Scenario: Daily inbox cap reached
-- GIVEN 2,000 inboxes were created this UTC day, or the free-tier audio-hours breaker has tripped ([transcription.md](transcription.md))
-- WHEN a phone creates an inbox
-- THEN the response is `503` with `"reason": "unavailable"`, no inbox is made, and the operator is alerted
-
-#### Scenario: A buyer on a new iPhone during the cap
-- GIVEN the daily inbox cap is reached
-- WHEN a phone creates an inbox with a verified purchase in the body
-- THEN the inbox is created, bound to that purchase and unlocked
-
-#### Scenario: A proof that can't bind during the cap
-- GIVEN the daily inbox cap is reached
-- WHEN a phone creates an inbox with a verified unlock purchase made for another inbox
-- THEN the response is `503` with `"reason": "unavailable"` and no inbox is made
+#### Scenario: A body never unlocks
+- GIVEN a valid assertion over a body holding a verified unlock purchase
+- WHEN a phone creates an inbox with it
+- THEN the response is `201` and `GET /account` reads `"unlocked": false, "free_notes_remaining": 25`
 
 ### Requirement: Account state
-`GET /account` SHALL return `{"unlocked", "free_notes_total": 25, "free_notes_remaining"}`, plus `"account_token"` for the phone. It SHALL NOT report usage or a suspension. Meaning: [purchase.md](purchase.md).
+`GET /account` SHALL return `{"unlocked", "free_notes_total": 25, "free_notes_remaining"}`, the same for the phone and the watch. It SHALL NOT report usage or a suspension. Meaning: [purchase.md](purchase.md).
 
 #### Scenario: Unlocked inbox
 - GIVEN an unlocked inbox whose purchase transcribed 141 hours this month
 - WHEN the phone reads `GET /account`
-- THEN the body is `{"unlocked": true, "free_notes_total": 25, "free_notes_remaining": 25, "account_token": "…"}`, with no usage in it
+- THEN the body is `{"unlocked": true, "free_notes_total": 25, "free_notes_remaining": 25}`, with no usage in it
 
 ### Requirement: Submitting a purchase
 `POST /entitlement` with `{"signed_transaction": "<JWS>"}` or, for early buyers, `{"app_transaction": "<JWS>"}` SHALL return `200` with the `GET /account` body once the record is verified: signature chained to Apple's root CA, bundle ID `dev.goodloop.Ramble`, not revoked or refunded, not from Xcode testing. A Sandbox unlock purchase (TestFlight, App Review) unlocks like a Production one, and a Sandbox app transaction is never early-buyer proof ([purchase.md](purchase.md)). A transaction SHALL be for the unlock product; `dev.goodloop.ramble.premium.monthly2` is accepted only as early-buyer proof ([purchase.md](purchase.md)). Re-sending a bound record SHALL return `200` and change nothing.
@@ -106,16 +96,11 @@ Every error SHALL be `{"error": "<sentence>"}`, plus `"reason": "<code>"` wherev
 - THEN the response is `403` with `"reason": "invalid_transaction"` and the inbox stays locked
 
 ### Requirement: Purchases are bound to inboxes
-A first-time unlock purchase SHALL be accepted only when its app account token equals this inbox's `account_token`; a restored purchase may carry another inbox's token. A purchase SHALL unlock at most 5 inboxes, counting every inbox it was bound to or that uploaded a note in the last 90 days, keyed on the original transaction ID (or the app transaction ID for early buyers). Family-shared purchases SHALL NOT unlock.
+Any inbox MAY submit a purchase, whichever inbox it was bought from. A purchase SHALL unlock at most 10 inboxes ever (or the higher cap the operator set on it), keyed on the original transaction ID (or the app transaction ID for early buyers); a binding is never released. Family-shared purchases SHALL NOT unlock.
 
-#### Scenario: Purchase made for another inbox
-- GIVEN a first-time purchase whose account token belongs to inbox A
-- WHEN inbox B submits it as its own purchase
-- THEN the response is `403` with `"reason": "wrong_account"`
-
-#### Scenario: Sixth active inbox
-- GIVEN one purchase bound to 5 inboxes in the last 90 days, whether or not they uploaded
-- WHEN a sixth inbox submits it
+#### Scenario: Eleventh inbox
+- GIVEN one purchase bound to 10 inboxes, whether or not they still upload
+- WHEN an eleventh inbox submits it
 - THEN the response is `403` with `"reason": "too_many_inboxes"`
 
 ### Requirement: Apple refund notifications
@@ -343,7 +328,7 @@ Over these limits the relay SHALL answer `429` with `{"reason": "rate_limited"}`
 | What | Limit |
 |---|---|
 | `POST /attest/challenge`; `POST /attest` | 20 per hour; 5 key registrations per day; per network address |
-| `POST /inboxes` | 3 per day per App Attest key, 20 per hour per network address; 2,000 per UTC day overall (then `503`, above) |
+| `POST /inboxes` | 3 per day per App Attest key, 20 per hour per network address |
 | `POST /pair/code` | 10 per hour per inbox |
 | `POST /pair/exchange` | 100 failed attempts per hour per network address |
 | `PUT /notes/:id` | 120 per hour and 500 per day per inbox, phone and watch together; repeats don't count, retries do |

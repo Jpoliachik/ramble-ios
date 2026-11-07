@@ -64,12 +64,11 @@ function decode(record) {
 export const UNLOCK = 'dev.goodloop.ramble.unlock';
 export const PREMIUM = 'dev.goodloop.ramble.premium.monthly2';
 
-export function unlockTx(accountToken, extra = {}) {
+export function unlockTx(extra = {}) {
   return jws({
     productId: UNLOCK,
     transactionId: 't1',
     originalTransactionId: 'otx1',
-    appAccountToken: accountToken,
     environment: 'Production',
     inAppOwnershipType: 'PURCHASED',
     ...extra,

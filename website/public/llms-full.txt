@@ -406,7 +406,7 @@ Human-readable version: https://ramble.watch/docs/help
 ## Purchase
 
 - **Bought on another iPhone.** Open Ramble with the same Apple ID and it unlocks on its own; otherwise tap Restore Purchases in Settings.
-- **"This purchase is in use on 5 iPhones."** One purchase works on up to 5 iPhones; each fresh start after a reinstall counts as one. A spot opens when one goes 90 days without sending a note.
+- **"This purchase is in use on 10 iPhones."** One purchase works on up to 10 iPhones; each fresh start after a reinstall counts as one. Email support@ramble.watch to add more.
 - **Refunds.** Apple handles them at https://reportaproblem.apple.com.
 
 ## Your agent

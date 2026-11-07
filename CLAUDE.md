@@ -137,7 +137,7 @@ WatchConnectivity now carries only the watch token and account state (phone → 
 
 - `Recording` (phone) — a note: id, createdAt, duration, source, audio, server status and result, transcript, delivery and webhook state
 - `WatchNote` (watch) — a watch note: upload state, holds, server status, first line, audio kept until safe
-- `RelayAccount` — `GET /account`: unlocked, free notes, account token
+- `RelayAccount` — `GET /account`: unlocked, free notes
 - `WebhookJob` — webhook delivery job with retry
 
 ### Tech Stack
