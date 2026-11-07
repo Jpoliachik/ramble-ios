@@ -19,6 +19,7 @@ enum HomeStatus: Equatable {
     case sending(count: Int)
     case transcribing(count: Int)
     case waiting(count: Int)
+    case checking
     case allGood(lastCheckIn: Date?)
 
     /// Notes waiting longer than this raise a pill.
@@ -65,6 +66,8 @@ enum HomeStatus: Equatable {
 
         if !waiting.isEmpty { return .waiting(count: waiting.count) }
 
+        if count(.checkingDelivery) > 0 { return .checking }
+
         return .allGood(lastCheckIn: hasAgent ? lastCheckIn : nil)
     }
 
@@ -72,7 +75,7 @@ enum HomeStatus: Equatable {
     var isPill: Bool {
         switch self {
         case .didntSend, .toUnlock, .noAgent, .freeNotesLow, .agentQuiet, .waitingLong: return true
-        case .sending, .transcribing, .waiting, .allGood: return false
+        case .sending, .transcribing, .waiting, .checking, .allGood: return false
         }
     }
 }
@@ -96,7 +99,7 @@ struct HomeStatusLine: View {
             } else {
                 HStack(spacing: 7) {
                     switch status {
-                    case .sending, .transcribing:
+                    case .sending, .transcribing, .checking:
                         ProgressView().controlSize(.mini)
                     default:
                         Circle().fill(dot).frame(width: 8, height: 8)
@@ -139,6 +142,8 @@ struct HomeStatusLine: View {
             return count == 1 ? "Transcribing 1 note…" : "Transcribing \(count) notes…"
         case .waiting(let count):
             return "\(count) waiting for your agent"
+        case .checking:
+            return "Checking delivery…"
         case .allGood(let lastCheckIn):
             if isEmptyList {
                 return hasAgent ? "Your agent is connected" : "Sending to your webhook"
@@ -167,7 +172,7 @@ struct HomeStatusLine: View {
         switch status {
         case .didntSend: return .red
         case .toUnlock, .noAgent, .freeNotesLow, .agentQuiet, .waitingLong, .waiting: return .brandAmber
-        case .sending, .transcribing, .allGood: return .green
+        case .sending, .transcribing, .checking, .allGood: return .green
         }
     }
 

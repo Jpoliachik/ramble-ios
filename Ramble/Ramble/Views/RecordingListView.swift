@@ -41,6 +41,9 @@ struct RecordingListView: View {
                 }
             }
             .listStyle(.insetGrouped)
+            .refreshable {
+                await BackgroundTaskService.shared.refresh()
+            }
             .onScrollGeometryChange(for: CGFloat.self) { geometry in
                 geometry.contentOffset.y + geometry.contentInsets.top
             } action: { _, newValue in

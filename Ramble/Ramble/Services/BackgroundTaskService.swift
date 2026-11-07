@@ -135,6 +135,12 @@ final class BackgroundTaskService {
         Task { await runOnce(appOpened: true) }
     }
 
+    /// Pull to refresh on Home: same as opening Ramble.
+    @MainActor
+    func refresh() async {
+        await runOnce(appOpened: true)
+    }
+
     @MainActor
     private func endImmediateBackgroundProcessing() {
         guard backgroundTaskID != .invalid else { return }

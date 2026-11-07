@@ -23,6 +23,7 @@ final class NoteSyncService: ObservableObject {
 
     @Published private(set) var isSyncing = false
     private var syncAgain = false
+    private var isRefreshingDelivery = false
     private var pollTask: Task<Void, Never>?
 
     private let storage = StorageService.shared
@@ -58,19 +59,46 @@ final class NoteSyncService: ObservableObject {
         } while syncAgain
     }
 
-    /// While Ramble is on screen and a note is transcribing, check every 10
-    /// seconds so the transcript shows soon after it's ready.
+    /// While Ramble is on screen: a full check-in every 10 seconds while a
+    /// note is transcribing, so the transcript shows soon after it's ready.
+    /// Otherwise, while a note's pickup is waiting or not yet known, ask the
+    /// relay about pickup every 10 seconds for notes under 10 minutes old
+    /// and every minute after that, so "Waiting for your agent" clears soon
+    /// after the agent picks the note up.
     func startForegroundPolling() {
         pollTask?.cancel()
         pollTask = Task { [weak self] in
+            var tick = 0
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 10_000_000_000)
+                tick += 1
                 guard !Task.isCancelled, let self else { return }
-                guard UIApplication.shared.applicationState == .active else { continue }
-                let transcribing = self.storage.loadRecordings().contains { $0.status == .transcribing && $0.hold == nil }
-                if transcribing { await self.checkIn() }
+                guard UIApplication.shared.applicationState == .active, !self.isSyncing else { continue }
+                let recordings = self.storage.loadRecordings()
+                if recordings.contains(where: { $0.status == .transcribing && $0.hold == nil }) {
+                    await self.checkIn()
+                    continue
+                }
+                let pending = Self.deliveryCandidates(recordings)
+                guard let newest = pending.map(\.waitingSince).max() else { continue }
+                let recent = Date().timeIntervalSince(newest) < Self.fastDeliveryPoll
+                if recent || tick % 6 == 0 {
+                    await self.refreshDeliveryNow()
+                }
             }
         }
+    }
+
+    /// Notes this new get their pickup checked every 10 seconds on screen.
+    private static let fastDeliveryPoll: TimeInterval = 10 * 60
+
+    /// Pickup only, between full check-ins.
+    private func refreshDeliveryNow() async {
+        guard Consent.hasConsented, !KeychainService.isLocked, relay.hasInbox,
+              !isSyncing, !isRefreshingDelivery else { return }
+        isRefreshingDelivery = true
+        defer { isRefreshingDelivery = false }
+        await refreshDelivery()
     }
 
     func stopForegroundPolling() {
@@ -176,13 +204,19 @@ final class NoteSyncService: ObservableObject {
 
     // MARK: - Delivery
 
-    private func refreshDelivery() async {
-        let cutoff = Date().addingTimeInterval(-Self.deliveryWindow)
-        let candidates = storage.loadRecordings().filter {
+    /// Notes whose pickup is still waiting or not yet known, while the relay
+    /// can still know it.
+    private static func deliveryCandidates(_ recordings: [Recording]) -> [Recording] {
+        let cutoff = Date().addingTimeInterval(-deliveryWindow)
+        return recordings.filter {
             $0.hasSpeechTranscript
                 && $0.waitingSince > cutoff
                 && ($0.agentDelivery == nil || ($0.agentDelivery?.waiting ?? 0) > 0)
         }
+    }
+
+    private func refreshDelivery() async {
+        let candidates = Self.deliveryCandidates(storage.loadRecordings())
         guard !candidates.isEmpty,
               let statuses = try? await relay.deliveryStatus(for: candidates.map(\.id)),
               !statuses.isEmpty else { return }

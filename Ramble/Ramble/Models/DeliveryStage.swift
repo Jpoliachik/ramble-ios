@@ -25,6 +25,9 @@ enum DeliveryStage: Equatable {
     case webhookSending
     case didntSend
     case waitingForAgent
+    /// An agent is connected but the phone hasn't heard from the relay
+    /// about this note yet, so it claims neither waiting nor picked up.
+    case checkingDelivery
     /// Every agent copy was removed unread.
     case notPickedUp
     case agentHasIt
@@ -35,8 +38,9 @@ enum DeliveryStage: Equatable {
         self.init(recording, hasAgents: RelayService.shared.hasConnectedAgents)
     }
 
-    /// `hasAgents` stands in for the relay's answer until the phone has
-    /// asked it about this note.
+    /// Until the relay has answered about this note, `hasAgents` decides
+    /// between "Checking delivery…" and "Saved, no agent connected"; the
+    /// phone never guesses "Waiting for your agent".
     init(_ recording: Recording, hasAgents: Bool) {
         if let hold = recording.hold {
             switch hold {
@@ -59,11 +63,12 @@ enum DeliveryStage: Equatable {
                 return
             }
             let delivery = recording.agentDelivery
-            let waiting = delivery.map { $0.waiting > 0 } ?? hasAgents
             if recording.webhookStatus == .failed {
                 self = .didntSend
-            } else if waiting {
+            } else if let delivery, delivery.waiting > 0 {
                 self = .waitingForAgent
+            } else if delivery == nil && hasAgents {
+                self = .checkingDelivery
             } else if recording.webhookStatus == .pending || recording.webhookStatus == .sending {
                 self = .webhookSending
             } else if let delivery, delivery.pickedUp > 0 {
@@ -93,6 +98,7 @@ enum DeliveryStage: Equatable {
         case .webhookSending: return "Sending to your webhook…"
         case .didntSend: return "Didn't send"
         case .waitingForAgent: return "Waiting for your agent"
+        case .checkingDelivery: return "Checking delivery…"
         case .notPickedUp: return "Not picked up"
         case .agentHasIt: return "Your agent has it"
         case .deliveredToWebhook: return "Delivered to webhook"
@@ -102,7 +108,7 @@ enum DeliveryStage: Equatable {
     /// The list row's caption, or nil when the icon says enough.
     var caption: String? {
         switch self {
-        case .webhookSending, .waitingForAgent, .agentHasIt, .deliveredToWebhook: return nil
+        case .webhookSending, .waitingForAgent, .checkingDelivery, .agentHasIt, .deliveredToWebhook: return nil
         default: return label
         }
     }
@@ -124,7 +130,7 @@ enum DeliveryStage: Equatable {
     /// The dot and icon color.
     var tint: Color {
         switch self {
-        case .waitingToSend, .waitingOnWatch, .transcribing, .webhookSending: return .secondary
+        case .waitingToSend, .waitingOnWatch, .transcribing, .webhookSending, .checkingDelivery: return .secondary
         case .heldForUnlock, .waitingForAgent: return .brandAmber
         case .tooLong, .couldntSend, .couldntTranscribe, .didntSend: return .red
         case .noSpeech, .noAgent, .notPickedUp: return Color(.tertiaryLabel)
@@ -136,7 +142,7 @@ enum DeliveryStage: Equatable {
     var systemImage: String? {
         switch self {
         case .transcribing, .webhookSending: return nil
-        case .waitingToSend, .waitingOnWatch, .noAgent, .waitingForAgent, .notPickedUp: return "tray"
+        case .waitingToSend, .waitingOnWatch, .noAgent, .waitingForAgent, .checkingDelivery, .notPickedUp: return "tray"
         case .heldForUnlock: return "lock.fill"
         case .tooLong, .couldntSend, .couldntTranscribe, .didntSend: return "exclamationmark.triangle.fill"
         case .noSpeech: return "waveform.slash"
@@ -148,7 +154,7 @@ enum DeliveryStage: Equatable {
     /// wall of color.
     var iconTint: Color {
         switch self {
-        case .waitingToSend, .waitingOnWatch: return .secondary
+        case .waitingToSend, .waitingOnWatch, .checkingDelivery: return .secondary
         case .agentHasIt, .deliveredToWebhook: return Color(.tertiaryLabel)
         default: return tint
         }

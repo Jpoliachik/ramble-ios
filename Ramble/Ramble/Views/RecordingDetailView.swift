@@ -330,7 +330,7 @@ struct RecordingDetailView: View {
             )
         case .didntSend:
             return DeliveryLine(title: "Didn't send", detail: lastWebhookFailure(recording), action: .resendWebhook)
-        case .noAgent, .webhookSending, .waitingForAgent, .notPickedUp, .deliveredToWebhook:
+        case .noAgent, .webhookSending, .waitingForAgent, .checkingDelivery, .notPickedUp, .deliveredToWebhook:
             return DeliveryLine(title: stage.label)
         }
     }

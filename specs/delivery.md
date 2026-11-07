@@ -181,7 +181,8 @@ Once a note's transcript exists, the iPhone SHALL give it exactly one of the sta
 
 | Shown | When |
 |---|---|
-| "Waiting for your agent" | at least one agent copy is still waiting, even if another agent picked up its own |
+| "Waiting for your agent" | the relay last reported at least one agent copy still waiting, even if another agent picked up its own |
+| "Checking delivery…" | an agent is connected and the relay hasn't yet reported on this note; the iPhone never guesses "Waiting for your agent" |
 | "Your agent has it" | none is waiting and at least one was picked up; shows the first pickup time |
 | "Not picked up" | copies were made and every one was removed unread (expired, deleted, or its agent disconnected) |
 | "Saved, no agent connected" | no copy was made because no eligible agent was connected |

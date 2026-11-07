@@ -231,7 +231,7 @@ struct MainView: View {
             openNewest { DeliveryStage($0) == .didntSend }
         case .toUnlock, .freeNotesLow:
             showUnlock = true
-        case .sending, .transcribing, .waiting, .allGood:
+        case .sending, .transcribing, .waiting, .checking, .allGood:
             break
         }
     }

@@ -89,7 +89,8 @@ The status line SHALL show exactly one state, the first that applies below. Pill
 | 7 | Notes not yet accepted by the server | spinner, "Sending 1 note…" / "Sending N notes…" | Quiet | — |
 | 8 | Notes transcribing | spinner, "Transcribing 1 note…" / "Transcribing N notes…" | Quiet | — |
 | 9 | Notes waiting for the agent | "N waiting for your agent" (amber) | Quiet | — |
-| 10 | Everything delivered | "All delivered · checked in 5m ago" ("just now" under a minute; "All delivered" if never); empty list: "Your agent is connected" or "Sending to your webhook" | Quiet | — |
+| 10 | Pickup not yet reported for a note | spinner, "Checking delivery…" | Quiet | — |
+| 11 | Everything delivered | "All delivered · checked in 5m ago" ("just now" under a minute; "All delivered" if never); empty list: "Your agent is connected" or "Sending to your webhook" | Quiet | — |
 
 #### Scenario: Out of free notes
 - GIVEN one phone note and one watch note are held for unlock and no webhook has failed
@@ -179,6 +180,7 @@ The list SHALL group notes by day, newest first, under "Today", "Yesterday", or 
 | Webhook sending | — | spinner |
 | Webhook gave up | "Didn't send" | warning, red |
 | Agent copies waiting | — | tray, amber |
+| Pickup not yet reported ("Checking delivery…") | — | tray, grey |
 | Every agent copy removed unread | "Not picked up" | tray, grey |
 | Picked up, or delivered to webhook | — | quiet check |
 
@@ -214,7 +216,7 @@ When the audio is on this iPhone, the note screen SHALL show a waveform player w
 - THEN the phone shows "Open Ramble on your watch to sync."
 
 ### Requirement: Delivery line
-Under the player, the note screen SHALL show one line saying where the note is. Delivery states use exactly the words in [delivery.md](delivery.md) ("Waiting for your agent", "Your agent has it" with the first pickup time, "Not picked up", "Saved, no agent connected", "Nothing to send · no speech detected", "Delivered to webhook", "Didn't send" with "Retry"). Before delivery the line reads:
+Under the player, the note screen SHALL show one line saying where the note is. Delivery states use exactly the words in [delivery.md](delivery.md) ("Waiting for your agent", "Checking delivery…", "Your agent has it" with the first pickup time, "Not picked up", "Saved, no agent connected", "Nothing to send · no speech detected", "Delivered to webhook", "Didn't send" with "Retry"). Before delivery the line reads:
 
 | State | Title | Detail | Action |
 |---|---|---|---|
@@ -259,7 +261,12 @@ The phone SHALL build each watch note from what the watch sends (details and hol
 - THEN the row shows the transcript and "Audio on watch", and the audio joins the same row when it arrives
 
 ### Requirement: When the phone checks in
-When Ramble opens or returns to the foreground, periodically in the background as often as iOS allows, and when a message from the watch wakes it, the phone SHALL fetch waiting transcripts and acknowledge each once saved, refresh the delivery state of notes with agent copies waiting, and read its account state. When the server no longer knows a note, the phone SHALL keep the last state it saw.
+When Ramble opens or returns to the foreground, when the person pulls down on the list, periodically in the background as often as iOS allows, and when a message from the watch wakes it, the phone SHALL fetch waiting transcripts and acknowledge each once saved, refresh the delivery state of notes whose agent copies are waiting or not yet reported, and read its account state. While Ramble is on screen it SHALL check in every 10 seconds while a note is transcribing, and otherwise, while any note's pickup is waiting or not yet reported, refresh delivery state every 10 seconds when the newest such note is under 10 minutes old and every minute after that. When the server no longer knows a note, the phone SHALL keep the last state it saw.
+
+#### Scenario: Agent picks up while Ramble is open
+- GIVEN Ramble is on screen and a note just turned "Waiting for your agent"
+- WHEN the agent picks it up
+- THEN within about 10 seconds the note shows as picked up, without leaving the app
 
 #### Scenario: In the background
 - GIVEN a watch note was transcribed while the phone app was closed
