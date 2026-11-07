@@ -1,7 +1,7 @@
 # Free notes and unlock
 
 ## Purpose
-How Ramble is paid for: 25 free notes, then a one-time $14.99 unlock with no subscription. Covers counting free notes, notes held when free notes run out, buying and restoring the unlock, how every device learns about it, fair use (heavy-use monitoring and suspending a user by hand), early buyers (paid download or cloud subscription), and what Ramble says about price. The wire contract (status codes, reasons, purchase and notification endpoints) is in relay-api.md; where held notes appear on screen is in watch.md and phone.md.
+How Ramble is paid for: 25 free notes, then a one-time $14.99 unlock with no subscription. Covers counting free notes, notes held when free notes run out, buying and restoring the unlock, how every device learns about it, fair use (heavy-use monitoring and suspending a user by hand), early buyers (paid download or cloud subscription), and what Ramble says about price. The wire contract (status codes, reasons, purchase endpoint) is in relay-api.md; where held notes appear on screen is in watch.md and phone.md.
 
 ## Free notes
 
@@ -209,17 +209,17 @@ A first purchase SHALL carry the account token the server gave the inbox it was 
 - THEN the server refuses it the same way
 
 ### Requirement: Refunds remove the unlock
-When Apple reports a refund or revocation through its server notifications (endpoint in relay-api.md), the server SHALL remove the unlock from every inbox bound to that purchase and SHALL reject that purchase record from then on. Each inbox SHALL return to the free state with its used free-note count unchanged (notes accepted while unlocked never use free notes). Notes accepted before the refund SHALL still be transcribed, and transcripts already made stay.
+The server SHALL refuse any purchase record Apple marks as refunded or revoked. The server does not listen for Apple's refund notifications; when the operator revokes a refunded purchase by hand (relay-api.md "Revoked purchases"), the server SHALL remove the unlock from every inbox bound to that purchase and SHALL reject that purchase record from then on. Each inbox SHALL return to the free state with its used free-note count unchanged (notes accepted while unlocked never use free notes). Notes accepted before the refund SHALL still be transcribed, and transcripts already made stay.
 
 #### Scenario: Refunded after running out
 - GIVEN an inbox that used all 25 free notes, then unlocked and sent 40 more notes
-- WHEN Apple notifies the server of a refund
+- WHEN the operator revokes the refunded purchase
 - THEN the inbox has 0 free notes left, and later uploads are refused with reason "free_notes_used" and held as "Unlock to transcribe"
 - AND the next time the app reads the account, Settings shows "0 of 25 free notes left" with "Unlock"
 
 #### Scenario: Refunded early
 - GIVEN an inbox that used 3 free notes before unlocking
-- WHEN Apple notifies the server of a refund
+- WHEN the operator revokes the refunded purchase
 - THEN the inbox has 22 free notes left
 
 ### Requirement: Sandbox purchases unlock like real ones

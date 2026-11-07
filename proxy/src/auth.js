@@ -57,22 +57,12 @@ async function lookup(value, ctx) {
 // --- Rate limits --------------------------------------------------------------
 
 // [limit, window seconds] per named rule, from relay-api.md "Rate limits".
+// Only App Attest and inbox creation are limited; nothing else is.
 export const LIMITS = {
   attest_challenge: [20, 3600],
   attest_register: [5, 86400],
   inboxes_key: [3, 86400],
   inboxes_addr: [20, 3600],
-  pair_code: [10, 3600],
-  pair_fail_addr: [100, 3600],
-  pair_fail_all: [1000, 3600],
-  notes_hour: [120, 3600],
-  notes_day: [500, 86400],
-  reads: [120, 60],
-  agent: [60, 60],
-  agent_patch: [10, 3600],
-  entitlement: [20, 3600],
-  settings: [20, 3600],
-  watch_token: [10, 86400],
 };
 
 /**

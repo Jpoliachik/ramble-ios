@@ -17,8 +17,9 @@ CREATE INDEX IF NOT EXISTS inboxes_purchase ON inboxes (purchase_id);
 
 -- One row per purchase, keyed on Apple's original transaction ID (or the app
 -- transaction ID for early buyers): "unlock:<id>", "sub:<id>", "app:<id>".
--- Inboxes point at it through inboxes.purchase_id. A refund sets revoked_at,
--- which locks every bound inbox and rejects the record from then on.
+-- Inboxes point at it through inboxes.purchase_id. The operator sets
+-- revoked_at by hand (proxy/README.md "Operations"), which locks every bound
+-- inbox and rejects the record from then on.
 CREATE TABLE IF NOT EXISTS purchases (
   id TEXT PRIMARY KEY,
   kind TEXT NOT NULL,
@@ -93,14 +94,7 @@ CREATE INDEX IF NOT EXISTS entries_inbox_recording ON entries (inbox_id, recordi
 ALTER TABLE pair_codes ADD COLUMN request_hash TEXT;
 DELETE FROM pair_codes WHERE token IS NOT NULL;
 
--- Operator: counted events (refusals, provider trouble) and alert cooldowns.
-CREATE TABLE IF NOT EXISTS events (
-  at INTEGER NOT NULL,
-  kind TEXT NOT NULL,
-  detail TEXT
-);
-CREATE INDEX IF NOT EXISTS events_kind ON events (kind, at);
-
+-- Operator: alert cooldowns.
 CREATE TABLE IF NOT EXISTS alerts (
   key TEXT PRIMARY KEY,
   sent_at INTEGER NOT NULL

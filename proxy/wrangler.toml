@@ -15,18 +15,13 @@ APPLE_BUNDLE_ID = "dev.goodloop.Ramble"
 PREMIUM_PRODUCT_ID = "dev.goodloop.ramble.premium.monthly2"
 # The one-time unlock (non-consumable).
 UNLOCK_PRODUCT_ID = "dev.goodloop.ramble.unlock"
-# App Store environment whose server notifications this relay accepts.
-APPSTORE_ENVIRONMENT = "Production"
 # Set at release (see specs/purchase.md "Early buyers"):
 #   FIRST_FREE_BUILD  build number of the first free-notes build, e.g. "120".
 #                     Downloads from a lower build are early buyers.
 #   FREE_RELEASE_AT   ISO time that build was released; subscriptions active
 #                     then are early buyers.
-#   LEGACY_UNTIL      ISO date old builds' POST /transcribe and text POST /inbox
-#                     stop working (410), by default 60 days after release.
 # FIRST_FREE_BUILD = ""
 # FREE_RELEASE_AT = ""
-# LEGACY_UNTIL = ""
 # Public base URL used in hook pings' pull_url when no request is in flight.
 RELAY_BASE_URL = "https://ramble-transcription-proxy.jpoliachik.workers.dev"
 
@@ -37,8 +32,7 @@ id = "25ac690e38ad498f819f70192ce40a95"
 
 # --- Relay (see RELAY.md) ---
 # Every minute: transcription retries and stalled attempts (picked up within
-# a minute of going stale), expiry, audio cleanup, operator alerts, and the
-# 14:00 UTC daily summary.
+# a minute of going stale), expiry, audio cleanup and the stuck-note alert.
 [triggers]
 crons = ["* * * * *"]
 

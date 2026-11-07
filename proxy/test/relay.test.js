@@ -17,7 +17,6 @@ import {
   validateHook,
   HOOK_REPING_SECONDS,
 } from '../src/relay.js';
-import { logId } from '../src/http.js';
 import { DAY, MINUTE, T0, createHarness, noteId } from './harness.js';
 
 let h;
@@ -195,27 +194,20 @@ describe('pairing', () => {
 
   it('caps an inbox at 10 agents', async () => {
     const secret = await h.inbox();
-    for (let i = 0; i < 10; i++) {
-      h.now += 7 * MINUTE; // past the 10-codes-an-hour limit
-      await h.connect(secret);
-    }
-    h.now += 7 * MINUTE;
+    for (let i = 0; i < 10; i++) await h.connect(secret);
     const res = await h.call('POST', '/pair/code', { auth: secret });
     assert.equal(res.status, 409);
     assert.equal(res.body.reason, 'too_many_agents');
   });
 
-  it('limits failed exchanges per address, and trips the circuit for everyone', async () => {
+  it('never limits exchanges: failed tries block no one', async () => {
     const bad = () => h.call('POST', '/pair/exchange', { body: { code: 'AAAA-AAAA-AAAA', request_id: 'w'.repeat(16) } });
-    for (let i = 0; i < 100; i++) assert.equal((await bad()).status, 400);
-    assert.equal((await bad()).status, 429);
-
+    for (let i = 0; i < 150; i++) assert.equal((await bad()).status, 400);
     const secret = await h.inbox();
     const { code } = (await h.call('POST', '/pair/code', { auth: secret })).body;
-    h.limiter.counts.set(`pair_fail_all:${await logId('all')}|${Math.floor(h.now / 3600000)}`, 1001);
     const res = await h.call('POST', '/pair/exchange', { body: { code, request_id: 'v'.repeat(16) } });
-    assert.equal(res.status, 503);
-    assert.ok(h.alerts.some((a) => a.includes('pairing is paused')));
+    assert.equal(res.status, 201);
+    assert.equal(h.limiter.counts.size, 2); // only the inbox creation limits counted
   });
 });
 
@@ -232,14 +224,9 @@ describe('credentials', () => {
     assert.equal((await h.call('GET', '/inbox', { auth: 'rmba_nope' })).status, 401);
   });
 
-  it('rate-limits an agent at 60 calls a minute, and its key works afterwards', async () => {
+  it('never rate-limits an agent', async () => {
     const { agent } = await setup();
-    for (let i = 0; i < 60; i++) assert.equal((await h.call('GET', '/inbox', { auth: agent })).status, 200);
-    const over = await h.call('GET', '/inbox', { auth: agent });
-    assert.equal(over.status, 429);
-    assert.ok(over.headers.get('Retry-After'));
-    h.now += MINUTE;
-    assert.equal((await h.call('GET', '/inbox', { auth: agent })).status, 200);
+    for (let i = 0; i < 100; i++) assert.equal((await h.call('GET', '/inbox', { auth: agent })).status, 200);
   });
 });
 

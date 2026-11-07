@@ -2,7 +2,7 @@
 // transcript kept for the person's own devices.
 // See specs/relay-api.md "Notes" and specs/transcription.md.
 //
-// Upload: auth -> repeat? (200, before the body is read) -> limits -> checks
+// Upload: auth -> repeat? (200, before the body is read) -> checks
 // -> suspended? (403) -> held? (402) -> read body -> measure -> store in R2 ->
 // create the note and count it in one batch (conditional, so concurrent
 // uploads count once) -> transcribe in the background, waiting up to 8
@@ -10,7 +10,7 @@
 // The cron sweeper (every minute) runs retries and picks up lost attempts.
 
 import { FREE_NOTES, loadAccount, recordUsage, suspendedResponse, usageUser } from './account.js';
-import { authenticate, limit } from './auth.js';
+import { authenticate } from './auth.js';
 import {
   DAY,
   HOUR,
@@ -25,7 +25,7 @@ import {
   unavailable,
   withTimeout,
 } from './http.js';
-import { alert, recordAttempt, recordEvent } from './ops.js';
+import { alertKeyProblem, alertPermanentFailure } from './ops.js';
 import { makeAgentCopies } from './relay.js';
 import { INLINE_PROVIDER_TIMEOUT_MS, TranscribeError } from './transcribe.js';
 
@@ -121,9 +121,9 @@ async function answerWithNote(ctx, cred, n, status) {
 const badUpload = (error) => fail(400, error, 'bad_upload');
 
 function holdFor(account) {
-  if (account.suspended) return { event: 'refused_suspended', response: suspendedResponse() };
+  if (account.suspended) return suspendedResponse();
   if (account.unlocked || account.freeRemaining > 0) return null;
-  return { event: 'refused_free', response: freeNotesUsed() };
+  return freeNotesUsed();
 }
 
 const freeNotesUsed = () =>
@@ -154,9 +154,6 @@ export async function uploadNote(request, rawId, ctx) {
     return fail(409, 'This note was already retried 3 times.', 'retry_limit');
   }
 
-  const limited = await limit(ctx, ['notes_hour', inboxId], ['notes_day', inboxId]);
-  if (limited) return limited;
-
   // Refusals: nothing stored or counted.
   const lengthHeader = request.headers.get('Content-Length');
   if (lengthHeader == null) return fail(411, 'Send a Content-Length header.', 'length_required');
@@ -179,10 +176,7 @@ export async function uploadNote(request, rawId, ctx) {
 
   const account = await loadAccount(ctx, inboxId);
   const hold = holdFor(account);
-  if (hold) {
-    await recordEvent(ctx, hold.event);
-    return hold.response;
-  }
+  if (hold) return hold;
 
   let bytes;
   try {
@@ -288,7 +282,6 @@ async function acceptNote(ctx, u) {
   if (u.retry && note && note.retry_count >= MAX_HAND_RETRIES) {
     return { response: fail(409, 'This note was already retried 3 times.', 'retry_limit') };
   }
-  await recordEvent(ctx, 'refused_free');
   return { response: freeNotesUsed() };
 }
 
@@ -297,8 +290,6 @@ async function acceptNote(ctx, u) {
 export async function getNote(request, rawId, ctx) {
   const { cred, response } = await authenticate(request, ctx, ['inbox', 'watch', 'watch_replaced']);
   if (response) return response;
-  const limited = await limit(ctx, ['reads', cred.hash]);
-  if (limited) return limited;
   const notFound = () => fail(404, 'Note not found');
   if (!UUID_RE.test(rawId)) return notFound();
   const n = await readNote(ctx, cred.inboxId, rawId.toUpperCase());
@@ -310,8 +301,6 @@ export async function getNote(request, rawId, ctx) {
 export async function listNotes(request, ctx) {
   const { cred, response } = await authenticate(request, ctx, ['inbox']);
   if (response) return response;
-  const limited = await limit(ctx, ['reads', cred.hash]);
-  if (limited) return limited;
 
   const after = new URL(request.url).searchParams.get('after');
   let afterAt = -1;
@@ -341,8 +330,6 @@ export async function listNotes(request, ctx) {
 export async function ackNotes(request, ctx) {
   const { cred, response } = await authenticate(request, ctx, ['inbox']);
   if (response) return response;
-  const limited = await limit(ctx, ['reads', cred.hash]);
-  if (limited) return limited;
 
   const ids = (await readJSON(request))?.ids;
   if (!Array.isArray(ids) || ids.length === 0 || ids.length > 500 || !ids.every((id) => typeof id === 'string' && UUID_RE.test(id))) {
@@ -408,7 +395,7 @@ async function attempt(ctx, note) {
     );
   } catch (err) {
     const actx = { ...ctx, now: ctx.clock() };
-    await recordAttempt(actx, err ?? {});
+    await alertKeyProblem(actx, err?.attempts);
     const message = String(err?.message ?? err).slice(0, 200);
     console.error(`[notes] attempt failed inbox=${await logId(note.inbox_id)} provider=${err?.provider ?? '-'} status=${err?.status ?? '-'}: ${message}`);
     if (err instanceof TranscribeError && err.retryable === false) {
@@ -416,9 +403,7 @@ async function attempt(ctx, note) {
     }
     return scheduleRetry(actx, note, message);
   }
-  const actx = { ...ctx, now: ctx.clock() };
-  await recordAttempt(actx, out);
-  return finishDone(actx, note, out);
+  return finishDone({ ...ctx, now: ctx.clock() }, note, out);
 }
 
 async function finishDone(ctx, note, out) {
@@ -442,10 +427,6 @@ async function finishDone(ctx, note, out) {
 
   // Monitoring: the measured length counts once, when the note is done.
   await recordUsage(ctx, await usageUser(ctx, note.inbox_id), duration);
-  if (duration > MAX_SECONDS) {
-    await alert(ctx, `long_note:${await logId(`${note.inbox_id}/${note.id}`)}`,
-      `A note measured ${(duration / 60).toFixed(0)} minutes, over the 61-minute cap: its file header understated its length.`);
-  }
   await deleteAudio(ctx, done);
 }
 
@@ -486,6 +467,7 @@ async function finishFailed(ctx, note, result, error) {
       .run();
   }
   console.log(`[notes] failed ${result} inbox=${await logId(note.inbox_id)}`);
+  await alertPermanentFailure(ctx, result, error);
   await deleteAudio(ctx, failed);
 }
 

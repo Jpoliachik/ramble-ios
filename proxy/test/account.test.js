@@ -1,10 +1,10 @@
-// Inboxes, account state, purchases, binding, refunds, settings.
+// Inboxes, account state, purchases, binding, revoking, settings.
 // specs/relay-api.md "Phone setup and purchase", specs/purchase.md.
 
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
-import { DAY, HOUR, PREMIUM, T0, UNLOCK, createHarness, jws, noteId, unlockTx } from './harness.js';
+import { DAY, PREMIUM, T0, createHarness, jws, noteId, unlockTx } from './harness.js';
 
 let h;
 beforeEach(() => {
@@ -259,11 +259,10 @@ describe('purchases', () => {
   });
 });
 
-describe('refunds', () => {
-  const refund = (otx, extra = {}) =>
-    h.call('POST', '/appstore/notifications', {
-      body: { signedPayload: jws({ notificationType: 'REFUND', environment: 'Production', transaction: { productId: UNLOCK, originalTransactionId: otx }, ...extra }) },
-    });
+describe('revoking a purchase by hand', () => {
+  // The command in proxy/README.md "Operations".
+  const revoke = (otx) =>
+    h.db.sqlite.exec(`UPDATE purchases SET revoked_at = CAST(strftime('%s', 'now') AS INTEGER) * 1000 WHERE id = 'unlock:${otx}'`);
 
   it('locks every bound inbox, keeps used free notes, and rejects the record from then on', async () => {
     const a = await h.newInbox();
@@ -273,7 +272,7 @@ describe('refunds', () => {
     await entitle(b, { signed_transaction: unlockTx(a.account_token) });
     assert.equal((await h.upload(a.inbox_secret, noteId(30))).status, 201);
 
-    assert.equal((await refund('otx1')).status, 200);
+    revoke('otx1');
     const after = await account(a.inbox_secret);
     assert.equal(after.unlocked, false);
     assert.equal(after.free_notes_remaining, 0);
@@ -284,11 +283,8 @@ describe('refunds', () => {
     assert.equal((await entitle(a.inbox_secret, { signed_transaction: unlockTx(a.account_token) })).body.reason, 'invalid_transaction');
   });
 
-  it('answers 400 to anything unsigned or for another environment', async () => {
-    assert.equal((await h.call('POST', '/appstore/notifications', { body: { signedPayload: 'forged' } })).status, 400);
-    assert.equal((await h.call('POST', '/appstore/notifications', { body: {} })).status, 400);
-    assert.equal((await refund('otx1', { environment: 'Sandbox' })).status, 400);
-    assert.equal(h.rows('SELECT COUNT(*) AS n FROM purchases')[0].n, 0);
+  it('has no App Store notification endpoint', async () => {
+    assert.equal((await h.call('POST', '/appstore/notifications', { body: {} })).status, 404);
   });
 });
 
@@ -303,12 +299,4 @@ describe('settings', () => {
     assert.equal((await h.call('PUT', '/settings', { auth: secret, body: { language: 'english' } })).status, 400);
     assert.equal((await h.call('GET', '/settings', { auth: secret })).body.language, 'haw');
   });
-});
-
-it('limits entitlement submissions to 20 an hour per inbox', async () => {
-  const secret = await h.inbox();
-  for (let i = 0; i < 20; i++) await entitle(secret, { signed_transaction: 'forged' });
-  assert.equal((await entitle(secret, { signed_transaction: 'forged' })).status, 429);
-  h.now = T0 + HOUR;
-  assert.equal((await entitle(secret, { signed_transaction: 'forged' })).status, 403);
 });

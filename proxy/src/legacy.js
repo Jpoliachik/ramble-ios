@@ -1,25 +1,24 @@
 // Old builds' cloud transcription for early subscribers: POST /transcribe.
-// Works until LEGACY_UNTIL, then 410 (see the router). Needs App Attest and
-// an unexpired subscription record checked like POST /entitlement, adds to
-// the monthly usage tally per original transaction (monitoring only), is
-// refused when that purchase is suspended, and always uses Groq whatever
-// model the old app asks for.
-// See specs/relay-api.md "Old app versions".
+// Works until LEGACY_RETIRES_AT, then 410 (see the router). Needs App Attest
+// and an unexpired, unrevoked subscription record, adds to the monthly usage
+// tally per original transaction (monitoring only), is refused when that
+// purchase is suspended, and always uses Groq whatever model the old app asks
+// for. See specs/relay-api.md "Old app versions".
 
 import { recordUsage, suspendedResponse } from './account.js';
 import { AppleVerifyError } from './apple.js';
-import { limit } from './auth.js';
 import { bearerValue, fail, json, logId, unavailable } from './http.js';
 import { MAX_SECONDS, MAX_UPLOAD_BYTES } from './notes.js';
-import { recordEvent } from './ops.js';
 import { TranscribeError } from './transcribe.js';
 
 const DEFAULT_PREMIUM_PRODUCT = 'dev.goodloop.ramble.premium.monthly2';
 const SUBSCRIPTION_REQUIRED = 'Premium subscription required';
 
+/** Old builds' POST /transcribe and text POST /inbox answer 410 from then on. */
+export const LEGACY_RETIRES_AT = Date.parse('2027-01-07T00:00:00Z');
+
 export function legacyOpen(ctx) {
-  const until = Date.parse(ctx.env.LEGACY_UNTIL ?? '');
-  return !Number.isFinite(until) || ctx.now < until;
+  return ctx.now < LEGACY_RETIRES_AT;
 }
 
 export async function legacyTranscribe(request, ctx) {
@@ -29,8 +28,6 @@ export async function legacyTranscribe(request, ctx) {
   if (Number(request.headers.get('Content-Length')) > MAX_UPLOAD_BYTES) {
     return fail(413, 'Recordings must be at most 20 MB.', 'too_large');
   }
-  const limited = await limit(ctx, ['notes_hour', `attest:${keyId}`], ['notes_day', `attest:${keyId}`]);
-  if (limited) return limited;
 
   const body = await request.arrayBuffer();
   if (body.byteLength > MAX_UPLOAD_BYTES) return fail(413, 'Recordings must be at most 20 MB.', 'too_large');
@@ -59,12 +56,8 @@ export async function legacyTranscribe(request, ctx) {
     return fail(403, SUBSCRIPTION_REQUIRED, 'invalid_transaction');
   }
   const purchaseId = `sub:${tx.originalTransactionId}`;
-  const purchase = await ctx.db.prepare('SELECT revoked_at, suspended FROM purchases WHERE id = ?').bind(purchaseId).first();
-  if (purchase?.revoked_at != null) return fail(403, SUBSCRIPTION_REQUIRED, 'invalid_transaction');
-  if (purchase?.suspended) {
-    await recordEvent(ctx, 'refused_suspended');
-    return suspendedResponse();
-  }
+  const purchase = await ctx.db.prepare('SELECT suspended FROM purchases WHERE id = ?').bind(purchaseId).first();
+  if (purchase?.suspended) return suspendedResponse();
 
   let audio;
   let options;

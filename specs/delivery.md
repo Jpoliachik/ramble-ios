@@ -23,7 +23,7 @@ The Connect screen SHALL show three steps, "Copy this message", "Paste it to you
 - AND step 3 reads "Waiting for your agent" with "Usually under a minute."
 
 ### Requirement: Codes work once and expire after 10 minutes
-A pairing code SHALL connect one agent and stay valid for 10 minutes after it is made, even if the Connect screen closes. The screen counts down ("Works once · 5:30 left"). Code length, format and attempt limits are in [relay-api.md](relay-api.md).
+A pairing code SHALL connect one agent and stay valid for 10 minutes after it is made, even if the Connect screen closes. The screen counts down ("Works once · 5:30 left"). Code length and format are in [relay-api.md](relay-api.md).
 
 #### Scenario: Expiry
 - GIVEN a code was made 10 minutes ago and no agent used it
