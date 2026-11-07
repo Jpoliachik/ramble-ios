@@ -75,6 +75,54 @@ describe('creating an inbox', () => {
     assert.equal(plain.status, 503);
   });
 
+  it('a verified proof that will not bind is capped like any request, and creates nothing', async () => {
+    const insert = h.db.sqlite.prepare('INSERT INTO inboxes (id, secret_hash, created_at) VALUES (?, ?, ?)');
+    for (let i = 0; i < 2000; i++) insert.run(`inb_${i}`, `h${i}`, T0);
+    const count = () => h.rows('SELECT COUNT(*) AS n FROM inboxes')[0].n;
+
+    // A first-time unlock bought for another inbox: wrong_account.
+    const wrong = await h.call('POST', '/inboxes', {
+      headers: { 'X-App-Attest-Key-Id': 'k2' },
+      body: { signed_transaction: unlockTx('someone-elses-token') },
+    });
+    assert.equal(wrong.status, 503);
+    assert.equal(wrong.body.reason, 'unavailable');
+    assert.equal(count(), 2000);
+
+    // A known purchase already on 5 iPhones: too_many_inboxes.
+    h.db.sqlite.prepare("INSERT INTO purchases (id, kind, environment, created_at) VALUES ('unlock:otx1', 'unlock', 'Production', ?)").run(T0);
+    h.db.sqlite.exec("UPDATE inboxes SET purchase_id = 'unlock:otx1', bound_at = created_at WHERE id IN ('inb_0', 'inb_1', 'inb_2', 'inb_3', 'inb_4')");
+    const full = await h.call('POST', '/inboxes', {
+      headers: { 'X-App-Attest-Key-Id': 'k3' },
+      body: { signed_transaction: unlockTx('someone-elses-token') },
+    });
+    assert.equal(full.status, 503);
+    assert.equal(count(), 2000);
+  });
+
+  it('a proof that will not bind under the cap gets a normal free inbox', async () => {
+    const res = await h.call('POST', '/inboxes', {
+      headers: { 'X-App-Attest-Key-Id': 'k2' },
+      body: { signed_transaction: unlockTx('someone-elses-token') },
+    });
+    assert.equal(res.status, 201);
+    const a = await account(res.body.inbox_secret);
+    assert.equal(a.unlocked, false);
+    assert.equal(a.free_notes_remaining, 25);
+  });
+
+  it('a proof that will not bind is refused while the free-tier breaker is tripped', async () => {
+    await h.inbox();
+    h.db.sqlite.exec(`INSERT INTO notes (inbox_id, id, source, status, recorded_at, recorded_ms, received_at, accepted_at, content_type, duration, free_note)
+      SELECT id, 'X', 'phone', 'done', '', 0, ${T0}, ${T0}, 'audio/mp4', ${200 * 3600}, 1 FROM inboxes`);
+    const res = await h.call('POST', '/inboxes', {
+      headers: { 'X-App-Attest-Key-Id': 'k2' },
+      body: { signed_transaction: unlockTx('someone-elses-token') },
+    });
+    assert.equal(res.status, 503);
+    assert.equal(h.rows('SELECT COUNT(*) AS n FROM inboxes')[0].n, 1);
+  });
+
   it('answers 503 once free inboxes used 200 hours today', async () => {
     const secret = await h.inbox();
     h.db.sqlite.exec(`INSERT INTO notes (inbox_id, id, source, status, recorded_at, recorded_ms, received_at, accepted_at, content_type, duration, free_note)
