@@ -203,10 +203,6 @@ final class UploadQueueService: ObservableObject {
             // Uploads from this setup were paused by hand: a plain refusal.
             refuseForGood(id, as: .couldntSend, response)
 
-        case 400 where response.reason == "recorded_in_future":
-            // The recorded time is ahead of the server's clock; it passes.
-            failTransiently(id, message: response.message ?? "Recorded time is in the future.", status: status, atLeast: 300)
-
         case 400:
             refuseForGood(id, as: .couldntSend, response)
 
@@ -215,7 +211,7 @@ final class UploadQueueService: ObservableObject {
             storage.update(id) {
                 $0.retryRequested = false
                 $0.retryCount = Recording.maxRetries
-                $0.activityLog.append(ActivityEntry("Retry refused: no retries left", httpStatus: 409))
+                $0.activityLog.append(ActivityEntry("Retry refused: already retried once", httpStatus: 409))
             }
 
         case 429:

@@ -16,14 +16,7 @@ import WatchKit
 final class WatchStuckNoteAlerts {
     static let shared = WatchStuckNoteAlerts()
 
-    /// Set from the iPhone's debug settings: thresholds in seconds, for testing.
-    static let fastModeKey = "deliveryAlertsFastMode"
-
-    static var rule: DeliveryAlertRule {
-        UserDefaults.standard.bool(forKey: fastModeKey)
-            ? DeliveryAlertRule(threshold: 60, cooldown: 60)
-            : DeliveryAlertRule(threshold: 6 * 3600, cooldown: 6 * 3600)
-    }
+    static let rule = DeliveryAlertRule(threshold: 6 * 3600, cooldown: 6 * 3600)
 
     private static let memoryKey = "stuckOnWatchAlertMemory"
     private static let nowID = "delivery.stuckOnWatch"

@@ -19,7 +19,6 @@ import {
   getSettings,
   postEntitlement,
   postWatchToken,
-  purgeWatchTokens,
   putSettings,
 } from './account.js';
 import { verifyAppTransaction, verifySignedTransaction } from './apple.js';
@@ -43,7 +42,6 @@ import {
   pull,
   purgeExpired,
   purgeInbox,
-  resolvesPublic,
   updateAgent,
 } from './relay.js';
 import { transcribeNote } from './transcribe.js';
@@ -68,7 +66,6 @@ export function makeContext(request, env, deps = {}) {
     transcribe: deps.transcribe ?? transcribeNote,
     transcribeDeps: deps.transcribeDeps ?? {},
     measureDuration: deps.measureDuration ?? measureDurationSeconds,
-    resolvesPublic: deps.resolvesPublic ?? resolvesPublic,
     inlineWaitMs: deps.inlineWaitMs ?? INLINE_WAIT_MS,
     bodyTimeoutMs: deps.bodyTimeoutMs ?? BODY_TIMEOUT_MS,
   };
@@ -169,7 +166,6 @@ export async function runScheduled(env, deps = {}) {
     ['copies', () => sweepCopies(ctx)],
     ['entries', () => purgeExpired(env.DB, ctx.now)],
     ['notes', () => purgeNotes(ctx)],
-    ['watch_tokens', () => purgeWatchTokens(ctx)],
     ['rate_limits', () => purgeRateLimits(env.DB, ctx.now)],
     ['alerts', () => checkAlerts(ctx)],
   ];

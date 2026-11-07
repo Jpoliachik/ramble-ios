@@ -112,8 +112,8 @@ final class WatchRelayService: ObservableObject {
         scheduleBackgroundRefresh()
     }
 
-    /// The iPhone connected the watch (a new token). The old token stops
-    /// uploading but still reads what it uploaded.
+    /// The iPhone connected the watch (a new token; the old one is revoked).
+    /// The new token uploads what's waiting and reads the inbox's watch notes.
     func connectionReplaced() {
         releaseHolds([.heldUnlock])
         Task { await retryPass(force: true) }
@@ -156,7 +156,6 @@ final class WatchRelayService: ObservableObject {
         let due = store.notes
             .filter { note in
                 guard note.upload == .waiting, !note.audioDeleted, !uploadingIDs.contains(note.id) else { return false }
-                if let notBefore = note.notBefore, notBefore > now { return false }
                 if !force, let next = note.nextAttemptAt, next > now { return false }
                 return true
             }
@@ -176,8 +175,7 @@ final class WatchRelayService: ObservableObject {
     }
 
     private func startUpload(_ note: WatchNoteRecord) {
-        guard let token = connection.token, let ref = connection.currentRef, !connection.tokenRejected,
-              !uploadingIDs.contains(note.id)
+        guard let token = connection.token, !connection.tokenRejected, !uploadingIDs.contains(note.id)
         else { return }
         guard FileManager.default.fileExists(atPath: note.fileURL.path) else {
             markLost(note.id)
@@ -189,7 +187,7 @@ final class WatchRelayService: ObservableObject {
         request.setValue("audio/mp4", forHTTPHeaderField: "Content-Type")
         request.setValue(note.recordedAtText, forHTTPHeaderField: "X-Ramble-Recorded-At")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        RelayUploadSession.shared.upload(request, fromFile: note.fileURL, noteID: note.id, tokenRef: ref)
+        RelayUploadSession.shared.upload(request, fromFile: note.fileURL, noteID: note.id)
         uploadingIDs.insert(note.id)
     }
 
@@ -211,22 +209,19 @@ final class WatchRelayService: ObservableObject {
         switch status {
         case 200, 201:
             if let body = try? JSONDecoder().decode(RelayNoteBody.self, from: outcome.body) {
-                applyNote(body, to: id, tokenRef: outcome.tokenRef, now: now)
+                applyNote(body, to: id, now: now)
             } else {
                 store.update(id) { note in
                     note.upload = .accepted
                     note.status = note.status ?? .transcribing
-                    note.tokenRef = outcome.tokenRef ?? note.tokenRef
                     note.failureCount = 0
                     note.nextAttemptAt = nil
-                    note.notBefore = nil
                 }
             }
         case 402 where reason == "free_notes_used":
             store.update(id) { note in
                 note.upload = .heldUnlock
                 note.nextAttemptAt = nil
-                note.notBefore = nil
                 note.failureCount = 0
             }
         case 413:
@@ -235,25 +230,19 @@ final class WatchRelayService: ObservableObject {
             refuse(id, as: .refusedBadUpload, now: now)
         case 400 where reason == "bad_upload", 403 where reason == "suspended":
             refuse(id, as: .refusedBadUpload, now: now)
-        case 400 where reason == "recorded_in_future":
-            // Retry once the server's clock has passed the recorded time
-            // less its 5 minutes of slack.
-            let serverNow = outcome.serverDate ?? now
-            let wait = max(60, before.recordedAt.timeIntervalSince(serverNow) - 300 + 30)
-            store.update(id) { $0.notBefore = now.addingTimeInterval(wait) }
         case 401:
             // Replaced or revoked. The note stays waiting for a new token.
             let wasConnected = connection.isConnected
-            connection.markRejected(ref: outcome.tokenRef)
+            connection.markRejected(token: outcome.token)
             if wasConnected && !connection.isConnected {
                 WatchConnectivityService.shared.sendNeedsConnection(replaces: connection.tokenToReplace)
             }
-            if outcome.tokenRef != connection.currentRef, connection.isConnected {
+            if outcome.token != connection.token, connection.isConnected {
                 // An older token's answer; upload again with the current one.
                 Task { await retryPass(force: true) }
             }
         case 429:
-            store.update(id) { $0.notBefore = now.addingTimeInterval(outcome.retryAfter ?? 60) }
+            store.update(id) { $0.nextAttemptAt = now.addingTimeInterval(outcome.retryAfter ?? 60) }
         default:
             // 5xx, 503 unavailable, 408, 411, anything unexpected
             backOff(id, now: now)
@@ -266,7 +255,6 @@ final class WatchRelayService: ObservableObject {
             note.upload = state
             note.finalAt = now
             note.nextAttemptAt = nil
-            note.notBefore = nil
         }
     }
 
@@ -307,7 +295,6 @@ final class WatchRelayService: ObservableObject {
             let change = store.update(note.id) { record in
                 record.upload = .waiting
                 record.waitingSince = now // The 6 hours count from the release
-                record.notBefore = nil
                 record.nextAttemptAt = nil
                 record.failureCount = 0
             }
@@ -337,7 +324,7 @@ final class WatchRelayService: ObservableObject {
     }
 
     private func poll(_ note: WatchNoteRecord) async {
-        guard let token = connection.token(forRef: note.tokenRef) else { return }
+        guard let token = connection.token, !connection.tokenRejected else { return }
         var request = URLRequest(url: noteURL(note.id))
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -352,19 +339,19 @@ final class WatchRelayService: ObservableObject {
             guard let body = try? JSONDecoder().decode(RelayNoteBody.self, from: result.0),
                   let before = store.note(note.id)
             else { return }
-            applyNote(body, to: note.id, tokenRef: before.tokenRef, now: now)
+            applyNote(body, to: note.id, now: now)
             finishChange(before: before)
-        case 401, 404:
-            if http.statusCode == 401 {
-                let ref = note.tokenRef ?? connection.currentRef
-                let wasConnected = connection.isConnected
-                connection.markRejected(ref: ref)
-                if wasConnected && !connection.isConnected {
-                    WatchConnectivityService.shared.sendNeedsConnection(replaces: connection.tokenToReplace)
-                }
+        case 401:
+            // This token was replaced or revoked. The note is read again
+            // once the iPhone connects the watch.
+            let wasConnected = connection.isConnected
+            connection.markRejected(token: token)
+            if wasConnected && !connection.isConnected {
+                WatchConnectivityService.shared.sendNeedsConnection(replaces: connection.tokenToReplace)
             }
-            // The server can no longer tell this watch about the note (its
-            // token was revoked or the note expired). Stop asking.
+        case 404:
+            // The current connection can't read the note (the iPhone set up
+            // Ramble again as a new inbox, or the note expired). Stop asking.
             guard note.needsPolling, let before = store.note(note.id) else { return }
             store.update(note.id) { record in
                 record.status = .done
@@ -379,14 +366,12 @@ final class WatchRelayService: ObservableObject {
         }
     }
 
-    private func applyNote(_ body: RelayNoteBody, to id: UUID, tokenRef: String?, now: Date) {
+    private func applyNote(_ body: RelayNoteBody, to id: UUID, now: Date) {
         let status = WatchServerStatus(rawValue: body.status) ?? .transcribing
         store.update(id) { note in
             note.upload = .accepted
-            if let tokenRef { note.tokenRef = tokenRef }
             note.failureCount = 0
             note.nextAttemptAt = nil
-            note.notBefore = nil
             note.lastPolledAt = now
             note.status = status
             note.result = body.result
@@ -428,7 +413,7 @@ final class WatchRelayService: ObservableObject {
             }
         case 401:
             let wasConnected = connection.isConnected
-            connection.markRejected(ref: connection.currentRef)
+            connection.markRejected(token: token)
             if wasConnected && !connection.isConnected {
                 WatchConnectivityService.shared.sendNeedsConnection(replaces: connection.tokenToReplace)
             }
@@ -494,9 +479,6 @@ final class WatchRelayService: ObservableObject {
         // A note is forgotten once it has left Recent and its audio is gone
         let gone = Set(store.notes.filter { $0.hiddenFromRecent && $0.audioDeleted }.map(\.id))
         store.remove(gone)
-
-        let refsInUse = Set(store.notes.filter { $0.needsPolling || $0.status == .failed }.compactMap(\.tokenRef))
-        connection.pruneOldTokens(keeping: refsInUse)
     }
 
     // MARK: - Background refresh

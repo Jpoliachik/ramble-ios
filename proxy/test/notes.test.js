@@ -95,7 +95,6 @@ describe('upload refusals store and count nothing', () => {
     ['empty', { bytes: 0 }, 400, 'bad_upload'],
     ['bad recorded time', { recordedAt: 'yesterday' }, 400, 'bad_upload'],
     ['recorded time without offset', { recordedAt: '2026-11-01T11:59:00' }, 400, 'bad_upload'],
-    ['recorded in the future', { recordedAt: new Date(T0 + HOUR).toISOString() }, 400, 'recorded_in_future'],
   ];
   for (const [name, opts, status, reason] of cases) {
     it(name, async () => {
@@ -485,21 +484,20 @@ describe('the pipeline', () => {
 describe('hand retries', () => {
   const retry = (secret, id, extra = {}) => h.upload(secret, id, { headers: { 'X-Ramble-Retry': '1' }, ...extra });
 
-  it('re-transcribes a failed note, up to 3 times, then 409 retry_limit', async () => {
+  it('re-transcribes a failed note once, then 409 retry_limit', async () => {
     const secret = await h.inbox();
     h.rejectAudio();
     await h.upload(secret, noteId(1));
     await h.call('POST', '/notes/ack', { auth: secret, body: { ids: [noteId(1)] } });
-    for (let i = 1; i <= 3; i++) {
-      const res = await retry(secret, noteId(1), { recordedAt: '2030-01-01T00:00:00Z' });
-      assert.equal(res.status, 201);
-      assert.equal(res.body.recorded_at, '2026-11-01T06:59:00-05:00');
-    }
-    assert.equal(h.rows('SELECT retry_count FROM notes')[0].retry_count, 3);
+    const res = await retry(secret, noteId(1), { recordedAt: '2030-01-01T00:00:00Z' });
+    assert.equal(res.status, 201);
+    assert.equal(res.body.recorded_at, '2026-11-01T06:59:00-05:00');
+    assert.equal(res.body.status, 'failed');
+    assert.equal(h.rows('SELECT retry_count FROM notes')[0].retry_count, 1);
     const calls = h.transcribeCalls.length;
-    const fourth = await retry(secret, noteId(1));
-    assert.equal(fourth.status, 409);
-    assert.equal(fourth.body.reason, 'retry_limit');
+    const second = await retry(secret, noteId(1));
+    assert.equal(second.status, 409);
+    assert.equal(second.body.reason, 'retry_limit');
     assert.equal(h.transcribeCalls.length, calls);
     assert.equal(await freeUsed(secret), 25);
   });
@@ -522,28 +520,33 @@ describe('hand retries', () => {
     assert.equal((await retry(secret, noteId(1))).status, 200);
   });
 
-  it('a retry with no free notes left is held', async () => {
+  it('a retry uses no free note and is never held for free notes', async () => {
     const secret = await h.inbox();
     h.rejectAudio();
     await h.upload(secret, noteId(1));
+    assert.equal(await freeUsed(secret), 25);
     h.db.sqlite.exec('UPDATE inboxes SET free_notes_used = 25');
+    h.transcribe = async () => ({ result: 'transcript', text: 'ok', provider: 'groq' });
     const res = await retry(secret, noteId(1));
-    assert.equal(res.status, 402);
-    assert.equal(res.body.reason, 'free_notes_used');
+    assert.equal(res.status, 201);
+    assert.equal(res.body.transcript, 'ok');
+    assert.equal(await freeUsed(secret), 0);
   });
 
-  it('copies a retried note only to agents paired before it was recorded', async () => {
+  it('copies a retried note to the agents connected when the retry was accepted', async () => {
     const secret = await h.inbox();
     const early = await h.connect(secret);
     h.now = T0 + 2 * HOUR;
     h.rejectAudio();
     await h.upload(secret, noteId(1), { recordedAt: new Date(T0 + HOUR).toISOString() });
+    h.now += MINUTE;
     const late = await h.connect(secret);
+    h.now += MINUTE;
     h.transcribe = async () => ({ result: 'transcript', text: 'ok', provider: 'groq' });
     await retry(secret, noteId(1));
     await h.settle();
     assert.equal((await h.call('GET', '/inbox', { auth: early })).body.items.length, 1);
-    assert.equal((await h.call('GET', '/inbox', { auth: late })).body.items.length, 0);
+    assert.equal((await h.call('GET', '/inbox', { auth: late })).body.items.length, 1);
   });
 });
 
@@ -626,19 +629,21 @@ describe('reading notes', () => {
 });
 
 describe('watch token', () => {
-  it('a replaced token gets 401 on uploads but reads its own notes', async () => {
+  it('a replaced token is revoked; the new one reads the watch notes of its own inbox only', async () => {
     const secret = await h.inbox();
     const old = await h.watchToken(secret);
     h.transcribe = () => new Promise(() => {});
     await h.upload(old, noteId(1));
-    const fresh = await h.inbox();
-    const next = await h.watchToken(fresh, old);
-    assert.equal((await h.upload(old, noteId(2))).status, 401);
-    assert.equal((await h.call('GET', `/notes/${noteId(1)}`, { auth: old })).status, 200);
-    assert.equal((await h.call('GET', '/account', { auth: old })).status, 401);
-    assert.equal((await h.upload(next, noteId(2))).status, 201);
-    h.now = T0 + 31 * DAY;
+    const same = await h.watchToken(secret, old);
     assert.equal((await h.call('GET', `/notes/${noteId(1)}`, { auth: old })).status, 401);
+    assert.equal((await h.call('GET', `/notes/${noteId(1)}`, { auth: same })).status, 200);
+
+    const fresh = await h.inbox();
+    const next = await h.watchToken(fresh, same);
+    assert.equal((await h.upload(same, noteId(2))).status, 401);
+    assert.equal((await h.call('GET', `/notes/${noteId(1)}`, { auth: same })).status, 401);
+    assert.equal((await h.call('GET', `/notes/${noteId(1)}`, { auth: next })).status, 404);
+    assert.equal((await h.upload(next, noteId(2))).status, 201);
   });
 
   it('one live token per inbox; revoking leaves agents alone', async () => {

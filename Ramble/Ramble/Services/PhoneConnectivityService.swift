@@ -131,7 +131,6 @@ final class PhoneConnectivityService: NSObject, ObservableObject {
         var context: [String: Any] = [
             "relayBaseURL": Constants.Relay.baseURL.absoluteString,
             "unlocked": AccountService.shared.isUnlocked,
-            "deliveryAlertsFastMode": DeliveryMonitor.isFastMode,
             "sentAt": Date().ISO8601Format(),
         ]
         if Consent.hasConsented, let token = KeychainService.string(forKey: Self.watchTokenKey) {

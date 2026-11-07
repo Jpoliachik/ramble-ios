@@ -30,17 +30,17 @@ A pairing code SHALL connect one agent and stay valid for 10 minutes after it is
 - WHEN the countdown reaches zero
 - THEN the box reads "This code expired" and the Copy button becomes "New code"
 
-### Requirement: Only the agent that pairs can recover its key
-When an exchange is retried with the same request ID within the code's 10 minutes, the relay SHALL return the same key. A retry with a different request ID SHALL get no key. Nobody can read a key back from the relay in any other way.
+### Requirement: A key is handed out once
+The relay SHALL return an agent's key only in the answer to the exchange that used the code. Nobody, including the agent that paired, can read a key back from the relay later.
 
 #### Scenario: Response lost
 - GIVEN an agent's exchange succeeded but the response never reached it
-- WHEN it repeats the exchange with the same code and request ID 30 seconds later
-- THEN it receives the same key, and only one agent appears in the app
+- WHEN it repeats the exchange with the same code 30 seconds later
+- THEN it gets no key, the app shows the unused agent as "Hasn't checked in yet", and the person connects again with a new code
 
 #### Scenario: Someone else replays the code
 - GIVEN an agent paired 2 minutes ago and the code is visible in its chat
-- WHEN another client sends that code with a different request ID
+- WHEN another client sends that code
 - THEN it gets no key, and the agent's key keeps working
 
 ### Requirement: The app shows the moment the agent connects
@@ -60,7 +60,7 @@ Each agent key SHALL be 32 random bytes, work until the agent is disconnected, a
 - THEN it sees only the transcripts meant for it
 
 ### Requirement: Reinstalling keeps or replaces the agents with the inbox
-When Ramble is reinstalled and the iPhone still holds its inbox credential, it SHALL keep the same inbox, with its agents, free-note count and unlock. When the credential is gone, the iPhone starts a fresh inbox and the person SHALL connect their agents again. Agents of the old inbox receive only notes the old inbox had already accepted; their waiting copies expire on the usual schedule. Notes that upload under the fresh inbox go only to agents paired before each note was recorded. Restoring the purchase is covered in [purchase.md](purchase.md).
+When Ramble is reinstalled and the iPhone still holds its inbox credential, it SHALL keep the same inbox, with its agents, free-note count and unlock. When the credential is gone, the iPhone starts a fresh inbox and the person SHALL connect their agents again. Agents of the old inbox receive only notes the old inbox had already accepted; their waiting copies expire on the usual schedule. Notes that upload under the fresh inbox go only to agents connected when the server accepted each note. Restoring the purchase is covered in [purchase.md](purchase.md).
 
 #### Scenario: Fresh inbox
 - GIVEN an agent was connected and the iPhone starts a fresh inbox
@@ -106,16 +106,21 @@ The app SHALL confirm before disconnecting: "Disconnect your agent?" with "It lo
 ## What each agent receives
 
 ### Requirement: Each eligible agent gets its own copy
-When a transcript is ready, the relay SHALL make one copy for each agent that is connected at that moment and was paired before the note's recorded time (from the recording device; [relay-api.md](relay-api.md) refuses times in the future). This includes a note whose transcript comes from a hand retry ([transcription.md](transcription.md)): its copies, hook pings and webhook follow the same rules at the moment the retry succeeds. Watch notes reach agents without the iPhone nearby.
+When a transcript is ready, the relay SHALL make one copy for each agent that is connected at that moment and was already connected when the server accepted the note's audio. The recording device's clock plays no part. A note whose transcript comes from a hand retry ([transcription.md](transcription.md)) SHALL follow the same rule, with the moment the server accepted the retry: its copies, hook pings and webhook follow at the moment the retry succeeds. Watch notes reach agents without the iPhone nearby.
 
-#### Scenario: Agent paired after recording
-- GIVEN a note was recorded at 9:00 and is still transcribing
+#### Scenario: Agent paired after upload
+- GIVEN a note reached the server at 9:00 and is still transcribing
 - WHEN an agent pairs at 9:05 and the transcript is ready at 9:06
 - THEN that agent receives no copy of the note
 
+#### Scenario: Recorded offline, uploaded after pairing
+- GIVEN a note was recorded on the watch at 8:00 with no connection
+- WHEN an agent pairs at 9:00 and the note reaches the server at 9:30
+- THEN that agent receives a copy
+
 #### Scenario: Retry succeeds
-- GIVEN a note recorded at 9:00 failed, agent A was paired at 8:00 and agent B at 10:00
-- WHEN the person retries it and the transcript is ready
+- GIVEN a note that reached the server at 9:00 failed, agent A was paired at 8:00 and agent B at 12:00
+- WHEN the person retries it at 11:00 and the transcript is ready
 - THEN only agent A gets a copy, its hook is pinged, and the iPhone sends the webhook
 
 ### Requirement: Silent notes go nowhere

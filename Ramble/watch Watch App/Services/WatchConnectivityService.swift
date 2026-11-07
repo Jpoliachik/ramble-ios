@@ -7,8 +7,7 @@
 //  left here, per the WatchConnectivity contract:
 //
 //  Phone -> watch
-//  - Application context: watchToken, relayBaseURL, unlocked,
-//    deliveryAlertsFastMode (latest wins).
+//  - Application context: watchToken, relayBaseURL, unlocked (latest wins).
 //  - ["type": "unlocked"] user info, to release held notes in the background.
 //  - ["type": "received", "recordingIds": [...]] receipts for saved audio.
 //  - ["type": "requestAudio", "recordingId": ...] when "Audio on watch" is tapped.
@@ -29,14 +28,12 @@ nonisolated struct PhoneContext: Sendable {
     let watchToken: String?
     let relayBaseURL: String?
     let unlocked: Bool
-    let fastMode: Bool?
 
     init?(_ context: [String: Any]) {
         guard !context.isEmpty else { return nil }
         watchToken = context["watchToken"] as? String
         relayBaseURL = context["relayBaseURL"] as? String
         unlocked = context["unlocked"] as? Bool ?? false
-        fastMode = context["deliveryAlertsFastMode"] as? Bool
     }
 }
 
@@ -166,9 +163,6 @@ final class WatchConnectivityService: NSObject, ObservableObject {
     // MARK: - Phone -> watch
 
     private func apply(_ context: PhoneContext) {
-        if let fastMode = context.fastMode {
-            UserDefaults.standard.set(fastMode, forKey: WatchStuckNoteAlerts.fastModeKey)
-        }
         let connection = WatchConnection.shared
         connection.setBaseURL(context.relayBaseURL)
         let tokenChanged = connection.setToken(context.watchToken)

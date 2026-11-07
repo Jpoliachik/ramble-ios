@@ -58,17 +58,13 @@ struct WatchNoteRecord: Codable, Identifiable, Equatable {
     var result: String?
     /// First line of the transcript, for Recent. The watch never keeps more.
     var preview: String?
-    /// Which watch token uploaded it (a hash, see WatchConnection.ref), so
-    /// it can still be read after the phone replaces the token.
-    var tokenRef: String?
     /// Start of the 6-hour stuck clock: the stop, or the release from a hold.
     var waitingSince: Date
     /// Failed attempts in a row, for the 10 s doubling to 5 min backoff.
     var failureCount: Int
-    /// The next backoff retry while the app is open.
+    /// The next timed retry while the app is open: the backoff, or the wait
+    /// the server asked for (429).
     var nextAttemptAt: Date?
-    /// A wait the server asked for (429, clock ahead).
-    var notBefore: Date?
     /// When the note reached a final state (done, failed, refused, lost).
     var finalAt: Date?
     /// When the watch learned the transcript (or silence) was ready.
@@ -92,11 +88,9 @@ struct WatchNoteRecord: Codable, Identifiable, Equatable {
         self.status = nil
         self.result = nil
         self.preview = nil
-        self.tokenRef = nil
         self.waitingSince = now
         self.failureCount = 0
         self.nextAttemptAt = nil
-        self.notBefore = nil
         self.finalAt = nil
         self.doneAt = nil
         self.firstSeenAt = nil

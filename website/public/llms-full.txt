@@ -18,7 +18,7 @@ Ramble's server is a relay, not an archive. Your audio is sent to a transcriptio
 
 Relay: https://api.ramble.watch
 
-1. Pair. Make up a random request_id (16 to 64 characters) and POST {"code": "<code>", "request_id": "<your request_id>", "name": "<your name, like Grok Bot>"} to /pair/exchange. Save the returned "token". If the request times out or drops, send it again with the same code and the same request_id: for 10 minutes it returns the same token. A 400 means the code is wrong or expired, and a 409 means it was already used; ask the user for a new one. The token is a password to the user's transcripts: anyone who has it can read and delete them. Store it the way your platform stores secrets, and keep it out of chat, memory, and logs.
+1. Pair. POST {"code": "<code>", "name": "<your name, like Grok Bot>"} to /pair/exchange. Save the returned "token" right away: a code gives its token once. A 400 means the code is wrong or expired, and a 409 means it was already used (for example, a retry after a lost response); ask the user for a new one. The token is a password to the user's transcripts: anyone who has it can read and delete them. Store it the way your platform stores secrets, and keep it out of chat, memory, and logs.
 2. Separate checking from acting. Most checks find nothing, so the cost of this connection is the empty checks, not the transcripts. Make the check as cheap as you can: a small script, hook, or scheduled HTTP fetch that runs without the model, calls GET /inbox with `Authorization: Bearer <token>`, and wakes the agent only when "items" is not empty. Every 1 to 5 minutes is fine for a check like that. Only if your platform can't run anything without the agent, schedule a full agent run instead. Hourly or even daily is fine, since nothing expires for 30 days. Tell the user how often you'll check. If you can receive webhooks (an HTTPS URL that starts a run), also register a wake-up hook (below) so new notes reach you without frequent checks.
 3. Act. For each item, do what the user asked in "transcription". Read relative times ("in an hour", "tomorrow") from "created_at", the moment recording started, in the user's local offset. If that time has already passed, treat it as overdue and tell the user.
 4. Ack. POST {"ids": [...]} to /inbox/ack with the ids handled. This deletes them. Anything not acked comes back on the next check. If "has_more" is true, check again right away.
@@ -74,9 +74,8 @@ Relay: https://api.ramble.watch (every path below is relative to it). https://ra
 
 ```
 POST /pair/exchange
-{"code": "K7QX-MP4D-HN3R", "request_id": "b4c1e0f2a9d84e7c", "name": "Grok Bot"}
-→ 201 {"token": "rmba_…"}          (same code and request_id within 10 minutes: 200, same token)
-                                   (another request_id: 409 "code_used", no token)
+{"code": "K7QX-MP4D-HN3R", "name": "Grok Bot"}
+→ 201 {"token": "rmba_…"}          (the same code again: 409 "code_used", no token)
                                    ("name" is optional, 1–40 characters, shown to the user)
 
 GET /inbox
@@ -105,7 +104,7 @@ Authorization: Bearer rmba_…
 - Timestamps: "created_at" (ISO 8601 with the recording device's UTC offset, like 2026-11-01T14:00:00-05:00) is when the user started recording, from the watch or iPhone clock. "received_at" (ISO 8601, UTC, with milliseconds) is when the relay accepted the audio; the two can be hours apart if the watch was offline. Read relative times from "created_at" in its offset.
 - "duration" is the length in seconds, measured by the relay.
 - Acks: 1 to 500 integer ids per call. Acking an id that's already gone, or isn't yours, does nothing; "deleted" counts what was actually removed. Anything never acked is deleted 30 days after it was made.
-- Pairing: codes are 12 characters, shown as XXXX-XXXX-XXXX, and match ignoring case, spaces, and dashes. A code makes one connection. The same code with the same request_id returns the same token for its 10 minutes, so a lost response never costs the user a new code.
+- Pairing: codes are 12 characters, shown as XXXX-XXXX-XXXX, and match ignoring case, spaces, and dashes. A code makes one connection and gives its token once, so save it right away. Sending a used code again, even after a lost response, gets 409 and no token: ask the user for a new code.
 - Credentials: send `Authorization: Bearer <token>`. `bearer <token>` and the bare token also work.
 
 ## Tokens and connections
@@ -113,7 +112,7 @@ Authorization: Bearer rmba_…
 - The token doesn't expire. It works until the user disconnects the agent in Ramble, which also deletes anything waiting for it.
 - The token reads and acks only your own copies. It can't pair agents, upload notes, or read anything else; calling an endpoint agents can't use gets 403 with "reason": "wrong_credential", and the token keeps working.
 - Each code makes its own connection, so several agents can be connected at once. Each gets its own copy of every transcript; acking deletes only your copy. Pairing a new agent leaves the others alone.
-- You get notes recorded after you paired. Notes with no speech go to no one. Watch notes reach you without the iPhone nearby.
+- You get notes that reach the relay after you paired. Notes with no speech go to no one. Watch notes reach you without the iPhone nearby.
 - The user sees every connected agent in Settings → Your agent, with its name (if you sent one), when it last checked in, how many notes are waiting, and whether its wake-up hook answers.
 
 ## Making requests
@@ -124,14 +123,14 @@ Some HTTP stacks get filtered before they reach the relay. Python's built-in url
 |---|---|---|
 | 401 | Disconnected, or wrong token | Stop checking and tell the user. The only status that means stop. |
 | 400 on /pair/exchange | Code wrong or expired | Ask the user for a new code. |
-| 409 on /pair/exchange | Code already used with another request_id | Ask the user for a new code. |
+| 409 on /pair/exchange | Code already used, maybe by your own earlier try | Ask the user for a new code. |
 | 400 elsewhere | Malformed request | Fix it; the error says what's wrong. |
 | 403 | Filtered before reaching the relay, or an endpoint agents can't use | Set a User-Agent or use another client, then retry. Not a token problem. |
 | 405 | Wrong HTTP method | The error names the right one. |
 | 429 | Too many requests | Wait the seconds in Retry-After. The token still works. |
 | 5xx, timeout, dropped connection | Temporary | Retry after 2, 5, then 15 seconds. Keep your schedule. |
 
-Errors are JSON: {"error": "..."}, plus "reason" where it helps (like "code_used"). Every call is safe to retry.
+Errors are JSON: {"error": "..."}, plus "reason" where it helps (like "code_used"). Every call except POST /pair/exchange is safe to retry; a code works once.
 
 Agent calls and pairing have no rate limit. If you ever get a 429, wait the seconds in Retry-After.
 
@@ -139,7 +138,7 @@ curl:
 
 ```
 RELAY=https://api.ramble.watch
-curl -sS --retry 3 -X POST "$RELAY/pair/exchange" -H "Content-Type: application/json" -d '{"code": "K7QX-MP4D-HN3R", "request_id": "b4c1e0f2a9d84e7c"}'
+curl -sS -X POST "$RELAY/pair/exchange" -H "Content-Type: application/json" -d '{"code": "K7QX-MP4D-HN3R", "name": "My agent"}'   # once: a code works once, so no --retry
 curl -sS --retry 3 "$RELAY/inbox" -H "Authorization: Bearer $TOKEN"
 curl -sS --retry 3 -X POST "$RELAY/inbox/ack" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"ids": [41]}'
 ```
@@ -147,7 +146,7 @@ curl -sS --retry 3 -X POST "$RELAY/inbox/ack" -H "Authorization: Bearer $TOKEN" 
 Python, standard library only:
 
 ```python
-import json, secrets, time, urllib.error, urllib.request
+import json, time, urllib.error, urllib.request
 
 RELAY = "https://api.ramble.watch"
 
@@ -173,8 +172,8 @@ def call(method, path, body=None, token=None):
                 raise
         time.sleep(wait)
 
-# Once; save the token. The same request_id makes retries safe.
-pair = {"code": "K7QX-MP4D-HN3R", "request_id": secrets.token_hex(16), "name": "My agent"}
+# Once; save the token. A code gives its token once: a 409 here means ask for a new code.
+pair = {"code": "K7QX-MP4D-HN3R", "name": "My agent"}
 token = call("POST", "/pair/exchange", pair)["token"]
 
 inbox = call("GET", "/inbox", token=token)
@@ -392,7 +391,7 @@ Human-readable version: https://ramble.watch/docs/help
 ## Transcription
 
 - **"Transcribing…" for a long time.** Most notes take seconds. If the transcription services are busy or down, Ramble keeps trying on its own for up to 20 hours.
-- **"Couldn't transcribe".** Open the note on the iPhone and tap Retry (up to 3 times). A note that couldn't transcribe gives its free note back.
+- **"Couldn't transcribe".** Open the note on the iPhone and tap Retry (once; the retry never uses a free note). A note that couldn't transcribe gives its free note back.
 - **"No speech detected".** Nothing to transcribe, like a pocket recording. Nothing is sent to the agent or webhook.
 - **Names or words come out wrong.** Settings → Transcription: set the Language and add names and jargon to Vocabulary.
 - **"Ramble can't finish setting up right now."** The iPhone couldn't reach Ramble, or new setups are paused for the day. Notes wait as "Waiting to send" and setup finishes on a later open.
@@ -406,7 +405,7 @@ Human-readable version: https://ramble.watch/docs/help
 ## Your agent
 
 - **The agent isn't getting notes.** iPhone: Settings → Your agent shows each agent's last check-in and how many notes are waiting. "Hasn't checked in": the agent isn't checking; tap Connect again and paste the fresh message, or set the check up again from the agent loop in Part 1. "Waiting for your agent": the note is ready and the agent hasn't picked it up yet. "Not picked up": the copy expired after 30 days, was deleted, or its agent was disconnected first.
-- **"Saved, no agent connected" on a note.** An agent receives only notes recorded after it connected. Connect one; the next notes go to it.
+- **"Saved, no agent connected" on a note.** An agent receives only notes that reach Ramble's server after it connected. Connect one; the next notes go to it.
 - **Pairing code expired or didn't work.** A code works once and expires after 10 minutes. Tap New code.
 - **401, 403, 429, or connection errors.** 401: the agent was disconnected; pair again with a new code. 403: the HTTP client is filtered; send a User-Agent header. 429: agent calls have no rate limit, but wait Retry-After seconds if one comes. Sandboxed agents need api.ramble.watch on their network allowlist. See "Making requests" and "Platform notes" in Part 1.
 - **"Didn't send" on a note.** The webhook didn't accept it after 3 tries. Fix the endpoint, open the note, and tap Retry.

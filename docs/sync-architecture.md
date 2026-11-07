@@ -29,7 +29,7 @@ itself, and the phone becomes just another reader of the result.
 | Watch → relay (audio) | Background `URLSession` upload task from file, `PUT /notes/:id`, started at Stop while the app is frontmost | Survives suspension; the system routes through the iPhone, then known Wi-Fi, then cellular [N1][N2][K4] |
 | Relay → watch (status, transcript) | Upload response (done within 8 s), then `GET /notes/:id` with a default session: every 10 s while open, on open, in refresh passes | Most notes finish in the upload answer; long ones need a read [N2] |
 | Watch → relay (account) | `GET /account` on open and in passes with held notes | Learns the unlock without the phone |
-| iPhone → watch (connection) | `updateApplicationContext` with `watchToken`, `relayBaseURL`, `unlocked`, `deliveryAlertsFastMode`, `sentAt` | Latest value wins, survives relaunch, delivered in the background [A1][W1] |
+| iPhone → watch (connection) | `updateApplicationContext` with `watchToken`, `relayBaseURL`, `unlocked`, `sentAt` | Latest value wins, survives relaunch, delivered in the background [A1][W1] |
 | iPhone → watch (unlock) | `transferUserInfo(["type": "unlocked"])` alongside the context | Wakes the watch app in the background so held notes upload without opening it [U1][W1] |
 | Watch → iPhone (note details, holds) | `sendMessage`, falling back to `transferUserInfo` | `sendMessage` wakes the iOS app now [M1][V1]; user info is the queue that survives [U1] |
 | Watch → iPhone (needs a connection) | Same: `sendMessage` + `transferUserInfo` fallback | The phone mints a token with `POST /watch-token` even from a background wake, but only when `replaces` is its current token, it has none, or the watch changed; otherwise it re-sends the current token (the context carries `sentAt` so it's delivered) |
@@ -57,9 +57,12 @@ itself, and the phone becomes just another reader of the result.
 - The relay may hold the answer up to 8 s for a quick transcript and clients
   must allow 30 s, so `timeoutIntervalForRequest` is 120 s. The resource
   timeout is a day, after which a retry pass starts the task again.
-- `taskDescription` carries `<note id>|<token ref>`, so a relaunched app maps
-  results to notes and knows which token uploaded each one. On launch the
-  app reconnects the session and adopts running tasks from `allTasks` rather
+- `taskDescription` carries the note ID, so a relaunched app maps results to
+  notes (tasks from older builds carry `<note id>|<token ref>`; the ID is
+  read either way). A 401 is checked against the task's own
+  `originalRequest` `Authorization` header, so an answer to a token already
+  replaced doesn't mark the current one rejected. On launch the app
+  reconnects the session and adopts running tasks from `allTasks` rather
   than starting duplicates.
 - The response body of a background upload task arrives through
   `urlSession(_:dataTask:didReceive:)`; the status in `didCompleteWithError`.
@@ -73,12 +76,16 @@ itself, and the phone becomes just another reader of the result.
 The watch never gives up on a note and never deletes audio because uploads
 fail. Network errors and 5xx: 10 s, doubling to 5 min, while the app is open;
 every open; when `NWPathMonitor` reports the path is back [N9]; and when a new
-token arrives. 429 waits `Retry-After`. 402 `free_notes_used` holds until the
-unlock (context, user info, or `GET /account`). 413/415/`bad_upload` and 403
-`suspended` are final: stop, keep the audio
-until the phone has it. 401 means the token was replaced or revoked: show "Set
-up", send `needsConnection` with `replaces`, keep reading notes the old token
-uploaded (the relay allows that for 30 days). Exact table: `specs/relay-api.md`.
+token arrives. 429 sets the next timed retry to `Retry-After`. 402
+`free_notes_used` holds until the unlock (context, user info, or
+`GET /account`). 413/415/`bad_upload` and 403 `suspended` are final: stop,
+keep the audio until the phone has it. 401 means the token was replaced or
+revoked (a replaced token is dead for every call): show "Set up", send
+`needsConnection` with `replaces`, and read accepted notes again with the
+next token, which sees every watch note of its inbox. A 404 on a status read
+(the new token belongs to a fresh inbox, or the note expired) shows the note
+as Done with no first line. The recorded time is never checked against the
+relay's clock. Exact table: `specs/relay-api.md`.
 
 ### Background refresh
 
@@ -102,7 +109,9 @@ uploaded (the relay allows that for 30 days). Exact table: `specs/relay-api.md`.
   `receivedApplicationContext` survives relaunch, so the watch re-reads it at
   activation. The watch token also goes into the watch Keychain
   (`kSecAttrAccessibleAfterFirstUnlock`, so background passes can read it
-  [L1]); replaced tokens are kept there while notes they uploaded are unfinished.
+  [L1]), with the previous token kept only to name in `replaces`.
+- The context carries nothing for debugging: the phone's fast stuck-note
+  alerts exist only in Debug builds and stay on the phone.
 - An empty context is ignored, so a phone that never wrote one can't clear a
   working token.
 

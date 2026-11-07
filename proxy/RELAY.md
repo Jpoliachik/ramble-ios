@@ -28,9 +28,9 @@ Codes are 12 characters from `23456789ABCDEFGHJKMNPQRSTVWXYZ`, shown as `XXXX-XX
 
 | Method | Path | Body → Response |
 |---|---|---|
-| `POST` | `/pair/exchange` | `{"code", "request_id", "name"?}`, no credential → `201 {"token": "rmba_…"}` |
+| `POST` | `/pair/exchange` | `{"code", "name"?}`, no credential → `201 {"token": "rmba_…"}` |
 
-- `request_id` is a random string of 16–64 characters the agent picks. Retrying with the same code and `request_id` within the code's 10 minutes returns `200` and the same token. A different `request_id` on a used code gets `409` with `"reason": "code_used"` and no token.
+- A code returns its token once. Save it before doing anything else. Sending a used code again gets `409` with `"reason": "code_used"` and no token; if the first response was lost, ask the user for a new code. Other fields (such as a `request_id` from older instructions) are ignored.
 - `name` is optional, 1–40 characters, and shows in the app. An invalid name is dropped without failing.
 - An unknown or expired code gets `400` ("Invalid or expired pairing code. Ask the user for a new one in the Ramble app.").
 
@@ -62,7 +62,7 @@ Items carry no audio, device id or device name.
 
 ### What an agent receives
 
-- One copy of each note recorded after the agent paired, made when the transcript is ready. Notes recorded before pairing never reach it.
+- One copy of each note the relay received after the agent paired, made when the transcript is ready. Notes the relay already had before pairing never reach it.
 - Watch notes reach agents without the iPhone nearby.
 - Notes with no speech detected produce no copy and no ping.
 - A copy is deleted when the agent acks it, when the person disconnects the agent or taps Delete waiting notes, or 30 days after it was made.
@@ -85,7 +85,7 @@ When a copy is made for an agent with a hook, the relay POSTs:
 with the agent's headers, `Content-Type: application/json` and `User-Agent: Ramble-Relay/1 (+https://ramble.watch/docs)`.
 
 - Pings never carry transcript text, note ids or counts. The agent pulls and acks as usual.
-- One try, 5-second timeout, no redirects, and only after the hostname resolves to a public address. A failed ping never affects the note.
+- One try, 5-second timeout, no redirects. A failed ping never affects the note.
 - After a ping, no other ping goes to that agent until it pulls or 10 minutes pass.
 - Agents should keep a slow scheduled check (hourly or daily) as a fallback.
 
@@ -99,7 +99,7 @@ Errors are `{"error": "<sentence>"}`, plus `"reason"` where a client acts on it.
 | `401` | Missing, unknown or revoked token: the person disconnected the agent. The only status that means stop |
 | `403` | `wrong_credential` (endpoint agents can't use), or filtered before reaching the Worker (below) |
 | `405` | Wrong method; the error names the right one and links https://ramble.watch/docs |
-| `409` | `code_used`: the code was exchanged with another `request_id` |
+| `409` | `code_used`: the pairing code was already exchanged |
 | `429` | `rate_limited`, with `Retry-After` in seconds. Nothing changed; the token still works |
 | `503` | `unavailable`: the relay couldn't check something and accepted nothing. Retry later |
 
@@ -116,7 +116,7 @@ The essentials the docs page teaches:
 - **Separate checking from acting.** Empty checks drive the cost. A cheap watcher (script, hook, scheduled fetch) checks every few minutes and wakes the agent only when `items` isn't empty. If a platform can only schedule full agent runs, hourly or daily is fine.
 - **Read relative times from `created_at`**, in its offset. If the moment has passed, the item is overdue.
 - **Notes can arrive late and out of order** (watch offline or away from the iPhone, Low Power Mode, background uploads scheduled by watchOS, transcription retries during a provider outage). An empty inbox doesn't mean nothing was recorded.
-- **Only 401 means stop.** On 429, wait `Retry-After`. 403, 5xx and timeouts are transient. Every call is safe to retry.
+- **Only 401 means stop.** On 429, wait `Retry-After`. 403, 5xx and timeouts are transient. Every call except `POST /pair/exchange` is safe to retry; a code works once.
 - **Send a User-Agent**, and a `name` at pairing so the person can tell agents apart.
 
 To test: record "Test, remind me to water the plants" on the watch. Settings → Your agent shows one waiting. After the agent's next check it reads "nothing waiting".

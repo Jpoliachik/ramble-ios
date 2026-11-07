@@ -26,14 +26,12 @@ const LEGACY_HOST = new URL(RELAY_URL_LEGACY).host;
 const AGENT_INSTRUCTIONS = `Ramble connection
 Relay: ${RELAY_URL}
 
-1. Pair. When I give you a code like ${PAIR_CODE_EXAMPLE}, make up a random
-   request_id (16 to 64 characters) and POST
-   {"code": "<the code>", "request_id": "<your request_id>", "name": "<your name>"}
-   to /pair/exchange. Save the returned "token". The name is optional and shows
-   in my Ramble app. If the request times out or drops, send it again with the
-   same code and the same request_id: for ${PAIR_CODE_TTL} it returns the same token.
-   A 400 means the code is wrong or expired, and a 409 means it was already
-   used, so ask me for a new one.
+1. Pair. When I give you a code like ${PAIR_CODE_EXAMPLE}, POST
+   {"code": "<the code>", "name": "<your name>"}
+   to /pair/exchange. Save the returned "token" right away: a code gives its
+   token once. The name is optional and shows in my Ramble app. A 400 means
+   the code is wrong or expired, and a 409 means it was already used (for
+   example, a retry after a lost response), so ask me for a new one.
    The token is a password to my transcripts: anyone who has it can read and
    delete them. Store it the way your platform stores secrets, and keep it out
    of chat, memory, and logs.
@@ -70,8 +68,8 @@ Send a User-Agent header on every request (any name, like my-agent/1.0).
 Full reference and examples: ${SITE_URL}/docs`;
 
 const API_EXAMPLE = `POST /pair/exchange
-{"code": "${PAIR_CODE_EXAMPLE}", "request_id": "b4c1e0f2a9d84e7c", "name": "My agent"}
-→ 201 {"token": "rmba_…"}   (same code and request_id again within ${PAIR_CODE_TTL}: 200, same token)
+{"code": "${PAIR_CODE_EXAMPLE}", "name": "My agent"}
+→ 201 {"token": "rmba_…"}   (the same code again: 409 "code_used", no token)
 
 GET /inbox
 Authorization: Bearer rmba_…
@@ -118,10 +116,10 @@ echo "$body"`;
 
 const CURL_EXAMPLE = `RELAY=${RELAY_URL}
 
-# Pair (once). Keep the same request_id if you need to retry.
-curl -sS --retry 3 -X POST "$RELAY/pair/exchange" \\
+# Pair (once; the code works once, so no --retry). Save the token.
+curl -sS -X POST "$RELAY/pair/exchange" \\
   -H "Content-Type: application/json" \\
-  -d '{"code": "${PAIR_CODE_EXAMPLE}", "request_id": "b4c1e0f2a9d84e7c"}'
+  -d '{"code": "${PAIR_CODE_EXAMPLE}", "name": "My agent"}'
 
 # Check
 curl -sS --retry 3 "$RELAY/inbox" -H "Authorization: Bearer $TOKEN"
@@ -130,7 +128,7 @@ curl -sS --retry 3 "$RELAY/inbox" -H "Authorization: Bearer $TOKEN"
 curl -sS --retry 3 -X POST "$RELAY/inbox/ack" -H "Authorization: Bearer $TOKEN" \\
   -H "Content-Type: application/json" -d '{"ids": [41]}'`;
 
-const PYTHON_EXAMPLE = `import json, secrets, time, urllib.error, urllib.request
+const PYTHON_EXAMPLE = `import json, time, urllib.error, urllib.request
 
 RELAY = "${RELAY_URL}"
 
@@ -156,8 +154,8 @@ def call(method, path, body=None, token=None):
                 raise
         time.sleep(wait)
 
-# Once; save the token. The same request_id makes retries safe.
-pair = {"code": "${PAIR_CODE_EXAMPLE}", "request_id": secrets.token_hex(16), "name": "My agent"}
+# Once; save the token. A code gives its token once: a 409 here means ask for a new code.
+pair = {"code": "${PAIR_CODE_EXAMPLE}", "name": "My agent"}
 token = call("POST", "/pair/exchange", pair)["token"]
 
 inbox = call("GET", "/inbox", token=token)
@@ -169,7 +167,7 @@ if inbox["items"]:
 const ERRORS: [string, string, string][] = [
   ["401", "You were disconnected, or the token is wrong", "Stop checking and tell the user. This is the only status that means stop."],
   ["400 on /pair/exchange", "The code is wrong or expired", "Ask the user for a new code."],
-  ["409 on /pair/exchange", "The code was already used with another request_id", "Ask the user for a new code."],
+  ["409 on /pair/exchange", "The code was already used, maybe by your own earlier try", "Ask the user for a new code."],
   ["400 elsewhere", "The request is malformed", "Fix it. The error message says what's wrong."],
   ["403", "Filtered before it reached the relay, or an endpoint agents can't use", "Set a User-Agent or use another HTTP client, then retry. Not a token problem."],
   ["405", "Wrong HTTP method", "The error message names the right one."],
@@ -332,11 +330,11 @@ export default function AgentDocs() {
                   Anything never acked comes back on every check and is deleted {RETENTION} after it was made.
                 </li>
                 <li>
-                  <Strong>Pairing retries.</Strong> A code makes one connection. Send the same code with the same{" "}
-                  <InlineCode>request_id</InlineCode> any time in its {PAIR_CODE_TTL} and you get the same token, so a
-                  lost response never costs the user a new code. A different <InlineCode>request_id</InlineCode> gets{" "}
-                  <InlineCode>409</InlineCode> and no token. Codes ignore case, spaces, and dashes.{" "}
-                  <InlineCode>name</InlineCode> is optional, 1 to 40 characters; an invalid one is dropped.
+                  <Strong>Pairing.</Strong> A code makes one connection and gives its token once, so save it right
+                  away. Sending a used code again, even after a lost response, gets <InlineCode>409</InlineCode> and no
+                  token: ask the user for a new code (it expires {PAIR_CODE_TTL} after it was made). Codes ignore
+                  case, spaces, and dashes. <InlineCode>name</InlineCode> is optional, 1 to 40 characters; an invalid
+                  one is dropped.
                 </li>
               </ul>
             </section>
@@ -355,7 +353,7 @@ export default function AgentDocs() {
                   alone.
                 </li>
                 <li>
-                  You get notes recorded after you paired. Notes with no speech go to no one. Notes from the watch reach
+                  You get notes that reach the relay after you paired. Notes with no speech go to no one. Notes from the watch reach
                   you without the iPhone nearby.
                 </li>
                 <li>
@@ -397,8 +395,9 @@ export default function AgentDocs() {
               <p>
                 Errors are JSON: <InlineCode>{`{"error": "..."}`}</InlineCode>, with a{" "}
                 <InlineCode>&quot;reason&quot;</InlineCode> code where it helps (like{" "}
-                <InlineCode>code_used</InlineCode>). Every call is safe to retry. Agent calls and pairing have no
-                rate limit; if you ever get a <InlineCode>429</InlineCode>, wait the seconds in{" "}
+                <InlineCode>code_used</InlineCode>). Every call except{" "}
+                <InlineCode>POST /pair/exchange</InlineCode> is safe to retry; a code works once. Agent calls and
+                pairing have no rate limit; if you ever get a <InlineCode>429</InlineCode>, wait the seconds in{" "}
                 <InlineCode>Retry-After</InlineCode>.
               </p>
               <CodeBlock filename="curl">{CURL_EXAMPLE}</CodeBlock>

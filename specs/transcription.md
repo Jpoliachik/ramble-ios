@@ -37,7 +37,7 @@ A note SHALL never have two attempts running at once. The attempt started when a
 - THEN a new attempt for that note starts within the next minute
 
 ### Requirement: Repeats never re-transcribe; a hand retry of a failed note does
-The server SHALL hold one current result per note. A repeated upload of the same note SHALL NOT start another transcription. Only the person's retry of a permanently failed note, sent from the iPhone ([relay-api.md](relay-api.md)), SHALL transcribe it again, up to 3 times per note. A retry runs the normal Groq call and retry window, with the options in effect when the retry starts.
+The server SHALL hold one current result per note. A repeated upload of the same note SHALL NOT start another transcription. Only the person's retry of a permanently failed note, sent from the iPhone ([relay-api.md](relay-api.md)), SHALL transcribe it again, once per note. A retry runs the normal Groq call and retry window, with the options in effect when the retry starts.
 
 #### Scenario: Retried upload after success
 - GIVEN a note already has a transcript
