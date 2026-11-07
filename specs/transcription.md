@@ -1,0 +1,288 @@
+# Transcription
+
+## Purpose
+What happens to a note's audio on Ramble's server from the moment an upload is accepted until a transcript exists: which provider transcribes it, the options that shape the text, silence, length, failures, when the audio is deleted, and the cost limits and operator alerts around it. The wire contract is in [relay-api.md](relay-api.md), who receives the transcript is in [delivery.md](delivery.md), and free notes, the unlock and fair use are in [purchase.md](purchase.md).
+
+## Starting transcription
+
+### Requirement: Transcription starts when an upload is accepted
+The server SHALL start transcribing a note as soon as its upload is accepted, which happens only once the note's audio is fully stored. All transcription happens on the server.
+
+#### Scenario: Watch note
+- GIVEN the watch uploads a 2-minute note
+- WHEN the server finishes storing the audio and accepts the upload
+- THEN transcription of that note starts right away
+- AND the note reads as transcribing until a result exists
+
+#### Scenario: Interrupted upload
+- GIVEN an upload breaks off halfway through the audio
+- WHEN the server sees the incomplete upload
+- THEN no note exists on the server and nothing is transcribed or counted
+- AND the device still has the audio and uploads it again
+
+### Requirement: Quick transcripts come back with the upload
+When transcription finishes within the inline wait set in relay-api.md (8 seconds), the upload response SHALL carry the transcript; otherwise the device reads it later by note ID.
+
+#### Scenario: Short note
+- GIVEN a 30-second note
+- WHEN the provider returns its transcript 3 seconds after the upload is accepted
+- THEN the upload response already carries the transcript
+
+### Requirement: Stalled attempts are picked up within minutes
+A note SHALL never have two attempts running at once. The attempt started when an upload (or hand retry) is accepted SHALL give its Groq call at most 20 seconds, and SHALL be treated as lost if it has no result 1 minute after starting. Every later attempt SHALL give its Groq call 120 seconds and is lost after 8 minutes. The server SHALL start the next attempt within 1 minute of one being lost.
+
+#### Scenario: Server work cut short
+- GIVEN a note's first attempt stopped before the provider answered
+- WHEN 1 minute has passed since that attempt started (8 minutes, for a later attempt)
+- THEN a new attempt for that note starts within the next minute
+
+### Requirement: Repeats never re-transcribe; a hand retry of a failed note does
+The server SHALL hold one current result per note. A repeated upload of the same note SHALL NOT start another transcription. Only the person's retry of a permanently failed note, sent from the iPhone ([relay-api.md](relay-api.md)), SHALL transcribe it again, once per note. A retry runs the normal Groq call and retry window, with the options in effect when the retry starts.
+
+#### Scenario: Retried upload after success
+- GIVEN a note already has a transcript
+- WHEN the device uploads the same note ID again
+- THEN the server answers with the existing note and its transcript
+- AND no provider is called and nothing more is counted
+
+#### Scenario: Retry of a failed note
+- GIVEN a note failed with "retries_exhausted" and has not been retried
+- WHEN the person taps "Retry" on the iPhone
+- THEN the server transcribes the re-uploaded audio with Groq, with a fresh 20-hour window
+
+## Provider
+
+### Requirement: One provider for everyone
+The server SHALL transcribe every note with Groq Whisper v3 Turbo, for free and unlocked inboxes alike, and SHALL send the audio to no other provider. There is no fallback provider: when Groq answers 5xx or 429, rejects or lacks Ramble's key (the operator is alerted), cannot be reached, or gives no answer within the attempt's call timeout (20 or 120 seconds, above), the attempt is a retryable failure (Failures, below). No note SHALL fail permanently or be marked silent because of Ramble's own configuration.
+
+#### Scenario: Normal day
+- GIVEN Groq is answering normally
+- WHEN any note is transcribed
+- THEN Groq Whisper v3 Turbo produces its transcript
+
+#### Scenario: Groq rate-limits
+- GIVEN Groq answers a note with 429
+- WHEN the attempt ends
+- THEN no other provider is called and the note waits for its next attempt as "Transcribing…"
+
+#### Scenario: Groq key rejected
+- GIVEN Groq answers 401 to Ramble's key
+- WHEN the attempt ends
+- THEN the note is not failed, it waits for its next attempt, and the operator is alerted
+
+#### Scenario: Audio rejected
+- GIVEN Groq answers 400 because it cannot decode the audio
+- WHEN the attempt ends
+- THEN the note fails permanently
+
+### Requirement: Only a provider that doesn't train on the audio
+The server SHALL send audio only to a provider whose API terms exclude training on it, and the privacy policy SHALL name Groq as that provider.
+
+#### Scenario: Reading the privacy policy
+- GIVEN a person opens the privacy policy
+- WHEN they read who transcribes their audio
+- THEN it names Groq as the one transcription provider
+
+## Options
+
+### Requirement: Options set on the iPhone apply to every note
+The person SHALL be able to set three options in the iPhone app (phone.md): Language (default "Auto-detect", with every language in phone.md's Language list), Vocabulary (up to 900 characters, default empty), and "Remove filler words" (default off). They SHALL be kept with the inbox on the server. A note's options SHALL be fixed when its first attempt starts, whichever device recorded it, and every automatic retry SHALL use those same options; a hand retry takes the options in effect when it starts.
+
+#### Scenario: Watch note uses phone settings
+- GIVEN Language is set to Spanish on the iPhone
+- WHEN the watch uploads a note while the phone is out of reach
+- THEN the note is transcribed with a Spanish language hint
+
+#### Scenario: Change while a note waits
+- GIVEN a note's first attempt ran with "Remove filler words" off and failed
+- WHEN the person turns it on before the retry
+- THEN the retried note keeps its filler words, and notes whose first attempt starts afterwards lose them
+
+### Requirement: Language hint
+The server SHALL pass the chosen language to Groq, and SHALL pass no language hint, letting Groq detect the language, when the setting is "Auto-detect".
+
+#### Scenario: Language set
+- GIVEN Language is Spanish
+- WHEN a note is transcribed
+- THEN Groq is given Spanish as the language
+
+#### Scenario: Auto-detect
+- GIVEN Language is "Auto-detect"
+- WHEN a note is transcribed
+- THEN Groq is given no language hint and detects the language itself
+
+### Requirement: Vocabulary hints
+The server SHALL use the vocabulary as a list of terms separated by commas or line breaks, ignoring case-only duplicates and dropping "<", ">" and line breaks inside a term, up to 100 terms of up to 100 characters each. The hint SHALL never appear in the transcript unless it was spoken.
+
+#### Scenario: Hint not echoed
+- GIVEN the vocabulary is "Goodloop, Ramble"
+- WHEN a note that never mentions them is transcribed
+- THEN neither the terms nor a sentence listing them appear in the transcript
+
+### Requirement: Filler-word removal
+When "Remove filler words" is on, the transcript SHALL leave out "um", "uh", "er", "ah", "hmm", "mhm", "uhm" and "erm", including drawn-out forms like "ummm", and keep words such as "like" and "you know" and keep paragraph breaks. When it is off, filler words SHALL be kept as Groq returned them.
+
+#### Scenario: On
+- GIVEN "Remove filler words" is on
+- WHEN the person says "Um, so I think, uh, we should ship it"
+- THEN the transcript is "so I think, we should ship it"
+
+#### Scenario: Off
+- GIVEN "Remove filler words" is off
+- WHEN Groq returns "Um, so I think, uh, we should ship it"
+- THEN the transcript is exactly that, "Um" and "uh" included
+
+### Requirement: Paragraphs
+Every transcript SHALL be broken into paragraphs, with no setting: a new paragraph starts after a pause of 2 seconds or more. When Groq gives no timing, a transcript of 500 characters or more breaks at the first sentence end once a paragraph reaches 350 characters, and a last piece under 80 characters joins the paragraph before it. A transcript under 500 characters with no 2-second pause is one paragraph.
+
+#### Scenario: Pause in speech
+- GIVEN the person pauses for 3 seconds mid-note
+- WHEN the transcript is produced
+- THEN a blank line separates the text before and after the pause
+
+## Silent notes
+
+### Requirement: No speech detected
+The server SHALL finish a note as "No speech detected", with an empty transcript and result "no_speech" (relay-api.md), when the provider returns no text, rejects the audio as too short, returns only one of these phrases, ignoring case and surrounding punctuation: "Thank you.", "Thanks for watching!", "Thank you for watching.", "you" or "Bye.", or marks every part of the audio as silence (Whisper's no-speech probability over 0.6 with low confidence).
+
+#### Scenario: Pocket recording
+- GIVEN a 20-second note of fabric noise
+- WHEN Groq returns "Thank you."
+- THEN the note shows "No speech detected" with an empty transcript
+
+#### Scenario: Real thanks inside a longer note
+- GIVEN a note whose transcript is "Thank you. Remind me to call Sam tomorrow."
+- WHEN its result is checked
+- THEN it is a normal transcript and is delivered
+
+### Requirement: Silent notes go nowhere
+A silent note SHALL use a free note like any other (purchase.md) and SHALL get no agent copy, no wake-up hook and no webhook (delivery.md).
+
+#### Scenario: Agent connected
+- GIVEN an agent is connected
+- WHEN a note finishes as "No speech detected"
+- THEN the agent receives nothing and the person's free-note count goes down by one
+
+## Length
+
+### Requirement: 60-minute cap
+A note SHALL be at most 60 minutes long. The watch and the iPhone stop recording at 60:00 (watch.md, phone.md) and record at no more than 32 kbps, so a 60-minute note fits the 20 MB upload limit. The server SHALL refuse an upload whose audio is longer than 61 minutes or larger than the size limit, without storing or counting it (relay-api.md), and SHALL transcribe any accepted note whole, in one piece.
+
+#### Scenario: Full-length note
+- GIVEN a 60-minute note from the watch
+- WHEN it is uploaded
+- THEN it is accepted and transcribed as one note with one transcript
+
+#### Scenario: Over-long upload
+- GIVEN an upload whose audio runs 3 hours
+- WHEN it reaches the server
+- THEN it is refused as too long and nothing is stored or counted
+
+### Requirement: Length is measured on the server
+The server SHALL take each note's length from the provider's response, or from the audio file when a provider reports none, and SHALL never use a length reported by a device or by the file's own header. The full measured length SHALL count, with no cap, even for a file whose header understated its length. This length is what the heavy-use tally (purchase.md) counts.
+
+#### Scenario: Device claims a short note
+- GIVEN a device reports a note as 10 seconds long
+- WHEN Groq reports 42 minutes of audio
+- THEN 42 minutes count toward the month's usage
+
+#### Scenario: Header understates the length
+- GIVEN an accepted upload whose header claims 59 minutes
+- WHEN Groq reports 5 hours of audio
+- THEN 5 hours count toward the month's usage
+
+## Failures
+
+### Requirement: Retryable failures keep retrying for 20 hours
+When Groq is overloaded, down, slow, or unavailable to Ramble (including Groq answering with a billing, quota or spend-limit error, or 402 or 413, which SHALL never fail the note as "audio_rejected"), the server SHALL wait 1, 2, 5, 10, then 15 minutes between attempts, then 30 minutes between each later attempt, until 20 hours after the upload (or hand retry) was accepted. The note then fails permanently. While it waits, the person sees "Transcribing…".
+
+#### Scenario: Window ends
+- GIVEN a note has failed every attempt for 20 hours
+- WHEN the window ends
+- THEN the note fails permanently, with result "retries_exhausted" (relay-api.md)
+
+#### Scenario: Groq spend limit reached
+- GIVEN Groq answers every request with a billing or spend-limit error
+- WHEN a note is attempted
+- THEN it keeps retrying as "Transcribing…" and is never marked "audio_rejected"
+
+### Requirement: Permanent failures
+A note SHALL fail permanently, with result "audio_rejected", when Groq rejects the audio itself (any 4xx other than 401, 402, 403, 413 and 429, and other than an error Groq marks as billing, quota or rate related), or with result "retries_exhausted" when the retry window ends. The person's devices show "Couldn't transcribe", with "Retry" on the iPhone while hand retries remain (phone.md), and the reason "Ramble couldn't turn this audio into text." or "Ramble couldn't reach a transcription service in time." respectively. The free note it used is given back (purchase.md). The audio stays wherever each device keeps it (watch.md, phone.md).
+
+#### Scenario: Corrupt audio
+- GIVEN a free note whose audio Groq can't decode
+- WHEN Groq answers 400
+- THEN the note shows "Couldn't transcribe" and "Ramble couldn't turn this audio into text.", with "Retry" on the iPhone
+- AND the person's free-note count goes back up by one
+
+## Audio retention
+
+### Requirement: Audio is deleted as soon as it is no longer needed
+The server SHALL delete a note's audio as soon as the note has a transcript, is "No speech detected", or has failed permanently. Separately, any stored audio SHALL be deleted 1 day after it was stored. Audio storage SHALL be private, and no endpoint SHALL return audio. Usage records SHALL hold lengths, providers and outcomes but no audio or transcript text; server-wide log rules are in relay-api.md.
+
+#### Scenario: Transcript ready
+- GIVEN a note's transcript has just been saved
+- WHEN anyone asks the server for the audio afterwards
+- THEN the server no longer has it
+
+#### Scenario: Delete fails
+- GIVEN deleting a note's audio failed after transcription
+- WHEN 1 day has passed since it was stored
+- THEN the audio is deleted anyway
+
+## Cost limits
+
+### Requirement: Heavy use is monitored, not capped
+The server SHALL add the measured length of each note that finishes (with a transcript or as "No speech detected") to its user's monthly tally and alert the operator once when a user passes 100 hours in a month (purchase.md). No upload SHALL be refused or held for usage; the operator's manual suspension is the only per-user stop (purchase.md). A note that fails for good adds nothing.
+
+#### Scenario: Crossing the line
+- GIVEN a purchase is 10 minutes under 100 hours this month
+- WHEN a 30-minute note is transcribed
+- THEN the operator is alerted once, and the next upload is accepted and transcribed as usual
+
+## Operator
+
+### Requirement: Operator alerts
+The server SHALL alert the operator when:
+- an attempt finds Groq rejected Ramble's key, or the key is missing
+- any accepted note is still transcribing more than 30 minutes after it was accepted (checked every minute)
+- a note fails permanently, naming its result
+- a user passes 100 hours of audio in a month (Cost limits, above)
+
+Besides these, the server SHALL send no alert and no usage summary; the operator reads anything else from Cloudflare's logs and the database. A Groq 429 alone alerts nothing.
+
+#### Scenario: Stuck note
+- GIVEN an accepted note has been transcribing for 31 minutes
+- WHEN the next check runs
+- THEN the operator is alerted
+
+#### Scenario: Not yet stuck
+- GIVEN an accepted note has been transcribing for 29 minutes
+- WHEN the next check runs
+- THEN no alert is sent
+
+#### Scenario: Permanent failure
+- GIVEN Groq can't decode a note's audio
+- WHEN the note fails with "audio_rejected"
+- THEN the operator is alerted with that result and no transcript text
+
+#### Scenario: Held notes don't alert
+- GIVEN a note was refused because the person is out of free notes
+- WHEN it waits on the device for days
+- THEN no stuck-note alert fires, because the server never accepted it
+
+### Requirement: Alert cooldown
+The same alert SHALL repeat at most once every 6 hours while it still holds; permanent failures share one alert per result. The heavy-use alert is sent once per user per month (purchase.md).
+
+#### Scenario: Still stuck
+- GIVEN the stuck-note alert fired at 10:00 and the note is still waiting
+- WHEN checks run until 15:59
+- THEN no second stuck-note alert is sent before 16:00
+
+### Requirement: Alerts go to one external webhook
+The server SHALL POST every alert, including alerts defined in relay-api.md, to one alert webhook outside Ramble, such as a phone push service, configured by the operator. Messages SHALL contain no transcript text and no inbox secrets. When no alert webhook is set, nothing is sent.
+
+#### Scenario: Webhook set
+- GIVEN the alert webhook is configured
+- WHEN an alert fires
+- THEN one POST with a short plain-text message goes to that webhook

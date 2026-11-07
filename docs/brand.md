@@ -23,7 +23,7 @@ Use both meanings in copy. "Go for a ramble" works. "Just ramble" works. Never u
 
 A watch app that hands what you say to your agent.
 
-Tap your Apple Watch, talk, and put your arm down. Your iPhone transcribes it, and the transcript goes to your agent, which handles it later. No screen to read, no reply to wait for. The watch is where you use Ramble. The phone does the transcription, the delivery, and the settings, and it can stay in your pocket or at home.
+Tap your Apple Watch, talk, and put your arm down. The watch sends it to Ramble's server, which transcribes it, and the transcript goes to your agent, which handles it later. No screen to read, no reply to wait for. The watch is where you use Ramble. The phone holds your history and the settings, and it can stay in your pocket or at home.
 
 ## Positioning
 
@@ -36,15 +36,15 @@ People with a personal agent still need a way to hand it things in the moment. R
 Every piece of copy should support at least one of these, and none should undercut them.
 
 1. **Stay in the moment.** A thought takes seconds. Tap, talk, done. Then you're back.
-2. **Leave your phone behind.** Your watch is enough. It records with no phone and no signal, and syncs when you're back in range.
+2. **Leave your phone behind.** Your watch is enough. It records with no phone and no signal, and sends when it has a connection again.
 3. **Let it go.** Nothing gets lost and nothing pulls you back in. No reply on your wrist. Your agent has it.
-4. **Nothing sticks around.** No accounts. Transcripts are deleted once your agent picks them up. We say exactly what's kept, where, and for how long.
+4. **Nothing sticks around.** No accounts. Audio is deleted as soon as the transcript is ready. Transcripts are deleted once your agent picks them up. We say exactly what's kept, where, and for how long.
 
 ## Who it's for
 
 **Primary: people who want less phone in their day and already use a personal agent.** They walk, run, drive, cook, and parent. They have ideas and to-dos at awkward moments, and they're tired of the phone being the only place to put them. They don't want another inbox. They want to say it and know it landed.
 
-**Secondary: builders.** Developers and tinkerers who pipe voice into their own stack via webhook, or who care which transcription model they use. Speak to them on the docs pages, not in the hero.
+**Secondary: builders.** Developers and tinkerers who pipe voice into their own stack via webhook. Speak to them on the docs pages, not in the hero.
 
 ## Voice
 
@@ -58,7 +58,7 @@ Ramble sounds like a calm friend who respects your time.
 
 ### Copy rules
 
-1. **Lead with the moment, then the mechanism.** "On a walk, a thought comes. Tell your watch." before "Ramble transcribes on your iPhone."
+1. **Lead with the moment, then the mechanism.** "On a walk, a thought comes. Tell your watch." before "Ramble transcribes it and hands it to your agent."
 2. **Write to "you."** Ramble is "it," never "we" in product copy. "We" is fine for privacy and pricing, where a person is accountable.
 3. **Use concrete moments.** A walk, the car, the dentist reminder, oat milk on the list. Real examples beat abstract benefits.
 4. **One idea per line.** Headlines are one thought. Body paragraphs are two or three sentences.
@@ -77,7 +77,7 @@ moment, walk, say it, let it go, back to your day, your agent handles it, messy 
 | productivity, hustle, crush, 10x, optimize | Ramble is about doing less on your phone, not doing more | "get back to your day" |
 | never miss a thing, capture everything | Fear of missing out is the opposite of the brand | "keep the thought" |
 | AI-powered, smart, revolutionary, game-changing, seamless | Hype that says nothing | say what it does |
-| notes, note-taking | Ramble isn't a notes app; your agent is where things live | "thought," "what you say" |
+| notes, note-taking | Ramble isn't a notes app; your agent is where things live | "thought," "what you say" ("notes" is fine in the price line and on-screen states the specs set) |
 | instantly, real-time | Agents pick up on their own schedule | "later," "when your agent checks in" |
 | ramble on, rambling (as long or tedious) | Undercuts quick capture | "just say it," "messy is fine" |
 
@@ -98,30 +98,31 @@ Use these as written, or start from them.
 ### By audience
 
 - **Agent owners:** "Tap your watch and talk. Your agent picks it up and takes care of it. Connect with a short code. No keys, no setup."
-- **Privacy-minded:** "No accounts. Audio never goes to the relay. Transcripts wait only until your agent picks them up, then they're deleted. Anything never picked up is deleted after 30 days."
+- **Privacy-minded:** "No accounts. Ramble's server is a relay, not an archive. Your audio is sent to a transcription provider and deleted as soon as the transcript is ready. Transcripts are deleted when your agent picks them up, or after 30 days. Your full history lives only on your iPhone."
 - **Builders:** "Every transcript can POST to your own endpoint. Signed requests, automatic retries, full API docs."
-- **Transcription:** "Apple Speech on your iPhone, free and private. Optional cloud models when you want more accuracy."
+- **Transcription:** "Accurate transcripts, with no model to pick. Messy is fine."
 
 ## Facts we can claim
 
 Keep claims inside this list. If it isn't here, check the code before writing it.
 
-- Records on the watch with no phone and no connection, and syncs later.
-- Transcribes on the iPhone with Apple Speech by default. Optional cloud models: Groq Whisper v3 Turbo, Whisper Large v3, Deepgram Nova-3, OpenAI GPT-Transcribe.
-- Connect an agent with a short single-use pairing code (like `K7QX-MP4D`, expires in 10 minutes). No API keys or URLs.
+- Records on the watch with no phone and no connection, and sends later. The watch uploads straight to Ramble's server, through the iPhone, Wi-Fi, or cellular.
+- Transcribes on Ramble's server with Groq Whisper v3 Turbo. If Groq is overloaded or down, the note waits and is retried. Groq doesn't train on the audio. There is no model to choose.
+- Connect an agent with a short single-use pairing code (like `K7QX-MP4D-HN3R`, expires in 10 minutes). No API keys or URLs.
 - Copy says "your agent." Muse is the agent we build and test with, so name it where someone needs to know what's tested, and don't headline "works with any agent."
-- No accounts. The relay never receives audio. Transcripts are deleted when the agent picks them up, and after 30 days at most if it never does. Credentials are stored only as hashes.
-- Webhooks: signed POST to any HTTPS endpoint, with retries.
-- $4.99 once. Optional $2.99/month for cloud transcription. Cloud is never required.
+- No accounts. Privacy, in the words we use everywhere: "Ramble's server is a relay, not an archive. Your audio is sent to a transcription provider and deleted as soon as the transcript is ready. Transcripts are deleted when your agent picks them up, or after 30 days. Your full history lives only on your iPhone." Credentials are stored only as hashes.
+- Webhooks: one destination. Your iPhone sends a signed POST to any HTTPS endpoint once it has the transcript, with retries.
+- Pricing, word for word: "Free to download. 25 notes free, then $14.99 once." No subscription. Fair use is 100 hours of audio per calendar month. Refunds are handled by Apple.
 
 ## What not to say
 
 - Don't promise real-time delivery. Minutes of delay is normal and fine.
 - Don't say "no servers" or "no data on our servers." The relay is a server. Say what it holds and when it deletes it.
+- Don't say audio never leaves your device or never reaches the server. It does, and it's deleted as soon as the transcript is ready. Don't call Ramble on-device or offline transcription.
 - Don't say "open source," "read the code," or "verify it yourself," and don't mention self-hosting.
-- Don't say "no subscriptions ever." The cloud upgrade is optional, not absent.
-- Don't claim a cloud model is better for noise or accents. No independent benchmark backs that. "More accurate" is fine.
-- Don't promise MCP, ChatGPT, Claude, or Grok connections, speaker labels, or end-to-end encryption until they ship.
+- Don't call the free notes a "trial," and don't say "unlimited" (fair use applies), "premium," "Subscribe," or "per month" next to a price. "Subscription" appears only in "No subscription."
+- Don't claim a transcription model is better for noise or accents. No independent benchmark backs that.
+- Don't promise MCP or dedicated ChatGPT, Claude, or Grok integrations, speaker labels, or end-to-end encryption until they ship. The Connect screen's "Works with Muse, Grok Bot, ChatGPT and more" is the one sanctioned agent list.
 - Don't use fear-based privacy marketing or compare directly to other apps.
 
 ## What Ramble is not
@@ -135,8 +136,8 @@ Keep claims inside this list. If it isn't here, check the code before writing it
 1. **Nothing ever gets lost.** Offline-first queues on watch and phone, clear status at every step. A thought recorded on a hike reaches your agent when you're back in range.
 2. **Capture over organization.** Messy input beats no input. Your agent handles the structure.
 3. **Less screen, not more.** Every feature should shorten the time someone spends looking at a device. If it adds a reason to look, question it.
-4. **Hold as little as possible.** No accounts, no audio on the relay, transcripts kept only until delivery, with a stated maximum.
-5. **Pluggable.** People choose their transcription model, their agent, and their webhook.
+4. **Hold as little as possible.** No accounts, audio deleted as soon as it's transcribed, transcripts kept only until delivery, with a stated maximum.
+5. **Pluggable.** People choose their agent and their webhook. Ramble picks the transcription model, so there's nothing to tune.
 6. **Ship and iterate.** Use it, notice what's missing, add that.
 
 ## Visual identity

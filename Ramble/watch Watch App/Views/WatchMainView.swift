@@ -9,14 +9,36 @@
 //
 
 import AVFoundation
+import Combine
 import SwiftUI
 import WatchKit
+
+/// Reads the live services once, so Home and Recent agree on every note.
+@MainActor
+enum WatchRecent {
+    static func notes(now: Date = Date()) -> [WatchNote] {
+        let uploading = WatchRelayService.shared.uploadingIDs
+        let stuckAfter: TimeInterval = 6 * 3600
+        return WatchNoteStore.shared.recent.map { record in
+            WatchNote(
+                record: record,
+                display: WatchNoteDisplay.resolve(
+                    record,
+                    isUploading: uploading.contains(record.id),
+                    stuckAfter: stuckAfter,
+                    now: now
+                )
+            )
+        }
+    }
+}
 
 struct WatchMainView: View {
     @StateObject private var recordingManager = WatchRecordingManager.shared
     @StateObject private var connectivity = WatchConnectivityService.shared
-    @StateObject private var syncQueue = WatchSyncQueue.shared
-    @StateObject private var history = WatchRecordingHistory.shared
+    @StateObject private var store = WatchNoteStore.shared
+    @StateObject private var relay = WatchRelayService.shared
+    @StateObject private var connection = WatchConnection.shared
 
     @Environment(\.scenePhase) private var scenePhase
 
@@ -31,6 +53,8 @@ struct WatchMainView: View {
     @State private var nudge = 0
     @State private var path: [WatchRoute] = []
     @State private var now = Date()
+    /// Moves `now` along while the app is open, for the stuck threshold.
+    private let clock = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
     /// 58% of the screen width: 120pt on a 46mm watch.
     private let buttonSize = (WKInterfaceDevice.current().screenBounds.width * 0.58).rounded()
@@ -42,19 +66,16 @@ struct WatchMainView: View {
             micDenied: micDenied,
             micBusy: micBusyToken != nil,
             companionAppInstalled: connectivity.isCompanionAppInstalled,
-            phoneNeedsUnlock: connectivity.phoneNeedsUnlock
+            isConnected: connection.isConnected,
+            hasUnlockHold: store.notes.contains { $0.upload == .heldUnlock }
         )
     }
 
     var body: some View {
-        // The observed services re-render this view whenever the queue, the
-        // session or the history changes. `now` moves on each foreground, so
-        // a note that crossed the stuck threshold turns red.
-        let notes = WatchDelivery.notes(now: now)
-        let badge = WatchHistoryBadge.resolve(
-            notes,
-            seenLostIDs: history.seenLostIDs
-        )
+        // The observed services re-render this view whenever a note, an
+        // upload or the connection changes. `now` moves on each foreground
+        // and every 30 s, so a note that crossed the stuck threshold turns red.
+        let badge = WatchHistoryBadge.resolve(WatchRecent.notes(now: now))
 
         NavigationStack(path: $path) {
             WatchRecordButtonView(
@@ -62,7 +83,7 @@ struct WatchMainView: View {
                 isRecording: isRecording,
                 audioLevel: recordingManager.audioLevel,
                 showCheck: showCheck,
-                breathe: history.entries.isEmpty && !micDenied,
+                breathe: !store.hasEverSavedNote && !micDenied,
                 dimmed: micDenied
             ) {
                 Task { await toggleRecording() }
@@ -102,10 +123,15 @@ struct WatchMainView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 refreshOnForeground()
+            } else {
+                relay.appLeftForeground()
             }
         }
         .onChange(of: recordingManager.stopCount) { _, _ in
             flashCheck()
+        }
+        .onReceive(clock) { date in
+            now = date
         }
     }
 
@@ -130,7 +156,11 @@ struct WatchMainView: View {
     }
 
     private var timer: some View {
-        Text(WatchFormat.duration(recordingManager.currentDuration))
+        Text(WatchFormat.timer(
+            elapsed: recordingManager.currentDuration,
+            cap: WatchRecordingManager.maxDuration,
+            warnAt: WatchRecordingManager.warnAt
+        ))
             .font(.system(size: 26, weight: .bold, design: .serif))
             .monospacedDigit()
             .foregroundStyle(Color.brandAmber)
@@ -147,19 +177,17 @@ struct WatchMainView: View {
         // first, since a tap can follow the launch almost at once.
         Task { @MainActor in
             recordingManager.prewarm()
-            // Retry anything still waiting, including transfers from previous sessions
-            syncQueue.pruneOrphanedJobs()
-            connectivity.retryPendingTransfers()
+            // Uploads, transcript reads, the account, resending audio to
+            // the iPhone, and asking it for a connection if there's none.
+            relay.appBecameActive()
             recordingManager.removeUnusedPreparedFiles()
-            WatchStuckNoteAlerts.shared.update()
         }
     }
 
     /// A tap always records on the watch, whatever the phone is doing.
     private func toggleRecording() async {
         if recordingManager.isRecording {
-            WatchHapticService.recordStop()
-            recordingManager.stopRecordingAndTransfer()
+            recordingManager.stopRecording()
             return
         }
         guard !isStarting else { return }
@@ -172,9 +200,8 @@ struct WatchMainView: View {
         defer { isStarting = false }
         showCheck = false
         micBusyToken = nil
-        if await recordingManager.startRecording() {
-            WatchHapticService.recordStart()
-        } else {
+        let started = await recordingManager.startRecording()
+        if !started {
             WatchHapticService.failure()
             if recordingManager.isMicrophoneDenied {
                 micDenied = true
@@ -298,8 +325,8 @@ struct WatchHistoryButton: View {
     private var accessibilityValue: String {
         switch badge {
         case .needsYou: return "A note needs you"
-        case .moving: return "Sending to iPhone"
-        case .waiting: return "Notes waiting for iPhone"
+        case .moving: return "Sending"
+        case .waiting: return "Notes waiting to send"
         case .none: return ""
         }
     }

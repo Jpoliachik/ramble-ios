@@ -18,6 +18,15 @@ final class SettingsService {
 
     private init() {}
 
+    private static let transcriptionSettingsDirtyKey = "transcriptionSettingsDirty"
+
+    /// Language, vocabulary or filler words changed here and the server
+    /// hasn't confirmed it yet. Sent again on the next check-in.
+    var transcriptionSettingsDirty: Bool {
+        get { UserDefaults.standard.bool(forKey: Self.transcriptionSettingsDirtyKey) }
+        set { UserDefaults.standard.set(newValue, forKey: Self.transcriptionSettingsDirtyKey) }
+    }
+
     func load() -> Settings {
         var settings: Settings
         if let data = try? Data(contentsOf: settingsFile),

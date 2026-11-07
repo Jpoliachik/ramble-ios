@@ -6,11 +6,13 @@
 //
 
 import SwiftUI
+import UserNotifications
 
 @main
 struct RambleApp: App {
     @AppStorage("appearanceMode") private var appearanceMode: String = AppearanceMode.system.rawValue
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
+    @AppStorage(Consent.key) private var hasConsented: Bool = false
 
     init() {
         BackgroundTaskService.shared.registerBackgroundTasks()
@@ -29,23 +31,28 @@ struct RambleApp: App {
             }
         }
         _ = PhoneConnectivityService.shared
-        DeliveryMonitor.shared.start()
+        // Ramble posts no notifications. Clear any an older build left.
+        UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+        UNUserNotificationCenter.current().removeAllDeliveredNotifications()
         HapticService.prepare()
 
-        // Proactively download the speech model so transcription works immediately
-        Task {
-            await TranscriptionQueueService.shared.prepareModelIfNeeded()
-        }
-
-        // Initialize subscription service and fetch products
-        Task {
-            await SubscriptionService.shared.start()
+        Task { @MainActor in
+            await PurchaseService.shared.start()
         }
     }
 
     var body: some Scene {
         WindowGroup {
             MainView()
+                // Onboarding done in an earlier build, without the consent
+                // line: ask once before anything uploads (specs/phone.md).
+                .sheet(isPresented: Binding(
+                    get: { hasCompletedOnboarding && !hasConsented },
+                    set: { _ in }
+                )) {
+                    ConsentNoticeView()
+                        .interactiveDismissDisabled()
+                }
                 .preferredColorScheme(
                     AppearanceMode(rawValue: appearanceMode)?.colorScheme
                 )
@@ -58,38 +65,26 @@ struct RambleApp: App {
                     OnboardingView()
                         .interactiveDismissDisabled()
                 }
+                .purchaseNotices()
                 .onReceive(
                     NotificationCenter.default.publisher(
                         for: UIApplication.didEnterBackgroundNotification
                     )
                 ) { _ in
-                    // Immediate ~30s background time for in-flight transcription + webhook
+                    NoteSyncService.shared.stopForegroundPolling()
+                    // ~30s to finish uploads and the check-in.
                     BackgroundTaskService.shared.beginImmediateBackgroundProcessing()
-                    // Also schedule deferred BGProcessingTask as fallback
                     BackgroundTaskService.shared.scheduleSyncTask()
-                    // Periodic backup check for watch notes the phone hasn't collected
                     BackgroundTaskService.shared.scheduleRefreshTask()
-                    // Hand any stuck-note alerts to the system now, in case
-                    // Ramble doesn't run again for a while.
-                    DeliveryMonitor.shared.evaluate()
-                }
-                .onReceive(
-                    NotificationCenter.default.publisher(
-                        for: UIApplication.willEnterForegroundNotification
-                    )
-                ) { _ in
-                    TranscriptionQueueService.shared.resumePendingJobs()
-                    WebhookQueueService.shared.resumePendingJobs()
-                    RelayQueueService.shared.resumePendingJobs()
                 }
                 .onReceive(
                     NotificationCenter.default.publisher(
                         for: UIApplication.didBecomeActiveNotification
                     )
                 ) { _ in
-                    // Also covers a cold launch, and asks for notification
-                    // permission once there's a note to protect.
-                    DeliveryMonitor.shared.evaluateSoon()
+                    // Also covers a cold launch: upload, then check in.
+                    BackgroundTaskService.shared.appDidOpen()
+                    NoteSyncService.shared.startForegroundPolling()
                 }
         }
     }

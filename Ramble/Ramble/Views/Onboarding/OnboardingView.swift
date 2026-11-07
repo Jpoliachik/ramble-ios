@@ -41,7 +41,10 @@ struct OnboardingView: View {
                     switch step {
                     case .intro:
                         OnboardingIntroStep(
-                            onContinue: { advance(to: .destination) }
+                            onContinue: {
+                                giveConsent()
+                                advance(to: .destination)
+                            }
                         )
                     case .destination:
                         OnboardingDestinationStep(
@@ -103,6 +106,12 @@ struct OnboardingView: View {
         withAnimation(.smooth(duration: 0.3)) {
             step = next
         }
+    }
+
+    /// "Get started" is the consent to cloud transcription. Only now does
+    /// the phone set up with the server, connect the watch and upload.
+    private func giveConsent() {
+        Consent.give()
     }
 
     private func finish() {

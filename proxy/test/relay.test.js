@@ -1,468 +1,346 @@
-// Relay endpoint tests against the real schema (node:sqlite standing in for
-// D1). App Attest is stubbed because it needs a real device.
+// Agent side: pairing, copies, pull and ack, delivery status, disconnect,
+// delete waiting, wake-up hooks. specs/relay-api.md "Agents and pairing",
+// specs/delivery.md.
 
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
 import {
-  DEFAULT_RETENTION_SECONDS,
   PAIR_CODE_ALPHABET,
-  PAIR_CODE_TTL_SECONDS,
-  PULL_LIMIT,
-  STATUS_LIMIT,
+  cleanName,
   generatePairCode,
-  handleRelayRequest,
-  isRelayPath,
   normalizePairCode,
-  purgeExpired,
-  retentionSeconds,
-  validateUpload,
+  openHeaders,
+  sealHeaders,
+  shouldPing,
+  validateHook,
+  HOOK_REPING_SECONDS,
 } from '../src/relay.js';
-import { createTestDB } from './d1.js';
+import { DAY, MINUTE, T0, createHarness, noteId } from './harness.js';
 
-const T0 = Date.UTC(2026, 10, 1, 12, 0, 0);
-const DAY = 24 * 3600 * 1000;
-
-let db, env, now, attestOK;
-
+let h;
 beforeEach(() => {
-  db = createTestDB();
-  env = { DB: db };
-  now = T0;
-  attestOK = true;
+  h = createHarness();
 });
 
-async function call(method, path, { body, auth, headers = {} } = {}) {
-  const h = new Headers({ 'X-App-Attest-Key-Id': 'key', 'X-App-Attest': 'assertion', ...headers });
-  if (auth) h.set('Authorization', `Bearer ${auth}`);
-  const res = await handleRelayRequest(
-    new Request(`https://relay.test${path}`, {
-      method,
-      headers: h,
-      body: body === undefined ? undefined : JSON.stringify(body),
-    }),
-    env,
-    { now, verifyAssertion: async () => ({ valid: attestOK, reason: 'stub' }) },
-  );
-  return { status: res.status, body: await res.json() };
+const pull = async (token) => (await h.call('GET', '/inbox', { auth: token })).body;
+const ack = (token, ids) => h.call('POST', '/inbox/ack', { auth: token, body: { ids } });
+const status = (secret, ids) => h.call('POST', '/inbox/status', { auth: secret, body: { recording_ids: ids } });
+
+/** An inbox with one agent connected before the note is uploaded. */
+async function setup() {
+  const secret = await h.inbox();
+  const agent = await h.connect(secret);
+  h.now = T0 + MINUTE;
+  return { secret, agent };
 }
-
-const rows = (table) => db.sqlite.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n;
-
-async function newInbox() {
-  const res = await call('POST', '/inboxes');
-  assert.equal(res.status, 201);
-  return res.body.inbox_secret;
-}
-
-async function connect(secret) {
-  const { code } = (await call('POST', '/pair/code', { auth: secret })).body;
-  const res = await call('POST', '/pair/exchange', { body: { code } });
-  assert.equal(res.status, 201);
-  return res.body.token;
-}
-
-function recording(n) {
-  return {
-    recording_id: `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`,
-    created_at: '2026-11-01T11:59:00Z',
-    duration: 12.5,
-    transcription: `thought ${n}`,
-  };
-}
-
-const upload = (secret, n) => call('POST', '/inbox', { auth: secret, body: recording(n) });
-const pull = async (token) => (await call('GET', '/inbox', { auth: token })).body;
-const ack = (token, ids) => call('POST', '/inbox/ack', { auth: token, body: { ids } });
-const connections = async (secret) => (await call('GET', '/connections', { auth: secret })).body.connections;
+const recordedAt = () => new Date(h.now - 1000).toISOString();
+const say = (secret, n, text = `thought ${n}`) => {
+  h.transcribe = async () => ({ result: 'transcript', text, provider: 'groq', durationSeconds: 7 });
+  return h.upload(secret, noteId(n), { recordedAt: recordedAt() });
+};
 
 describe('the whole loop', () => {
-  it('pairs, uploads, pulls, acks, and leaves nothing behind', async () => {
-    const secret = await newInbox();
-    const token = await connect(secret);
-
-    assert.deepEqual((await upload(secret, 1)).body, { queued: 1 });
-    const { items, has_more } = await pull(token);
+  it('note in, copy out, ack, and the copy is gone', async () => {
+    const { secret, agent } = await setup();
+    await say(secret, 1);
+    await h.settle();
+    const { items, has_more } = await pull(agent);
     assert.equal(has_more, false);
-    assert.deepEqual(items, [{ id: items[0].id, ...recording(1), received_at: new Date(T0).toISOString() }]);
-
-    assert.deepEqual((await ack(token, [items[0].id])).body, { deleted: 1 });
-    assert.equal((await pull(token)).items.length, 0);
-    assert.equal(rows('entries'), 0);
-  });
-
-  it('keeps the recording time as sent, offset included, and adds when the relay got it', async () => {
-    const secret = await newInbox();
-    const token = await connect(secret);
-    now = T0 + 3 * 3600 * 1000; // the phone was offline for three hours
-    await call('POST', '/inbox', { auth: secret, body: { ...recording(1), created_at: '2026-11-01T07:59:00-05:00' } });
-    const [item] = (await pull(token)).items;
-    assert.equal(item.created_at, '2026-11-01T07:59:00-05:00');
-    assert.equal(item.received_at, '2026-11-01T15:00:00.000Z');
-  });
-
-  it('stores credentials only as hashes', async () => {
-    const secret = await newInbox();
-    const token = await connect(secret);
-    const dump = JSON.stringify([
-      db.sqlite.prepare('SELECT * FROM inboxes').all(),
-      db.sqlite.prepare('SELECT * FROM connections').all(),
+    assert.deepEqual(items, [
+      {
+        id: items[0].id,
+        recording_id: noteId(1),
+        created_at: recordedAt(),
+        received_at: new Date(h.now).toISOString(),
+        duration: 7,
+        transcription: 'thought 1',
+      },
     ]);
-    assert.match(secret, /^rmbi_/);
-    assert.match(token, /^rmba_/);
-    assert.ok(!dump.includes(secret) && !dump.includes(token));
+    assert.deepEqual((await ack(agent, [items[0].id])).body, { deleted: 1 });
+    assert.deepEqual(await pull(agent), { items: [], has_more: false });
+    assert.equal(h.rows("SELECT COUNT(*) AS n FROM entries WHERE text != ''")[0].n, 0);
   });
-});
 
-describe('pickup status', () => {
-  const status = (secret, ids) => call('POST', '/inbox/status', { auth: secret, body: { recording_ids: ids } });
-  const id = (n) => recording(n).recording_id;
+  it('copies to agents connected when the server accepted the note, whatever its recorded time', async () => {
+    const secret = await h.inbox();
+    h.now = T0 + 5 * MINUTE;
+    const early = await h.connect(secret);
+    h.now += MINUTE;
+    const releases = [];
+    h.transcribe = () => new Promise((r) => releases.push(() => r({ result: 'transcript', text: 'x', provider: 'groq' })));
+    // Recorded before the agent paired, and with a clock far ahead: neither matters.
+    await h.upload(secret, noteId(1), { recordedAt: new Date(T0).toISOString() });
+    await h.upload(secret, noteId(2), { recordedAt: new Date(T0 + 30 * DAY).toISOString() });
+    h.now += MINUTE;
+    const late = await h.connect(secret);
+    releases.forEach((release) => release());
+    await h.settle();
+    assert.deepEqual((await pull(early)).items.map((i) => i.recording_id).sort(), [noteId(1), noteId(2)].sort());
+    assert.equal((await pull(late)).items.length, 0);
+  });
 
-  it('counts agents still waiting, and drops to 0 once every agent acks', async () => {
-    const secret = await newInbox();
-    const a = await connect(secret);
-    const b = await connect(secret);
-    await upload(secret, 1);
-    await upload(secret, 2);
+  it('gives each agent its own copy; acking one leaves the other', async () => {
+    const secret = await h.inbox();
+    const a = await h.connect(secret, 'Grok Bot');
+    const b = await h.connect(secret, 'Muse');
+    h.now = T0 + MINUTE;
+    await say(secret, 1);
+    const [item] = (await pull(a)).items;
+    await ack(a, [item.id]);
+    assert.equal((await pull(b)).items.length, 1);
+    assert.deepEqual((await ack(b, [item.id])).body, { deleted: 0 });
+  });
 
-    assert.deepEqual((await status(secret, [id(1), id(2)])).body, {
-      recordings: [{ recording_id: id(1), waiting: 2 }, { recording_id: id(2), waiting: 2 }],
+  it('returns oldest first, 50 at a time', async () => {
+    const { secret, agent } = await setup();
+    h.db.sqlite.exec('UPDATE inboxes SET free_notes_used = -100');
+    for (let i = 1; i <= 52; i++) await say(secret, i);
+    const first = await pull(agent);
+    assert.equal(first.items.length, 50);
+    assert.equal(first.has_more, true);
+    assert.equal(first.items[0].recording_id, noteId(1));
+  });
+
+  it('rejects bad ack bodies', async () => {
+    const { agent } = await setup();
+    for (const ids of [[], ['1'], Array(501).fill(1)]) assert.equal((await ack(agent, ids)).status, 400);
+  });
+
+  it('expires unacked copies after 30 days', async () => {
+    const { secret, agent } = await setup();
+    await say(secret, 1);
+    h.now += 30 * DAY;
+    assert.equal((await pull(agent)).items.length, 0);
+    await h.cron();
+    assert.deepEqual((await status(secret, [noteId(1)])).body.recordings[0], {
+      recording_id: noteId(1), copies: 1, waiting: 0, picked_up: 0, removed: 1, first_picked_up_at: null,
     });
-
-    const first = (await pull(a)).items.find((item) => item.recording_id === id(1));
-    await ack(a, [first.id]);
-    assert.equal((await status(secret, [id(1)])).body.recordings[0].waiting, 1);
-
-    const second = (await pull(b)).items.find((item) => item.recording_id === id(1));
-    await ack(b, [second.id]);
-    assert.deepEqual((await status(secret, [id(1), id(2)])).body.recordings, [
-      { recording_id: id(1), waiting: 0 },
-      { recording_id: id(2), waiting: 2 },
-    ]);
-  });
-
-  it('treats expired items as no longer waiting', async () => {
-    const secret = await newInbox();
-    await connect(secret);
-    await upload(secret, 1);
-    now = T0 + DEFAULT_RETENTION_SECONDS * 1000 + 1;
-    assert.equal((await status(secret, [id(1)])).body.recordings[0].waiting, 0);
-  });
-
-  it("only sees the caller's own inbox", async () => {
-    const mine = await newInbox();
-    const theirs = await newInbox();
-    await connect(theirs);
-    await upload(theirs, 1);
-    assert.equal((await status(mine, [id(1)])).body.recordings[0].waiting, 0);
-  });
-
-  it('rejects bad input and agent tokens', async () => {
-    const secret = await newInbox();
-    const token = await connect(secret);
-    assert.equal((await status(secret, [])).status, 400);
-    assert.equal((await status(secret, ['not ok!'])).status, 400);
-    assert.equal((await status(secret, Array.from({ length: STATUS_LIMIT + 1 }, (_, n) => id(n)))).status, 400);
-    assert.equal((await status(token, [id(1)])).status, 401);
-    assert.equal((await call('GET', '/inbox/status', { auth: secret })).status, 405);
   });
 });
 
-describe('inbox creation', () => {
-  it('requires App Attest', async () => {
-    attestOK = false;
-    assert.equal((await call('POST', '/inboxes')).status, 403);
+describe('delivery status', () => {
+  it('counts copies, waiting, picked up and removed, and lists unknown IDs as missing', async () => {
+    const secret = await h.inbox();
+    const a = await h.connect(secret);
+    const b = await h.connect(secret);
+    h.now = T0 + MINUTE;
+    await say(secret, 1);
+    const [item] = (await pull(a)).items;
+    await ack(a, [item.id]);
+    const res = await status(secret, [noteId(1), noteId(2)]);
+    assert.deepEqual(res.body, {
+      recordings: [
+        { recording_id: noteId(1), copies: 2, waiting: 1, picked_up: 1, removed: 0, first_picked_up_at: new Date(h.now).toISOString() },
+      ],
+      missing: [noteId(2)],
+    });
+    await h.call('DELETE', `/connections/${(await h.call('GET', '/connections', { auth: secret })).body.connections[1].id}`, { auth: secret });
+    assert.equal((await pull(b)).items, undefined);
+    assert.equal((await status(secret, [noteId(1)])).body.recordings[0].removed, 1);
   });
 
-  it('accepts the dev bypass only when configured and matching', async () => {
-    attestOK = false;
-    const bypass = { headers: { 'X-Dev-Bypass': 'dev' } };
-    assert.equal((await call('POST', '/inboxes', bypass)).status, 403);
-    env.DEV_BYPASS_TOKEN = 'dev';
-    assert.equal((await call('POST', '/inboxes', bypass)).status, 201);
-    assert.equal((await call('POST', '/inboxes', { headers: { 'X-Dev-Bypass': 'nope' } })).status, 403);
-  });
-
-  it('never needs attestation after that, so delivery and kill switches keep working', async () => {
-    const secret = await newInbox();
-    const token = await connect(secret);
-    attestOK = false;
-    assert.equal((await upload(secret, 1)).status, 200);
-    assert.equal((await pull(token)).items.length, 1);
-    assert.equal((await call('DELETE', '/inbox', { auth: secret })).status, 200);
+  it("can't see another inbox, and needs the phone's credential", async () => {
+    const { secret, agent } = await setup();
+    await say(secret, 1);
+    const other = await h.inbox();
+    assert.deepEqual((await status(other, [noteId(1)])).body.missing, [noteId(1)]);
+    assert.equal((await status(agent, [noteId(1)])).body.reason, 'wrong_credential');
+    assert.equal((await status(secret, [])).status, 400);
   });
 });
 
 describe('pairing', () => {
-  it('a code makes one connection, and stops working once the agent pulls', async () => {
-    const secret = await newInbox();
-    const { code, expires_at } = (await call('POST', '/pair/code', { auth: secret })).body;
-    assert.match(code, /^[2-9A-Z]{4}-[2-9A-Z]{4}$/);
-    assert.equal(expires_at, new Date(T0 + PAIR_CODE_TTL_SECONDS * 1000).toISOString());
-    const first = await call('POST', '/pair/exchange', { body: { code } });
+  it('makes 12-character codes from the readable alphabet', () => {
+    for (let i = 0; i < 50; i++) {
+      const code = generatePairCode();
+      assert.match(code, /^[^-]{4}-[^-]{4}-[^-]{4}$/);
+      assert.ok([...code.replace(/-/g, '')].every((c) => PAIR_CODE_ALPHABET.includes(c)));
+    }
+    assert.equal(normalizePairCode(' k7qx-mp4d 2hnv '), 'K7QXMP4D2HNV');
+  });
+
+  it('a code makes one connection, once; a second exchange gets 409 and no key', async () => {
+    const secret = await h.inbox();
+    const { code } = (await h.call('POST', '/pair/code', { auth: secret })).body;
+    const body = { code: code.toLowerCase().replace(/-/g, ' ') };
+    const first = await h.call('POST', '/pair/exchange', { body });
     assert.equal(first.status, 201);
     await pull(first.body.token);
-    assert.equal((await call('POST', '/pair/exchange', { body: { code } })).status, 400);
-    assert.equal((await connections(secret)).length, 1);
-    assert.equal(rows('pair_codes'), 0);
+    h.now += 9 * MINUTE;
+    const again = await h.call('POST', '/pair/exchange', { body });
+    assert.equal(again.status, 409);
+    assert.equal(again.body.reason, 'code_used');
+    assert.equal(again.body.token, undefined);
+    assert.equal((await h.call('GET', '/connections', { auth: secret })).body.connections.length, 1);
+    assert.ok(!JSON.stringify(h.rows('SELECT * FROM pair_codes')).includes(first.body.token));
+    h.now += 2 * MINUTE;
+    assert.equal((await h.call('POST', '/pair/exchange', { body })).status, 400);
   });
 
-  it('a retried exchange gets the same token when the first response was lost', async () => {
-    const secret = await newInbox();
-    const { code } = (await call('POST', '/pair/code', { auth: secret })).body;
-    const first = await call('POST', '/pair/exchange', { body: { code } });
-    now += 60_000;
-    const retry = await call('POST', '/pair/exchange', { body: { code } });
-    assert.equal(retry.status, 200);
-    assert.equal(retry.body.token, first.body.token);
-    assert.equal((await connections(secret)).length, 1);
-    assert.deepEqual((await pull(retry.body.token)).items, []);
+  it('a new code cancels the previous one; expired codes fail', async () => {
+    const secret = await h.inbox();
+    const { code: old } = (await h.call('POST', '/pair/code', { auth: secret })).body;
+    const { code } = (await h.call('POST', '/pair/code', { auth: secret })).body;
+    const exchange = (c) => h.call('POST', '/pair/exchange', { body: { code: c } });
+    assert.equal((await exchange(old)).status, 400);
+    h.now += 10 * MINUTE;
+    assert.equal((await exchange(code)).status, 400);
   });
 
-  it('stops replaying the token when the code expires or the user disconnects', async () => {
-    const secret = await newInbox();
-    const { code } = (await call('POST', '/pair/code', { auth: secret })).body;
-    await call('POST', '/pair/exchange', { body: { code } });
-    now = T0 + PAIR_CODE_TTL_SECONDS * 1000;
-    assert.equal((await call('POST', '/pair/exchange', { body: { code } })).status, 400);
-
-    now = T0;
-    const other = (await call('POST', '/pair/code', { auth: secret })).body.code;
-    await call('POST', '/pair/exchange', { body: { code: other } });
-    const [, second] = await connections(secret);
-    await call('DELETE', `/connections/${second.id}`, { auth: secret });
-    assert.equal((await call('POST', '/pair/exchange', { body: { code: other } })).status, 400);
-  });
-
-  it('is lenient about how the agent sends things', async () => {
-    const secret = await newInbox();
-    const { code } = (await call('POST', '/pair/code', { auth: secret })).body;
-    const res = await handleRelayRequest(
-      new Request('https://relay.test/pair/exchange', { method: 'POST', body: JSON.stringify({ code }) }),
-      env,
-      { now },
-    );
+  it('needs a code, ignores a request_id, and drops a bad name', async () => {
+    const secret = await h.inbox();
+    const { code } = (await h.call('POST', '/pair/code', { auth: secret })).body;
+    assert.equal((await h.call('POST', '/pair/exchange', { body: { request_id: 'z'.repeat(16) } })).status, 400);
+    const res = await h.call('POST', '/pair/exchange', { body: { code, request_id: 'short', name: 'x'.repeat(41) } });
     assert.equal(res.status, 201);
-    const { token } = await res.json();
-    for (const authorization of [`bearer ${token}`, token, `Bearer  ${token} `]) {
-      const pulled = await call('GET', '/inbox', { headers: { Authorization: authorization } });
-      assert.equal(pulled.status, 200, authorization);
+    assert.equal((await h.call('GET', '/connections', { auth: secret })).body.connections[0].name, null);
+  });
+
+  it('caps an inbox at 10 agents', async () => {
+    const secret = await h.inbox();
+    for (let i = 0; i < 10; i++) await h.connect(secret);
+    const res = await h.call('POST', '/pair/code', { auth: secret });
+    assert.equal(res.status, 409);
+    assert.equal(res.body.reason, 'too_many_agents');
+  });
+
+  it('never limits exchanges: failed tries block no one', async () => {
+    const bad = () => h.call('POST', '/pair/exchange', { body: { code: 'AAAA-AAAA-AAAA', request_id: 'w'.repeat(16) } });
+    for (let i = 0; i < 150; i++) assert.equal((await bad()).status, 400);
+    const secret = await h.inbox();
+    const { code } = (await h.call('POST', '/pair/code', { auth: secret })).body;
+    const res = await h.call('POST', '/pair/exchange', { body: { code, request_id: 'v'.repeat(16) } });
+    assert.equal(res.status, 201);
+    assert.equal(h.limiter.counts.size, 2); // only the inbox creation limits counted
+  });
+});
+
+describe('credentials', () => {
+  it('accepts a bare key, and 403s a key on the wrong side without breaking it', async () => {
+    const { secret, agent } = await setup();
+    const bare = await h.call('GET', '/inbox', { headers: { Authorization: agent } });
+    assert.equal(bare.status, 200);
+    const wrong = await h.call('GET', '/connections', { auth: agent });
+    assert.equal(wrong.status, 403);
+    assert.equal(wrong.body.reason, 'wrong_credential');
+    assert.equal((await h.call('GET', '/inbox', { auth: agent })).status, 200);
+    assert.equal((await h.call('GET', '/inbox', { auth: secret })).status, 403);
+    assert.equal((await h.call('GET', '/inbox', { auth: 'rmba_nope' })).status, 401);
+  });
+
+  it('never rate-limits an agent', async () => {
+    const { agent } = await setup();
+    for (let i = 0; i < 100; i++) assert.equal((await h.call('GET', '/inbox', { auth: agent })).status, 200);
+  });
+});
+
+describe('disconnect and delete waiting', () => {
+  it('disconnect revokes the key and removes its copies', async () => {
+    const { secret, agent } = await setup();
+    for (let i = 1; i <= 3; i++) await say(secret, i);
+    const [c] = (await h.call('GET', '/connections', { auth: secret })).body.connections;
+    assert.equal(c.pending, 3);
+    assert.deepEqual((await h.call('DELETE', `/connections/${c.id}`, { auth: secret })).body, { status: 'disconnected' });
+    assert.equal((await h.call('GET', '/inbox', { auth: agent })).status, 401);
+    assert.equal((await h.call('DELETE', `/connections/${c.id}`, { auth: secret })).status, 404);
+  });
+
+  it('DELETE /inbox removes waiting copies only, keeping the device copy and transcribing notes', async () => {
+    const { secret, agent } = await setup();
+    const watch = await h.watchToken(secret);
+    h.transcribe = async () => ({ result: 'transcript', text: 'kept', provider: 'groq' });
+    await h.upload(watch, noteId(1), { recordedAt: recordedAt() });
+    let release;
+    h.transcribe = () => new Promise((r) => (release = () => r({ result: 'transcript', text: 'later', provider: 'groq' })));
+    await h.upload(secret, noteId(2), { recordedAt: recordedAt() });
+
+    assert.deepEqual((await h.call('DELETE', '/inbox', { auth: secret })).body, { deleted: 1 });
+    const listed = (await h.call('GET', '/notes', { auth: secret })).body.notes;
+    assert.equal(listed.find((n) => n.id === noteId(1)).transcript, 'kept');
+    release();
+    await h.settle();
+    assert.deepEqual((await pull(agent)).items.map((i) => i.recording_id), [noteId(2)]);
+    assert.equal((await h.call('GET', '/connections', { auth: secret })).body.connections.length, 1);
+  });
+});
+
+describe('wake-up hooks', () => {
+  const setHook = (agent, hook) => h.call('PATCH', '/agent', { auth: agent, body: { hook } });
+  const hook = { url: 'https://agent.example/wake', headers: { Authorization: 'Bearer s3cret' } };
+
+  it('sends a test ping when set, shows header names only, and stores values encrypted', async () => {
+    const { agent } = await setup();
+    const res = await setHook(agent, hook);
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body.hook, { url: hook.url, header_names: ['Authorization'], last_ping_at: null, last_status: 200 });
+    assert.equal(h.fetches[0].body.event, 'ramble.test');
+    assert.equal(h.fetches[0].headers['User-Agent'], 'Ramble-Relay/1 (+https://ramble.watch/docs)');
+    assert.ok(!JSON.stringify(h.rows('SELECT hook_headers FROM connections')).includes('s3cret'));
+  });
+
+  it('refuses to set a hook without an encryption key', async () => {
+    const { agent } = await setup();
+    h.envExtra = { HOOK_ENCRYPTION_KEY: undefined };
+    assert.equal((await setHook(agent, hook)).status, 503);
+  });
+
+  it('pings once on a new copy, without text, then waits for a pull or 10 minutes', async () => {
+    const { secret, agent } = await setup();
+    await setHook(agent, hook);
+    h.fetches = [];
+    await say(secret, 1, 'secret words');
+    await h.settle();
+    assert.equal(h.fetches.length, 1);
+    assert.equal(h.fetches[0].body.event, 'ramble.notes_waiting');
+    assert.ok(!JSON.stringify(h.fetches[0].body).includes('secret words'));
+    await say(secret, 2);
+    await h.settle();
+    assert.equal(h.fetches.length, 1);
+    h.now += 1000;
+    await pull(agent);
+    await say(secret, 3);
+    await h.settle();
+    assert.equal(h.fetches.length, 2);
+  });
+
+  it('never pings for a silent note', async () => {
+    const { secret, agent } = await setup();
+    await setHook(agent, hook);
+    h.fetches = [];
+    h.transcribe = async () => ({ result: 'no_speech', text: '', provider: 'groq' });
+    await h.upload(secret, noteId(1), { recordedAt: recordedAt() });
+    await h.settle();
+    assert.equal(h.fetches.length, 0);
+  });
+
+  it('rejects private URLs and reserved headers', () => {
+    for (const url of ['https://192.168.1.5/run', 'https://box.local/run', 'http://agent.example/', 'https://localhost/x']) {
+      assert.ok(validateHook({ url }, 'https://relay.test').error, url);
     }
-    const missing = await call('POST', '/pair/exchange', { body: {} });
-    assert.equal(missing.status, 400);
-    assert.match(missing.body.error, /"code"/);
+    assert.ok(validateHook({ url: 'https://a.example/', headers: { Host: 'x' } }, 'https://relay.test').error);
+    assert.ok(!validateHook({ url: 'https://a.example/', headers: { 'X-Key': 'v' } }, 'https://relay.test').error);
   });
 
-  it('accepts codes pasted with odd spacing and case', async () => {
-    const secret = await newInbox();
-    const { code } = (await call('POST', '/pair/code', { auth: secret })).body;
-    const messy = ` ${code.toLowerCase().replace('-', ' - ')} `;
-    assert.equal((await call('POST', '/pair/exchange', { body: { code: messy } })).status, 201);
+  it('round-trips sealed headers, and reads anything else as no headers', async () => {
+    const env = { HOOK_ENCRYPTION_KEY: 'k' };
+    assert.deepEqual(await openHeaders(await sealHeaders({ A: 'b' }, env), env), { A: 'b' });
+    assert.deepEqual(await openHeaders('{"A":"b"}', env), {});
+    assert.deepEqual(await openHeaders('enc:v1:garbage', env), {});
   });
 
-  it('rejects expired codes', async () => {
-    const secret = await newInbox();
-    const { code } = (await call('POST', '/pair/code', { auth: secret })).body;
-    now = T0 + PAIR_CODE_TTL_SECONDS * 1000;
-    assert.equal((await call('POST', '/pair/exchange', { body: { code } })).status, 400);
+  it('decides when to ping', () => {
+    const now = T0;
+    assert.equal(shouldPing({ hook_url: null }, now), false);
+    assert.equal(shouldPing({ hook_url: 'u', hook_pinged_at: null }, now), true);
+    assert.equal(shouldPing({ hook_url: 'u', hook_pinged_at: now - 1000, last_pull_at: null }, now), false);
+    assert.equal(shouldPing({ hook_url: 'u', hook_pinged_at: now - 1000, last_pull_at: now }, now), true);
+    assert.equal(shouldPing({ hook_url: 'u', hook_pinged_at: now - HOOK_REPING_SECONDS * 1000 }, now), true);
   });
 
-  it('a new code cancels the previous one', async () => {
-    const secret = await newInbox();
-    const a = (await call('POST', '/pair/code', { auth: secret })).body.code;
-    const b = (await call('POST', '/pair/code', { auth: secret })).body.code;
-    assert.equal((await call('POST', '/pair/exchange', { body: { code: a } })).status, 400);
-    assert.equal((await call('POST', '/pair/exchange', { body: { code: b } })).status, 201);
-  });
-
-  it('needs the inbox secret to issue a code', async () => {
-    assert.equal((await call('POST', '/pair/code')).status, 401);
-  });
-});
-
-describe('upload and pull', () => {
-  it('requires the inbox secret', async () => {
-    assert.equal((await call('POST', '/inbox', { body: recording(1) })).status, 401);
-    assert.equal((await call('POST', '/inbox', { auth: 'rmbi_wrong', body: recording(1) })).status, 401);
-  });
-
-  it('queues nothing when no agent is connected', async () => {
-    const secret = await newInbox();
-    assert.deepEqual((await upload(secret, 1)).body, { queued: 0 });
-    assert.equal(rows('entries'), 0);
-  });
-
-  it('is idempotent on recording_id', async () => {
-    const secret = await newInbox();
-    const token = await connect(secret);
-    await upload(secret, 1);
-    await upload(secret, 1);
-    assert.equal((await pull(token)).items.length, 1);
-  });
-
-  it('gives each agent its own copy', async () => {
-    const secret = await newInbox();
-    const a = await connect(secret);
-    const b = await connect(secret);
-    assert.equal((await upload(secret, 1)).body.queued, 2);
-    await ack(a, (await pull(a)).items.map((i) => i.id));
-    assert.equal((await pull(a)).items.length, 0);
-    assert.equal((await pull(b)).items.length, 1);
-  });
-
-  it('returns oldest first, PULL_LIMIT at a time', async () => {
-    const secret = await newInbox();
-    const token = await connect(secret);
-    for (let i = 1; i <= PULL_LIMIT + 2; i++) await upload(secret, i);
-
-    const first = await pull(token);
-    assert.equal(first.items.length, PULL_LIMIT);
-    assert.equal(first.items[0].transcription, 'thought 1');
-    assert.equal(first.has_more, true);
-    await ack(token, first.items.map((i) => i.id));
-    const rest = await pull(token);
-    assert.deepEqual(rest.items.map((i) => i.transcription), [`thought ${PULL_LIMIT + 1}`, `thought ${PULL_LIMIT + 2}`]);
-    assert.equal(rest.has_more, false);
-  });
-
-  it("keeps inboxes and agents apart", async () => {
-    const mine = await newInbox();
-    const theirs = await newInbox();
-    const myAgent = await connect(mine);
-    const theirAgent = await connect(theirs);
-    await upload(theirs, 1);
-    assert.equal((await pull(myAgent)).items.length, 0);
-
-    const [item] = (await pull(theirAgent)).items;
-    assert.deepEqual((await ack(myAgent, [item.id])).body, { deleted: 0 });
-    assert.equal((await pull(theirAgent)).items.length, 1);
-  });
-
-  it('keeps each credential on its own side', async () => {
-    const secret = await newInbox();
-    const token = await connect(secret);
-    assert.equal((await call('GET', '/inbox', { auth: secret })).status, 401);
-    assert.equal((await call('POST', '/inbox', { auth: token, body: recording(1) })).status, 401);
-  });
-
-  it('validates ack bodies', async () => {
-    const token = await connect(await newInbox());
-    assert.equal((await ack(token, [])).status, 400);
-    assert.equal((await ack(token, ['1'])).status, 400);
-    assert.equal((await ack(token, Array.from({ length: 501 }, (_, i) => i + 1))).status, 400);
-  });
-
-  it('shows the app each agent’s last check and pending count', async () => {
-    const secret = await newInbox();
-    const token = await connect(secret);
-    assert.equal((await connections(secret))[0].last_pull_at, null);
-    now = T0 + 3600_000;
-    await upload(secret, 1);
-    await pull(token);
-    const [conn] = await connections(secret);
-    assert.equal(conn.last_pull_at, new Date(now).toISOString());
-    assert.equal(conn.pending, 1);
-  });
-});
-
-describe('retention', () => {
-  it('keeps unclaimed transcripts 30 days, then hides and purges them', async () => {
-    const secret = await newInbox();
-    const token = await connect(secret);
-    await upload(secret, 1);
-
-    now = T0 + DEFAULT_RETENTION_SECONDS * 1000 - 1;
-    assert.equal((await pull(token)).items.length, 1);
-    now = T0 + DEFAULT_RETENTION_SECONDS * 1000;
-    assert.equal((await pull(token)).items.length, 0);
-    assert.equal((await connections(secret))[0].pending, 0);
-
-    assert.equal((await purgeExpired(db, now)).entries, 1);
-    assert.equal(rows('entries'), 0);
-  });
-
-  it('purges expired pairing codes', async () => {
-    await call('POST', '/pair/code', { auth: await newInbox() });
-    assert.equal((await purgeExpired(db, T0)).pairCodes, 0);
-    assert.equal((await purgeExpired(db, T0 + PAIR_CODE_TTL_SECONDS * 1000)).pairCodes, 1);
-  });
-
-  it('honors RETENTION_SECONDS', async () => {
-    env.RETENTION_SECONDS = String(DAY / 1000);
-    const secret = await newInbox();
-    const token = await connect(secret);
-    await upload(secret, 1);
-    now = T0 + DAY;
-    assert.equal((await pull(token)).items.length, 0);
-    assert.equal(retentionSeconds({ RETENTION_SECONDS: 'soon' }), DEFAULT_RETENTION_SECONDS);
-  });
-});
-
-describe('disconnect and delete everything', () => {
-  it('disconnect kills the token and deletes its queue', async () => {
-    const secret = await newInbox();
-    const token = await connect(secret);
-    await upload(secret, 1);
-    const [{ id }] = await connections(secret);
-
-    assert.equal((await call('DELETE', `/connections/${id}`, { auth: secret })).status, 200);
-    assert.equal((await call('GET', '/inbox', { auth: token })).status, 401);
-    assert.equal(rows('entries'), 0);
-    assert.equal((await call('DELETE', `/connections/${id}`, { auth: secret })).status, 404);
-  });
-
-  it("can't disconnect another inbox's agent", async () => {
-    const theirs = await newInbox();
-    const theirAgent = await connect(theirs);
-    const [{ id }] = await connections(theirs);
-    assert.equal((await call('DELETE', `/connections/${id}`, { auth: await newInbox() })).status, 404);
-    assert.equal((await call('GET', '/inbox', { auth: theirAgent })).status, 200);
-  });
-
-  it('delete everything empties every queue and keeps connections', async () => {
-    const secret = await newInbox();
-    const a = await connect(secret);
-    await connect(secret);
-    await upload(secret, 1);
-    await upload(secret, 2);
-    assert.deepEqual((await call('DELETE', '/inbox', { auth: secret })).body, { deleted: 4 });
-    assert.equal((await call('GET', '/inbox', { auth: a })).status, 200);
-  });
-});
-
-describe('helpers and routing', () => {
-  it('generates readable codes', () => {
-    for (let i = 0; i < 200; i++) {
-      const code = generatePairCode();
-      assert.match(code, /^.{4}-.{4}$/);
-      for (const ch of code.replace('-', '')) assert.ok(PAIR_CODE_ALPHABET.includes(ch));
-    }
-    assert.equal(normalizePairCode(' abcd - efgh\n'), 'ABCDEFGH');
-  });
-
-  it('validates uploads', () => {
-    assert.ok(!validateUpload(recording(1)).error);
-    assert.ok(validateUpload(null).error);
-    assert.ok(validateUpload({ ...recording(1), transcription: '  ' }).error);
-    assert.ok(validateUpload({ ...recording(1), duration: -1 }).error);
-    assert.ok(validateUpload({ ...recording(1), created_at: 'yesterday' }).error);
-    assert.ok(validateUpload({ ...recording(1), recording_id: 'x/../y' }).error);
-    assert.ok(validateUpload({ ...recording(1), transcription: 'a'.repeat(200_001) }).error);
-  });
-
-  it('claims only relay paths', () => {
-    for (const p of ['/inboxes', '/inbox', '/inbox/ack', '/pair/code', '/pair/exchange', '/connections', '/connections/con_x']) {
-      assert.ok(isRelayPath(p), p);
-    }
-    for (const p of ['/transcribe', '/health', '/attest', '/receipts', '/inbox/x/y']) assert.ok(!isRelayPath(p), p);
-  });
-
-  it('405s wrong methods with a hint, and 503s without a database', async () => {
-    const wrong = await call('GET', '/pair/exchange');
-    assert.equal(wrong.status, 405);
-    assert.match(wrong.body.error, /Use POST/);
-    assert.equal((await call('PUT', '/inbox')).status, 405);
-    env = {};
-    assert.equal((await call('GET', '/inbox')).status, 503);
+  it('cleans names', () => {
+    assert.equal(cleanName('  Grok\nBot '), 'Grok Bot');
+    assert.equal(cleanName(''), null);
+    assert.equal(cleanName(5), null);
   });
 });

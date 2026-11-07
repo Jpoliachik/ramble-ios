@@ -3,7 +3,6 @@ import Link from "next/link";
 import { CodeBlock, InlineCode } from "@/components/code-block";
 import DocsSidebar from "@/components/docs-sidebar";
 import CopyLlmButton from "@/components/copy-llm-button";
-import { BASE_PATH } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Webhook Docs",
@@ -64,9 +63,8 @@ export default function WebhookDocs() {
             Receive your transcripts
           </h1>
           <p className="mt-4 text-lg leading-relaxed text-stone-500">
-            Every time you finish a recording, Ramble POSTs the transcript to each destination you&apos;ve added — an
-            automation platform, an AI agent, your own backend, or all of them at once. Three steps to set it up.
-            Webhooks work alongside the{" "}
+            Once a note is transcribed, your iPhone POSTs the transcript to your destination: an automation platform,
+            an agent, or your own backend. Three steps to set it up. Webhooks work alongside the{" "}
             <Link href="/docs" className="text-brand-text underline-offset-2 hover:underline">
               agent connection
             </Link>
@@ -85,24 +83,22 @@ export default function WebhookDocs() {
               </StepHeader>
               <div className="mt-6 space-y-5 pl-14">
                 <p>
-                  In Ramble, go to <strong>Settings &rarr; Send via Webhook</strong>{" "}and tap{" "}
-                  <strong>Add a destination</strong>. Paste in any HTTPS URL — grab one from your automation platform
-                  (step 2) or use your own server. Add as many destinations as you want; every transcript fires to
-                  all of them.
+                  In Ramble on your iPhone, open <strong>Settings &rarr; Webhook</strong>{" "}and tap{" "}
+                  <strong>Add destination</strong>. Paste in an HTTPS URL from your automation platform (step 2) or your
+                  own server. Ramble sends to one destination, and you can change it any time with{" "}
+                  <strong>Edit destination</strong>.
                 </p>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={`${BASE_PATH}/webhook-settings.png`}
-                  alt="Ramble Send via Webhook settings screen with an Add a destination button"
-                  className="mx-auto max-w-sm rounded-2xl shadow-md"
-                />
+                <p>
+                  The URL must use HTTPS. Localhost, private and link-local addresses, and <InlineCode>.internal</InlineCode>{" "}
+                  hosts are refused.
+                </p>
               </div>
             </section>
 
             {/* Step 2 */}
             <section>
               <StepHeader id="step-2" step={2}>
-                Connect a destination
+                Point it somewhere
               </StepHeader>
               <div className="mt-6 space-y-8 pl-14">
                 {/* Automation platforms */}
@@ -160,12 +156,18 @@ export default function WebhookDocs() {
                 <div id="custom" className="scroll-mt-8">
                   <h3 className="font-serif text-base font-semibold text-stone-900">Or build your own endpoint</h3>
                   <p className="mt-2">
-                    Point Ramble at any HTTPS URL you control. After transcription completes, Ramble sends
-                    a <InlineCode>POST</InlineCode>{" "}with{" "}
+                    Point Ramble at any HTTPS URL you control. Once your iPhone has a note&apos;s transcript, it sends
+                    one <InlineCode>POST</InlineCode>{" "}with{" "}
                     <InlineCode>Content-Type: application/json</InlineCode>. Return any{" "}
-                    <strong>2xx</strong>{" "}within <strong>10 seconds</strong>{" "}to acknowledge receipt. If your endpoint is
-                    down or returns an error, Ramble retries up to 3 times with backoff (5s, 30s, 120s) and persists
-                    pending webhooks to disk so nothing is lost if the app is closed.
+                    <strong>2xx</strong>{" "}within <strong>10 seconds</strong>. Otherwise Ramble tries 3 times in
+                    total, 30 seconds and then 2 minutes apart, and marks the note &ldquo;Didn&apos;t send&rdquo;; tapping
+                    Retry starts 3 fresh attempts. Pending webhooks survive the app closing and wait while the iPhone is
+                    locked.
+                  </p>
+                  <p className="mt-3">
+                    Webhooks go straight from the iPhone to your URL. Ramble&apos;s server never sees the URL or the
+                    secret. A watch note is sent once the iPhone pulls its transcript. Notes with no speech are not
+                    sent.
                   </p>
 
                   <h4 className="mt-8 text-sm font-semibold text-stone-700">Payload</h4>
@@ -187,25 +189,26 @@ export default function WebhookDocs() {
                       UUID v4. Unique identifier for this recording.
                     </Param>
                     <Param name="created_at" type="string">
-                      ISO 8601 timestamp of when the recording was created.
+                      When recording started, ISO 8601 in UTC.
                     </Param>
                     <Param name="duration" type="number">
-                      Recording duration in seconds.
+                      Recording length in seconds.
                     </Param>
                     <Param name="transcription" type="string">
-                      Full transcript text. Empty string if transcription produced no output.
+                      Full transcript text.
                     </Param>
                     <Param name="device_id" type="string">
-                      Stable per-device UUID. Not tied to any account — useful for distinguishing multiple devices.
+                      A random ID for this install of Ramble. Not tied to any account.
                     </Param>
                   </div>
 
                   <h4 className="mt-8 text-sm font-semibold text-stone-700">Verify the signature</h4>
                   <p className="mt-3">
                     Every request includes an <InlineCode>X-Webhook-Signature</InlineCode>{" "}header — an HMAC-SHA256
-                    digest of the raw request body, keyed with the destination&apos;s signing secret. Copy the secret
-                    from the destination&apos;s detail screen in <strong>Settings &rarr; Send via Webhook</strong>.
-                    Always verify before processing to confirm the request came from Ramble.
+                    digest of the raw request body, keyed with the signing secret, as{" "}
+                    <InlineCode>sha256=&lt;hex&gt;</InlineCode>. Reveal and copy the secret under{" "}
+                    <strong>Settings &rarr; Webhook &rarr; Edit destination</strong>. Always verify before processing to
+                    confirm the request came from Ramble.
                   </p>
 
                   <div className="mt-4">
@@ -226,8 +229,7 @@ function verifySignature(rawBody, signatureHeader, secret) {
                   </div>
 
                   <p className="mt-4">
-                    If you regenerate the signing secret in Settings, update your server before the next transcription
-                    completes.
+                    If you tap Regenerate, your endpoint needs the new secret to accept requests.
                   </p>
 
                   <details className="mt-4 rounded-lg border border-stone-200">
@@ -286,11 +288,11 @@ app.listen(3000, () => console.log("Listening on :3000"));`}
               </StepHeader>
               <div className="mt-6 space-y-4 pl-14">
                 <p>
-                  Open the destination from <strong>Settings &rarr; Send via Webhook</strong>{" "}and tap{" "}
-                  <strong>Send Test Webhook</strong>{" "}to fire a test payload at that endpoint. The test payload is
-                  identical to a real one, with two differences: <InlineCode>test</InlineCode>{" "}is{" "}
-                  <InlineCode>true</InlineCode>, and <InlineCode>recording_id</InlineCode>{" "}is prefixed with{" "}
-                  <InlineCode>test-</InlineCode>.
+                  Open the destination from <strong>Settings &rarr; Webhook</strong>{" "}and tap{" "}
+                  <strong>Send test webhook</strong>. Ramble shows &ldquo;Test delivered&rdquo; or the reason it
+                  failed. The test payload has the same shape as a real one, with <InlineCode>test</InlineCode>{" "}set
+                  to <InlineCode>true</InlineCode>, a <InlineCode>recording_id</InlineCode>{" "}starting with{" "}
+                  <InlineCode>test-</InlineCode>, and <InlineCode>duration</InlineCode>{" "}0.
                 </p>
 
                 <CodeBlock language="json">
@@ -305,8 +307,8 @@ app.listen(3000, () => console.log("Listening on :3000"));`}
                 </CodeBlock>
 
                 <p>
-                  If the test succeeds, you&apos;re all set — every future transcription will POST automatically. If it
-                  fails, check that your endpoint returns a 2xx and that the URL is correct.
+                  If the test succeeds, you&apos;re all set: every new transcript is sent on its own. If it fails, check
+                  that your endpoint returns a 2xx and that the URL is correct.
                 </p>
               </div>
             </section>

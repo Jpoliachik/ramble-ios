@@ -14,7 +14,21 @@
 
   ],
   "products" : [
-
+    {
+      "displayPrice" : "14.99",
+      "familyShareable" : false,
+      "internalID" : "7D3F2A91",
+      "localizations" : [
+        {
+          "description" : "Transcribe every note from your watch and iPhone. One-time purchase.",
+          "displayName" : "Unlock Ramble",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "dev.goodloop.ramble.unlock",
+      "referenceName" : "Unlock Ramble",
+      "type" : "NonConsumable"
+    }
   ],
   "settings" : {
     "_askToBuyEnabled" : false,
