@@ -29,10 +29,10 @@ itself, and the phone becomes just another reader of the result.
 | Watch → relay (audio) | Background `URLSession` upload task from file, `PUT /notes/:id`, started at Stop while the app is frontmost | Survives suspension; the system routes through the iPhone, then known Wi-Fi, then cellular [N1][N2][K4] |
 | Relay → watch (status, transcript) | Upload response (done within 8 s), then `GET /notes/:id` with a default session: every 10 s while open, on open, in refresh passes | Most notes finish in the upload answer; long ones need a read [N2] |
 | Watch → relay (account) | `GET /account` on open and in passes with held notes | Learns the unlock and the fair-use reset without the phone |
-| iPhone → watch (connection) | `updateApplicationContext` with `watchToken`, `relayBaseURL`, `unlocked`, `deliveryAlertsFastMode` | Latest value wins, survives relaunch, delivered in the background [A1][W1] |
+| iPhone → watch (connection) | `updateApplicationContext` with `watchToken`, `relayBaseURL`, `unlocked`, `deliveryAlertsFastMode`, `sentAt` | Latest value wins, survives relaunch, delivered in the background [A1][W1] |
 | iPhone → watch (unlock) | `transferUserInfo(["type": "unlocked"])` alongside the context | Wakes the watch app in the background so held notes upload without opening it [U1][W1] |
 | Watch → iPhone (note details, holds) | `sendMessage`, falling back to `transferUserInfo` | `sendMessage` wakes the iOS app now [M1][V1]; user info is the queue that survives [U1] |
-| Watch → iPhone (needs a connection) | Same: `sendMessage` + `transferUserInfo` fallback | The phone mints a token with `POST /watch-token` even from a background wake |
+| Watch → iPhone (needs a connection) | Same: `sendMessage` + `transferUserInfo` fallback | The phone mints a token with `POST /watch-token` even from a background wake, but only when `replaces` is its current token, it has none, or the watch changed; otherwise it re-sends the current token (the context carries `sentAt` so it's delivered) |
 | Watch → iPhone (audio for history) | `transferFile`, best effort; on open, resend anything unconfirmed; on `requestAudio`, send right away | Playback only. The transcript never depends on it [T1] |
 | iPhone → watch (receipt) | `sendMessage` when reachable, else `transferUserInfo` `["type": "received"]` | Lets the watch free audio once the note is also final |
 | Relay | Note UUID is the idempotency key within an inbox | Any resend from any hop is harmless |

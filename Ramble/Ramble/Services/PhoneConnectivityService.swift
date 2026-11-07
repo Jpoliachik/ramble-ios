@@ -100,7 +100,27 @@ final class PhoneConnectivityService: NSObject, ObservableObject {
         }
     }
 
-    /// Latest wins; sent again on every change.
+    /// The watch says it has no working token. Mints only when the token
+    /// it gave up on is the phone's current one (the server refused it),
+    /// the phone has none, or a different watch is paired. Otherwise the
+    /// watch just missed the current token, so it's sent again: minting
+    /// would replace a working token, fail the watch's in-flight uploads
+    /// and use up the server's daily limit.
+    @MainActor
+    private func answerNeedsConnection(replaces: String?) async {
+        let current = KeychainService.string(forKey: Self.watchTokenKey)
+        var watchChanged = false
+        if let directory = WCSession.default.watchDirectoryURL?.path {
+            let previous = UserDefaults.standard.string(forKey: Self.pairedWatchKey)
+            watchChanged = previous != nil && previous != directory
+            UserDefaults.standard.set(directory, forKey: Self.pairedWatchKey)
+        }
+        let refused = replaces != nil && replaces == current
+        await connectWatch(force: current == nil || refused || watchChanged, replaces: replaces)
+    }
+
+    /// Latest wins; sent again on every change. `sentAt` makes each context
+    /// differ, so WatchConnectivity delivers a re-sent token too.
     @MainActor
     func pushApplicationContext() {
         guard WCSession.isSupported(), WCSession.default.activationState == .activated,
@@ -112,6 +132,7 @@ final class PhoneConnectivityService: NSObject, ObservableObject {
             "relayBaseURL": Constants.Relay.baseURL.absoluteString,
             "unlocked": AccountService.shared.isUnlocked,
             "deliveryAlertsFastMode": DeliveryMonitor.isFastMode,
+            "sentAt": Date().ISO8601Format(),
         ]
         if Consent.hasConsented, let token = KeychainService.string(forKey: Self.watchTokenKey) {
             context["watchToken"] = token
@@ -202,7 +223,7 @@ final class PhoneConnectivityService: NSObject, ObservableObject {
 
             case "needsConnection":
                 BackgroundTaskService.shared.beginImmediateBackgroundProcessing(keepAliveFor: 20)
-                await self.connectWatch(force: true, replaces: message["replaces"] as? String)
+                await self.answerNeedsConnection(replaces: message["replaces"] as? String)
 
             default:
                 break

@@ -48,7 +48,7 @@ When the phone can't set itself up with Ramble's server (offline, or the server 
 - THEN the message shows, the note reads "Waiting to send", and setup completes on a later open
 
 ### Requirement: The phone connects the watch
-The phone SHALL give the watch a credential that can only upload that watch's notes, read them back and read the account state, after the person taps "Get started" on first run (or "Continue" on the consent sheet for earlier installs), after a reinstall, when the paired watch changes, and whenever the watch says it has no working connection (no credential, or the server refused it), including when that message wakes the phone app in the background, with no control for the person ([watch.md](watch.md)). A reinstall that still finds the phone's earlier connection SHALL keep it (agents, free count and unlock stay); otherwise it starts fresh and agents must connect again ([delivery.md](delivery.md)).
+The phone SHALL give the watch a credential that can only upload that watch's notes, read them back and read the account state, after the person taps "Get started" on first run (or "Continue" on the consent sheet for earlier installs), after a reinstall, when the paired watch changes, and whenever the watch says it has no working connection (no credential, or the server refused it), including when that message wakes the phone app in the background, with no control for the person ([watch.md](watch.md)). When the watch says so, the phone SHALL make a new credential only if the one the watch gave up on is the phone's current one, the phone has none, or the paired watch changed; otherwise it SHALL send the watch its current credential again, so a working credential is never replaced. A reinstall that still finds the phone's earlier connection SHALL keep it (agents, free count and unlock stay); otherwise it starts fresh and agents must connect again ([delivery.md](delivery.md)).
 
 #### Scenario: First phone launch
 - GIVEN the watch has recorded notes but the phone app has never run
@@ -58,7 +58,12 @@ The phone SHALL give the watch a credential that can only upload that watch's no
 #### Scenario: Watch lost its connection
 - GIVEN the phone has been set up for weeks and the watch app was reinstalled
 - WHEN the watch app opens and tells the phone it has no connection
-- THEN the phone gives it a new one without being opened, and the watch's waiting notes upload
+- THEN the phone sends it its current credential, still working, without being opened, and the watch's waiting notes upload
+
+#### Scenario: Watch's credential refused
+- GIVEN the server refused the watch's credential, which is the phone's current one
+- WHEN the watch tells the phone it has no working connection
+- THEN the phone makes a new credential and sends it, and the watch's waiting notes upload under it
 
 ## Home
 
