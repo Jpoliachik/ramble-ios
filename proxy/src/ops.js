@@ -3,12 +3,11 @@
 // See specs/transcription.md "Operator". Messages never carry transcript
 // text or credentials.
 
-import { DAY, HOUR, MINUTE, utcDayStart, utcMonth } from './http.js';
+import { DAY, HOUR, MINUTE, utcDayStart } from './http.js';
 
 export const ALERT_COOLDOWN_MS = 6 * HOUR;
 export const SPEND_ALERT_USD = 5;
 export const FREE_TIER_DAILY_SECONDS = 200 * 3600;
-export const FAIR_USE_SECONDS = 100 * 3600;
 const EVENT_RETENTION_MS = 3 * DAY;
 
 // Rough list prices per audio hour, for the spend estimate when the
@@ -142,19 +141,6 @@ export async function checkAlerts(ctx) {
   const spend = Object.values(await spendForDay(ctx, utcDayStart(ctx.now))).reduce((a, b) => a + b, 0);
   if (spend > SPEND_ALERT_USD) await alert(ctx, 'spend', `Estimated transcription spend today is $${spend.toFixed(2)}.`);
 
-  const { results: heavy } = await ctx.db
-    .prepare('SELECT purchase_id, seconds FROM fair_use WHERE month = ? AND seconds >= ?')
-    .bind(utcMonth(ctx.now), FAIR_USE_SECONDS * 0.8)
-    .all();
-  for (const p of heavy) {
-    const hours = (p.seconds / 3600).toFixed(1);
-    if (p.seconds >= FAIR_USE_SECONDS) {
-      await alert(ctx, `fair_use_100:${p.purchase_id}`, `Purchase ${p.purchase_id} used its fair-use allowance (${hours} h): its notes are held.`);
-    } else {
-      await alert(ctx, `fair_use_80:${p.purchase_id}`, `Purchase ${p.purchase_id} reached 80% of fair use (${hours} h).`);
-    }
-  }
-
   if ((await freeSecondsToday(ctx)) >= FREE_TIER_DAILY_SECONDS) {
     await alert(ctx, 'free_tier_breaker', 'Free inboxes reached 200 hours of audio today: new inboxes are refused until tomorrow (UTC).');
   }
@@ -203,7 +189,7 @@ export async function dailySummary(ctx, start, end) {
   const between = (kind) =>
     count(ctx, 'SELECT COUNT(*) AS n FROM events WHERE kind = ? AND at >= ? AND at < ?', kind, start, end);
   const refusedFree = await between('refused_free');
-  const refusedFairUse = await between('refused_fair_use');
+  const refusedSuspended = await between('refused_suspended');
   const fallbacks = await between('fallback');
 
   const { results: providers } = await ctx.db
@@ -238,7 +224,7 @@ export async function dailySummary(ctx, start, end) {
     `Summary for ${day} (UTC)`,
     `Active inboxes: ${accepted.inboxes ?? 0}`,
     `Notes accepted: ${accepted.free_notes ?? 0} free (${hours(accepted.free_s)} h), ${accepted.unlocked_notes ?? 0} unlocked (${hours(accepted.unlocked_s)} h)`,
-    `New unlocks: ${unlocks}. Refused: ${refusedFree} free notes used, ${refusedFairUse} fair use`,
+    `New unlocks: ${unlocks}. Refused: ${refusedFree} free notes used, ${refusedSuspended} suspended`,
     `Providers: ${providerLine}. Fallbacks: ${fallbacks}`,
     `No speech: ${outcomes.silent ?? 0}. Permanent failures: ${outcomes.failed ?? 0}`,
     `Upload to transcript: median ${pct(0.5).toFixed(1)} s, p95 ${pct(0.95).toFixed(1)} s`,

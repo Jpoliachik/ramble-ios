@@ -1,15 +1,17 @@
 // Old builds' cloud transcription for early subscribers: POST /transcribe.
 // Works until LEGACY_UNTIL, then 410 (see the router). Needs App Attest and
-// an unexpired subscription record checked like POST /entitlement, counts
-// toward 100 hours a month per original transaction, and always uses the
-// default provider chain whatever model the old app asks for.
+// an unexpired subscription record checked like POST /entitlement, adds to
+// the monthly usage tally per original transaction (monitoring only), is
+// refused when that purchase is suspended, and always uses the default
+// provider chain whatever model the old app asks for.
 // See specs/relay-api.md "Old app versions".
 
+import { recordUsage, suspendedResponse } from './account.js';
 import { AppleVerifyError } from './apple.js';
 import { limit } from './auth.js';
-import { bearerValue, fail, json, logId, nextMonthStart, unavailable, utcMonth } from './http.js';
+import { bearerValue, fail, json, logId, unavailable } from './http.js';
 import { MAX_SECONDS, MAX_UPLOAD_BYTES } from './notes.js';
-import { FAIR_USE_SECONDS } from './ops.js';
+import { recordEvent } from './ops.js';
 import { TranscribeError } from './transcribe.js';
 
 const DEFAULT_PREMIUM_PRODUCT = 'dev.goodloop.ramble.premium.monthly2';
@@ -57,8 +59,12 @@ export async function legacyTranscribe(request, ctx) {
     return fail(403, SUBSCRIPTION_REQUIRED, 'invalid_transaction');
   }
   const purchaseId = `sub:${tx.originalTransactionId}`;
-  const revoked = await ctx.db.prepare('SELECT revoked_at FROM purchases WHERE id = ?').bind(purchaseId).first();
-  if (revoked?.revoked_at != null) return fail(403, SUBSCRIPTION_REQUIRED, 'invalid_transaction');
+  const purchase = await ctx.db.prepare('SELECT revoked_at, suspended FROM purchases WHERE id = ?').bind(purchaseId).first();
+  if (purchase?.revoked_at != null) return fail(403, SUBSCRIPTION_REQUIRED, 'invalid_transaction');
+  if (purchase?.suspended) {
+    await recordEvent(ctx, 'refused_suspended');
+    return suspendedResponse();
+  }
 
   let audio;
   let options;
@@ -78,16 +84,6 @@ export async function legacyTranscribe(request, ctx) {
   const measured = ctx.measureDuration(bytes);
   if (measured != null && measured > MAX_SECONDS) return fail(413, 'Recordings must be at most 60 minutes.', 'too_long');
 
-  const month = utcMonth(ctx.now);
-  const used = await ctx.db
-    .prepare('SELECT seconds FROM fair_use WHERE purchase_id = ? AND month = ?')
-    .bind(purchaseId, month)
-    .first();
-  if ((used?.seconds ?? 0) >= FAIR_USE_SECONDS) {
-    const retryAfter = Math.ceil((nextMonthStart(ctx.now) - ctx.now) / 1000);
-    return fail(402, 'This subscription used its 100 hours of audio this month.', 'fair_use', {}, { 'Retry-After': String(retryAfter) });
-  }
-
   let out;
   try {
     out = await ctx.transcribe(
@@ -102,13 +98,6 @@ export async function legacyTranscribe(request, ctx) {
     return fail(503, 'Transcription service unavailable');
   }
 
-  const seconds = out.durationSeconds ?? measured ?? 0;
-  await ctx.db
-    .prepare(
-      `INSERT INTO fair_use (purchase_id, month, seconds) VALUES (?, ?, ?)
-         ON CONFLICT (purchase_id, month) DO UPDATE SET seconds = seconds + excluded.seconds`,
-    )
-    .bind(purchaseId, month, seconds)
-    .run();
+  await recordUsage(ctx, purchaseId, out.durationSeconds ?? measured ?? 0);
   return json({ text: out.result === 'no_speech' ? '' : String(out.text ?? '') });
 }

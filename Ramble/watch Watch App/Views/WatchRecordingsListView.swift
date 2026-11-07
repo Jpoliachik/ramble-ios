@@ -103,10 +103,6 @@ struct WatchRecordingRow: View {
             ProgressView().controlSize(.mini)
         case .done, .silent:
             Image(systemName: "checkmark").foregroundStyle(.secondary)
-        case .heldFairUse:
-            Image(systemName: "circle.fill")
-                .font(.system(size: 7))
-                .foregroundStyle(.secondary)
         case .heldUnlock, .stuck, .failed, .lost, .tooLong, .couldntSend:
             Image(systemName: "exclamationmark.circle").foregroundStyle(.red)
         }
@@ -126,15 +122,13 @@ struct WatchRecordingRow: View {
 struct WatchAlertDetailView: View {
     let alert: WatchAlert
 
-    @StateObject private var store = WatchNoteStore.shared
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 8) {
                 Label(alert.detailTitle, systemImage: alert.symbol)
                     .font(.headline)
                     .foregroundStyle(alert.isBlocking ? Color.red : Color.primary)
-                ForEach(alert.detailBody(resetDate: WatchRecent.fairUseResetDate), id: \.self) { paragraph in
+                ForEach(alert.detailBody, id: \.self) { paragraph in
                     Text(paragraph)
                         .font(.footnote)
                         .foregroundStyle(.secondary)

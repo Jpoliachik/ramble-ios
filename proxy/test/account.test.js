@@ -142,24 +142,28 @@ describe('creating an inbox', () => {
 });
 
 describe('account state', () => {
-  it('starts with 25 free notes and no fair use; the watch gets no account token', async () => {
+  it('starts with 25 free notes; the watch gets no account token', async () => {
     const { inbox_secret: secret, account_token } = await h.newInbox();
     assert.deepEqual(await account(secret), {
       unlocked: false,
       free_notes_total: 25,
       free_notes_remaining: 25,
-      fair_use: null,
       account_token,
     });
     const watch = await h.watchToken(secret);
     assert.equal((await account(watch)).account_token, undefined);
   });
 
-  it('shows fair use for an unlocked inbox', async () => {
+  it('shows no usage for an unlocked inbox', async () => {
     const { inbox_secret: secret, account_token: token } = await h.newInbox();
     await entitle(secret, { signed_transaction: unlockTx(token) });
-    h.db.sqlite.exec(`INSERT INTO fair_use (purchase_id, month, seconds) VALUES ('unlock:otx1', '2026-11', ${41 * 3600})`);
-    assert.deepEqual((await account(secret)).fair_use, { used_hours: 41, limit_hours: 100, resets_at: '2026-12-01T00:00:00.000Z' });
+    h.db.sqlite.exec(`INSERT INTO usage (user_id, month, seconds) VALUES ('unlock:otx1', '2026-11', ${141 * 3600})`);
+    assert.deepEqual(await account(secret), {
+      unlocked: true,
+      free_notes_total: 25,
+      free_notes_remaining: 25,
+      account_token: token,
+    });
   });
 
   it('gives old inboxes an account token on first read', async () => {
@@ -242,7 +246,6 @@ describe('purchases', () => {
     const ok = await entitle(secret, { app_transaction: app() });
     assert.equal(ok.status, 200);
     assert.equal(ok.body.unlocked, true);
-    assert.notEqual(ok.body.fair_use, null);
   });
 
   it('early subscribers: active at FREE_RELEASE_AT unlocks; lapsed does not', async () => {

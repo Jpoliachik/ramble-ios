@@ -1,16 +1,14 @@
 // Inboxes as accounts: creation, free notes, the unlock and its binding,
-// refunds, fair use, transcription settings and the watch token.
-// See specs/purchase.md and specs/relay-api.md "Phone setup and purchase".
+// refunds, usage monitoring and suspension, transcription settings and the
+// watch token. See specs/purchase.md and specs/relay-api.md "Phone setup and purchase".
 
 import { AppleVerifyError } from './apple.js';
 import { address, authenticate, limit } from './auth.js';
 import {
   DAY,
   fail,
-  iso,
   json,
   logId,
-  nextMonthStart,
   randomToken,
   readJSON,
   sha256Hex,
@@ -18,9 +16,10 @@ import {
   utcDayStart,
   utcMonth,
 } from './http.js';
-import { FAIR_USE_SECONDS, FREE_TIER_DAILY_SECONDS, alert, freeSecondsToday } from './ops.js';
+import { FREE_TIER_DAILY_SECONDS, alert, freeSecondsToday } from './ops.js';
 
 export const FREE_NOTES = 25;
+export const HEAVY_USE_SECONDS = 100 * 3600;
 export const INBOX_DAILY_CAP = 2000;
 export const MAX_INBOXES_PER_PURCHASE = 5;
 export const BINDING_ACTIVE_MS = 90 * DAY;
@@ -35,46 +34,77 @@ export async function loadAccount(ctx, inboxId) {
   const row = await ctx.db
     .prepare(
       `SELECT i.id, i.account_token, i.free_notes_used, i.purchase_id, i.language, i.remove_filler_words,
-              i.vocabulary, p.kind AS purchase_kind, p.test_until, p.revoked_at
+              i.vocabulary, p.kind AS purchase_kind, p.revoked_at,
+              (i.suspended != 0 OR COALESCE(p.suspended, 0) != 0) AS suspended
          FROM inboxes i LEFT JOIN purchases p ON p.id = i.purchase_id WHERE i.id = ?`,
     )
     .bind(inboxId)
     .first();
   if (!row) return null;
-  const unlocked =
-    row.purchase_kind != null && row.revoked_at == null && (row.test_until == null || row.test_until > ctx.now);
-  let fairUseSeconds = 0;
-  if (unlocked) {
-    const usage = await ctx.db
-      .prepare('SELECT seconds FROM fair_use WHERE purchase_id = ? AND month = ?')
-      .bind(row.purchase_id, utcMonth(ctx.now))
-      .first();
-    fairUseSeconds = usage?.seconds ?? 0;
-  }
+  const unlocked = row.purchase_kind != null && row.revoked_at == null;
   return {
     ...row,
+    suspended: !!row.suspended,
     unlocked,
     activePurchase: unlocked ? row.purchase_id : null,
-    fairUseSeconds,
     freeRemaining: Math.max(0, FREE_NOTES - row.free_notes_used),
   };
 }
 
-export function accountView(account, ctx, { includeToken }) {
+export function accountView(account, { includeToken }) {
   const view = {
     unlocked: account.unlocked,
     free_notes_total: FREE_NOTES,
     free_notes_remaining: account.freeRemaining,
-    fair_use: account.unlocked
-      ? {
-          used_hours: Math.round((account.fairUseSeconds / 3600) * 100) / 100,
-          limit_hours: FAIR_USE_SECONDS / 3600,
-          resets_at: iso(nextMonthStart(ctx.now)),
-        }
-      : null,
   };
   if (includeToken) view.account_token = account.account_token;
   return view;
+}
+
+// --- Usage monitoring and suspension -------------------------------------------
+
+/** Set by the operator by hand; see proxy/README.md "Operations". */
+export const suspendedResponse = () =>
+  fail(403, 'Uploads from this Ramble setup are paused. Contact support@ramble.watch.', 'suspended');
+
+/**
+ * Adds transcribed audio to the user's tally for this UTC month: the purchase
+ * an inbox is unlocked by, else the inbox. Alerts the operator once, when the
+ * tally first passes HEAVY_USE_SECONDS. Monitoring only; never throws.
+ */
+export async function recordUsage(ctx, userId, seconds) {
+  if (!userId || !(seconds > 0)) return;
+  try {
+    const month = utcMonth(ctx.now);
+    const row = await ctx.db
+      .prepare(
+        `INSERT INTO usage (user_id, month, seconds) VALUES (?, ?, ?)
+           ON CONFLICT (user_id, month) DO UPDATE SET seconds = seconds + excluded.seconds
+         RETURNING seconds`,
+      )
+      .bind(userId, month, seconds)
+      .first();
+    const total = row?.seconds ?? 0;
+    if (total >= HEAVY_USE_SECONDS && total - seconds < HEAVY_USE_SECONDS) {
+      await alert(
+        ctx,
+        `heavy_use:${userId}:${month}`,
+        `${userId} passed ${HEAVY_USE_SECONDS / 3600} hours of audio in ${month} (UTC). Nothing is refused; suspend by hand if needed (proxy/README.md).`,
+      );
+    }
+  } catch (err) {
+    console.error(`[account] usage not recorded: ${String(err?.message).slice(0, 200)}`);
+  }
+}
+
+/** The tally key for an inbox's notes. Never throws. */
+export async function usageUser(ctx, inboxId) {
+  try {
+    const account = await loadAccount(ctx, inboxId);
+    return account ? (account.activePurchase ?? account.id) : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Inboxes made before accounts existed get their token on first read. */
@@ -95,7 +125,7 @@ export async function getAccount(request, ctx) {
   if (limited) return limited;
   let account = await loadAccount(ctx, cred.inboxId);
   if (cred.kind === 'inbox') account = await ensureAccountToken(ctx, account);
-  return json(accountView(account, ctx, { includeToken: cred.kind === 'inbox' }));
+  return json(accountView(account, { includeToken: cred.kind === 'inbox' }));
 }
 
 // --- Creating an inbox -------------------------------------------------------
@@ -288,8 +318,8 @@ export async function bindPurchase(ctx, inboxId, proof) {
 
   const account = await loadAccount(ctx, inboxId);
   if (account.purchase_id === proof.id) return null;
-  // Already unlocked for real by another record: nothing to change.
-  if (account.unlocked && !account.testUnlock) return null;
+  // Already unlocked by another record: nothing to change.
+  if (account.unlocked) return null;
 
   // A first-time unlock must be bought from this inbox; a restore may not be.
   if (proof.kind === 'unlock' && !existing) {
@@ -300,15 +330,12 @@ export async function bindPurchase(ctx, inboxId, proof) {
   }
 
   // Sandbox (TestFlight, App Review) unlocks like a real purchase; it is kept
-  // out of revenue counts by its environment. test_until stays unused.
-  const testUntil = null;
+  // out of revenue counts by its environment.
   const since = ctx.now - BINDING_ACTIVE_MS;
   const [, bound] = await ctx.db.batch([
     ctx.db
-      .prepare(
-        'INSERT OR IGNORE INTO purchases (id, kind, environment, test_until, created_at) VALUES (?, ?, ?, ?, ?)',
-      )
-      .bind(proof.id, proof.kind, proof.environment, testUntil, ctx.now),
+      .prepare('INSERT OR IGNORE INTO purchases (id, kind, environment, created_at) VALUES (?, ?, ?, ?)')
+      .bind(proof.id, proof.kind, proof.environment, ctx.now),
     // Conditional, so two inboxes binding at once can't both take the 5th spot.
     ctx.db
       .prepare(
@@ -335,7 +362,7 @@ export async function postEntitlement(request, ctx) {
   const refused = await bindPurchase(ctx, cred.inboxId, verified.proof);
   if (refused) return refused;
   const account = await ensureAccountToken(ctx, await loadAccount(ctx, cred.inboxId));
-  return json(accountView(account, ctx, { includeToken: true }));
+  return json(accountView(account, { includeToken: true }));
 }
 
 /** App Store Server Notifications v2: refunds and revocations lock inboxes. */

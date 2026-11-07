@@ -20,7 +20,7 @@ Ramble can also send each transcript to an HTTPS endpoint (webhook) from the iPh
 - [Connect your agent](https://ramble.watch/docs): Pairing, the agent loop, wake-up hooks, rate limits, and the relay API.
 - [Webhooks](https://ramble.watch/docs/webhooks): Payload format, signature verification, retries, automation platforms.
 - [Requirements and troubleshooting](https://ramble.watch/docs/help): Minimum iOS and watchOS, and fixes for a missing watch app, notes waiting on the watch, held notes, transcription errors, and an agent that isn't picking up.
-- [Support](https://ramble.watch/support): support@ramble.watch, usage limits, restoring a purchase, refunds.
+- [Support](https://ramble.watch/support): support@ramble.watch, restoring a purchase, refunds.
 
 Requirements: iPhone on iOS 26.2 or later. Apple Watch on watchOS 10.0 or later (Series 4 and later, any SE, any Ultra). If the watch app doesn't appear after installing, the watch is usually on an older watchOS.
 

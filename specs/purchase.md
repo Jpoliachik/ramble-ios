@@ -1,7 +1,7 @@
 # Free notes and unlock
 
 ## Purpose
-How Ramble is paid for: 25 free notes, then a one-time $14.99 unlock with no subscription. Covers counting free notes, notes held when free notes run out, buying and restoring the unlock, how every device learns about it, fair use, early buyers (paid download or cloud subscription), and what Ramble says about price. The wire contract (status codes, reasons, purchase and notification endpoints) is in relay-api.md; where held notes appear on screen is in watch.md and phone.md.
+How Ramble is paid for: 25 free notes, then a one-time $14.99 unlock with no subscription. Covers counting free notes, notes held when free notes run out, buying and restoring the unlock, how every device learns about it, fair use (heavy-use monitoring and suspending a user by hand), early buyers (paid download or cloud subscription), and what Ramble says about price. The wire contract (status codes, reasons, purchase and notification endpoints) is in relay-api.md; where held notes appear on screen is in watch.md and phone.md.
 
 ## Free notes
 
@@ -20,7 +20,7 @@ Ramble SHALL transcribe the first 25 notes from an inbox for free, counted on th
 - AND the other is refused with nothing kept or counted on the server, and is held on its device
 
 ### Requirement: Free note refunded only on permanent failure
-The server SHALL give back a free note when that note's transcription permanently fails ("Couldn't transcribe", transcription.md). A note that transcribes as "No speech detected" SHALL use a free note like any other. A hand retry of a failed note (transcription.md) SHALL count like the original note: before unlock it takes a free note when accepted, is held with "free_notes_used" when none are left, and gets it back if it fails permanently again; after unlock it counts toward fair use by measured length.
+The server SHALL give back a free note when that note's transcription permanently fails ("Couldn't transcribe", transcription.md). A note that transcribes as "No speech detected" SHALL use a free note like any other. A hand retry of a failed note (transcription.md) SHALL count like the original note: before unlock it takes a free note when accepted, is held with "free_notes_used" when none are left, and gets it back if it fails permanently again; after unlock it uses no free note.
 
 #### Scenario: Retry with no free notes left
 - GIVEN a locked inbox with 0 free notes left and a note that couldn't transcribe
@@ -223,7 +223,7 @@ When Apple reports a refund or revocation through its server notifications (endp
 - THEN the inbox has 22 free notes left
 
 ### Requirement: Sandbox purchases unlock like real ones
-TestFlight testers and App Review buy with sandbox purchases against the production server. The server SHALL verify a sandbox unlock purchase against Apple's root CA like any other and unlock the inbox for good, with the same binding, 5-inbox cap and fair use. A sandbox unlock SHALL NOT count in revenue or purchase counts. Records from Xcode testing SHALL be rejected, and the production server SHALL accept no developer bypass key. Early-buyer proof (below) SHALL count only when Apple marks the record as Production.
+TestFlight testers and App Review buy with sandbox purchases against the production server. The server SHALL verify a sandbox unlock purchase against Apple's root CA like any other and unlock the inbox for good, with the same binding, 5-inbox cap and heavy-use monitoring. A sandbox unlock SHALL NOT count in revenue or purchase counts. Records from Xcode testing SHALL be rejected, and the production server SHALL accept no developer bypass key. Early-buyer proof (below) SHALL count only when Apple marks the record as Production.
 
 #### Scenario: TestFlight tester buys the unlock
 - GIVEN a TestFlight build with 0 free notes left
@@ -237,49 +237,63 @@ TestFlight testers and App Review buy with sandbox purchases against the product
 
 ## Fair use
 
-Fair use is an abuse guard, set far above real use. Exceptions are handled by the operator by hand; the product has no override.
+Fair use is stated in the Terms of Use as 100 hours of audio per calendar month per purchase. The server does not enforce it: it watches for heavy use and alerts the operator, who can suspend one user by hand. The product has no automatic cap and no override screen.
 
-### Requirement: 100 hours a month per purchase
-An unlocked purchase SHALL include 100 hours of transcribed audio per calendar month (UTC), counted across every inbox bound to it and resetting on the 1st. Duration SHALL be measured by the server from the transcription result, never taken from the device. There SHALL be no separate per-device limit, and before purchase only the 25 free notes apply.
+### Requirement: Heavy use is monitored, never refused
+The server SHALL keep a tally of transcribed audio per user per calendar month (UTC), where the user is the purchase an inbox is unlocked by (counted across every inbox bound to it), or the inbox when it has none. Only notes that finish with a transcript or as "No speech detected" SHALL count, by the length the server measured ([transcription.md](transcription.md)); old-build transcriptions count toward their subscription's original transaction. When a user's tally first passes 100 hours in a month, the server SHALL send the operator one alert naming the user and the month, and no further heavy-use alert for that user that month. Heavy use SHALL NOT refuse, hold or slow any note, and the person SHALL see nothing about it.
 
-#### Scenario: The note that crosses the line
-- GIVEN 99.5 hours used this month
-- WHEN a 60-minute note is accepted
-- THEN it transcribes in full, and only uploads after it are held
+#### Scenario: Passing 100 hours
+- GIVEN a purchase with 99.8 hours transcribed in November
+- WHEN a 59-minute note from one of its inboxes transcribes
+- THEN the operator gets one alert naming the purchase and "2026-11"
+- AND that note and every later one transcribe as usual, with no second alert in November
 
-### Requirement: Over the usage limit, notes are held
-When the allowance is used up, the server SHALL refuse uploads with payment required, reason "fair_use", and a retry time equal to the reset, keeping and counting nothing, and SHALL alert the operator ([transcription.md](transcription.md)). The device SHALL keep the audio, show the note as "Usage limit reached" with the detail "Ramble pauses transcription after 100 hours in a month to stop abuse. This note will transcribe on <Mon D>. If this looks wrong, contact support." (the reset date), retry at the reset time and whenever the app opens, and raise no stuck-note alert.
-
-#### Scenario: Held until the reset
-- GIVEN a purchase that has used 100 hours in November
-- WHEN the iPhone uploads 3 notes on November 20
-- THEN each shows "Usage limit reached" and "… This note will transcribe on Dec 1. …"
-- AND the operator is alerted
-- AND after December 1 (UTC) the iPhone retries, and the notes upload and transcribe
-
-### Requirement: Contact support goes to the support email
-"Contact support" on a held note SHALL open a new email to support@ramble.watch in the iPhone's mail app, with the subject "Usage limit reached". The person sees and edits the email before sending; the app sends nothing itself. If no mail app is set up, the app SHALL show the address so the person can copy it. The website SHALL have a page at https://ramble.watch/support that shows support@ramble.watch, and it SHALL be the App Store listing's Support URL; the mailbox SHALL be receiving mail before the app is submitted.
-
-#### Scenario: Person thinks the limit is wrong
-- GIVEN a note showing "Usage limit reached"
-- WHEN the person taps "Contact support"
-- THEN a new email to support@ramble.watch opens with the subject "Usage limit reached"
-- AND nothing is sent until the person sends it
-
-### Requirement: The limit is shown only when reached
-The app SHALL NOT show usage or warn before the limit is reached. Fair use appears only in the Terms of Use, the App Store description, the unlock sheet, and on notes held by it.
+#### Scenario: A new month
+- GIVEN a purchase that passed 100 hours in November
+- WHEN its first note transcribes on December 1 (UTC)
+- THEN it counts toward a fresh December tally
 
 #### Scenario: Heavy but normal use
 - GIVEN 85 hours used in November
 - WHEN the person opens Settings and Home
 - THEN neither mentions usage or a limit
 
+### Requirement: The operator can suspend one user
+The operator SHALL be able to suspend, and later unsuspend, a single inbox or a single purchase by hand, with one database command (proxy/README.md). A suspended purchase SHALL suspend every inbox bound to it, and an old-build subscriber by its original transaction. While suspended, every new upload and hand retry from that user, from the watch or the iPhone, SHALL be refused with `403` and reason "suspended", keeping and counting nothing (relay-api.md). Notes accepted before the suspension SHALL still transcribe and be delivered, reads and acks SHALL keep working, and every other user SHALL be unaffected. The devices SHALL treat the refusal like any other refusal for good: stop retrying, keep the audio, show "Couldn't send" (watch.md, phone.md). The operator's commands (all in proxy/README.md):
+
+```bash
+npx wrangler d1 execute ramble-relay --remote --command "SELECT user_id, ROUND(seconds / 3600.0, 1) AS hours FROM usage WHERE month = strftime('%Y-%m', 'now') ORDER BY seconds DESC LIMIT 20"
+npx wrangler d1 execute ramble-relay --remote --command "UPDATE purchases SET suspended = 1 WHERE id = '<purchase ID>'"
+npx wrangler d1 execute ramble-relay --remote --command "UPDATE inboxes SET suspended = 1 WHERE id = '<inbox ID>'"
+npx wrangler d1 execute ramble-relay --remote --command "UPDATE purchases SET suspended = 0 WHERE id = '<purchase ID>'"
+npx wrangler d1 execute ramble-relay --remote --command "UPDATE inboxes SET suspended = 0 WHERE id = '<inbox ID>'"
+```
+
+#### Scenario: One user suspended
+- GIVEN the operator suspended the purchase bound to inboxes A and B
+- WHEN the watch on A and the iPhone on B each upload a note
+- THEN both are refused with reason "suspended", and each note shows "Couldn't send" with no retry
+- AND an upload from any other inbox transcribes as usual
+
+#### Scenario: Unsuspended
+- GIVEN a suspended inbox
+- WHEN the operator unsuspends it and the person records a new note
+- THEN the new note uploads and transcribes as usual
+
+### Requirement: Support page
+The website SHALL have a page at https://ramble.watch/support that shows support@ramble.watch, and it SHALL be the App Store listing's Support URL; the mailbox SHALL be receiving mail before the app is submitted.
+
+#### Scenario: Finding support
+- GIVEN the App Store listing
+- WHEN someone opens its Support URL
+- THEN they see support@ramble.watch
+
 ## Early buyers
 
 The first free build is the first build that offers free notes; its build number is FIRST_FREE_BUILD, set at release. A person's "first free-notes launch" is the first time they open a build at or above it.
 
 ### Requirement: Paid-download buyers are unlocked
-A person whose first download of Ramble was a build below FIRST_FREE_BUILD SHALL be treated as unlocked, proved by Apple's signed app purchase record from the Production environment. The server SHALL read its original app version as a whole number and compare it numerically with FIRST_FREE_BUILD; a value that is not a whole number SHALL NOT count. Build numbers SHALL stay one increasing whole number shared by the iPhone and watch targets, never reset. The app SHALL send it on its own at first launch and on "Restore Purchases". The 5-inbox cap and fair use apply.
+A person whose first download of Ramble was a build below FIRST_FREE_BUILD SHALL be treated as unlocked, proved by Apple's signed app purchase record from the Production environment. The server SHALL read its original app version as a whole number and compare it numerically with FIRST_FREE_BUILD; a value that is not a whole number SHALL NOT count. Build numbers SHALL stay one increasing whole number shared by the iPhone and watch targets, never reset. The app SHALL send it on its own at first launch and on "Restore Purchases". The 5-inbox cap and heavy-use monitoring apply.
 
 #### Scenario: Paid buyer's first free-notes launch
 - GIVEN a person who bought Ramble for $4.99
@@ -321,7 +335,7 @@ The app, website, Terms of Use, Privacy Policy and App Store listing SHALL descr
 - AND it says nothing about auto-renewal
 
 ### Requirement: Words to avoid
-Copy SHALL NOT call the free notes a "trial", and SHALL NOT say "unlimited" (fair use applies), "premium", "Subscribe", or "per month" or "/month" next to a price. The only monthly wording allowed is the fair-use line "100 hours of audio per calendar month", the unlock sheet's "Includes up to 100 hours of audio each month.", and the held-note detail. "Subscription" SHALL appear only in "No subscription." and in messages to subscribers.
+Copy SHALL NOT call the free notes a "trial", and SHALL NOT say "unlimited" (fair use applies), "premium", "Subscribe", or "per month" or "/month" next to a price. The only monthly wording allowed is the fair-use line "100 hours of audio per calendar month", and the unlock sheet's "Includes up to 100 hours of audio each month.". "Subscription" SHALL appear only in "No subscription." and in messages to subscribers.
 
 #### Scenario: Out of free notes
 - GIVEN a person with 0 free notes left

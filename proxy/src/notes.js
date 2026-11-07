@@ -3,12 +3,13 @@
 // See specs/relay-api.md "Notes" and specs/transcription.md.
 //
 // Upload: auth -> repeat? (200, before the body is read) -> limits -> checks
-// -> held? (402) -> read body -> measure -> store in R2 -> create the note and
-// count it in one batch (conditional, so concurrent uploads count once) ->
-// transcribe in the background, waiting up to 8 seconds to answer "done".
+// -> suspended? (403) -> held? (402) -> read body -> measure -> store in R2 ->
+// create the note and count it in one batch (conditional, so concurrent
+// uploads count once) -> transcribe in the background, waiting up to 8
+// seconds to answer "done".
 // The cron sweeper (every minute) runs retries and picks up lost attempts.
 
-import { FREE_NOTES, loadAccount } from './account.js';
+import { FREE_NOTES, loadAccount, recordUsage, suspendedResponse, usageUser } from './account.js';
 import { authenticate, limit } from './auth.js';
 import {
   DAY,
@@ -19,14 +20,12 @@ import {
   iso,
   json,
   logId,
-  nextMonthStart,
   randomToken,
   readJSON,
   unavailable,
-  utcMonth,
   withTimeout,
 } from './http.js';
-import { FAIR_USE_SECONDS, alert, recordAttempt, recordEvent } from './ops.js';
+import { alert, recordAttempt, recordEvent } from './ops.js';
 import { makeAgentCopies } from './relay.js';
 import { INLINE_BUDGET_MS, INLINE_PROVIDER_TIMEOUT_MS, TranscribeError } from './transcribe.js';
 
@@ -121,22 +120,9 @@ async function answerWithNote(ctx, cred, n, status) {
 
 const badUpload = (error) => fail(400, error, 'bad_upload');
 
-function holdFor(account, ctx) {
-  if (account.unlocked) {
-    if (account.fairUseSeconds < FAIR_USE_SECONDS) return null;
-    const retryAfter = Math.ceil((nextMonthStart(ctx.now) - ctx.now) / 1000);
-    return {
-      event: 'refused_fair_use',
-      response: fail(
-        402,
-        'This purchase used its 100 hours of audio this month. The note will transcribe after the reset.',
-        'fair_use',
-        {},
-        { 'Retry-After': String(retryAfter) },
-      ),
-    };
-  }
-  if (account.freeRemaining > 0) return null;
+function holdFor(account) {
+  if (account.suspended) return { event: 'refused_suspended', response: suspendedResponse() };
+  if (account.unlocked || account.freeRemaining > 0) return null;
   return { event: 'refused_free', response: freeNotesUsed() };
 }
 
@@ -192,7 +178,7 @@ export async function uploadNote(request, rawId, ctx) {
   }
 
   const account = await loadAccount(ctx, inboxId);
-  const hold = holdFor(account, ctx);
+  const hold = holdFor(account);
   if (hold) {
     await recordEvent(ctx, hold.event);
     return hold.response;
@@ -251,7 +237,6 @@ async function acceptNote(ctx, u) {
   const { db, now } = ctx;
   const inboxId = u.cred.inboxId;
   const free = !u.account.unlocked;
-  const fairUse = free ? [null, null, 0] : [u.account.activePurchase, utcMonth(now), u.seconds ?? 0];
   // Free notes are claimed in SQL, so two devices can't both take the last one.
   const freeSQL = free ? `(SELECT free_notes_used FROM inboxes WHERE id = ?) < ${FREE_NOTES}` : '1';
   const freeParams = free ? [inboxId] : [];
@@ -266,39 +251,28 @@ async function acceptNote(ctx, u) {
                 provider = NULL, model = NULL, ready_at = NULL, transcript_cleared_at = NULL, phone_acked_at = NULL,
                 watch_received_at = NULL, retry_count = retry_count + 1, attempts = 1, attempt_started_at = ?,
                 next_attempt_at = NULL, options = NULL, accepted_at = ?, content_type = ?, container_duration = ?,
-                audio_key = ?, audio_stored_at = ?, free_note = ?, fair_use_purchase = ?, fair_use_month = ?,
-                fair_use_seconds = ?, last_error = NULL
+                audio_key = ?, audio_stored_at = ?, free_note = ?, last_error = NULL
               WHERE inbox_id = ? AND id = ? AND status = 'failed' AND retry_count < ? AND ${freeSQL}`,
           )
-          .bind(now, now, u.contentType, u.seconds, u.audioKey, now, free ? 1 : 0, ...fairUse,
+          .bind(now, now, u.contentType, u.seconds, u.audioKey, now, free ? 1 : 0,
             inboxId, u.id, MAX_HAND_RETRIES, ...freeParams)
       : db
           .prepare(
             `INSERT INTO notes (inbox_id, id, source, watch_token_hash, status, recorded_at, recorded_ms, received_at,
                 accepted_at, content_type, container_duration, attempts, attempt_started_at, audio_key, audio_stored_at,
-                free_note, fair_use_purchase, fair_use_month, fair_use_seconds)
-             SELECT ?, ?, ?, ?, 'transcribing', ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ? WHERE ${freeSQL}
+                free_note)
+             SELECT ?, ?, ?, ?, 'transcribing', ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ? WHERE ${freeSQL}
              ON CONFLICT (inbox_id, id) DO NOTHING`,
           )
           .bind(inboxId, u.id, u.cred.kind === 'inbox' ? 'phone' : 'watch', u.cred.kind === 'inbox' ? null : u.cred.hash,
             u.recordedAt, u.recordedMs, now, now, u.contentType, u.seconds, now, u.audioKey, now, free ? 1 : 0,
-            ...fairUse, ...freeParams),
+            ...freeParams),
     db
       .prepare(
         `UPDATE inboxes SET free_notes_used = free_notes_used + ?, last_upload_at = ? WHERE id = ? AND ${mine}`,
       )
       .bind(free ? 1 : 0, now, inboxId, ...mineParams),
   ];
-  if (!free) {
-    statements.push(
-      db
-        .prepare(
-          `INSERT INTO fair_use (purchase_id, month, seconds) SELECT ?, ?, ? WHERE ${mine}
-           ON CONFLICT (purchase_id, month) DO UPDATE SET seconds = seconds + excluded.seconds`,
-        )
-        .bind(fairUse[0], fairUse[1], fairUse[2], ...mineParams),
-    );
-  }
   await db.batch(statements);
 
   const note = await readNote(ctx, inboxId, u.id);
@@ -466,18 +440,8 @@ async function finishDone(ctx, note, out) {
   // makes any copies not yet marked made. Silent notes go nowhere.
   if (result === 'transcript') await copyToAgents(ctx, done);
 
-  // Fair use counts the measured length, which may beat the container's.
-  if (done.fair_use_purchase && duration > done.fair_use_seconds) {
-    await ctx.db.batch([
-      ctx.db
-        .prepare(
-          `INSERT INTO fair_use (purchase_id, month, seconds) VALUES (?, ?, ?)
-             ON CONFLICT (purchase_id, month) DO UPDATE SET seconds = seconds + excluded.seconds`,
-        )
-        .bind(done.fair_use_purchase, done.fair_use_month, duration - done.fair_use_seconds),
-      ctx.db.prepare('UPDATE notes SET fair_use_seconds = ? WHERE inbox_id = ? AND id = ?').bind(duration, note.inbox_id, note.id),
-    ]);
-  }
+  // Monitoring: the measured length counts once, when the note is done.
+  await recordUsage(ctx, await usageUser(ctx, note.inbox_id), duration);
   if (duration > MAX_SECONDS) {
     await alert(ctx, `long_note:${await logId(`${note.inbox_id}/${note.id}`)}`,
       `A note measured ${(duration / 60).toFixed(0)} minutes, over the 61-minute cap: its file header understated its length.`);
@@ -520,15 +484,6 @@ async function finishFailed(ctx, note, result, error) {
       .prepare('UPDATE inboxes SET free_notes_used = MAX(0, free_notes_used - 1) WHERE id = ?')
       .bind(note.inbox_id)
       .run();
-  }
-  // Nothing was transcribed, so nothing counts toward fair use.
-  if (failed.fair_use_purchase && failed.fair_use_seconds > 0) {
-    await ctx.db.batch([
-      ctx.db
-        .prepare('UPDATE fair_use SET seconds = MAX(0, seconds - ?) WHERE purchase_id = ? AND month = ?')
-        .bind(failed.fair_use_seconds, failed.fair_use_purchase, failed.fair_use_month),
-      ctx.db.prepare('UPDATE notes SET fair_use_seconds = 0 WHERE inbox_id = ? AND id = ?').bind(note.inbox_id, note.id),
-    ]);
   }
   console.log(`[notes] failed ${result} inbox=${await logId(note.inbox_id)}`);
   await deleteAudio(ctx, failed);

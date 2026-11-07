@@ -115,8 +115,8 @@ Matches the privacy policy and `specs/delivery.md`. Ramble does no tracking and 
 | --- | --- | --- | --- | --- |
 | User Content → Audio Data | Yes | No | App Functionality | Each recording is uploaded and sent to a transcription provider (Groq, or Deepgram or OpenAI as fallbacks), then deleted once transcribed, at most 1 day after upload |
 | User Content → Other User Content | Yes | No | App Functionality | Transcripts, held for the person's devices and agents, deleted on pickup or after 30 days (a point-in-time database backup keeps deleted rows up to 30 days for outage recovery) |
-| Purchases → Purchase History | Yes | No | App Functionality | Apple's signed purchase record, to unlock notes and apply fair use |
-| Usage Data or Diagnostics | TODO: decide | No | App Functionality | Per-note lengths, providers and outcomes, with no audio or text, used for fair use and running the service |
+| Purchases → Purchase History | Yes | No | App Functionality | Apple's signed purchase record, to unlock notes |
+| Usage Data or Diagnostics | TODO: decide | No | App Functionality | Per-note lengths, providers and outcomes, with no audio or text, used for usage monitoring and running the service |
 
 Not collected: contact info, location, identifiers for tracking, browsing history. Webhook transcripts go from the iPhone straight to the person's own URL and never reach Ramble's server.
 

@@ -31,14 +31,6 @@ enum WatchRecent {
             )
         }
     }
-
-    /// The fair-use reset the server gave for held notes, for "Limit".
-    static var fairUseResetDate: Date? {
-        WatchNoteStore.shared.notes
-            .filter { $0.upload == .heldFairUse }
-            .compactMap { $0.fairUseResetsAt ?? $0.notBefore }
-            .max()
-    }
 }
 
 struct WatchMainView: View {
@@ -75,8 +67,7 @@ struct WatchMainView: View {
             micBusy: micBusyToken != nil,
             companionAppInstalled: connectivity.isCompanionAppInstalled,
             isConnected: connection.isConnected,
-            hasUnlockHold: store.notes.contains { $0.upload == .heldUnlock },
-            hasFairUseHold: store.notes.contains { $0.upload == .heldFairUse }
+            hasUnlockHold: store.notes.contains { $0.upload == .heldUnlock }
         )
     }
 

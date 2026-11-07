@@ -19,22 +19,12 @@ CREATE INDEX IF NOT EXISTS inboxes_purchase ON inboxes (purchase_id);
 -- transaction ID for early buyers): "unlock:<id>", "sub:<id>", "app:<id>".
 -- Inboxes point at it through inboxes.purchase_id. A refund sets revoked_at,
 -- which locks every bound inbox and rejects the record from then on.
--- test_until is set for sandbox purchases: a 7-day test unlock.
 CREATE TABLE IF NOT EXISTS purchases (
   id TEXT PRIMARY KEY,
   kind TEXT NOT NULL,
   environment TEXT NOT NULL,
-  test_until INTEGER,
   revoked_at INTEGER,
   created_at INTEGER NOT NULL
-);
-
--- Fair use: measured audio seconds per purchase per UTC month ("2026-11").
-CREATE TABLE IF NOT EXISTS fair_use (
-  purchase_id TEXT NOT NULL,
-  month TEXT NOT NULL,
-  seconds REAL NOT NULL DEFAULT 0,
-  PRIMARY KEY (purchase_id, month)
 );
 
 -- Watch tokens. One live token per inbox; a replaced token keeps reading the
@@ -79,9 +69,6 @@ CREATE TABLE IF NOT EXISTS notes (
   audio_key TEXT,
   audio_stored_at INTEGER,
   free_note INTEGER NOT NULL DEFAULT 0,
-  fair_use_purchase TEXT,
-  fair_use_month TEXT,
-  fair_use_seconds REAL NOT NULL DEFAULT 0,
   last_error TEXT,
   PRIMARY KEY (inbox_id, id)
 );

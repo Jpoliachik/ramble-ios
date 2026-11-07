@@ -4,7 +4,7 @@
 //
 //  Sends each note straight to Ramble's relay and learns its status back:
 //  PUT /notes/:id with the raw audio, GET /notes/:id until it's done, and
-//  GET /account for the unlock and the fair-use reset (specs/relay-api.md).
+//  GET /account for the unlock (specs/relay-api.md).
 //  The watch never gives up on a note and never deletes its audio because
 //  uploads fail; it keeps the audio until the note is final and the iPhone
 //  has it, or 30 days after the final state.
@@ -104,7 +104,7 @@ final class WatchRelayService: ObservableObject {
         cleanUp()
         await retryPass(force: true)
         await pollPass(includeFailed: false, force: true)
-        if store.notes.contains(where: { $0.upload == .heldUnlock || $0.upload == .heldFairUse }) {
+        if store.notes.contains(where: { $0.upload == .heldUnlock }) {
             await refreshAccount()
         }
         cleanUp()
@@ -115,7 +115,7 @@ final class WatchRelayService: ObservableObject {
     /// The iPhone connected the watch (a new token). The old token stops
     /// uploading but still reads what it uploaded.
     func connectionReplaced() {
-        releaseHolds([.heldUnlock, .heldFairUse])
+        releaseHolds([.heldUnlock])
         Task { await retryPass(force: true) }
         WatchStuckNoteAlerts.shared.update()
     }
@@ -153,7 +153,6 @@ final class WatchRelayService: ObservableObject {
         await adoptRunningUploads()
         guard connection.isConnected else { return }
         let now = Date()
-        releaseDueFairUseHolds(now: now)
         let due = store.notes
             .filter { note in
                 guard note.upload == .waiting, !note.audioDeleted, !uploadingIDs.contains(note.id) else { return false }
@@ -230,20 +229,11 @@ final class WatchRelayService: ObservableObject {
                 note.notBefore = nil
                 note.failureCount = 0
             }
-        case 402 where reason == "fair_use":
-            let reset = now.addingTimeInterval(outcome.retryAfter ?? 3600)
-            store.update(id) { note in
-                note.upload = .heldFairUse
-                note.notBefore = reset
-                note.fairUseResetsAt = reset
-                note.nextAttemptAt = nil
-                note.failureCount = 0
-            }
         case 413:
             refuse(id, as: .refusedTooLong, now: now)
         case 415:
             refuse(id, as: .refusedBadUpload, now: now)
-        case 400 where reason == "bad_upload":
+        case 400 where reason == "bad_upload", 403 where reason == "suspended":
             refuse(id, as: .refusedBadUpload, now: now)
         case 400 where reason == "recorded_in_future":
             // Retry once the server's clock has passed the recorded time
@@ -327,27 +317,6 @@ final class WatchRelayService: ObservableObject {
         }
     }
 
-    /// Fair-use holds retry at the reset time and on every open after it.
-    private func releaseDueFairUseHolds(now: Date) {
-        let due = store.notes.contains { note in
-            note.upload == .heldFairUse && (note.notBefore ?? .distantPast) <= now
-        }
-        guard due else { return }
-        for note in store.notes.reversed()
-        where note.upload == .heldFairUse && (note.notBefore ?? .distantPast) <= now {
-            let change = store.update(note.id) { record in
-                record.upload = .waiting
-                record.waitingSince = now
-                record.notBefore = nil
-                record.nextAttemptAt = nil
-                record.failureCount = 0
-            }
-            if let after = change?.after {
-                WatchConnectivityService.shared.sendNoteDetails(after)
-            }
-        }
-    }
-
     // MARK: - Status and transcript
 
     /// Reads accepted notes that aren't done. `force` ignores the 10 s
@@ -418,7 +387,6 @@ final class WatchRelayService: ObservableObject {
             note.failureCount = 0
             note.nextAttemptAt = nil
             note.notBefore = nil
-            note.fairUseResetsAt = nil
             note.lastPolledAt = now
             note.status = status
             note.result = body.result
@@ -457,14 +425,6 @@ final class WatchRelayService: ObservableObject {
             connection.setUnlocked(account.unlocked)
             if account.unlocked, store.notes.contains(where: { $0.upload == .heldUnlock }) {
                 accountUnlocked()
-            }
-            if let text = account.fairUse?.resetsAt, let reset = WatchDates.parse(text) {
-                for note in store.notes where note.upload == .heldFairUse {
-                    store.update(note.id) { record in
-                        record.fairUseResetsAt = reset
-                        record.notBefore = reset
-                    }
-                }
             }
         case 401:
             let wasConnected = connection.isConnected
@@ -542,20 +502,17 @@ final class WatchRelayService: ObservableObject {
     // MARK: - Background refresh
 
     /// Asks watchOS for a background pass: every 15 minutes while there is
-    /// work, sooner for a fair-use reset or a stuck-note alert `deadline`.
+    /// work, sooner for a stuck-note alert `deadline`.
     /// watchOS keeps one request, so an earlier one replaces a later one.
     func scheduleBackgroundRefresh(before deadline: Date? = nil) {
         let now = Date()
         let hasWork = store.notes.contains {
-            $0.upload == .waiting || $0.upload == .heldFairUse || $0.needsPolling
+            $0.upload == .waiting || $0.needsPolling
         }
         guard hasWork || deadline != nil else { return }
         var date = now.addingTimeInterval(Self.backgroundInterval)
         if let deadline {
             date = min(date, max(deadline, now.addingTimeInterval(60)))
-        }
-        if let reset = store.notes.filter({ $0.upload == .heldFairUse }).compactMap(\.notBefore).min(), reset > now {
-            date = min(date, max(reset, now.addingTimeInterval(60)))
         }
         if let backgroundRefreshDate, backgroundRefreshDate > now, backgroundRefreshDate <= date { return }
         backgroundRefreshDate = date
@@ -627,19 +584,5 @@ struct RelayErrorBody: Decodable {
 }
 
 struct RelayAccountBody: Decodable {
-    struct FairUse: Decodable {
-        let resetsAt: String?
-
-        enum CodingKeys: String, CodingKey {
-            case resetsAt = "resets_at"
-        }
-    }
-
     let unlocked: Bool
-    let fairUse: FairUse?
-
-    enum CodingKeys: String, CodingKey {
-        case unlocked
-        case fairUse = "fair_use"
-    }
 }

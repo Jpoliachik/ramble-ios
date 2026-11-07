@@ -100,10 +100,9 @@ export default function TermsOfUse() {
               Each purchase includes {FAIR_USE} (UTC), counted across every
               iPhone and Apple Watch it unlocks and reset on the 1st. Length is
               measured by Ramble&apos;s server. Fair use exists to stop abuse
-              and is set far above normal use. Past it, new notes are kept on
-              your device as &ldquo;Usage limit reached&rdquo; and transcribe
-              after the reset. A note that was already accepted is always
-              transcribed in full. If the limit looks wrong, email{" "}
+              and is set far above normal use. Ramble may pause uploads from a
+              setup that abuses the service. A note that was already accepted
+              is always transcribed in full. Questions? Email{" "}
               <a href={`mailto:${SUPPORT_EMAIL}`} className={link}>
                 {SUPPORT_EMAIL}
               </a>

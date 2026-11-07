@@ -249,7 +249,6 @@ final class PhoneConnectivityService: NSObject, ObservableObject {
         let hold: NoteHold?
         switch message["hold"] as? String {
         case "unlock": hold = .unlock
-        case "fairUse": hold = .fairUse
         case "refused": hold = (message["refusedReason"] as? String) == "too_long" ? .tooLong : .couldntSend
         default: hold = nil
         }
@@ -259,7 +258,6 @@ final class PhoneConnectivityService: NSObject, ObservableObject {
             r.hold = hold
             switch hold {
             case .unlock: r.activityLog.append(ActivityEntry("Held on the watch until Ramble is unlocked"))
-            case .fairUse: r.activityLog.append(ActivityEntry("Held on the watch: usage limit reached"))
             case .tooLong, .couldntSend: r.activityLog.append(ActivityEntry("Refused by Ramble's server"))
             case nil: r.activityLog.append(ActivityEntry("Sending from the watch"))
             }

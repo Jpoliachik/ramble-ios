@@ -11,7 +11,6 @@ import SwiftUI
 struct RecordingDetailView: View {
     let recordingId: UUID
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.openURL) private var openURL
     @State private var recording: Recording?
     @State private var showCopied = false
     @State private var showDeleteConfirmation = false
@@ -20,10 +19,8 @@ struct RecordingDetailView: View {
     @State private var transcriptFullHeight: CGFloat = 0
     @State private var transcriptLimitedHeight: CGFloat = 0
     @State private var showUnlock = false
-    @State private var showSupportAddress = false
     @State private var audioRequest: AudioRequest = .idle
     @ObservedObject private var relay = RelayService.shared
-    @ObservedObject private var accountService = AccountService.shared
 
     private enum AudioRequest {
         case idle
@@ -80,14 +77,6 @@ struct RecordingDetailView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This will permanently delete the recording and its transcript.")
-        }
-        .alert("Contact support", isPresented: $showSupportAddress) {
-            Button("Copy Address") {
-                UIPasteboard.general.string = Constants.Relay.supportEmail
-            }
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text("Email \(Constants.Relay.supportEmail) with the subject \u{201C}Usage limit reached\u{201D}.")
         }
         .overlay(alignment: .top) {
             if showCopied {
@@ -286,13 +275,12 @@ struct RecordingDetailView: View {
     // MARK: - Delivery
 
     private enum DeliveryAction {
-        case retryTranscription, resendWebhook, unlock, contactSupport
+        case retryTranscription, resendWebhook, unlock
 
         var title: String {
             switch self {
             case .retryTranscription, .resendWebhook: return "Retry"
             case .unlock: return "Unlock"
-            case .contactSupport: return "Contact support"
             }
         }
     }
@@ -302,14 +290,6 @@ struct RecordingDetailView: View {
         var detail: String?
         var action: DeliveryAction?
     }
-
-    /// "Dec 1", in UTC like the reset itself.
-    private static let resetFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d"
-        formatter.timeZone = TimeZone(identifier: "UTC")
-        return formatter
-    }()
 
     private func deliveryLine(for recording: Recording) -> DeliveryLine {
         let stage = DeliveryStage(recording)
@@ -329,14 +309,6 @@ struct RecordingDetailView: View {
                 title: "Unlock to transcribe",
                 detail: "This note is saved. It transcribes as soon as you unlock Ramble.",
                 action: .unlock
-            )
-        case .heldForFairUse:
-            let reset = recording.holdUntil ?? accountService.account?.fairUse?.resetsAt
-            let when = reset.map { " This note will transcribe on \(Self.resetFormatter.string(from: $0))." } ?? ""
-            return DeliveryLine(
-                title: "Usage limit reached",
-                detail: "Ramble pauses transcription after 100 hours in a month to stop abuse.\(when) If this looks wrong, contact support.",
-                action: .contactSupport
             )
         case .tooLong, .couldntSend:
             return DeliveryLine(title: stage.label)
@@ -413,8 +385,6 @@ struct RecordingDetailView: View {
             WebhookQueueService.shared.resend(recordingId: recording.id)
         case .unlock:
             showUnlock = true
-        case .contactSupport:
-            contactSupport()
         }
     }
 
@@ -427,20 +397,6 @@ struct RecordingDetailView: View {
         }
         UploadQueueService.shared.retry(recordingId: recording.id)
         refreshRecording()
-    }
-
-    private func contactSupport() {
-        var components = URLComponents()
-        components.scheme = "mailto"
-        components.path = Constants.Relay.supportEmail
-        components.queryItems = [URLQueryItem(name: "subject", value: "Usage limit reached")]
-        guard let url = components.url else {
-            showSupportAddress = true
-            return
-        }
-        openURL(url) { accepted in
-            if !accepted { showSupportAddress = true }
-        }
     }
 
     // MARK: - More menu

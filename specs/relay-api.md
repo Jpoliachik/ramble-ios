@@ -90,12 +90,12 @@ Every error SHALL be `{"error": "<sentence>"}`, plus `"reason": "<code>"` wherev
 - THEN the response is `503` with `"reason": "unavailable"` and no inbox is made
 
 ### Requirement: Account state
-`GET /account` SHALL return `{"unlocked", "free_notes_total": 25, "free_notes_remaining", "fair_use": {"used_hours", "limit_hours", "resets_at"} | null}`, plus `"account_token"` for the phone. `fair_use` is `null` while no purchase is bound. Meaning and thresholds: [purchase.md](purchase.md).
+`GET /account` SHALL return `{"unlocked", "free_notes_total": 25, "free_notes_remaining"}`, plus `"account_token"` for the phone. It SHALL NOT report usage or a suspension. Meaning: [purchase.md](purchase.md).
 
-#### Scenario: Usage this month
-- GIVEN an unlocked inbox whose purchase used 41 of its 100 hours this month
+#### Scenario: Unlocked inbox
+- GIVEN an unlocked inbox whose purchase transcribed 141 hours this month
 - WHEN the phone reads `GET /account`
-- THEN `fair_use` is `{"used_hours": 41, "limit_hours": 100, "resets_at": "2026-12-01T00:00:00.000Z"}`
+- THEN the body is `{"unlocked": true, "free_notes_total": 25, "free_notes_remaining": 25, "account_token": "…"}`, with no usage in it
 
 ### Requirement: Submitting a purchase
 `POST /entitlement` with `{"signed_transaction": "<JWS>"}` or, for early buyers, `{"app_transaction": "<JWS>"}` SHALL return `200` with the `GET /account` body once the record is verified: signature chained to Apple's root CA, bundle ID `dev.goodloop.Ramble`, not revoked or refunded, not from Xcode testing. A Sandbox unlock purchase (TestFlight, App Review) unlocks like a Production one, and a Sandbox app transaction is never early-buyer proof ([purchase.md](purchase.md)). A transaction SHALL be for the unlock product; `dev.goodloop.ramble.premium.monthly2` is accepted only as early-buyer proof ([purchase.md](purchase.md)). Re-sending a bound record SHALL return `200` and change nothing.
@@ -173,6 +173,7 @@ The relay SHALL refuse these uploads, storing and counting nothing. Refusals mar
 | Container says longer than 61 minutes; body over 20 MB | `413` | `too_long`; `too_large` | yes |
 | Not one of the audio types above | `415` | `unsupported_type` | yes |
 | Empty body, body bytes ≠ `Content-Length`, missing or invalid recorded time | `400` | `bad_upload` | yes |
+| The inbox, or the purchase it is bound to, is suspended by the operator ([purchase.md](purchase.md)) | `403` | `suspended` | yes |
 | Recorded time more than 5 minutes in the future | `400` | `recorded_in_future` | no: retry once it isn't ahead |
 | No `Content-Length` (`411`), or body not finished within 30 minutes (`408`) | `411` / `408` | `length_required` / `upload_timeout` | no |
 
@@ -180,6 +181,11 @@ The relay SHALL refuse these uploads, storing and counting nothing. Refusals mar
 - GIVEN a watch whose clock is an hour fast
 - WHEN it uploads a note
 - THEN the response is `400` with `"reason": "recorded_in_future"`, and the same upload succeeds once its recorded time has passed
+
+#### Scenario: Suspended user
+- GIVEN the operator suspended an inbox
+- WHEN its watch or phone uploads a new note
+- THEN the response is `403` with `"reason": "suspended"`, nothing is stored or counted, and a repeat of a note accepted before still gets `200`
 
 ### Requirement: Upload idempotency and retries
 The note UUID SHALL be the idempotency key within an inbox. A repeated upload of an accepted ID without a valid retry (below) SHALL be answered `200` with the note's current state before the body is read, storing and counting nothing. Concurrent uploads of one ID SHALL produce one note, counted once. An upload of an ID this inbox already holds but the uploading credential may not read (a watch reusing a phone note's ID) SHALL get `409` with `"reason": "id_in_use"`, changing nothing.
@@ -197,7 +203,7 @@ The note UUID SHALL be the idempotency key within an inbox. A repeated upload of
 - THEN the response is `409` with `"reason": "retry_limit"`, and nothing is transcribed or counted
 
 ### Requirement: Held uploads
-An upload the inbox may not transcribe SHALL get `402`, keeping and counting nothing: `{"reason": "free_notes_used", "free_notes_remaining": 0}` when out of free notes and not unlocked, or `{"reason": "fair_use"}` with `Retry-After` set to the seconds until the fair-use reset. Meaning and copy: [purchase.md](purchase.md).
+An upload the inbox may not transcribe SHALL get `402` with `{"reason": "free_notes_used", "free_notes_remaining": 0}` when out of free notes and not unlocked, keeping and counting nothing. An unlocked inbox SHALL never be held for how much audio it sends. Meaning and copy: [purchase.md](purchase.md).
 
 #### Scenario: Out of free notes
 - GIVEN 25 notes accepted and no purchase
@@ -372,7 +378,7 @@ Relay logs SHALL contain no request bodies, transcript text, audio, credentials 
 LEGACY_UNTIL is the retirement date for old builds' paths, set at release (by default 60 days after the first free-notes build ships). Until then, `POST /transcribe` (cloud transcription for early subscribers) and text `POST /inbox` (old builds delivering transcripts to agents) SHALL keep working for old builds, within the rate limits above, under these checks:
 
 - Text `POST /inbox` needs only the old build's inbox secret, as today, and no purchase record, so $4.99 buyers' old builds keep delivering.
-- `POST /transcribe` needs the App Attest checks above and a subscription record that passes the same checks as `POST /entitlement` and has not expired. It SHALL apply the upload size limits above, count audio toward a 100-hour monthly cap per original transaction (over it, `402` with `"reason": "fair_use"`), and always transcribe with the default provider chain ([transcription.md](transcription.md)), ignoring any model the client asks for. `GET /analytics`, and from LEGACY_UNTIL on those two paths, SHALL answer `410` with `"error": "This version of Ramble is out of date. Update Ramble from the App Store."`, and SHALL transcribe, queue or reveal nothing.
+- `POST /transcribe` needs the App Attest checks above and a subscription record that passes the same checks as `POST /entitlement` and has not expired. It SHALL apply the upload size limits above, add transcribed audio to the monthly usage tally of its original transaction (monitoring only, never a cap; [purchase.md](purchase.md)), refuse with `403` and `"reason": "suspended"` when the operator suspended that transaction, and always transcribe with the default provider chain ([transcription.md](transcription.md)), ignoring any model the client asks for. `GET /analytics`, and from LEGACY_UNTIL on those two paths, SHALL answer `410` with `"error": "This version of Ramble is out of date. Update Ramble from the App Store."`, and SHALL transcribe, queue or reveal nothing.
 
 #### Scenario: Old subscriber before and after the date
 - GIVEN an old build with an active subscription and a valid App Attest assertion

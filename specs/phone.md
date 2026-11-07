@@ -76,7 +76,7 @@ Home SHALL show the "Ramble" wordmark with an amber dot and a Settings button, o
 - THEN it shows a watch illustration, "TRY SAYING", and one example phrase at a time, changing every 3.5 seconds (the first phrase only with Reduce Motion), and "Or record here" above the record button
 
 ### Requirement: Status line shows the single worst state
-The status line SHALL show exactly one state, the first that applies below. Pills are tappable and open their fix; quiet states are plain text. Ages read "5m", "14h", "3d". Notes that couldn't transcribe, are too long, are over fair use, are silent, or are "Saved, no agent connected" never raise a pill.
+The status line SHALL show exactly one state, the first that applies below. Pills are tappable and open their fix; quiet states are plain text. Ages read "5m", "14h", "3d". Notes that couldn't transcribe, are too long, couldn't send, are silent, or are "Saved, no agent connected" never raise a pill.
 
 | Order | State | Words | Kind | Tap |
 |---|---|---|---|---|
@@ -136,24 +136,24 @@ The phone SHALL upload each of its own notes under the note's ID, retrying 10 se
 - THEN the row reads "Waiting to send", then "Transcribing…" once the server accepts it, and it is never counted twice
 
 ### Requirement: Held notes wait for their release
-A note refused for unlock SHALL stop retrying until the unlock; one refused for fair use SHALL retry at the time the server gives and whenever Ramble opens; a rate-limited upload SHALL wait the time the server gives ([purchase.md](purchase.md), [relay-api.md](relay-api.md)).
+A note refused for unlock SHALL stop retrying until the unlock; a rate-limited upload SHALL wait the time the server gives ([purchase.md](purchase.md), [relay-api.md](relay-api.md)).
 
 #### Scenario: Unlock releases held notes
 - GIVEN three phone notes read "Unlock to transcribe"
 - WHEN the person completes the unlock
 - THEN all three upload, oldest first, with no tap on any note
 
-#### Scenario: Fair use resets
-- GIVEN a phone note reads "Usage limit reached" with a reset on Dec 1
-- WHEN Ramble opens on Dec 1
-- THEN the note uploads
-
 ### Requirement: Refused for good
-When the server refuses a note's audio for good, the phone SHALL stop retrying it, keep the audio, and never alert about it: "Too long to transcribe" for a recording over the length limit, "Couldn't send" otherwise ([relay-api.md](relay-api.md)).
+When the server refuses a note's audio for good, the phone SHALL stop retrying it, keep the audio, and never alert about it: "Too long to transcribe" for a recording over the length limit, "Couldn't send" otherwise, including when the operator suspended this person's uploads ([relay-api.md](relay-api.md), [purchase.md](purchase.md)).
 
 #### Scenario: Damaged file
 - GIVEN the server refuses a phone note's audio as unreadable
 - WHEN the upload ends
+- THEN the row reads "Couldn't send", the audio stays playable, and no retry or alert follows
+
+#### Scenario: Suspended
+- GIVEN the operator suspended this person's uploads
+- WHEN a phone note uploads
 - THEN the row reads "Couldn't send", the audio stays playable, and no retry or alert follows
 
 ## Notes list
@@ -172,7 +172,6 @@ The list SHALL group notes by day, newest first, under "Today", "Yesterday", or 
 | Watch note not yet accepted | "Waiting on your watch" | tray |
 | Transcribing | spinner, "Transcribing…" | — |
 | Held for unlock (either device) | "Unlock to transcribe" | lock, amber |
-| Held for fair use | "Usage limit reached" | pause, amber |
 | Refused for good | "Too long to transcribe" or "Couldn't send" | warning, red |
 | Transcription failed | "Couldn't transcribe" | warning, red |
 | Silent | "No speech detected" | quiet |
@@ -224,7 +223,6 @@ Under the player, the note screen SHALL show one line saying where the note is. 
 | Webhook send in progress | "Sending to your webhook…" | — | — |
 | Transcribing | "Transcribing…" | "It goes out as soon as the transcript is ready." | — |
 | Held for unlock | "Unlock to transcribe" | "This note is saved. It transcribes as soon as you unlock Ramble." | "Unlock" |
-| Held for fair use | "Usage limit reached" | the detail in [purchase.md](purchase.md) ("… This note will transcribe on Dec 1. If this looks wrong, contact support.") | "Contact support" (an email to support@ramble.watch; purchase.md) |
 | Audio unreadable | "Couldn't transcribe" | "Ramble couldn't turn this audio into text." | "Retry" |
 | Transcription gave up | "Couldn't transcribe" | "Ramble couldn't reach a transcription service in time." | "Retry" |
 | Failed after 3 retries | "Couldn't transcribe" | either detail above, then "Ramble tried 3 more times." | — |

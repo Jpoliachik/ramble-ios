@@ -16,7 +16,6 @@ enum DeliveryStage: Equatable {
     case waitingOnWatch
     case transcribing
     case heldForUnlock
-    case heldForFairUse
     case tooLong
     case couldntSend
     case couldntTranscribe
@@ -42,7 +41,6 @@ enum DeliveryStage: Equatable {
         if let hold = recording.hold {
             switch hold {
             case .unlock: self = .heldForUnlock
-            case .fairUse: self = .heldForFairUse
             case .tooLong: self = .tooLong
             case .couldntSend: self = .couldntSend
             }
@@ -87,7 +85,6 @@ enum DeliveryStage: Equatable {
         case .waitingOnWatch: return "Waiting on your watch"
         case .transcribing: return "Transcribing…"
         case .heldForUnlock: return "Unlock to transcribe"
-        case .heldForFairUse: return "Usage limit reached"
         case .tooLong: return "Too long to transcribe"
         case .couldntSend: return "Couldn't send"
         case .couldntTranscribe: return "Couldn't transcribe"
@@ -128,7 +125,7 @@ enum DeliveryStage: Equatable {
     var tint: Color {
         switch self {
         case .waitingToSend, .waitingOnWatch, .transcribing, .webhookSending: return .secondary
-        case .heldForUnlock, .heldForFairUse, .waitingForAgent: return .brandAmber
+        case .heldForUnlock, .waitingForAgent: return .brandAmber
         case .tooLong, .couldntSend, .couldntTranscribe, .didntSend: return .red
         case .noSpeech, .noAgent, .notPickedUp: return Color(.tertiaryLabel)
         case .agentHasIt, .deliveredToWebhook: return .green
@@ -141,7 +138,6 @@ enum DeliveryStage: Equatable {
         case .transcribing, .webhookSending: return nil
         case .waitingToSend, .waitingOnWatch, .noAgent, .waitingForAgent, .notPickedUp: return "tray"
         case .heldForUnlock: return "lock.fill"
-        case .heldForFairUse: return "pause.circle.fill"
         case .tooLong, .couldntSend, .couldntTranscribe, .didntSend: return "exclamationmark.triangle.fill"
         case .noSpeech: return "waveform.slash"
         case .agentHasIt, .deliveredToWebhook: return "checkmark.circle.fill"

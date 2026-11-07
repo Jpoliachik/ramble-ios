@@ -9,7 +9,7 @@ The behavior is specified in [`specs/`](../specs/): the HTTP contract is [`relay
 ## How it works
 
 1. The watch or iPhone uploads a note's audio to `PUT /notes/:id` (the note's UUID is the idempotency key).
-2. The relay stores the audio in a private R2 bucket, then accepts the note, counting a free note or fair-use hours.
+2. The relay stores the audio in a private R2 bucket, then accepts the note, counting a free note before the unlock.
 3. It transcribes right away: Groq Whisper v3 Turbo first, falling back to Deepgram Nova-3 and OpenAI GPT-Transcribe only when a provider is overloaded or down. Quick transcripts come back in the upload response.
 4. The audio is deleted. One copy of the transcript goes to each connected agent, and one is kept for the person's devices until the phone acks it (and, for a watch note, the watch has seen it), at most 30 days.
 5. A cron job every minute retries failed attempts (for up to 20 hours), picks up stalled ones, expires old data, and sends operator alerts.
@@ -20,7 +20,7 @@ The behavior is specified in [`specs/`](../specs/): the HTTP contract is [`relay
 |---|---|
 | `src/index.js` | Routing, the request context, the cron |
 | `src/auth.js` | Credentials (`rmbi_` phone, `rmbw_` watch, `rmba_` agent) and the rate limits table |
-| `src/account.js` | Inbox creation, free notes, the unlock and its binding, refunds, settings, the watch token |
+| `src/account.js` | Inbox creation, free notes, the unlock and its binding, refunds, the usage tally and suspension, settings, the watch token |
 | `src/notes.js` | Audio uploads, the transcription pipeline and retries, the device copy and acks |
 | `src/relay.js` | Pairing, agent copies, pull and ack, delivery status, wake-up hooks, old builds' text upload |
 | `src/legacy.js` | Old builds' `POST /transcribe` for early subscribers, until `LEGACY_UNTIL` |
@@ -56,11 +56,44 @@ Apple: point App Store Server Notifications (version 2) for production at `https
 
 ## What is stored
 
-- **Inboxes:** a hash of the secret, the account token, the free-note count, the bound purchase, and the transcription settings.
+- **Inboxes:** a hash of the secret, the account token, the free-note count, the bound purchase, the transcription settings, and the operator's `suspended` flag.
 - **Notes:** ID, source device, status, recorded time as sent, measured length, and the transcript until the person's devices have it. Audio sits in R2 only until transcription ends, and at most 1 day.
 - **Agent copies:** transcript text until the agent acks it or 30 days pass; afterwards a row without text, so the app can show "picked up" or "not picked up".
-- **Purchases:** Apple's original transaction ID, kind, environment, refund time; fair-use seconds per month.
+- **Purchases:** Apple's original transaction ID, kind, environment, refund time, and the operator's `suspended` flag.
+- **Usage:** transcribed audio seconds per user (purchase, or inbox without one) per UTC month, for monitoring only.
 - **Operator data:** counted events (refusals, provider trouble) for 3 days, alert cooldowns, rate-limit counters, estimated spend per provider per day.
+
+## Operations: heavy users and suspending one
+
+Fair use (100 hours of audio a month per purchase, in the Terms) is not enforced. The relay keeps a monthly tally per user, where the user is the purchase an inbox is unlocked by (`unlock:…`, `sub:…`, `app:…`) or the inbox ID (`inb_…`) when it has none, and sends one alert to `ALERT_WEBHOOK_URL` the first time a user passes 100 hours in a UTC month. Nothing is refused. The global backstop is a spend limit in the Groq console.
+
+If one user needs stopping, suspend them by hand. Uploads (`PUT /notes/:id` and old builds' `POST /transcribe`) from a suspended inbox, or from any inbox bound to a suspended purchase, get `403` with `"reason": "suspended"`; the apps show "Couldn't send" and stop retrying. Notes already accepted still transcribe, and everyone else is unaffected. Each command is one line:
+
+```bash
+# Heaviest users this month (UTC)
+npx wrangler d1 execute ramble-relay --remote --command "SELECT user_id, ROUND(seconds / 3600.0, 1) AS hours FROM usage WHERE month = strftime('%Y-%m', 'now') ORDER BY seconds DESC LIMIT 20"
+
+# Inboxes bound to a purchase
+npx wrangler d1 execute ramble-relay --remote --command "SELECT id, suspended, last_upload_at FROM inboxes WHERE purchase_id = 'unlock:2000000123456789'"
+
+# Suspend a purchase (every inbox bound to it)
+npx wrangler d1 execute ramble-relay --remote --command "UPDATE purchases SET suspended = 1 WHERE id = 'unlock:2000000123456789'"
+
+# Suspend an old-build subscriber (POST /transcribe) whose sub:… ID may not be in purchases yet
+npx wrangler d1 execute ramble-relay --remote --command "INSERT INTO purchases (id, kind, environment, created_at, suspended) VALUES ('sub:2000000123456789', 'subscriber', 'Production', 0, 1) ON CONFLICT (id) DO UPDATE SET suspended = 1"
+
+# Suspend one inbox
+npx wrangler d1 execute ramble-relay --remote --command "UPDATE inboxes SET suspended = 1 WHERE id = 'inb_abc123'"
+
+# Unsuspend
+npx wrangler d1 execute ramble-relay --remote --command "UPDATE purchases SET suspended = 0 WHERE id = 'unlock:2000000123456789'"
+npx wrangler d1 execute ramble-relay --remote --command "UPDATE inboxes SET suspended = 0 WHERE id = 'inb_abc123'"
+
+# Everyone suspended
+npx wrangler d1 execute ramble-relay --remote --command "SELECT 'purchase' AS kind, id FROM purchases WHERE suspended = 1 UNION ALL SELECT 'inbox', id FROM inboxes WHERE suspended = 1"
+```
+
+The `UPDATE` reports `changes: 1` when it found the purchase. The old-build subscriber command adds a row only when the `sub:` ID isn't known yet; that row is dated 1970, so it never counts as a new unlock. Notes the apps marked "Couldn't send" while suspended don't upload again by themselves after an unsuspend; new notes do.
 
 Logs carry no request bodies, transcript text, audio, credentials or network addresses; inbox IDs and App Attest key IDs appear only as short hashes, and provider error bodies are cut to 200 characters.
 

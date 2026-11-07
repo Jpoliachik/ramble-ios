@@ -28,7 +28,7 @@ A bar alert SHALL be one icon plus at most 8 characters, counting spaces, ending
 - THEN the bar shows only the iPhone icon, and the words come back when recording stops
 
 ### Requirement: Bar alerts and their order
-The watch SHALL pick at most one bar alert in this order: "Mic off", "Mic busy", "No phone", "Set up", "Unlock", "Limit". The two microphone alerts SHALL be red, because nothing can be recorded; the rest SHALL be gray, because recording still works.
+The watch SHALL pick at most one bar alert in this order: "Mic off", "Mic busy", "No phone", "Set up", "Unlock". The two microphone alerts SHALL be red, because nothing can be recorded; the rest SHALL be gray, because recording still works.
 
 | Alert | When | Detail title | Detail text |
 |---|---|---|---|
@@ -37,7 +37,6 @@ The watch SHALL pick at most one bar alert in this order: "Mic off", "Mic busy",
 | "No phone" | The paired iPhone does not have Ramble | "Ramble isn't on your iPhone" | "Your notes are safe on this watch, but they can't reach your agent yet." / "Install Ramble on your iPhone and open it once. Waiting notes will send on their own." |
 | "Set up" | Ramble is on the iPhone, but the watch is not connected to it yet, or the server no longer accepts the watch's connection | "Open Ramble on your iPhone" | "Your notes are safe on this watch, but they can't send yet." / "Open Ramble on your iPhone once. Waiting notes will send on their own." |
 | "Unlock" | A note is held because the free notes are used up | "Unlock to transcribe" | "You've used your free notes. Your notes are safe on this watch." / "Unlock Ramble on your iPhone and they'll transcribe on their own." |
-| "Limit" | A note is held over fair use | "Usage limit reached" | "Your notes are safe on this watch." / "They will transcribe on Dec 1. If this looks wrong, contact support from Ramble on your iPhone." (the date is the reset date the server gives; purchase.md) |
 
 #### Scenario: Highest alert wins
 - GIVEN microphone permission is off and the paired iPhone doesn't have Ramble
@@ -45,8 +44,8 @@ The watch SHALL pick at most one bar alert in this order: "Mic off", "Mic busy",
 - THEN only "Mic off" shows, in red
 
 #### Scenario: Gray alert with a detail screen
-- GIVEN a note is held over fair use and nothing else is wrong
-- WHEN the person taps "Limit", shown in gray with a chevron
+- GIVEN a note is held for unlock and nothing else is wrong
+- WHEN the person taps "Unlock", shown in gray with a chevron
 - THEN a detail screen opens with the icon and title, what happened, and when it resolves
 
 ### Requirement: First launch hint
@@ -58,7 +57,7 @@ Until the first note is ever saved on this watch, a soft amber ring SHALL breath
 - THEN the breathing ring stops for good
 
 ### Requirement: History badge
-The history button SHALL carry at most one mark, highest first: a red dot if any note needs the person (held for unlock, failed, refused, stuck, or lost and not yet opened in Recent); a spinning ring while any note is uploading or being transcribed; a still gray dot if any note is waiting to upload or held over fair use; otherwise nothing. The history button SHALL be hidden while recording.
+The history button SHALL carry at most one mark, highest first: a red dot if any note needs the person (held for unlock, failed, refused, stuck, or lost and not yet opened in Recent); a spinning ring while any note is uploading or being transcribed; a still gray dot if any note is waiting to upload; otherwise nothing. The history button SHALL be hidden while recording.
 
 #### Scenario: Reduce Motion
 - GIVEN Reduce Motion is on and a note is uploading
@@ -145,12 +144,11 @@ Recent SHALL group notes, newest first, into "Needs you · N", "Waiting · N" an
 | Transcribed | Done | gray check | first line of the transcript, cut with an ellipsis |
 | Silent | Done | gray check | "No speech detected" |
 | Held: free notes used up | Needs you | red mark | "Unlock to transcribe" |
-| Held: fair use | Waiting | gray dot | "Usage limit reached" |
 | Not yet accepted 6 hours after recording | Needs you | red mark | "Waiting 6 hours", "Waiting 7 hours", … |
 | Transcription failed (a retry from the iPhone updates it) | Needs you | red mark | "Couldn't transcribe" |
 | Audio lost before the server accepted it | Needs you | red mark | "Audio lost" |
 | Refused as over the length limit | Needs you | red mark | "Too long to transcribe" |
-| Refused for good for another reason | Needs you | red mark | "Couldn't send" |
+| Refused for good for another reason (unreadable, or uploads suspended) | Needs you | red mark | "Couldn't send" |
 
 #### Scenario: A held note needs the person
 - GIVEN the only note on the watch is held because the free notes are used up
@@ -196,6 +194,11 @@ When the server refuses a note's audio for good (relay-api.md), the watch SHALL 
 - WHEN the watch gets the answer
 - THEN the note shows "Couldn't send" under Needs you and the watch stops retrying it
 
+#### Scenario: Suspended
+- GIVEN the operator suspended this person's uploads (purchase.md)
+- WHEN the watch uploads a note
+- THEN the note shows "Couldn't send", the watch stops retrying it, and it keeps the audio until the iPhone has it
+
 ### Requirement: Status and transcript
 The watch SHALL learn each accepted note's status and transcript from the server: from the upload answer when the transcript is ready within 8 seconds (relay-api.md), otherwise every 10 seconds while the app is open, when it opens, and in background passes. When the server no longer lets the watch read an accepted note (its connection was revoked, or the note expired), the watch SHALL stop asking and show the note as Done with no first line.
 
@@ -221,14 +224,6 @@ When the server holds a note because the free notes are used up, the watch SHALL
 - THEN the watch uploads both notes, oldest first, usually without the watch app being opened, and at the latest when it next opens
 - AND the "Unlock" alert goes away
 
-### Requirement: Held over fair use
-When the server holds a note over fair use, the watch SHALL keep the note and its audio, show "Usage limit reached", and retry it at the reset time the server gave and on every app open after it.
-
-#### Scenario: Month resets
-- GIVEN a note has been held over fair use since November 28
-- WHEN the person opens the watch app on December 1
-- THEN the note uploads and is transcribed
-
 ### Requirement: Not set up yet
 Until the iPhone has connected the watch, the watch SHALL record and keep notes, show "Set up" (or "No phone"), and upload every waiting note once connected. When the watch has no connection, or the server stops accepting it, the watch SHALL keep its notes, show "Set up", and tell the iPhone it needs a connection each time the app opens and the iPhone is in reach; the iPhone then connects it again (phone.md).
 
@@ -251,7 +246,7 @@ When the iPhone connects the watch again, the watch's previous connection SHALL 
 - THEN the accepted note still moves to "Done", and the waiting note uploads under the current connection
 
 ### Requirement: Tell the iPhone right away
-At each stop, when the iPhone is in reach, the watch SHALL send it the note's ID, recorded time and length at once; the note SHOULD appear in the iPhone's list within 5 seconds when both are awake. The watch SHALL also tell the iPhone whenever a note becomes held (for unlock or fair use) or is released, and SHALL send the audio in the background, as a best effort, for playback.
+At each stop, when the iPhone is in reach, the watch SHALL send it the note's ID, recorded time and length at once; the note SHOULD appear in the iPhone's list within 5 seconds when both are awake. The watch SHALL also tell the iPhone whenever a note becomes held for unlock or refused for good, or is released, and SHALL send the audio in the background, as a best effort, for playback.
 
 #### Scenario: Note shows on the iPhone
 - GIVEN the iPhone is nearby
