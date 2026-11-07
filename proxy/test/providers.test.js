@@ -150,6 +150,51 @@ describe('transcribeNote: fallback', () => {
     }
   });
 
+  it('keeps every call within the budget, and starts none with under 3 seconds left', async () => {
+    let t = NOW;
+    const timedOut = (ms) => () => {
+      t += ms;
+      throw new DOMException('timed out', 'TimeoutError');
+    };
+    const { env, calls, deps } = setup({ groq: timedOut(20_000), deepgram: timedOut(6_000) });
+    const timeouts = [];
+    const original = AbortSignal.timeout;
+    AbortSignal.timeout = (ms) => {
+      timeouts.push(ms);
+      return original.call(AbortSignal, ms);
+    };
+    try {
+      await assert.rejects(
+        transcribeNote(AUDIO, opts(), env, { ...deps, now: () => t, timeoutMs: 20_000, budgetMs: 28_000 }),
+        (err) => {
+          assert.equal(err.retryable, true);
+          assert.deepEqual(err.attempts.map((a) => a.outcome), ['timeout', 'timeout', 'out_of_time']);
+          return true;
+        },
+      );
+    } finally {
+      AbortSignal.timeout = original;
+    }
+    assert.deepEqual(timeouts, [20_000, 8_000]);
+    assert.deepEqual(calls.map((c) => c.provider), ['groq', 'deepgram']);
+  });
+
+  it('gives each call 120 seconds with no budget', async () => {
+    const { env, deps } = setup({ groq: groqOK('Hi there.') });
+    const timeouts = [];
+    const original = AbortSignal.timeout;
+    AbortSignal.timeout = (ms) => {
+      timeouts.push(ms);
+      return original.call(AbortSignal, ms);
+    };
+    try {
+      await transcribeNote(AUDIO, opts(), env, deps);
+    } finally {
+      AbortSignal.timeout = original;
+    }
+    assert.deepEqual(timeouts, [120_000]);
+  });
+
   it('Groq billing error, 402 and 413 fall back and never reject the audio', async () => {
     for (const groq of [
       fail(400, '{"error":{"message":"Organization spend limit reached","code":"spend_limit"}}'),

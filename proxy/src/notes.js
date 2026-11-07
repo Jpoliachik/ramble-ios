@@ -28,7 +28,7 @@ import {
 } from './http.js';
 import { FAIR_USE_SECONDS, alert, recordAttempt, recordEvent } from './ops.js';
 import { makeAgentCopies } from './relay.js';
-import { TranscribeError } from './transcribe.js';
+import { INLINE_BUDGET_MS, INLINE_PROVIDER_TIMEOUT_MS, TranscribeError } from './transcribe.js';
 
 export const AUDIO_TYPES = new Set(['audio/mp4', 'audio/m4a', 'audio/x-m4a', 'audio/aac']);
 export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
@@ -37,6 +37,9 @@ export const FUTURE_SLACK_MS = 5 * MINUTE;
 export const BODY_TIMEOUT_MS = 30 * MINUTE;
 export const INLINE_WAIT_MS = 8000;
 export const ATTEMPT_LOST_MS = 8 * MINUTE;
+// The first attempt (made on upload, attempts = 1) is lost sooner: it fits the
+// Worker's waitUntil budget, so one still running after a minute was cut off.
+export const INLINE_ATTEMPT_LOST_MS = MINUTE;
 export const RETRY_WINDOW_MS = 20 * HOUR;
 export const BACKOFF_MINUTES = [1, 2, 5, 10, 15, 30];
 export const MAX_HAND_RETRIES = 3;
@@ -226,8 +229,13 @@ export async function uploadNote(request, rawId, ctx) {
     return accepted.response;
   }
 
-  // Transcription continues if the client goes away.
-  const attempt = runAttempt(ctx, accepted.note);
+  // Transcription continues if the client goes away, within the Worker's
+  // waitUntil budget: short provider timeouts, and a short lease (attempt 1).
+  const inline = {
+    ...ctx,
+    transcribeDeps: { ...ctx.transcribeDeps, timeoutMs: INLINE_PROVIDER_TIMEOUT_MS, budgetMs: INLINE_BUDGET_MS },
+  };
+  const attempt = runAttempt(inline, accepted.note);
   ctx.waitUntil(attempt);
   await withTimeout(attempt, ctx.inlineWaitMs, null);
   const fresh = await readNote(ctx, inboxId, id);
@@ -454,6 +462,9 @@ async function finishDone(ctx, note, out) {
     .bind(result, text, duration, out.provider ?? null, out.model ?? null, ctx.now, note.inbox_id, note.id, note.retry_count)
     .first();
   if (!done) return;
+  // Agents first: if a later step fails or the Worker stops, the sweeper
+  // makes any copies not yet marked made. Silent notes go nowhere.
+  if (result === 'transcript') await copyToAgents(ctx, done);
 
   // Fair use counts the measured length, which may beat the container's.
   if (done.fair_use_purchase && duration > done.fair_use_seconds) {
@@ -472,8 +483,19 @@ async function finishDone(ctx, note, out) {
       `A note measured ${(duration / 60).toFixed(0)} minutes, over the 61-minute cap: its file header understated its length.`);
   }
   await deleteAudio(ctx, done);
-  // Silent notes go nowhere.
-  if (result === 'transcript') await makeAgentCopies(ctx, done);
+}
+
+/** Makes a done note's agent copies (idempotent), then marks them made. Never rejects. */
+async function copyToAgents(ctx, note) {
+  try {
+    await makeAgentCopies(ctx, note);
+    await ctx.db
+      .prepare('UPDATE notes SET copies_made_at = ? WHERE inbox_id = ? AND id = ? AND copies_made_at IS NULL')
+      .bind(ctx.now, note.inbox_id, note.id)
+      .run();
+  } catch (err) {
+    console.error(`[notes] agent copies failed inbox=${await logId(note.inbox_id)}: ${String(err?.message).slice(0, 200)}`);
+  }
 }
 
 async function finishFailed(ctx, note, result, error) {
@@ -541,18 +563,20 @@ async function deleteAudio(ctx, note) {
 }
 
 /**
- * Cron, every minute: start due retries, and attempts lost for 8 minutes.
- * The claim is conditional, so one attempt runs per note.
+ * Cron, every minute: start due retries, and attempts lost (the upload's
+ * first attempt after 1 minute, the cron's after 8). The claim is
+ * conditional, so one attempt runs per note.
  */
 export async function sweep(ctx) {
   const { results } = await ctx.db
     .prepare(
       `SELECT inbox_id, id, attempt_started_at FROM notes
         WHERE status = 'transcribing'
-          AND ((attempt_started_at IS NULL AND next_attempt_at <= ?) OR attempt_started_at <= ?)
+          AND ((attempt_started_at IS NULL AND next_attempt_at <= ?) OR attempt_started_at <= ?
+            OR (attempts = 1 AND attempt_started_at <= ?))
         ORDER BY accepted_at LIMIT ?`,
     )
-    .bind(ctx.now, ctx.now - ATTEMPT_LOST_MS, SWEEP_BATCH)
+    .bind(ctx.now, ctx.now - ATTEMPT_LOST_MS, ctx.now - INLINE_ATTEMPT_LOST_MS, SWEEP_BATCH)
     .all();
   const running = [];
   for (const n of results) {
@@ -568,6 +592,25 @@ export async function sweep(ctx) {
   }
   await Promise.all(running);
   return running.length;
+}
+
+/**
+ * Cron, every minute: agent copies for transcripts done over a minute ago
+ * whose copies were never marked made. Insertion is idempotent and keeps the
+ * "paired before it was recorded" rule; only new copies ping a hook.
+ */
+export async function sweepCopies(ctx) {
+  const { results } = await ctx.db
+    .prepare(
+      `SELECT * FROM notes
+        WHERE status = 'done' AND result = 'transcript' AND copies_made_at IS NULL
+          AND transcript IS NOT NULL AND ready_at <= ?
+        ORDER BY ready_at LIMIT ?`,
+    )
+    .bind(ctx.now - MINUTE, SWEEP_BATCH)
+    .all();
+  for (const n of results) await copyToAgents(ctx, n);
+  return results.length;
 }
 
 /** Cron: device copies after 30 days, old notes, and audio no longer needed. */

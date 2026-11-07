@@ -72,7 +72,7 @@ Every error SHALL be `{"error": "<sentence>"}`, plus `"reason": "<code>"` wherev
 - THEN the response is `409` and the stored key is unchanged
 
 ### Requirement: Creating an inbox
-`POST /inboxes` SHALL require `X-App-Attest-Key-Id` and `X-App-Attest` (an assertion over the exact body, which may be empty) and return `201 {"inbox_secret": "rmbi_…", "account_token": "<UUID>"}`. A missing assertion gets `403` "App attestation required"; a failing one, or one reusing a counter, `403` "App attestation failed". After that only the inbox secret is checked. A local development relay, and never production, SHALL also accept its configured developer key in `X-Dev-Bypass` in place of the assertion, on this endpoint only. A phone that still holds its inbox secret after a reinstall SHALL keep using that inbox. The daily inbox cap and the free-tier breaker SHALL NOT apply to a request whose body carries a verified purchase or early-buyer proof (`{"signed_transaction"}` or `{"app_transaction"}`, checked as in "Submitting a purchase"); that inbox is created already bound and unlocked.
+`POST /inboxes` SHALL require `X-App-Attest-Key-Id` and `X-App-Attest` (an assertion over the exact body, which may be empty) and return `201 {"inbox_secret": "rmbi_…", "account_token": "<UUID>"}`. A missing assertion gets `403` "App attestation required"; a failing one, or one reusing a counter, `403` "App attestation failed". After that only the inbox secret is checked. A local development relay, and never production, SHALL also accept its configured developer key in `X-Dev-Bypass` in place of the assertion, on this endpoint only. A phone that still holds its inbox secret after a reinstall SHALL keep using that inbox. The daily inbox cap and the free-tier breaker SHALL NOT apply to a request whose body carries a verified purchase or early-buyer proof (`{"signed_transaction"}` or `{"app_transaction"}`, checked as in "Submitting a purchase") that binds to the new inbox; that inbox is created already bound and unlocked. A proof that verifies but cannot bind (a first-time unlock bought for another inbox, a purchase already on 5 iPhones, a revoked purchase) SHALL get a normal free inbox, under the cap and the breaker like any other request.
 
 #### Scenario: Daily inbox cap reached
 - GIVEN 2,000 inboxes were created this UTC day, or the free-tier audio-hours breaker has tripped ([transcription.md](transcription.md))
@@ -83,6 +83,11 @@ Every error SHALL be `{"error": "<sentence>"}`, plus `"reason": "<code>"` wherev
 - GIVEN the daily inbox cap is reached
 - WHEN a phone creates an inbox with a verified purchase in the body
 - THEN the inbox is created, bound to that purchase and unlocked
+
+#### Scenario: A proof that can't bind during the cap
+- GIVEN the daily inbox cap is reached
+- WHEN a phone creates an inbox with a verified unlock purchase made for another inbox
+- THEN the response is `503` with `"reason": "unavailable"` and no inbox is made
 
 ### Requirement: Account state
 `GET /account` SHALL return `{"unlocked", "free_notes_total": 25, "free_notes_remaining", "fair_use": {"used_hours", "limit_hours", "resets_at"} | null}`, plus `"account_token"` for the phone. `fair_use` is `null` while no purchase is bound. Meaning and thresholds: [purchase.md](purchase.md).

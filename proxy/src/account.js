@@ -133,7 +133,7 @@ export async function createInbox(request, ctx) {
   }
 
   // A buyer on a new iPhone skips the cap and the breaker. A proof that
-  // doesn't verify just means a normal, capped inbox.
+  // doesn't verify or bind just means a normal, capped inbox.
   let proof = null;
   let parsed = null;
   try {
@@ -146,10 +146,7 @@ export async function createInbox(request, ctx) {
     if (verified.proof) proof = verified.proof;
   }
 
-  if (!proof && (await freeSecondsToday(ctx)) >= FREE_TIER_DAILY_SECONDS) {
-    await alert(ctx, 'free_tier_breaker', 'Free inboxes reached 200 hours of audio today: new inboxes are refused until tomorrow (UTC).');
-    return unavailable();
-  }
+  if (!proof && (await freeTierBreakerTripped(ctx))) return unavailable();
 
   const id = `inb_${randomToken(12)}`;
   const secret = `rmbi_${randomToken(32)}`;
@@ -161,15 +158,42 @@ export async function createInbox(request, ctx) {
     )
     .bind(id, await sha256Hex(secret), ctx.now, accountToken, proof ? 1 : 0, utcDayStart(ctx.now), INBOX_DAILY_CAP)
     .run();
-  if (insert.meta.changes === 0) {
-    await alert(ctx, 'inbox_cap', `${INBOX_DAILY_CAP} inboxes were created today: new inboxes are refused until tomorrow (UTC).`);
-    return unavailable();
-  }
+  if (insert.meta.changes === 0) return inboxCapReached(ctx);
   if (proof) {
-    const bound = await bindPurchase(ctx, id, proof);
-    if (bound) console.log(`[account] new inbox proof not bound: ${bound.status}`);
+    // Only a proof that binds skips the cap and the breaker. Unbound, this is
+    // a normal free inbox: it stays only if a capped request would be let in.
+    let refused;
+    try {
+      refused = await bindPurchase(ctx, id, proof);
+    } catch (err) {
+      console.error(`[account] new inbox bind failed: ${String(err?.message).slice(0, 200)}`);
+      refused = { status: 503 };
+    }
+    if (refused) {
+      console.log(`[account] new inbox proof not bound: ${refused.status}`);
+      const others = await ctx.db
+        .prepare('SELECT COUNT(*) AS n FROM inboxes WHERE created_at >= ? AND id != ?')
+        .bind(utcDayStart(ctx.now), id)
+        .first();
+      const capped = others.n >= INBOX_DAILY_CAP;
+      if (capped || (await freeTierBreakerTripped(ctx))) {
+        await ctx.db.prepare('DELETE FROM inboxes WHERE id = ? AND purchase_id IS NULL').bind(id).run();
+        return capped ? inboxCapReached(ctx) : unavailable();
+      }
+    }
   }
   return json({ inbox_secret: secret, account_token: accountToken }, 201);
+}
+
+async function inboxCapReached(ctx) {
+  await alert(ctx, 'inbox_cap', `${INBOX_DAILY_CAP} inboxes were created today: new inboxes are refused until tomorrow (UTC).`);
+  return unavailable();
+}
+
+async function freeTierBreakerTripped(ctx) {
+  if ((await freeSecondsToday(ctx)) < FREE_TIER_DAILY_SECONDS) return false;
+  await alert(ctx, 'free_tier_breaker', 'Free inboxes reached 200 hours of audio today: new inboxes are refused until tomorrow (UTC).');
+  return true;
 }
 
 // --- Purchases -----------------------------------------------------------------

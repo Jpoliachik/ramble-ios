@@ -282,10 +282,38 @@ describe('the pipeline', () => {
     assert.equal(h.bucket.objects.size, 0);
   });
 
-  it('picks up an attempt lost for 8 minutes', async () => {
+  it('gives the upload attempt short provider timeouts, and the sweeper the long ones', async () => {
     const secret = await h.inbox();
-    h.transcribe = () => new Promise(() => {}); // the worker died mid-attempt
+    h.providersDown();
     await h.upload(secret, noteId(1));
+    assert.deepEqual(h.transcribeCalls[0].deps, { timeoutMs: 20_000, budgetMs: 28_000 });
+    h.transcribe = async () => ({ result: 'transcript', text: 'ok', provider: 'groq' });
+    h.now = T0 + MINUTE;
+    await h.cron();
+    assert.equal(h.transcribeCalls.length, 2);
+    assert.deepEqual(h.transcribeCalls[1].deps, {});
+  });
+
+  it('picks up an upload attempt lost for 1 minute', async () => {
+    const secret = await h.inbox();
+    h.transcribe = () => new Promise(() => {}); // the worker was cut off mid-attempt
+    await h.upload(secret, noteId(1));
+    h.transcribe = async () => ({ result: 'transcript', text: 'recovered', provider: 'groq' });
+    h.now = T0 + 59 * 1000;
+    await h.cron();
+    assert.equal(h.transcribeCalls.length, 1);
+    h.now = T0 + MINUTE;
+    await h.cron();
+    assert.equal(h.transcribeCalls.length, 2);
+    assert.equal((await h.call('GET', `/notes/${noteId(1)}`, { auth: secret })).body.transcript, 'recovered');
+  });
+
+  it('picks up a sweeper attempt lost for 8 minutes', async () => {
+    const secret = await h.inbox();
+    h.transcribe = () => new Promise(() => {}); // the worker stopped mid-attempt
+    await h.upload(secret, noteId(1));
+    // As if that attempt had been a later one, started by the cron.
+    h.db.sqlite.exec('UPDATE notes SET attempts = 2');
     h.transcribe = async () => ({ result: 'transcript', text: 'recovered', provider: 'groq' });
     h.now = T0 + 7 * MINUTE;
     await h.cron();
@@ -294,6 +322,50 @@ describe('the pipeline', () => {
     await h.cron();
     assert.equal(h.transcribeCalls.length, 2);
     assert.equal((await h.call('GET', `/notes/${noteId(1)}`, { auth: secret })).body.transcript, 'recovered');
+  });
+
+  it('makes agent copies first, and the sweeper makes any that failed, once', async () => {
+    const secret = await h.inbox();
+    const agent = await h.connect(secret);
+    h.now = T0 + MINUTE;
+    // The first copy insertion fails, as if D1 hiccuped mid-pipeline.
+    const batch = h.db.batch;
+    let failures = 1;
+    h.db.batch = async (statements) => {
+      if (failures > 0 && statements.some((s) => /INTO entries/.test(s.sql))) {
+        failures--;
+        throw new Error('D1 hiccup');
+      }
+      return batch(statements);
+    };
+    const res = await h.upload(secret, noteId(1), { recordedAt: new Date(T0 + 30000).toISOString() });
+    await h.settle();
+    assert.equal(res.body.status, 'done');
+    assert.equal(h.bucket.objects.size, 0); // later steps still ran
+    assert.equal(h.rows('SELECT copies_made_at FROM notes')[0].copies_made_at, null);
+    assert.deepEqual((await h.call('GET', '/inbox', { auth: agent })).body.items, []);
+
+    h.now = T0 + 2 * MINUTE;
+    await h.cron();
+    const items = (await h.call('GET', '/inbox', { auth: agent })).body.items;
+    assert.equal(items.length, 1);
+    assert.equal(items[0].transcription, 'hello world');
+    assert.equal(h.rows('SELECT copies_made_at FROM notes')[0].copies_made_at, T0 + 2 * MINUTE);
+
+    // Marked made: later sweeps copy nothing again, even after the agent acked.
+    await h.call('POST', '/inbox/ack', { auth: agent, body: { ids: [items[0].id] } });
+    h.now = T0 + 3 * MINUTE;
+    await h.cron();
+    assert.equal((await h.call('GET', '/inbox', { auth: agent })).body.items.length, 0);
+  });
+
+  it('marks copies made when a note finishes normally', async () => {
+    const secret = await h.inbox();
+    await h.connect(secret);
+    h.now = T0 + MINUTE;
+    await h.upload(secret, noteId(1), { recordedAt: new Date(T0 + 30000).toISOString() });
+    await h.settle();
+    assert.equal(h.rows('SELECT copies_made_at FROM notes')[0].copies_made_at, T0 + MINUTE);
   });
 
   it('fixes options at the first attempt; retries keep them', async () => {
@@ -309,7 +381,9 @@ describe('the pipeline', () => {
 
   it('alerts the operator about a stuck note once per 6 hours', async () => {
     const secret = await h.inbox();
-    h.transcribe = () => new Promise(() => {});
+    h.transcribe = async () => {
+      throw new TranscribeError('slow', { retryable: true, provider: 'groq', status: 503 });
+    };
     await h.upload(secret, noteId(1));
     h.now = T0 + 6 * MINUTE;
     await h.cron();
