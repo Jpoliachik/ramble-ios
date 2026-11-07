@@ -28,11 +28,25 @@ describe('creating an inbox', () => {
     assert.ok(!JSON.stringify(h.rows('SELECT * FROM inboxes')).includes(inbox_secret));
   });
 
-  it('honors no developer bypass', async () => {
+  it('honors no developer bypass outside a local development relay', async () => {
     h.attestOK = false;
-    h.envExtra = { DEV_BYPASS_TOKEN: 'letmein' };
-    const res = await h.call('POST', '/inboxes', { headers: { 'X-Dev-Bypass': 'letmein' } });
-    assert.equal(res.status, 403);
+    const key = 'local-dev-key-0123456789';
+    h.envExtra = { DEV_BYPASS_KEY: key };
+    assert.equal((await h.call('POST', '/inboxes', { headers: { 'X-Dev-Bypass': key } })).status, 403);
+    h.envExtra = { DEV_BYPASS_KEY: key, ENVIRONMENT: 'production' };
+    assert.equal((await h.call('POST', '/inboxes', { headers: { 'X-Dev-Bypass': key } })).status, 403);
+    h.envExtra = { ENVIRONMENT: 'development' };
+    assert.equal((await h.call('POST', '/inboxes', { headers: { 'X-Dev-Bypass': key } })).status, 403);
+  });
+
+  it('takes the bypass key on a local development relay', async () => {
+    h.attestOK = false;
+    const key = 'local-dev-key-0123456789';
+    h.envExtra = { DEV_BYPASS_KEY: key, ENVIRONMENT: 'development' };
+    assert.equal((await h.call('POST', '/inboxes', { headers: { 'X-Dev-Bypass': 'wrong-key-0123456789' } })).status, 403);
+    const res = await h.call('POST', '/inboxes', { headers: { 'X-Dev-Bypass': key } });
+    assert.equal(res.status, 201);
+    assert.match(res.body.inbox_secret, /^rmbi_/);
   });
 
   it('answers 503 once 2,000 inboxes were made today, except for a buyer', async () => {

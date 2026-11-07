@@ -378,11 +378,7 @@ final class RelayService: ObservableObject {
         }
 
         var headers: [String: String] = [:]
-        #if DEBUG
-        let bypass = UserDefaults.standard.string(forKey: Constants.Relay.devBypassKey) ?? ""
-        #else
-        let bypass = ""
-        #endif
+        let bypass = Constants.Relay.devBypass
         if !bypass.isEmpty {
             headers["X-Dev-Bypass"] = bypass // Debug builds against a local relay only
         } else {

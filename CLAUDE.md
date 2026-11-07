@@ -69,6 +69,13 @@ handler against a SQLite stand-in for D1 and fakes for R2, providers and Apple
 `proxy/**` and gates the deploy on them. Bindings, secrets and vars are listed
 in `proxy/README.md`.
 
+There is no staging relay. Testing is local (`npm test`, and `npm run dev`,
+which runs the same Worker as production with local D1/R2/KV) plus TestFlight
+against production. Debug simulator builds talk to `http://localhost:8787` and
+skip App Attest with a key that only a local relay accepts (`.dev.vars`), in one
+central check on `POST /inboxes`. Never add per-endpoint dev paths or a bypass
+that production could honor; new endpoints work locally automatically.
+
 ### Website
 
 ```bash

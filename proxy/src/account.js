@@ -102,22 +102,37 @@ export async function getAccount(request, ctx) {
 
 // --- Creating an inbox -------------------------------------------------------
 
+// The developer bypass works only on a local relay (`wrangler dev`), where
+// .dev.vars sets ENVIRONMENT=development and DEV_BYPASS_KEY. Production sets
+// neither, so it never takes the bypass.
+export async function localBypassAllowed(env, presented) {
+  const key = env?.DEV_BYPASS_KEY;
+  if (env?.ENVIRONMENT !== 'development' || typeof key !== 'string' || key.length < 16) return false;
+  return (await sha256Hex(presented)) === (await sha256Hex(key));
+}
+
 export async function createInbox(request, ctx) {
   const limited = await limit(ctx, ['inboxes_addr', address(request, ctx)]);
   if (limited) return limited;
 
   const body = await request.arrayBuffer();
-  const keyId = request.headers.get('X-App-Attest-Key-Id');
-  const assertion = request.headers.get('X-App-Attest');
-  if (!keyId || !assertion) return fail(403, 'App attestation required');
-  const result = await ctx.verifyAssertion(keyId, assertion, body, ctx.env);
-  if (result?.unavailable) return unavailable();
-  if (!result?.valid) {
-    console.error(`[account] inbox attestation failed key=${await logId(keyId)}`);
-    return fail(403, 'App attestation failed');
+  const bypass = request.headers.get('X-Dev-Bypass');
+  if (bypass !== null) {
+    // Local development only (simulators can't use App Attest).
+    if (!(await localBypassAllowed(ctx.env, bypass))) return fail(403, 'App attestation failed');
+  } else {
+    const keyId = request.headers.get('X-App-Attest-Key-Id');
+    const assertion = request.headers.get('X-App-Attest');
+    if (!keyId || !assertion) return fail(403, 'App attestation required');
+    const result = await ctx.verifyAssertion(keyId, assertion, body, ctx.env);
+    if (result?.unavailable) return unavailable();
+    if (!result?.valid) {
+      console.error(`[account] inbox attestation failed key=${await logId(keyId)}`);
+      return fail(403, 'App attestation failed');
+    }
+    const keyLimited = await limit(ctx, ['inboxes_key', keyId]);
+    if (keyLimited) return keyLimited;
   }
-  const keyLimited = await limit(ctx, ['inboxes_key', keyId]);
-  if (keyLimited) return keyLimited;
 
   // A buyer on a new iPhone skips the cap and the breaker. A proof that
   // doesn't verify just means a normal, capped inbox.

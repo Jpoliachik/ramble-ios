@@ -50,7 +50,7 @@ Secrets (`npx wrangler secret put NAME`):
 
 Vars (`[vars]`): `RETENTION_SECONDS`, `APPLE_BUNDLE_ID`, `UNLOCK_PRODUCT_ID`, `PREMIUM_PRODUCT_ID`, `APPSTORE_ENVIRONMENT` (`Production`), `RELAY_BASE_URL`, and three set at release: `FIRST_FREE_BUILD` (build number of the first free-notes build), `FREE_RELEASE_AT` (its release time, ISO 8601) and `LEGACY_UNTIL` (when old builds' paths start answering 410). Without `FIRST_FREE_BUILD`/`FREE_RELEASE_AT` nobody counts as an early buyer; without `LEGACY_UNTIL` the old paths keep working.
 
-There is no developer bypass. `DEV_BYPASS_TOKEN` and `ANALYTICS_TOKEN` are no longer read and can be deleted.
+Production has no developer bypass: never set `ENVIRONMENT` or `DEV_BYPASS_KEY` on the deployed Worker (see Local Development). `DEV_BYPASS_TOKEN` and `ANALYTICS_TOKEN` are no longer read and can be deleted.
 
 Apple: point App Store Server Notifications (version 2) for production at `https://<relay>/appstore/notifications`.
 
@@ -130,9 +130,24 @@ During attestation, the credential public key is available in two places: the CO
 
 ```bash
 npm install
-npm run dev
+cp .dev.vars.example .dev.vars          # once; add your GROQ_API_KEY
+npx wrangler d1 migrations apply ramble-relay --local   # once, and after new migrations
+npm run dev                             # http://localhost:8787
 npm test        # Unit tests — no credentials or Worker runtime needed
 ```
+
+`npm run dev` runs the exact Worker that production runs, with local D1, R2 and
+KV, so every endpoint (including new ones) works locally with no extra wiring.
+There is no separate local route list.
+
+**Simulators.** App Attest doesn't work in the Simulator, so debug simulator
+builds of the iPhone app default to `http://localhost:8787` and send
+`X-Dev-Bypass` instead of an assertion. The relay accepts that header in one
+place only, `POST /inboxes` (the only call that needs App Attest; every other
+call uses the inbox secret it returns), and only when `ENVIRONMENT=development`
+and `DEV_BYPASS_KEY` match `.dev.vars`. The watch simulator follows the phone's
+relay URL. Release builds contain no bypass code. Purchases and App Attest
+still need a real device.
 
 `npm test` runs every endpoint against the real schema (node:sqlite stands in for
 D1) with fakes for R2, providers, App Attest and Apple, plus the provider, audio,

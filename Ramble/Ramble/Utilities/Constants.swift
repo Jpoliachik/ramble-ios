@@ -35,13 +35,39 @@ enum Constants {
 
         static let supportEmail = "support@ramble.watch"
 
+        #if DEBUG && targetEnvironment(simulator)
+        /// Simulators can't use App Attest, so debug simulator builds talk to
+        /// a local relay (`cd proxy`, `npm run dev`) that takes the bypass key
+        /// from proxy/.dev.vars. Production never accepts it.
+        static let localBaseURL = URL(string: "http://localhost:8787")!
+        static let localDevBypassKey = "ramble-local-dev-bypass-key"
+        #endif
+
         static var baseURL: URL {
             if let override = UserDefaults.standard.string(forKey: baseURLOverrideKey),
                !override.isEmpty,
                let url = URL(string: override) {
                 return url
             }
+            #if DEBUG && targetEnvironment(simulator)
+            return localBaseURL
+            #else
             return hostedBaseURL
+            #endif
+        }
+
+        /// X-Dev-Bypass value, or "" to use App Attest. Always "" in release builds.
+        static var devBypass: String {
+            #if DEBUG
+            if let key = UserDefaults.standard.string(forKey: devBypassKey), !key.isEmpty { return key }
+            #if targetEnvironment(simulator)
+            return localDevBypassKey
+            #else
+            return ""
+            #endif
+            #else
+            return ""
+            #endif
         }
     }
 }
