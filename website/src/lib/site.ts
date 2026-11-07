@@ -1,6 +1,5 @@
-// Shared facts the site states in more than one place. Several are
-// PLACEHOLDERS awaiting Justin's decision (handoff Section 7). Change them here
-// and every page follows. Search for "PLACEHOLDER" before shipping.
+// Shared facts the site states in more than one place. Change them here and
+// every page follows. The specs in specs/ are the source of truth.
 
 // The site is served from the root of its own domain (no basePath).
 export const BASE_PATH = "";
@@ -9,23 +8,36 @@ export const BASE_PATH = "";
 // message all use it, including on preview deployments.
 export const SITE_URL = "https://ramble.watch";
 export const APP_STORE_URL = "https://apps.apple.com/app/id6761857751";
+export const SUPPORT_EMAIL = "support@ramble.watch";
 
-// One-time app price (Justin, Nov 2 2026).
-export const APP_PRICE = "$4.99";
+// Pricing (specs/purchase.md "What Ramble says about price"). Never add a
+// monthly price, "trial", "unlimited", "premium" or "Subscribe".
+export const FREE_NOTES = 25;
+export const APP_PRICE = "$14.99";
+export const PRICE_STORY = `Free to download. ${FREE_NOTES} notes free, then ${APP_PRICE} once.`;
+export const FAIR_USE = "100 hours of audio per calendar month";
 
-// Optional cloud transcription upgrade. Nobody has to upgrade; everything works without it.
-export const CLOUD_PRICE = "$2.99/month";
+// specs/delivery.md "One privacy wording everywhere". Use it verbatim.
+export const PRIVACY_WORDING =
+  "Ramble's server is a relay, not an archive. Your audio is sent to a transcription provider and deleted as soon as the transcript is ready. Transcripts are deleted when your agent picks them up, or after 30 days. Your full history lives only on your iPhone.";
 
-// PLACEHOLDER: hard maximum for transcripts an agent never picks up. Justin is choosing 30 or 60 days.
+// How long an agent's copy waits if it is never picked up.
 export const RETENTION = "30 days";
 
-// The relay runs in the transcription proxy Worker, at its workers.dev host
-// (same value as Constants.Relay.hostedBaseURL in the app).
-export const RELAY_URL = "https://ramble-transcription-proxy.jpoliachik.workers.dev";
+// The one transcription provider (specs/transcription.md).
+export const PROVIDERS = [
+  { name: "Groq", model: "Whisper v3 Turbo", privacy: "https://groq.com/privacy-policy/" },
+] as const;
 
-// Pairing code defaults from the relay (PR #32). Proposed, not locked.
-export const PAIR_CODE_EXAMPLE = "K7QX-MP4D";
+// Relay base URL (specs/relay-api.md "Base URL"). The workers.dev host serves
+// the identical API, so agents paired against it keep working.
+export const RELAY_URL = "https://api.ramble.watch";
+export const RELAY_URL_LEGACY = "https://ramble-transcription-proxy.jpoliachik.workers.dev";
+
+// Pairing codes: 12 characters, shown as XXXX-XXXX-XXXX, single use.
+export const PAIR_CODE_EXAMPLE = "K7QX-MP4D-HN3R";
 export const PAIR_CODE_TTL = "10 minutes";
+
 // Minimum OS versions. Keep in sync with IPHONEOS_DEPLOYMENT_TARGET and
 // WATCHOS_DEPLOYMENT_TARGET in Ramble/Ramble.xcodeproj.
 export const MIN_IOS = "26.2";

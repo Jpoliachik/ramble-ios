@@ -30,6 +30,7 @@ Use plain `<img>` tags with `BASE_PATH` from `src/lib/site.ts` (currently empty)
 | `/docs` | `src/app/docs/page.tsx` | Connect your agent: pairing, Muse, relay API, what the relay stores |
 | `/docs/webhooks` | `src/app/docs/webhooks/page.tsx` | Webhook API docs (developer-targeted) |
 | `/docs/help` | `src/app/docs/help/page.tsx` | Requirements (min iOS/watchOS) and troubleshooting |
+| `/support` | `src/app/support/page.tsx` | Support email and short answers (the App Store Support URL) |
 | `/privacy` | `src/app/privacy/page.tsx` | Privacy policy |
 | `/terms` | `src/app/terms/page.tsx` | Terms of use |
 

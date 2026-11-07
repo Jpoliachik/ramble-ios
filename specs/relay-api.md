@@ -1,7 +1,7 @@
 # Relay API
 
 ## Purpose
-The HTTP contract of Ramble's relay: every endpoint, who may call it with which credential, request and response shapes, status codes, idempotency and limits. Its callers are the Ramble iPhone app, the Ramble watch app, the user's agents, and Apple. What results mean to the person is in [transcription.md](transcription.md), [delivery.md](delivery.md) and [purchase.md](purchase.md).
+The HTTP contract of Ramble's relay: every endpoint, who may call it with which credential, request and response shapes, status codes, idempotency and limits. Its callers are the Ramble iPhone app, the Ramble watch app and the user's agents. What results mean to the person is in [transcription.md](transcription.md), [delivery.md](delivery.md) and [purchase.md](purchase.md).
 
 ## Endpoints at a glance
 
@@ -11,14 +11,13 @@ The HTTP contract of Ramble's relay: every endpoint, who may call it with which 
 | `POST /inboxes` | phone | App Attest assertion |
 | `GET /account` | phone, watch | inbox secret or watch token |
 | `POST /entitlement` | phone | inbox secret |
-| `POST /appstore/notifications` | Apple | Apple-signed body |
 | `GET /settings`, `PUT /settings`, `POST /watch-token`, `DELETE /watch-token` | phone | inbox secret |
 | `PUT /notes/:id`, `GET /notes/:id` | phone, watch | inbox secret or watch token |
 | `GET /notes`, `POST /notes/ack`, `POST /inbox/status`, `DELETE /inbox`, `POST /pair/code`, `GET /connections`, `DELETE /connections/:id` | phone | inbox secret |
 | `POST /pair/exchange` | agent | none (the pairing code) |
 | `GET /inbox`, `POST /inbox/ack`, `GET /agent`, `PATCH /agent` | agent | agent key |
 | `GET /`, `GET /health` | anyone | none |
-| `POST /transcribe`, `POST /inbox`; `GET /analytics` | old builds | work until LEGACY_UNTIL, then `410`; `410` |
+| `POST /transcribe`, `POST /inbox`; `GET /analytics` | old builds | work until 2027-01-07 00:00 UTC, then `410`; `410` |
 
 ## Basics
 
@@ -31,7 +30,7 @@ The relay SHALL be served at `https://api.ramble.watch`, and every path here is 
 - THEN it gets `200 {"service": "Ramble relay", "docs": "https://ramble.watch/docs", "llms": "https://ramble.watch/llms-full.txt"}`
 
 ### Requirement: Three credentials
-Calls other than pairing exchange, inbox creation, App Attest registration and Apple notifications SHALL carry `Authorization: Bearer <credential>`: an inbox secret (`rmbi_…`, the phone), a watch token (`rmbw_…`, the watch) or an agent key (`rmba_…`, an agent). Each is 32 random bytes; the relay SHALL keep only a SHA-256 hash, never a readable copy. The one exception is a new agent key during its pairing code's 10 minutes, so a retried exchange gets the same key: it is kept encrypted with a key derived from the exchange's `request_id`, and deleted when the code expires. `bearer <credential>` and the bare credential are accepted. A missing, unknown or revoked credential SHALL get `401` ("Invalid or revoked credentials. Send \"Authorization: Bearer <token>\"."); a valid credential on an endpoint its caller may not use SHALL get `403` with `"reason": "wrong_credential"` and keep working.
+Calls other than pairing exchange, inbox creation and App Attest registration SHALL carry `Authorization: Bearer <credential>`: an inbox secret (`rmbi_…`, the phone), a watch token (`rmbw_…`, the watch) or an agent key (`rmba_…`, an agent). Each is 32 random bytes; the relay SHALL keep only a SHA-256 hash, never a readable copy. `bearer <credential>` and the bare credential are accepted. A missing, unknown or revoked credential SHALL get `401` ("Invalid or revoked credentials. Send \"Authorization: Bearer <token>\"."); a valid credential on an endpoint its caller may not use SHALL get `403` with `"reason": "wrong_credential"` and keep working.
 
 #### Scenario: Lenient header
 - GIVEN a valid agent key
@@ -72,28 +71,23 @@ Every error SHALL be `{"error": "<sentence>"}`, plus `"reason": "<code>"` wherev
 - THEN the response is `409` and the stored key is unchanged
 
 ### Requirement: Creating an inbox
-`POST /inboxes` SHALL require `X-App-Attest-Key-Id` and `X-App-Attest` (an assertion over the exact body, which may be empty) and return `201 {"inbox_secret": "rmbi_…", "account_token": "<UUID>"}`. A missing assertion gets `403` "App attestation required"; a failing one, or one reusing a counter, `403` "App attestation failed". After that only the inbox secret is checked. A phone that still holds its inbox secret after a reinstall SHALL keep using that inbox. The daily inbox cap and the free-tier breaker SHALL NOT apply to a request whose body carries a verified purchase or early-buyer proof (`{"signed_transaction"}` or `{"app_transaction"}`, checked as in "Submitting a purchase"); that inbox is created already bound and unlocked.
+`POST /inboxes` SHALL require `X-App-Attest-Key-Id` and `X-App-Attest` (an assertion over the exact body, which may be empty) and return `201 {"inbox_secret": "rmbi_…"}`. A missing assertion gets `403` "App attestation required"; a failing one, or one reusing a counter, `403` "App attestation failed". After that only the inbox secret is checked. A local development relay, and never production, SHALL also accept its configured developer key in `X-Dev-Bypass` in place of the assertion, on this endpoint only. A phone that still holds its inbox secret after a reinstall SHALL keep using that inbox. Every new inbox SHALL start locked with 25 free notes, whatever the body carries; a purchase is bound afterwards with `POST /entitlement`. There SHALL be no daily cap on inboxes overall, only the per-key and per-address limits ("Rate limits").
 
-#### Scenario: Daily inbox cap reached
-- GIVEN 2,000 inboxes were created this UTC day, or the free-tier audio-hours breaker has tripped ([transcription.md](transcription.md))
-- WHEN a phone creates an inbox
-- THEN the response is `503` with `"reason": "unavailable"`, no inbox is made, and the operator is alerted
-
-#### Scenario: A buyer on a new iPhone during the cap
-- GIVEN the daily inbox cap is reached
-- WHEN a phone creates an inbox with a verified purchase in the body
-- THEN the inbox is created, bound to that purchase and unlocked
+#### Scenario: A body never unlocks
+- GIVEN a valid assertion over a body holding a verified unlock purchase
+- WHEN a phone creates an inbox with it
+- THEN the response is `201` and `GET /account` reads `"unlocked": false, "free_notes_remaining": 25`
 
 ### Requirement: Account state
-`GET /account` SHALL return `{"unlocked", "free_notes_total": 25, "free_notes_remaining", "fair_use": {"used_hours", "limit_hours", "resets_at"} | null}`, plus `"account_token"` for the phone. `fair_use` is `null` while no purchase is bound. Meaning and thresholds: [purchase.md](purchase.md).
+`GET /account` SHALL return `{"unlocked", "free_notes_total": 25, "free_notes_remaining"}`, the same for the phone and the watch. It SHALL NOT report usage or a suspension. Meaning: [purchase.md](purchase.md).
 
-#### Scenario: Usage this month
-- GIVEN an unlocked inbox whose purchase used 41 of its 100 hours this month
+#### Scenario: Unlocked inbox
+- GIVEN an unlocked inbox whose purchase transcribed 141 hours this month
 - WHEN the phone reads `GET /account`
-- THEN `fair_use` is `{"used_hours": 41, "limit_hours": 100, "resets_at": "2026-12-01T00:00:00.000Z"}`
+- THEN the body is `{"unlocked": true, "free_notes_total": 25, "free_notes_remaining": 25}`, with no usage in it
 
 ### Requirement: Submitting a purchase
-`POST /entitlement` with `{"signed_transaction": "<JWS>"}` or, for early buyers, `{"app_transaction": "<JWS>"}` SHALL return `200` with the `GET /account` body once the record is verified: signature chained to Apple's root CA, bundle ID `dev.goodloop.Ramble`, not revoked or refunded, not from Xcode testing. On production, a Sandbox unlock purchase is verified against Apple's sandbox and gives a 7-day test unlock, and a Sandbox app transaction is never early-buyer proof ([purchase.md](purchase.md)). A transaction SHALL be for the unlock product; `dev.goodloop.ramble.premium.monthly2` is accepted only as early-buyer proof ([purchase.md](purchase.md)). Re-sending a bound record SHALL return `200` and change nothing.
+`POST /entitlement` with `{"signed_transaction": "<JWS>"}` or, for early buyers, `{"app_transaction": "<JWS>"}` SHALL return `200` with the `GET /account` body once the record is verified: signature chained to Apple's root CA, bundle ID `dev.goodloop.Ramble`, not revoked or refunded, not from Xcode testing. A Sandbox unlock purchase (TestFlight, App Review) unlocks like a Production one, and a Sandbox app transaction is never early-buyer proof ([purchase.md](purchase.md)). A transaction SHALL be for the unlock product; `dev.goodloop.ramble.premium.monthly2` is accepted only as early-buyer proof ([purchase.md](purchase.md)). Re-sending a bound record SHALL return `200` and change nothing.
 
 #### Scenario: Forged or refunded record
 - GIVEN a self-signed JWS, a refunded transaction, or an Xcode test record sent to production
@@ -101,24 +95,19 @@ Every error SHALL be `{"error": "<sentence>"}`, plus `"reason": "<code>"` wherev
 - THEN the response is `403` with `"reason": "invalid_transaction"` and the inbox stays locked
 
 ### Requirement: Purchases are bound to inboxes
-A first-time unlock purchase SHALL be accepted only when its app account token equals this inbox's `account_token`; a restored purchase may carry another inbox's token. A purchase SHALL unlock at most 5 inboxes, counting every inbox it was bound to or that uploaded a note in the last 90 days, keyed on the original transaction ID (or the app transaction ID for early buyers). Family-shared purchases SHALL NOT unlock.
+Any inbox MAY submit a purchase, whichever inbox it was bought from. A purchase SHALL unlock at most 10 inboxes ever (or the higher cap the operator set on it), keyed on the original transaction ID (or the app transaction ID for early buyers); a binding is never released. Family-shared purchases SHALL NOT unlock.
 
-#### Scenario: Purchase made for another inbox
-- GIVEN a first-time purchase whose account token belongs to inbox A
-- WHEN inbox B submits it as its own purchase
-- THEN the response is `403` with `"reason": "wrong_account"`
-
-#### Scenario: Sixth active inbox
-- GIVEN one purchase bound to 5 inboxes in the last 90 days, whether or not they uploaded
-- WHEN a sixth inbox submits it
+#### Scenario: Eleventh inbox
+- GIVEN one purchase bound to 10 inboxes, whether or not they still upload
+- WHEN an eleventh inbox submits it
 - THEN the response is `403` with `"reason": "too_many_inboxes"`
 
-### Requirement: Apple refund notifications
-`POST /appstore/notifications` SHALL accept App Store Server Notifications (version 2) whose signature chains to Apple's root CA and whose environment matches the relay's, answer `200`, and return every inbox bound to a refunded or revoked purchase to the free state with its used free-note count unchanged. Any other body SHALL get `400` and change nothing.
+### Requirement: Revoked purchases
+The relay SHALL NOT receive App Store Server Notifications. A purchase the operator marks revoked by hand ([proxy/README.md](../proxy/README.md) "Operations") SHALL return every inbox bound to it to the free state, with its used free-note count unchanged, and SHALL be refused as `invalid_transaction` when submitted again.
 
-#### Scenario: Refund
+#### Scenario: Refund revoked by hand
 - GIVEN a purchase bound to 2 inboxes that used all 25 free notes before unlocking
-- WHEN Apple sends a signed refund notification for it
+- WHEN the operator marks it revoked
 - THEN both inboxes read `"unlocked": false, "free_notes_remaining": 0`, and their next uploads get `402` with `"reason": "free_notes_used"`
 
 ### Requirement: Transcription settings
@@ -130,17 +119,22 @@ A first-time unlock purchase SHALL be accepted only when its app account token e
 - THEN the response is `400`, and `GET /settings` still returns `"language": "haw"`
 
 ### Requirement: Watch token
-`POST /watch-token` with `{"replaces": "<the watch's previous token>"?}` SHALL return `201 {"watch_token": "rmbw_…"}` and replace the token named in `replaces` (even one of an earlier inbox) and any other watch token of this inbox, so an inbox has one. `DELETE /watch-token` SHALL revoke it and return `200 {"revoked": <0 or 1>}`. Neither touches agent connections. A replaced token SHALL get `401` on uploads but SHALL read, by ID, the notes it uploaded for 30 days after it was replaced. When the phone calls these: [phone.md](phone.md).
+`POST /watch-token` with `{"replaces": "<the watch's previous token>"?}` SHALL return `201 {"watch_token": "rmbw_…"}` and revoke the token named in `replaces` (even one of an earlier inbox) and any other watch token of this inbox, so an inbox has one. `DELETE /watch-token` SHALL revoke it and return `200 {"revoked": <0 or 1>}`. Neither touches agent connections. A replaced or revoked token SHALL get `401` on every call, including reads of notes it uploaded. When the phone calls these: [phone.md](phone.md).
 
 #### Scenario: Revoked
 - GIVEN a watch token and one connected agent
 - WHEN the phone calls `DELETE /watch-token`
 - THEN every call with that token gets `401`, and the agent keeps pulling
 
+#### Scenario: Token replaced in the same inbox
+- GIVEN the inbox accepted a watch note that is still transcribing
+- WHEN the phone mints a new watch token
+- THEN the old token gets `401`, and the new token reads that note
+
 #### Scenario: Phone reinstalled with a fresh inbox
 - GIVEN the old inbox accepted a watch note that is still transcribing
 - WHEN the reinstalled phone mints a token with the old one as `replaces`
-- THEN the old token's uploads get `401`, and it still reads that note until it is done
+- THEN the old token gets `401`, and the new token reading that note gets `404`
 
 ## Notes
 
@@ -168,31 +162,43 @@ The relay SHALL refuse these uploads, storing and counting nothing. Refusals mar
 | Container says longer than 61 minutes; body over 20 MB | `413` | `too_long`; `too_large` | yes |
 | Not one of the audio types above | `415` | `unsupported_type` | yes |
 | Empty body, body bytes ≠ `Content-Length`, missing or invalid recorded time | `400` | `bad_upload` | yes |
-| Recorded time more than 5 minutes in the future | `400` | `recorded_in_future` | no: retry once it isn't ahead |
+| The inbox, or the purchase it is bound to, is suspended by the operator ([purchase.md](purchase.md)) | `403` | `suspended` | yes |
 | No `Content-Length` (`411`), or body not finished within 30 minutes (`408`) | `411` / `408` | `length_required` / `upload_timeout` | no |
+
+The recorded time is stored and returned as sent and is never checked against the relay's clock.
 
 #### Scenario: Watch clock far ahead
 - GIVEN a watch whose clock is an hour fast
 - WHEN it uploads a note
-- THEN the response is `400` with `"reason": "recorded_in_future"`, and the same upload succeeds once its recorded time has passed
+- THEN the note is accepted like any other, with `recorded_at` as the watch sent it
+
+#### Scenario: Suspended user
+- GIVEN the operator suspended an inbox
+- WHEN its watch or phone uploads a new note
+- THEN the response is `403` with `"reason": "suspended"`, nothing is stored or counted, and a repeat of a note accepted before still gets `200`
 
 ### Requirement: Upload idempotency and retries
-The note UUID SHALL be the idempotency key within an inbox. A repeated upload of an accepted ID without a valid retry (below) SHALL be answered `200` with the note's current state before the body is read, storing and counting nothing. Concurrent uploads of one ID SHALL produce one note, counted once.
+The note UUID SHALL be the idempotency key within an inbox. A repeated upload of an accepted ID without a valid retry (below) SHALL be answered `200` with the note's current state before the body is read, storing and counting nothing. Concurrent uploads of one ID SHALL produce one note, counted once. An upload of an ID this inbox already holds but the uploading credential may not read (a watch reusing a phone note's ID) SHALL get `409` with `"reason": "id_in_use"`, changing nothing.
 
 #### Scenario: Lost response
 - GIVEN a watch upload was accepted but the response never arrived
 - WHEN the watch uploads the same note again
 - THEN the response is `200` with the current status, and the free-note count is unchanged
 
-`PUT /notes/:id` from the phone with `X-Ramble-Retry: 1`, on a note whose `status` is `"failed"` and that has been retried fewer than 3 times, SHALL be checked and held like a first upload (refusals, `402`), then SHALL replace the audio, start a fresh transcription, add one to the note's retry count, list the note again in `GET /notes`, and answer `201` like a first upload; `id`, `source` and `recorded_at` stay. On a note not failed, or from a watch token, the header is ignored. After 3 retries it SHALL get `409` with `"reason": "retry_limit"`, changing nothing. Concurrent retries of one note SHALL start one.
+`PUT /notes/:id` from the phone with `X-Ramble-Retry: 1`, on a note whose `status` is `"failed"` and that has not been retried, SHALL be checked like a first upload (refusals, including `suspended`) but never held for free notes and never counted, then SHALL replace the audio, start a fresh transcription, list the note again in `GET /notes`, and answer `201` like a first upload; `id`, `source` and `recorded_at` stay. On a note not failed, or from a watch token, the header is ignored. A note SHALL be retried at most once: a second retry gets `409` with `"reason": "retry_limit"`, changing nothing. Concurrent retries of one note SHALL start one.
 
-#### Scenario: Fourth retry
-- GIVEN a note that failed again after its third retry
+#### Scenario: Second retry
+- GIVEN a note that failed again after its retry
 - WHEN the phone sends `PUT /notes/:id` with `X-Ramble-Retry: 1`
 - THEN the response is `409` with `"reason": "retry_limit"`, and nothing is transcribed or counted
 
+#### Scenario: Retry with no free notes left
+- GIVEN a failed note in an inbox that has used all 25 free notes and is not unlocked
+- WHEN the phone retries it
+- THEN the response is `201`, and the free-note count is unchanged
+
 ### Requirement: Held uploads
-An upload the inbox may not transcribe SHALL get `402`, keeping and counting nothing: `{"reason": "free_notes_used", "free_notes_remaining": 0}` when out of free notes and not unlocked, or `{"reason": "fair_use"}` with `Retry-After` set to the seconds until the fair-use reset. Meaning and copy: [purchase.md](purchase.md).
+An upload the inbox may not transcribe SHALL get `402` with `{"reason": "free_notes_used", "free_notes_remaining": 0}` when out of free notes and not unlocked, keeping and counting nothing. An unlocked inbox SHALL never be held for how much audio it sends. Meaning and copy: [purchase.md](purchase.md).
 
 #### Scenario: Out of free notes
 - GIVEN 25 notes accepted and no purchase
@@ -205,7 +211,7 @@ Note responses SHALL be `{"id", "source", "status", "result", "recorded_at", "re
 | Field | Values |
 |---|---|
 | `status` | `"transcribing"`, `"done"` or `"failed"` |
-| `result` | done: `"transcript"` or `"no_speech"`; failed: `"audio_rejected"` (no provider could transcribe the audio) or `"retries_exhausted"` (it kept failing until the retry window ended); else `null` |
+| `result` | done: `"transcript"` or `"no_speech"`; failed: `"audio_rejected"` (Groq rejected the audio itself) or `"retries_exhausted"` (it kept failing until the retry window ended); else `null` |
 | `recorded_at` | exactly as the device sent it, offset included |
 | `duration` | seconds measured by the relay; `null` until done |
 | `transcript` | the text for `"transcript"`, `""` for `"no_speech"`, else `null` |
@@ -217,7 +223,7 @@ Note responses SHALL be `{"id", "source", "status", "result", "recorded_at", "re
 - THEN `status` is `"done"`, `result` is `"no_speech"` and `transcript` is `""`
 
 ### Requirement: Reading a note by ID
-`GET /notes/:id` SHALL return `200` with the note. The phone reads any note in its inbox; a watch token reads only notes uploaded with a watch token of that inbox, or, once replaced, the notes it uploaded itself. Any other ID SHALL get `404`. Once the copy for the person's devices is gone, the note SHALL read with `"transcript": null` and `"transcript_cleared": true` for 30 more days, then `404`.
+`GET /notes/:id` SHALL return `200` with the note. The phone reads any note in its inbox; the inbox's watch token reads only notes uploaded with a watch token of that inbox, including ones uploaded with a token since replaced. Any other ID SHALL get `404`. Once the copy for the person's devices is gone, the note SHALL read with `"transcript": null` and `"transcript_cleared": true` for 30 more days, then `404`.
 
 #### Scenario: Watch asks for a phone note
 - GIVEN a note recorded on the phone
@@ -225,7 +231,7 @@ Note responses SHALL be `{"id", "source", "status", "result", "recorded_at", "re
 - THEN the response is `404`
 
 ### Requirement: Copy kept for the person's devices
-A note's transcript SHALL stay readable by the person's devices until the phone has acked it and, for a watch note, the watch has received it as done, in an upload response or a `GET /notes/:id`; and at most 30 days after it is ready. Meaning: [delivery.md](delivery.md).
+A note's transcript SHALL stay readable by the person's devices until the phone has acked it and, for a watch note, the watch has received it as done or failed, in an upload response or a `GET /notes/:id`; and at most 30 days after it is ready. Meaning: [delivery.md](delivery.md).
 
 #### Scenario: Phone acks before the watch looks
 - GIVEN the phone acked a watch note whose upload response said `"transcribing"`
@@ -259,16 +265,16 @@ A note's transcript SHALL stay readable by the person's devices until the phone 
 - THEN the first code fails to exchange
 
 ### Requirement: Pairing exchange
-`POST /pair/exchange` with `{"code", "request_id", "name"?}` and no credential SHALL return `201 {"token": "rmba_…"}` and create one connection. `request_id` is a random string of 16–64 characters chosen by the agent; `name` is optional, 1–40 characters, and an invalid name is dropped without failing. Codes match ignoring case, spaces and dashes. An unknown or expired code SHALL get `400` ("Invalid or expired pairing code. Ask the user for a new one in the Ramble app."); an exchanged code with a different `request_id`, `409` with `"reason": "code_used"` and no key. Which notes the connection receives: [delivery.md](delivery.md).
+`POST /pair/exchange` with `{"code", "name"?}` and no credential SHALL return `201 {"token": "rmba_…"}` and create one connection. `name` is optional, 1–40 characters, and an invalid name is dropped without failing; any other field, such as a `request_id` older instructions send, is ignored. Codes match ignoring case, spaces and dashes. A code SHALL make one connection and return its key once. An unknown or expired code SHALL get `400` ("Invalid or expired pairing code. Ask the user for a new one in the Ramble app."); a code already exchanged, while it hasn't expired and its connection still exists, `409` with `"reason": "code_used"` and no key. Which notes the connection receives: [delivery.md](delivery.md).
 
-#### Scenario: Retried exchange
-- GIVEN an exchange succeeded but the response was lost
-- WHEN the agent retries with the same code and `request_id` at any time in the code's 10 minutes
-- THEN it gets `200` and the same key
+#### Scenario: Response lost
+- GIVEN an exchange succeeded but the response never reached the agent
+- WHEN the agent sends the same code again
+- THEN the response is `409` with `"reason": "code_used"` and no key, the unused connection shows as "Hasn't checked in yet" ([delivery.md](delivery.md)), and the user makes a new code
 
 #### Scenario: Someone else replays the code
 - GIVEN a code already exchanged
-- WHEN it is sent with a different `request_id`
+- WHEN anyone sends it again
 - THEN the response is `409`, and no key is returned
 
 ### Requirement: Connections
@@ -309,12 +315,12 @@ A note's transcript SHALL stay readable by the person's devices until the phone 
 - THEN the response is `400`
 
 ### Requirement: Wake-up pings
-When a copy is made for an agent with a hook, the relay SHALL POST `{"event": "ramble.notes_waiting", "text", "pull_url"}` with the agent's headers and `User-Agent: Ramble-Relay/1 (+https://ramble.watch/docs)`, once, with a 5-second timeout and no redirects, after checking the hostname resolves to a public address. No further ping goes out until the agent pulls or 10 minutes pass. Pings SHALL never carry transcript text.
+When a copy is made for an agent with a hook, the relay SHALL POST `{"event": "ramble.notes_waiting", "text", "pull_url"}` with the agent's headers and `User-Agent: Ramble-Relay/1 (+https://ramble.watch/docs)`, once, with a 5-second timeout and no redirects. No further ping goes out until the agent pulls or 10 minutes pass. Pings SHALL never carry transcript text. A ping that gets no response records `last_status` `0`.
 
-#### Scenario: Hostname turns private
-- GIVEN a hook whose hostname resolved publicly when it was set
-- WHEN it resolves to a private address at ping time
-- THEN no ping is sent and `last_status` is `0`
+#### Scenario: Burst of notes
+- GIVEN an agent with a hook that hasn't pulled since its last ping 3 minutes ago
+- WHEN another copy is made for it
+- THEN no ping is sent, and the next one can go out once the agent pulls or the 10 minutes pass
 
 ### Requirement: Delete waiting notes
 `DELETE /inbox` (phone) SHALL delete every agent copy still waiting in the inbox and return `{"deleted": <n>}`. It SHALL NOT delete the copy for the person's devices, notes still transcribing, agent connections, the watch token, the free count or the unlock. Meaning: [delivery.md](delivery.md).
@@ -327,31 +333,22 @@ When a copy is made for an agent with a hook, the relay SHALL POST `{"event": "r
 ## Limits
 
 ### Requirement: Rate limits
-Over these limits the relay SHALL answer `429` with `{"reason": "rate_limited"}` and `Retry-After` in seconds, and change nothing. Network addresses are used only by the limiter for its window, never stored with notes or logged.
+Over these limits the relay SHALL answer `429` with `{"reason": "rate_limited"}` and `Retry-After` in seconds, and change nothing. No other endpoint is rate-limited: agents, uploads, reads and pairing have no per-caller limit. Network addresses are used only by the limiter for its window, never stored with notes or logged.
 
 | What | Limit |
 |---|---|
 | `POST /attest/challenge`; `POST /attest` | 20 per hour; 5 key registrations per day; per network address |
-| `POST /inboxes` | 3 per day per App Attest key, 20 per hour per network address; 2,000 per UTC day overall (then `503`, above) |
-| `POST /pair/code` | 10 per hour per inbox |
-| `POST /pair/exchange` | 100 failed attempts per hour per network address |
-| `PUT /notes/:id` | 120 per hour and 500 per day per inbox, phone and watch together; repeats don't count, retries do |
-| `GET /notes…`, `POST /notes/ack`, `POST /inbox/status`, `GET /account` | 120 per minute per credential |
-| `GET /inbox`, `POST /inbox/ack`, `GET /agent`; `PATCH /agent` | 60 per minute; 10 per hour; per agent key |
-| `POST /entitlement`, `PUT /settings`; `POST /watch-token` | 20 per hour; 10 per day; per inbox |
+| `POST /inboxes` | 3 per day per App Attest key, 20 per hour per network address |
 
-#### Scenario: Agent checking too often
+#### Scenario: Agent checking often
 - GIVEN an agent pulling every second
-- WHEN it passes 60 calls in a minute
-- THEN it gets `429` with `Retry-After`, and its key still works afterwards
+- WHEN it passes 100 calls in a minute
+- THEN every pull succeeds
 
-### Requirement: Pairing failure circuit
-When failed pairing exchanges from all addresses together exceed 1,000 in an hour, every exchange SHALL get `503` with `"reason": "unavailable"` until that hour ends, and the operator SHALL be alerted.
-
-#### Scenario: Spread-out guessing
-- GIVEN 1,001 failed exchanges this hour from many addresses
+#### Scenario: Failed pairing exchanges
+- GIVEN 150 failed exchanges this hour from one address
 - WHEN an agent sends a valid code
-- THEN it gets `503`, and the code still works once the hour ends, if it hasn't expired
+- THEN it gets `201` and a key
 
 ### Requirement: Logs
 Relay logs SHALL contain no request bodies, transcript text, audio, credentials or network addresses, SHALL record inbox IDs and App Attest key IDs only as hashes, and SHALL keep at most 200 characters of a provider error body.
@@ -363,24 +360,24 @@ Relay logs SHALL contain no request bodies, transcript text, audio, credentials 
 
 ## Old app versions
 
-### Requirement: Old builds work until LEGACY_UNTIL, then are told to update
-LEGACY_UNTIL is the retirement date for old builds' paths, set at release (by default 60 days after the first free-notes build ships). Until then, `POST /transcribe` (cloud transcription for early subscribers) and text `POST /inbox` (old builds delivering transcripts to agents) SHALL keep working for old builds, within the rate limits above, under these checks:
+### Requirement: Old builds work until 2027-01-07, then are told to update
+Old builds' paths retire at a fixed date, 2027-01-07 00:00 UTC, fixed in the relay's code. Until then, `POST /transcribe` (cloud transcription for early subscribers) and text `POST /inbox` (old builds delivering transcripts to agents) SHALL keep working for old builds, under these checks:
 
 - Text `POST /inbox` needs only the old build's inbox secret, as today, and no purchase record, so $4.99 buyers' old builds keep delivering.
-- `POST /transcribe` needs the App Attest checks above and a subscription record that passes the same checks as `POST /entitlement` and has not expired. It SHALL apply the upload size limits above, count audio toward a 100-hour monthly cap per original transaction, and always transcribe with the default provider chain ([transcription.md](transcription.md)), ignoring any model the client asks for. `GET /analytics`, and from LEGACY_UNTIL on those two paths, SHALL answer `410` with `"error": "This version of Ramble is out of date. Update Ramble from the App Store."`, and SHALL transcribe, queue or reveal nothing.
+- `POST /transcribe` needs the App Attest checks above and a subscription record that passes the same checks as `POST /entitlement` and has not expired. It SHALL apply the upload size limits above, add transcribed audio to the monthly usage tally of its original transaction (monitoring only, never a cap; [purchase.md](purchase.md)), refuse with `403` and `"reason": "suspended"` when the operator suspended that transaction, and always transcribe with Groq ([transcription.md](transcription.md)), ignoring any model the client asks for. `GET /analytics`, and from 2027-01-07 00:00 UTC on those two paths, SHALL answer `410` with `"error": "This version of Ramble is out of date. Update Ramble from the App Store."`, and SHALL transcribe, queue or reveal nothing.
 
 #### Scenario: Old subscriber before and after the date
 - GIVEN an old build with an active subscription and a valid App Attest assertion
-- WHEN it sends `POST /transcribe` with audio before LEGACY_UNTIL
+- WHEN it sends `POST /transcribe` with audio before 2027-01-07
 - THEN it gets the transcript
-- AND from LEGACY_UNTIL on, that request or a text `POST /inbox` gets `410`, and nothing is transcribed or queued for any agent
+- AND from 2027-01-07 00:00 UTC on, that request or a text `POST /inbox` gets `410`, and nothing is transcribed or queued for any agent
 
 #### Scenario: Old $4.99 build delivers text
 - GIVEN an old build of a $4.99 buyer with no subscription, transcribing on device
-- WHEN it sends a text `POST /inbox` before LEGACY_UNTIL
+- WHEN it sends a text `POST /inbox` before 2027-01-07
 - THEN the transcript is queued for its agents as before
 
 #### Scenario: Expired subscription on the old path
 - GIVEN an old build whose subscription record expired last month
-- WHEN it sends `POST /transcribe` before LEGACY_UNTIL
+- WHEN it sends `POST /transcribe` before 2027-01-07
 - THEN the response is `403`, and nothing is transcribed

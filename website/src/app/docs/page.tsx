@@ -3,22 +3,35 @@ import Link from "next/link";
 import { CodeBlock, InlineCode } from "@/components/code-block";
 import DocsSidebar from "@/components/docs-sidebar";
 import CopyLlmButton from "@/components/copy-llm-button";
-import { PAIR_CODE_EXAMPLE, PAIR_CODE_TTL, RELAY_URL, RETENTION, SITE_URL } from "@/lib/site";
+import {
+  PAIR_CODE_EXAMPLE,
+  PAIR_CODE_TTL,
+  PRIVACY_WORDING,
+  RELAY_URL,
+  RELAY_URL_LEGACY,
+  RETENTION,
+  SITE_URL,
+} from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Connect your agent",
   description: "Pair Ramble with your agent using a short code. Your agent picks up each transcript and Ramble deletes it.",
 };
 
+const RELAY_HOST = new URL(RELAY_URL).host;
+const LEGACY_HOST = new URL(RELAY_URL_LEGACY).host;
+
 // The block agents actually follow. Keep it agnostic: every rule here has to
 // work for any agent stack. Platform specifics go under "Platform notes".
 const AGENT_INSTRUCTIONS = `Ramble connection
 Relay: ${RELAY_URL}
 
-1. Pair. When I give you a code like ${PAIR_CODE_EXAMPLE}, POST {"code": "<the code>"}
-   to /pair/exchange and save the returned "token". If that request times out or
-   drops, send the same code again: for ${PAIR_CODE_TTL} it returns the same token.
-   A 400 means the code is wrong or expired, so ask me for a new one.
+1. Pair. When I give you a code like ${PAIR_CODE_EXAMPLE}, POST
+   {"code": "<the code>", "name": "<your name>"}
+   to /pair/exchange. Save the returned "token" right away: a code gives its
+   token once. The name is optional and shows in my Ramble app. A 400 means
+   the code is wrong or expired, and a 409 means it was already used (for
+   example, a retry after a lost response), so ask me for a new one.
    The token is a password to my transcripts: anyone who has it can read and
    delete them. Store it the way your platform stores secrets, and keep it out
    of chat, memory, and logs.
@@ -31,10 +44,14 @@ Relay: ${RELAY_URL}
    like that. Only if your platform can't run anything without you, schedule
    your own run instead. Hourly or even daily is fine (nothing expires for
    ${RETENTION}), and tell me how often you'll check.
+   If you can receive webhooks (an HTTPS URL that starts a run), also register
+   it: PATCH /agent with {"hook": {"url": "<your URL>", "headers":
+   {"Authorization": "<what your webhook needs>"}}}. The relay then pings that
+   URL when a new note is waiting, and you check, act, and ack as usual.
 
 3. Act. For each item, do what I asked in "transcription". "created_at" is when
    I started recording, in my local time, which can be hours before you see it
-   (my phone may have been offline). Read relative times like "in an hour" or
+   (my watch may have been offline). Read relative times like "in an hour" or
    "tomorrow" from created_at. If that time has already passed, treat it as
    overdue and tell me.
 
@@ -43,20 +60,21 @@ Relay: ${RELAY_URL}
    true, check again right away.
 
 5. Only 401 means stop. 401 means I disconnected you: stop checking and tell
-   me. Anything else (403, 5xx, a timeout) is temporary: retry after 2, 5, then
+   me. A 429 means slow down: wait the seconds in the Retry-After header.
+   Anything else (403, 5xx, a timeout) is temporary: retry after 2, 5, then
    15 seconds, and keep your schedule.
 
 Send a User-Agent header on every request (any name, like my-agent/1.0).
 Full reference and examples: ${SITE_URL}/docs`;
 
 const API_EXAMPLE = `POST /pair/exchange
-{"code": "${PAIR_CODE_EXAMPLE}"}
-→ 201 {"token": "rmba_…"}          (a retry with the same code: 200, same token)
+{"code": "${PAIR_CODE_EXAMPLE}", "name": "My agent"}
+→ 201 {"token": "rmba_…"}   (the same code again: 409 "code_used", no token)
 
 GET /inbox
 Authorization: Bearer rmba_…
 → {"items": [{"id": 41, "recording_id": "6F1C…", "created_at": "2026-11-01T14:00:00-05:00",
-              "received_at": "2026-11-01T19:00:04.120Z", "duration": 8.2,
+              "received_at": "2026-11-02T00:00:00.000Z", "duration": 8.2,
               "transcription": "Remind me to book the dentist."}],
    "has_more": false}
 
@@ -64,6 +82,19 @@ POST /inbox/ack
 Authorization: Bearer rmba_…
 {"ids": [41]}
 → {"deleted": 1}`;
+
+const HOOK_EXAMPLE = `PATCH /agent
+Authorization: Bearer rmba_…
+{"hook": {"url": "https://your-platform.example/run/abc",
+          "headers": {"Authorization": "Bearer <your webhook key>"}}}
+→ {"name": "My agent",
+   "hook": {"url": "https://your-platform.example/run/abc", "header_names": ["Authorization"],
+            "last_ping_at": "2026-11-06T09:12:00.000Z", "last_status": 200}}
+
+Each ping the relay sends (POST, with your headers):
+{"event": "ramble.notes_waiting",
+ "text": "New Ramble notes are waiting. Pull them from …/inbox …",
+ "pull_url": "${RELAY_URL}/inbox"}`;
 
 const WATCHER_EXAMPLE = `#!/bin/sh
 # Run every few minutes from cron, a hook, or any scheduler. Prints the inbox
@@ -85,9 +116,10 @@ echo "$body"`;
 
 const CURL_EXAMPLE = `RELAY=${RELAY_URL}
 
-# Pair (once)
-curl -sS --retry 3 -X POST "$RELAY/pair/exchange" \\
-  -H "Content-Type: application/json" -d '{"code": "${PAIR_CODE_EXAMPLE}"}'
+# Pair (once; the code works once, so no --retry). Save the token.
+curl -sS -X POST "$RELAY/pair/exchange" \\
+  -H "Content-Type: application/json" \\
+  -d '{"code": "${PAIR_CODE_EXAMPLE}", "name": "My agent"}'
 
 # Check
 curl -sS --retry 3 "$RELAY/inbox" -H "Authorization: Bearer $TOKEN"
@@ -112,14 +144,19 @@ def call(method, path, body=None, token=None):
             with urllib.request.urlopen(req, timeout=20) as res:
                 return json.load(res)
         except urllib.error.HTTPError as err:
+            if err.code == 429 and wait is not None:
+                time.sleep(int(err.headers.get("Retry-After", "60")))
+                continue
             if err.code < 500 or wait is None:
-                raise  # 400: bad or expired code. 401: the user disconnected you.
+                raise  # 400/409: bad, expired or used code. 401: the user disconnected you.
         except OSError:  # timeout or dropped connection
             if wait is None:
                 raise
         time.sleep(wait)
 
-token = call("POST", "/pair/exchange", {"code": "${PAIR_CODE_EXAMPLE}"})["token"]  # once; save it
+# Once; save the token. A code gives its token once: a 409 here means ask for a new code.
+pair = {"code": "${PAIR_CODE_EXAMPLE}", "name": "My agent"}
+token = call("POST", "/pair/exchange", pair)["token"]
 
 inbox = call("GET", "/inbox", token=token)
 for item in inbox["items"]:
@@ -130,9 +167,11 @@ if inbox["items"]:
 const ERRORS: [string, string, string][] = [
   ["401", "You were disconnected, or the token is wrong", "Stop checking and tell the user. This is the only status that means stop."],
   ["400 on /pair/exchange", "The code is wrong or expired", "Ask the user for a new code."],
+  ["409 on /pair/exchange", "The code was already used, maybe by your own earlier try", "Ask the user for a new code."],
   ["400 elsewhere", "The request is malformed", "Fix it. The error message says what's wrong."],
-  ["403", "Filtered before it reached the relay", "Set a User-Agent or use another HTTP client, then retry. Not a token problem."],
+  ["403", "Filtered before it reached the relay, or an endpoint agents can't use", "Set a User-Agent or use another HTTP client, then retry. Not a token problem."],
   ["405", "Wrong HTTP method", "The error message names the right one."],
+  ["429", "Too many requests", "Wait the seconds in Retry-After, then carry on. Your token still works."],
   ["5xx, timeout, dropped connection", "Temporary", "Retry after 2, 5, then 15 seconds. Keep your schedule."],
 ];
 
@@ -147,6 +186,8 @@ function SectionHeader({ id, children }: { id: string; children: React.ReactNode
 function Strong({ children }: { children: React.ReactNode }) {
   return <strong className="font-medium text-stone-900">{children}</strong>;
 }
+
+const linkClass = "text-brand-text underline-offset-2 hover:underline";
 
 export default function AgentDocs() {
   return (
@@ -173,16 +214,16 @@ export default function AgentDocs() {
             <section className="space-y-4">
               <SectionHeader id="pairing">Pairing</SectionHeader>
               <ol className="list-decimal space-y-2 pl-5">
-                <li>In Ramble on your iPhone, open Settings → Connect agent and pick your agent.</li>
+                <li>In Ramble on your iPhone, open Settings → Your agent and tap Connect your agent.</li>
                 <li>
-                  Tell your agent &ldquo;I downloaded Ramble, connect it&rdquo; and paste the code (like{" "}
-                  <InlineCode>{PAIR_CODE_EXAMPLE}</InlineCode>). It connects one agent and expires in {PAIR_CODE_TTL}.
+                  Tap Copy and paste the message to your agent. It holds a code like{" "}
+                  <InlineCode>{PAIR_CODE_EXAMPLE}</InlineCode> that connects one agent and expires in {PAIR_CODE_TTL}.
                 </li>
-                <li>Talk to your watch. Your agent picks up each one and gets to work.</li>
+                <li>Wait for it to connect. Then talk to your watch, and your agent picks up each note.</li>
               </ol>
               <p>
-                Your agent can only pick up your transcripts. Tap Disconnect on the same screen to cut it off; anything
-                still waiting is deleted.
+                Your agent can only pick up its own copies of your transcripts. Tap Disconnect on the same screen to cut
+                it off; anything still waiting for it is deleted.
               </p>
             </section>
 
@@ -209,46 +250,91 @@ export default function AgentDocs() {
                   or even daily works, since nothing expires for {RETENTION}. Tell the user the interval.
                 </li>
                 <li>
-                  <Strong>No polling at all:</Strong> if your agent has an always-on HTTPS URL that wakes it, a{" "}
-                  <Link href="/docs/webhooks" className="text-brand-text underline-offset-2 hover:underline">
-                    webhook
-                  </Link>{" "}
-                  may suit it better. See{" "}
-                  <a href="#relay-or-webhook" className="text-brand-text underline-offset-2 hover:underline">
-                    relay or webhook
-                  </a>
-                  .
+                  <Strong>No polling at all:</Strong> if your agent has an HTTPS URL that starts a run, register it as
+                  a{" "}
+                  <a href="#wake-up-hook" className={linkClass}>
+                    wake-up hook
+                  </a>{" "}
+                  and the relay calls it when something is waiting.
                 </li>
               </ul>
               <CodeBlock filename="watcher.sh">{WATCHER_EXAMPLE}</CodeBlock>
             </section>
 
             <section className="space-y-4">
+              <SectionHeader id="wake-up-hook">Wake-up hook (optional)</SectionHeader>
+              <p>
+                If your platform gives the agent a webhook URL (a webhook-triggered routine or automation), the agent
+                can register it once after pairing. The relay then calls it whenever a new note is waiting, so the
+                agent doesn&rsquo;t need frequent checks. The user doesn&rsquo;t set anything up in the app.
+              </p>
+              <CodeBlock>{HOOK_EXAMPLE}</CodeBlock>
+              <ul className="list-disc space-y-2 pl-5">
+                <li>
+                  <Strong>Test ping.</Strong> Registering sends one ping right away with{" "}
+                  <InlineCode>&quot;event&quot;: &quot;ramble.test&quot;</InlineCode> and the text &ldquo;Ramble test
+                  ping: your wake-up hook works. Nothing new to pick up, no action needed.&rdquo;{" "}
+                  <InlineCode>last_status</InlineCode> is its HTTP status: 2xx means it worked, 0 means no response. If
+                  your webhook key changes, send <InlineCode>PATCH /agent</InlineCode> again with the new one.
+                </li>
+                <li>
+                  <Strong>No transcript in the ping.</Strong> No text, note ids, or counts. When pinged, check the
+                  inbox, act, and ack as usual.
+                </li>
+                <li>
+                  <Strong>One ping per batch.</Strong> After a ping, the next waits until the agent checks the inbox,
+                  or 10 minutes pass, so a burst of notes is one run.
+                </li>
+                <li>
+                  <Strong>Best effort.</Strong> One try, a 5-second timeout, no redirects, sent with{" "}
+                  <InlineCode>User-Agent: Ramble-Relay/1 (+https://ramble.watch/docs)</InlineCode>. Keep a slow
+                  scheduled check (daily is fine) as a backup.
+                </li>
+                <li>
+                  <Strong>Limits.</Strong> <InlineCode>https://</InlineCode> with a public hostname, up to 8 headers
+                  and 4 KB. <InlineCode>Host</InlineCode>, <InlineCode>Content-Type</InlineCode>,{" "}
+                  <InlineCode>Content-Length</InlineCode>, <InlineCode>Connection</InlineCode>,{" "}
+                  <InlineCode>Transfer-Encoding</InlineCode>, <InlineCode>User-Agent</InlineCode> and{" "}
+                  <InlineCode>Cookie</InlineCode> can&rsquo;t be set. Header values are stored only encrypted and never
+                  shown again. <InlineCode>{`{"hook": null}`}</InlineCode> removes the hook, and{" "}
+                  <InlineCode>GET /agent</InlineCode> shows what&rsquo;s registered, with header names only.
+                </li>
+              </ul>
+            </section>
+
+            <section className="space-y-4">
               <SectionHeader id="api">API</SectionHeader>
               <p>
-                Three JSON calls. Every path is relative to <InlineCode>{RELAY_URL}</InlineCode>. A check returns up
-                to 50 items, oldest first.
+                Three JSON calls. Every path is relative to <InlineCode>{RELAY_URL}</InlineCode>.{" "}
+                <InlineCode>{RELAY_URL_LEGACY}</InlineCode> serves the identical API, so agents paired against it keep
+                working. A check returns up to 50 items, oldest first.
               </p>
               <CodeBlock>{API_EXAMPLE}</CodeBlock>
               <ul className="list-disc space-y-2 pl-5">
                 <li>
                   <Strong>Timestamps.</Strong> <InlineCode>created_at</InlineCode> is when the user started recording,
-                  taken from the watch or phone clock, with the phone&rsquo;s UTC offset (so{" "}
+                  taken from the watch or iPhone clock, with that device&rsquo;s UTC offset (so{" "}
                   <InlineCode>-05:00</InlineCode> means the user is 5 hours behind UTC).{" "}
-                  <InlineCode>received_at</InlineCode> (UTC) is when the relay got it. The two can be hours apart if the
-                  phone was offline. Read relative times like &ldquo;tomorrow&rdquo; from{" "}
+                  <InlineCode>received_at</InlineCode> is when the relay accepted the audio, in UTC. The two can be
+                  hours apart if the watch was offline. Read relative times like &ldquo;tomorrow&rdquo; from{" "}
                   <InlineCode>created_at</InlineCode> in that offset, and if the moment has passed, treat it as overdue
-                  rather than moving it. <InlineCode>duration</InlineCode> is in seconds.
+                  rather than moving it.
                 </li>
                 <li>
-                  <Strong>Acks.</Strong> Up to 500 ids per call. Acking an id that&rsquo;s already gone, or isn&rsquo;t
-                  yours, does nothing; <InlineCode>deleted</InlineCode> counts what was actually removed. Anything never
-                  acked comes back on every check and is deleted after {RETENTION}.
+                  <Strong>Duration.</Strong> <InlineCode>duration</InlineCode> is the length in seconds, measured by
+                  the relay.
                 </li>
                 <li>
-                  <Strong>Pairing retries.</Strong> A code makes one connection. If the exchange times out, send the
-                  same code again: until the agent first checks the inbox, or {PAIR_CODE_TTL} pass, it returns the
-                  same token, so a lost response never costs the user a new code.
+                  <Strong>Acks.</Strong> 1 to 500 integer ids per call. Acking an id that&rsquo;s already gone, or
+                  isn&rsquo;t yours, does nothing; <InlineCode>deleted</InlineCode> counts what was actually removed.
+                  Anything never acked comes back on every check and is deleted {RETENTION} after it was made.
+                </li>
+                <li>
+                  <Strong>Pairing.</Strong> A code makes one connection and gives its token once, so save it right
+                  away. Sending a used code again, even after a lost response, gets <InlineCode>409</InlineCode> and no
+                  token: ask the user for a new code (it expires {PAIR_CODE_TTL} after it was made). Codes ignore
+                  case, spaces, and dashes. <InlineCode>name</InlineCode> is optional, 1 to 40 characters; an invalid
+                  one is dropped.
                 </li>
               </ul>
             </section>
@@ -256,17 +342,24 @@ export default function AgentDocs() {
             <section className="space-y-4">
               <SectionHeader id="connections">Tokens and connections</SectionHeader>
               <ul className="list-disc space-y-2 pl-5">
-                <li>The token doesn&rsquo;t expire. It works until the user taps Disconnect in Ramble.</li>
+                <li>The token doesn&rsquo;t expire. It works until the user disconnects the agent in Ramble.</li>
+                <li>
+                  The token reads and acks only your own copies. It can&rsquo;t pair agents, upload notes, or read
+                  anyone else&rsquo;s.
+                </li>
                 <li>
                   Each code makes its own connection, so several agents can be connected at once. Each gets its own
                   copy of every transcript, and acking deletes only your copy. Pairing a new agent leaves the others
                   alone.
                 </li>
                 <li>
-                  The user sees every connected agent in Settings → Connect agent, with when it last checked and how many
-                  transcripts are waiting for it.
+                  You get notes that reach the relay after you paired. Notes with no speech go to no one. Notes from the watch reach
+                  you without the iPhone nearby.
                 </li>
-                <li>Ramble sends only recordings made while at least one agent is connected.</li>
+                <li>
+                  The user sees every connected agent in Settings → Your agent, with its name (if it sent one), when it
+                  last checked in, how many notes are waiting for it, and whether its wake-up hook is answering.
+                </li>
               </ul>
             </section>
 
@@ -300,8 +393,12 @@ export default function AgentDocs() {
                 </table>
               </div>
               <p>
-                Errors are JSON: <InlineCode>{`{"error": "..."}`}</InlineCode>. Every call is safe to retry. There is no
-                rate limit today, but please keep checks to once a minute or slower.
+                Errors are JSON: <InlineCode>{`{"error": "..."}`}</InlineCode>, with a{" "}
+                <InlineCode>&quot;reason&quot;</InlineCode> code where it helps (like{" "}
+                <InlineCode>code_used</InlineCode>). Every call except{" "}
+                <InlineCode>POST /pair/exchange</InlineCode> is safe to retry; a code works once. Agent calls and
+                pairing have no rate limit; if you ever get a <InlineCode>429</InlineCode>, wait the seconds in{" "}
+                <InlineCode>Retry-After</InlineCode>.
               </p>
               <CodeBlock filename="curl">{CURL_EXAMPLE}</CodeBlock>
               <CodeBlock filename="Python (standard library)">{PYTHON_EXAMPLE}</CodeBlock>
@@ -312,22 +409,21 @@ export default function AgentDocs() {
               <p>Ramble can deliver to an agent two ways. Use either or both.</p>
               <ul className="list-disc space-y-2 pl-5">
                 <li>
-                  <Strong>Relay (this page).</Strong> The agent pulls. If the phone is offline, Ramble keeps retrying
-                  the upload until it gets through (hourly once it&rsquo;s been a while), and the relay then holds each transcript for up to {RETENTION} until the
-                  agent acks it. If the agent is down for a while, nothing is lost. The agent needs to make outbound
-                  HTTPS calls on a schedule.
+                  <Strong>Relay (this page).</Strong> The agent pulls. The relay holds each transcript for up to{" "}
+                  {RETENTION} until the agent acks it, so nothing is lost if the agent is down for a while. The agent
+                  needs to make outbound HTTPS calls on a schedule, or have a wake-up hook.
                 </li>
                 <li>
                   <Strong>
-                    <Link href="/docs/webhooks" className="text-brand-text underline-offset-2 hover:underline">
+                    <Link href="/docs/webhooks" className={linkClass}>
                       Webhook
                     </Link>
                     .
                   </Strong>{" "}
-                  The phone POSTs each transcript to your HTTPS URL as soon as it&rsquo;s transcribed. Nothing is stored
-                  in between and there&rsquo;s no polling. If the URL is down, Ramble retries 3 times (after 5 seconds,
-                  30 seconds, and 2 minutes), then marks it failed, and the user can resend it from the recording. Best
-                  when the agent has an always-on URL that wakes it.
+                  The iPhone POSTs each transcript to your HTTPS URL once it has it. There&rsquo;s no polling. If the
+                  URL is down, Ramble tries 3 times in total (30 seconds, then 2 minutes apart), then marks the note
+                  &ldquo;Didn&rsquo;t send&rdquo; and the user can retry it. Best when the agent has an always-on URL
+                  that wakes it.
                 </li>
               </ul>
             </section>
@@ -335,49 +431,38 @@ export default function AgentDocs() {
             <section className="space-y-4">
               <SectionHeader id="timing">Delivery timing</SectionHeader>
               <p>
-                A note goes watch → iPhone → transcription → relay. With the iPhone nearby, even locked in a pocket,
-                that usually takes seconds to a minute. Apple&rsquo;s limits can make it longer:
+                A note goes from the watch (or iPhone) straight to Ramble&rsquo;s server, is transcribed there, and
+                waits for your agent. The watch sends over the iPhone, Wi-Fi, or cellular, whichever it has. Most notes
+                are ready within seconds of the upload. Some take longer:
               </p>
               <ul className="list-disc space-y-2 pl-5">
                 <li>
-                  <Strong>iPhone out of range or off.</Strong> Notes wait on the watch and send once the two are back
-                  together.
+                  <Strong>No connection.</Strong> Notes wait on the watch and send once it has one.
                 </li>
                 <li>
-                  <Strong>Longer notes.</Strong> Watch-to-iPhone file transfers are{" "}
-                  <a
-                    href="https://developer.apple.com/documentation/watchconnectivity/wcsession/transferfile(_:metadata:)"
-                    className="text-brand-text underline-offset-2 hover:underline"
-                  >
-                    paced by the system
-                  </a>{" "}
-                  for power, so they can take minutes, occasionally more.
+                  <Strong>Away from the iPhone.</Strong> The watch sends while the app is open or soon after a
+                  recording stops. In Low Power Mode, watchOS turns off Wi-Fi and cellular away from the iPhone, so
+                  notes wait until the iPhone is back or the app is opened.
                 </li>
                 <li>
-                  <Strong>iPhone just restarted.</Strong> Nothing moves until it&rsquo;s{" "}
+                  <Strong>In the background.</Strong> watchOS{" "}
                   <a
-                    href="https://developer.apple.com/documentation/watchconnectivity/wcsession/iosdeviceneedsunlockafterrebootforreachability"
-                    className="text-brand-text underline-offset-2 hover:underline"
+                    href="https://developer.apple.com/documentation/foundation/urlsessionconfiguration/background(withidentifier:)"
+                    className={linkClass}
                   >
-                    unlocked once
+                    decides when background uploads run
                   </a>
-                  .
+                  , so a note can wait for the next window or for the app to open.
                 </li>
                 <li>
-                  <Strong>Limited background time.</Strong> iOS gives Ramble{" "}
-                  <a
-                    href="https://developer.apple.com/documentation/backgroundtasks/choosing-background-strategies-for-your-app"
-                    className="text-brand-text underline-offset-2 hover:underline"
-                  >
-                    short, system-scheduled windows
-                  </a>{" "}
-                  to transcribe and upload, so a note can wait for the next one or for the app to open.
+                  <Strong>Transcription services down.</Strong> Ramble keeps retrying for up to 20 hours before it
+                  gives up on a note.
                 </li>
               </ul>
               <p>
                 So notes can arrive late and out of order. Go by <InlineCode>created_at</InlineCode>, not arrival time,
-                and don&rsquo;t read an empty inbox as &ldquo;nothing was recorded&rdquo;. A late note isn&rsquo;t lost: the
-                watch keeps each one until the iPhone confirms it has it.
+                and don&rsquo;t read an empty inbox as &ldquo;nothing was recorded&rdquo;. A late note isn&rsquo;t lost:
+                the watch keeps each one until Ramble&rsquo;s server has it.
               </p>
             </section>
 
@@ -390,14 +475,29 @@ export default function AgentDocs() {
                   arrives. Avoid a scheduled agent run every few minutes.
                 </li>
                 <li>
-                  <Strong>Agents in a sandbox with a network allowlist.</Strong> Add{" "}
-                  <InlineCode>{new URL(RELAY_URL).host}</InlineCode> to the allowed hosts, or every request fails
-                  before it leaves the sandbox.
+                  <Strong>Grok Bot.</Strong> Add a routine with a webhook trigger, and register its URL and key as a{" "}
+                  <a href="#wake-up-hook" className={linkClass}>
+                    wake-up hook
+                  </a>{" "}
+                  with the header <InlineCode>Authorization: Bearer &lt;key&gt;</InlineCode>. The routine&rsquo;s
+                  Webhook section shows both. The key lets anyone start that routine, so give it to Grok through a
+                  secure secret card rather than ordinary chat. Add a daily scheduled check as a backup. Each routine
+                  run uses Grok usage, so avoid a schedule every few minutes.
+                </li>
+                <li>
+                  <Strong>Agents in a sandbox with a network allowlist.</Strong> Add <InlineCode>{RELAY_HOST}</InlineCode>{" "}
+                  to the allowed hosts (and <InlineCode>{LEGACY_HOST}</InlineCode> if you paired against it), or every
+                  request fails before it leaves the sandbox.
                 </li>
               </ul>
+            </section>
+
+            <section className="space-y-4">
+              <SectionHeader id="privacy">What the relay keeps</SectionHeader>
+              <p>{PRIVACY_WORDING}</p>
               <p>
-                What the relay stores and for how long is in the{" "}
-                <Link href="/privacy" className="text-brand-text underline-offset-2 hover:underline">
+                Every detail is in the{" "}
+                <Link href="/privacy" className={linkClass}>
                   privacy policy
                 </Link>
                 .

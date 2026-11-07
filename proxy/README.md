@@ -1,69 +1,141 @@
-# Ramble Transcription Proxy
+# Ramble Relay
 
-This is the production proxy that Ramble uses for cloud transcription. It's a stateless Cloudflare Worker that receives audio, forwards it to a transcription provider, and returns text. It stores nothing — no audio, no transcriptions, no user data.
+This is the server Ramble's iPhone and Apple Watch apps talk to. It's one Cloudflare Worker that takes each note's audio, transcribes it, keeps the transcript for the person's own devices until they have it, and hands a copy to each agent the person connected. The code is in this repo so you can verify exactly what it does.
 
-The code is in this repo so you can verify exactly what it does.
+Ramble's server is a relay, not an archive. Your audio is sent to a transcription provider and deleted as soon as the transcript is ready. Transcripts are deleted when your agent picks them up, or after 30 days. Your full history lives only on your iPhone.
 
-The same Worker also serves the **Ramble Relay**, which holds transcripts until your agent picks them up and then deletes them. The relay has its own routes and its own small database, described in [RELAY.md](RELAY.md). Transcription never touches it.
+The behavior is specified in [`specs/`](../specs/): the HTTP contract is [`relay-api.md`](../specs/relay-api.md), the pipeline [`transcription.md`](../specs/transcription.md), agents and retention [`delivery.md`](../specs/delivery.md), free notes and the unlock [`purchase.md`](../specs/purchase.md). Agent-facing docs are in [RELAY.md](RELAY.md).
 
-## How It Works
+## How it works
 
-1. App sends audio to `POST /transcribe`
-2. Proxy verifies the request (App Attest assertion + active subscription)
-3. Audio is forwarded to the selected transcription provider
-4. Provider returns text, proxy passes it back to the app
+1. The watch or iPhone uploads a note's audio to `PUT /notes/:id` (the note's UUID is the idempotency key).
+2. The relay stores the audio in a private R2 bucket, then accepts the note, counting a free note before the unlock.
+3. It transcribes right away with Groq Whisper v3 Turbo, the only provider. Quick transcripts come back in the upload response; if Groq is overloaded or down, the note waits for a retry.
+4. The audio is deleted. One copy of the transcript goes to each connected agent, and one is kept for the person's devices until the phone acks it (and, for a watch note, the watch has seen it), at most 30 days.
+5. A cron job every minute retries failed attempts (for up to 20 hours), picks up stalled ones, expires old data, and alerts the operator about notes stuck for 30 minutes.
 
-That's it. Transcription keeps no audio or transcripts, no database, and no user accounts.
+## Code map
 
-## Supported Models
+| File | What it does |
+|---|---|
+| `src/index.js` | Routing, the request context, the cron |
+| `src/auth.js` | Credentials (`rmbi_` phone, `rmbw_` watch, `rmba_` agent) and the rate limits (App Attest and inbox creation only) |
+| `src/account.js` | Inbox creation, free notes, the unlock and its binding, revoked purchases, the usage tally and suspension, settings, the watch token |
+| `src/notes.js` | Audio uploads, the transcription pipeline and retries, the device copy and acks |
+| `src/relay.js` | Pairing, agent copies, pull and ack, delivery status, wake-up hooks, old builds' text upload |
+| `src/legacy.js` | Old builds' `POST /transcribe` for early subscribers, until the fixed retirement date `LEGACY_RETIRES_AT` (2027-01-07 00:00 UTC) |
+| `src/ops.js` | Operator alerts: Groq key rejected or missing, a note stuck 30 minutes, permanent failures |
+| `src/transcribe.js`, `src/audio.js` | The Groq call, error classification, formatting; audio length from the container |
+| `src/apple.js`, `src/attest.js`, `src/ratelimit.js`, `src/crypto.js` | Apple-signed records, App Attest, the D1 rate limiter |
+| `migrations/` | D1 schema |
 
-| Model | Provider | Key |
-|-------|----------|-----|
-| Whisper v3 Turbo | Groq | `whisper-large-v3-turbo` (default) |
-| Whisper Large v3 | Groq | `whisper-large-v3` |
-| Nova-3 | Deepgram | `deepgram-nova-3` |
-| GPT-Transcribe | OpenAI | `openai-gpt-transcribe` |
+## Configuration
 
-Retired model keys keep working — `openai-gpt-4o-transcribe` resolves to `openai-gpt-transcribe`, so app versions already on people's phones don't break when a model is replaced.
+Bindings (in `wrangler.toml`):
 
-## Transcription Request
+| Binding | What |
+|---|---|
+| `DB` | D1 database `ramble-relay` (apply `migrations/` with `npx wrangler d1 migrations apply ramble-relay --remote`) |
+| `AUDIO` | R2 bucket `ramble-audio`, private, with a 1-day object lifecycle rule as the backstop for failed deletes |
+| `ATTEST_KV` | KV namespace for App Attest challenges and keys |
 
-`POST /transcribe` takes multipart form data:
+Secrets (`npx wrangler secret put NAME`):
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `audio` | yes | The recording. The app sends 16 kHz mono AAC, split client-side into pieces under 24 MB and 20 minutes so every request stays inside the providers' size and length limits. |
-| `model` | no | One of the keys above. Defaults to `whisper-large-v3-turbo`. |
-| `language` | no | ISO-639-1 hint. Omit to auto-detect. |
-| `vocabulary` | no | Comma- or newline-separated names and jargon. |
-| `remove_filler_words` | no | `"true"` to strip "um", "uh", and friends. |
+| Secret | What |
+|---|---|
+| `GROQ_API_KEY` | The transcription provider |
+| `HOOK_ENCRYPTION_KEY` | Encrypts agents' wake-up hook headers at rest. Without it, setting a hook answers 503 |
+| `ALERT_WEBHOOK_URL` | Where operator alerts are POSTed as plain text (for example an ntfy topic). Unset: nothing is sent |
 
-Each provider takes those hints differently, which is the reason the proxy exists rather than the app calling providers directly:
+Vars (`[vars]`): `RETENTION_SECONDS`, `APPLE_BUNDLE_ID`, `UNLOCK_PRODUCT_ID`, `PREMIUM_PRODUCT_ID`, `RELAY_BASE_URL`, and one set at release: `FIRST_FREE_BUILD` (build number of the first free-notes build). Without it no paid download counts as an early buyer (old subscribers still do). Old builds' paths (`POST /transcribe`, text `POST /inbox`) answer 410 from 2027-01-07 00:00 UTC, a date fixed in `src/legacy.js`, not a var.
 
-| | Groq (Whisper) | Deepgram Nova-3 | OpenAI GPT-Transcribe |
-|---|---|---|---|
-| Vocabulary | `prompt` (framed as a sentence, echo stripped from the result) | one `keyterm` per term | one `keywords[]` per term |
-| Language | `language` | `language`, or `multi` to auto-detect | `languages[]` (sending `language` too is rejected) |
-| Filler words | stripped from the response | `filler_words` parameter | stripped from the response |
-| Paragraphs | from segment timings, breaking on pauses | native `paragraphs=true` | grouped from sentences — the model returns plain text with no timings |
+Production has no developer bypass: never set `ENVIRONMENT` or `DEV_BYPASS_KEY` on the deployed Worker (see Local Development). `DEV_BYPASS_TOKEN`, `ANALYTICS_TOKEN`, `DEEPGRAM_API_KEY` and `OPENAI_API_KEY` are no longer read and can be deleted.
 
-Response is `{"text": "..."}`, or `{"error": "..."}` with a 4xx/5xx status.
+Apple: the relay takes no App Store Server Notifications; leave the App Store Server Notifications URL unset in App Store Connect. Refunds are revoked by hand (Operations, below).
 
-## Endpoints
+## Before the first deploy of this version
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/transcribe` | Multipart audio in, `{"text": "..."}` out |
-| `POST` | `/attest/challenge` | Issue a challenge for App Attest registration |
-| `POST` | `/attest` | Register a device via App Attest |
-| `GET` | `/health` | Health check |
-| | `/inboxes`, `/inbox`, `/inbox/ack`, `/pair/*`, `/connections` | Relay — see [RELAY.md](RELAY.md) |
+Merging to `main` deploys the Worker and applies migrations (`.github/workflows/deploy-proxy.yml`), so do steps 1–4 first. Run the `npx wrangler` commands from `proxy/`.
 
-## Authentication
+1. **CI token.** The `CLOUDFLARE_API_TOKEN` GitHub secret needs, for the account: Workers Scripts Edit, Workers KV Storage Edit, D1 Edit, and now **Workers R2 Storage Edit** (My Profile → API Tokens → edit the token). Without R2 the deploy fails on the `AUDIO` binding.
+2. **R2 bucket.** Create it private (the default) with a 1-day expiry rule as the backstop for failed deletes:
+   ```bash
+   npx wrangler r2 bucket create ramble-audio
+   npx wrangler r2 bucket lifecycle add ramble-audio expire-1-day --expire-days 1
+   ```
+   Don't enable public access or an r2.dev URL. The binding is already in `wrangler.toml`.
+3. **Secrets.** Each command prompts for the value:
+   ```bash
+   npx wrangler secret put GROQ_API_KEY          # console.groq.com → API Keys
+   npx wrangler secret put HOOK_ENCRYPTION_KEY   # paste the output of: openssl rand -base64 32
+   npx wrangler secret put ALERT_WEBHOOK_URL     # https://ntfy.sh/ramble-alerts-<openssl rand -hex 12>?email=<you>: each alert arrives by email (or subscribe in the ntfy app). Any plain-text POST URL works
+   ```
+   Keep `HOOK_ENCRYPTION_KEY` stable: changing it makes stored hook headers unreadable. Only after this version is deployed (the Worker running before it still calls Deepgram and OpenAI), delete the ones no longer read: `npx wrangler secret delete NAME` for `DEEPGRAM_API_KEY`, `OPENAI_API_KEY`, `DEV_BYPASS_TOKEN` and `ANALYTICS_TOKEN`, if they exist (`npx wrangler secret list`).
+4. **Groq spend limit.** On the paid Developer tier, set a monthly spend limit (about $50) in console.groq.com; it is the only global cost cap. The free tier never bills, so it needs none, but its rate limits cap throughput: past them Groq answers 429 and notes wait for a retry (the stuck-note alert fires after 30 minutes).
+5. **App Store Connect.** Create the in-app purchase: type Non-Consumable, product ID `dev.goodloop.ramble.unlock`, price $14.99, Family Sharing **off** (shared purchases don't unlock). Add it to the app version you submit. Take `dev.goodloop.ramble.premium.monthly2` off sale at launch. Leave the App Store Server Notifications URL empty.
+6. **`FIRST_FREE_BUILD`, at release.** Set it in `wrangler.toml` `[vars]` to the build number of the first free-notes build you ship (Xcode Cloud's build number for it), commit, and let it deploy. Downloads from a lower build are early buyers. Old builds' paths retire on their own on 2027-01-07; there is no `LEGACY_UNTIL` to set.
+7. **`api.ramble.watch`.** The agent docs point agents there. Until it is routed, only the `workers.dev` host answers (the apps use it either way). Steps: [RELAY.md](RELAY.md) "Operator: the api.ramble.watch domain".
+8. **Local relay** (any time): `cp .dev.vars.example .dev.vars`, put your Groq key in `GROQ_API_KEY`, keep `ENVIRONMENT=development` and `DEV_BYPASS_KEY` as they are, then `npx wrangler d1 migrations apply ramble-relay --local` and `npm run dev`.
 
-**App Attest** — Apple's device attestation proves requests come from a real copy of Ramble on a real Apple device. The app attests once, then sends an assertion with each request. All `/transcribe` requests must include valid attestation headers.
+## What is stored
 
-**Subscription verification** — Cloud transcription requires an active StoreKit 2 subscription. The proxy verifies Apple's signed JWS transaction directly — no server-side receipt validation, no App Store Server API calls.
+- **Inboxes:** a hash of the secret, the free-note count, the bound purchase, the transcription settings, and the operator's `suspended` flag.
+- **Notes:** ID, source device, status, recorded time as sent, measured length, and the transcript until the person's devices have it. Audio sits in R2 only until transcription ends, and at most 1 day.
+- **Agent copies:** transcript text until the agent acks it or 30 days pass; afterwards a row without text, so the app can show "picked up" or "not picked up".
+- **Purchases:** Apple's original transaction ID, kind, environment, the operator's revoke time, `inbox_cap` (empty means 10) and `suspended` flag.
+- **Usage:** transcribed audio seconds per user (purchase, or inbox without one) per UTC month, for monitoring only.
+- **Operator data:** alert cooldowns, and rate-limit counters for App Attest and inbox creation.
+
+## Operations: heavy users, suspending one, and revoking a refund
+
+Fair use (100 hours of audio a month per purchase, in the Terms) is not enforced. The relay keeps a monthly tally per user, where the user is the purchase an inbox is unlocked by (`unlock:…`, `sub:…`, `app:…`) or the inbox ID (`inb_…`) when it has none, and sends one alert to `ALERT_WEBHOOK_URL` the first time a user passes 100 hours in a UTC month. Nothing is refused. The global backstop is a spend limit in the Groq console.
+
+If one user needs stopping, suspend them by hand. Uploads (`PUT /notes/:id` and old builds' `POST /transcribe`) from a suspended inbox, or from any inbox bound to a suspended purchase, get `403` with `"reason": "suspended"`; the apps show "Couldn't send" and stop retrying. Notes already accepted still transcribe, and everyone else is unaffected. Each command is one line:
+
+```bash
+# Heaviest users this month (UTC)
+npx wrangler d1 execute ramble-relay --remote --command "SELECT user_id, ROUND(seconds / 3600.0, 1) AS hours FROM usage WHERE month = strftime('%Y-%m', 'now') ORDER BY seconds DESC LIMIT 20"
+
+# Inboxes bound to a purchase
+npx wrangler d1 execute ramble-relay --remote --command "SELECT id, suspended, last_upload_at FROM inboxes WHERE purchase_id = 'unlock:2000000123456789'"
+
+# Suspend a purchase (every inbox bound to it)
+npx wrangler d1 execute ramble-relay --remote --command "UPDATE purchases SET suspended = 1 WHERE id = 'unlock:2000000123456789'"
+
+# Suspend an old-build subscriber (POST /transcribe) whose sub:… ID may not be in purchases yet
+npx wrangler d1 execute ramble-relay --remote --command "INSERT INTO purchases (id, kind, environment, created_at, suspended) VALUES ('sub:2000000123456789', 'subscriber', 'Production', 0, 1) ON CONFLICT (id) DO UPDATE SET suspended = 1"
+
+# Suspend one inbox
+npx wrangler d1 execute ramble-relay --remote --command "UPDATE inboxes SET suspended = 1 WHERE id = 'inb_abc123'"
+
+# Unsuspend
+npx wrangler d1 execute ramble-relay --remote --command "UPDATE purchases SET suspended = 0 WHERE id = 'unlock:2000000123456789'"
+npx wrangler d1 execute ramble-relay --remote --command "UPDATE inboxes SET suspended = 0 WHERE id = 'inb_abc123'"
+
+# Everyone suspended
+npx wrangler d1 execute ramble-relay --remote --command "SELECT 'purchase' AS kind, id FROM purchases WHERE suspended = 1 UNION ALL SELECT 'inbox', id FROM inboxes WHERE suspended = 1"
+
+# Revoke a refunded unlock (every inbox bound to it goes back to the free state, and the record is refused from then on)
+npx wrangler d1 execute ramble-relay --remote --command "UPDATE purchases SET revoked_at = CAST(strftime('%s', 'now') AS INTEGER) * 1000 WHERE id = 'unlock:2000000123456789'"
+```
+
+The `UPDATE` reports `changes: 1` when it found the purchase. The old-build subscriber command adds a row only when the `sub:` ID isn't known yet; that row is dated 1970, so it never counts as a new unlock. Notes the apps marked "Couldn't send" while suspended don't upload again by themselves after an unsuspend; new notes do.
+
+Refunds: the relay doesn't listen for Apple's refund notifications. A refunded purchase whose signed record Apple marks with a `revocationDate` is refused when it is sent again, but inboxes it already unlocked stay unlocked until you revoke it with the command above. Use the original transaction ID from App Store Connect or the refund report. Notes accepted before the revoke still transcribe.
+
+Logs carry no request bodies, transcript text, audio, credentials or network addresses; inbox IDs and App Attest key IDs appear only as short hashes, and provider error bodies are cut to 200 characters.
+
+## Operations: a purchase on more than 10 iPhones
+
+One purchase unlocks at most 10 inboxes ever (each fresh start after a reinstall is a new inbox), and time frees no spot. The 11th gets `403` `too_many_inboxes`, and the app asks the person to contact support. To check and raise one purchase's cap (the person then taps "Restore Purchases"):
+
+```bash
+# How many inboxes it is bound to, and its cap (empty means 10)
+npx wrangler d1 execute ramble-relay --remote --command "SELECT p.id, p.inbox_cap, COUNT(i.id) AS inboxes FROM purchases p LEFT JOIN inboxes i ON i.purchase_id = p.id WHERE p.id = 'unlock:2000000123456789' GROUP BY p.id"
+
+# Raise its cap
+npx wrangler d1 execute ramble-relay --remote --command "UPDATE purchases SET inbox_cap = 15 WHERE id = 'unlock:2000000123456789'"
+```
 
 ## App Attest Implementation Notes
 
@@ -100,7 +172,7 @@ During attestation, the credential public key is available in two places: the CO
 
 **4. App Attest works on local Xcode dev builds**
 
-`DCAppAttestService` works on any real Apple device, including apps built directly from Xcode. The only difference is the environment: dev builds use `appattestdevelop` as the AAGUID, while TestFlight/App Store builds use `appattest`. The proxy accepts both. App Attest does NOT work on the iOS Simulator.
+`DCAppAttestService` works on any real Apple device, including apps built directly from Xcode. The only difference is the environment: dev builds use `appattestdevelop` as the AAGUID, while TestFlight/App Store builds use `appattest`. The production relay accepts only `appattest`. App Attest does NOT work on the iOS Simulator.
 
 ## Deploy Your Own
 
@@ -117,48 +189,40 @@ During attestation, the credential public key is available in two places: the CO
    ```
    Paste the returned ID into `wrangler.toml`.
 
-4. Set your API keys as secrets:
-   ```bash
-   npx wrangler secret put GROQ_API_KEY
-   npx wrangler secret put DEEPGRAM_API_KEY    # optional
-   npx wrangler secret put OPENAI_API_KEY      # optional
-   ```
+4. Create the D1 database and the R2 bucket (see Configuration), paste the D1 id into `wrangler.toml`, and apply the migrations.
 
-5. Deploy:
+5. Set the secrets listed under Configuration.
+
+6. Deploy:
    ```bash
    npm install
    npm run deploy
    ```
 
-## Anonymous Usage Analytics
-
-When you use cloud transcription, the proxy records anonymous usage metrics via Cloudflare Analytics Engine. This helps us understand which models are popular and keep the service running well.
-
-**What's collected per transcription request:**
-- Model name and provider (e.g. "whisper-large-v3-turbo" via Groq)
-- Audio file size and transcript length (character count, not the text itself)
-- Processing duration
-- Success or failure status
-- SHA-256 hashed device ID — a one-way hash for counting unique devices, not reversible to your actual device ID
-
-**What's NOT collected:**
-- Audio content
-- Transcription text
-- IP addresses
-- Anything that identifies you as a person
-
-On-device transcription (Apple Speech) never contacts the proxy, so it generates zero analytics data. You can verify all of this in [`proxy/src/analytics.js`](src/analytics.js).
-
-### Local Development
+## Local Development
 
 ```bash
 npm install
-npm run dev
+cp .dev.vars.example .dev.vars          # once; add your GROQ_API_KEY
+npx wrangler d1 migrations apply ramble-relay --local   # once, and after new migrations
+npm run dev                             # http://localhost:8787
 npm test        # Unit tests — no credentials or Worker runtime needed
 ```
 
-`npm test` covers the pure parts: model resolution, keyword sanitizing, language
-resolution, and transcript formatting. CI runs it on every PR touching `proxy/`
-and the deploy is gated on it.
+`npm run dev` runs the exact Worker that production runs, with local D1, R2 and
+KV, so every endpoint (including new ones) works locally with no extra wiring.
+There is no separate local route list.
 
-You'll likely want to set `DEV_BYPASS_TOKEN` as a var in `wrangler.toml` during development to skip subscription verification.
+**Simulators.** App Attest doesn't work in the Simulator, so debug simulator
+builds of the iPhone app default to `http://localhost:8787` and send
+`X-Dev-Bypass` instead of an assertion. The relay accepts that header in one
+place only, `POST /inboxes` (the only call that needs App Attest; every other
+call uses the inbox secret it returns), and only when `ENVIRONMENT=development`
+and `DEV_BYPASS_KEY` match `.dev.vars`. The watch simulator follows the phone's
+relay URL. Release builds contain no bypass code. Purchases and App Attest
+still need a real device.
+
+`npm test` runs every endpoint against the real schema (node:sqlite stands in for
+D1) with fakes for R2, providers, App Attest and Apple, plus the provider, audio,
+Apple and App Attest unit tests. CI runs it on every PR touching `proxy/` and the
+deploy is gated on it.

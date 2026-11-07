@@ -22,7 +22,7 @@ final class WatchAudioRecorderService: NSObject, ObservableObject {
     @Published private(set) var audioLevel: Float = 0
 
     /// Called when something other than the user ended the recording: a phone
-    /// call, Siri, an alarm, or the recorder stopping on its own. The audio
+    /// call, Siri, an alarm, the 60-minute cap, or the recorder stopping on its own. The audio
     /// captured so far is still good and should be saved.
     var onEndedBySystem: (() -> Void)?
 
@@ -39,11 +39,33 @@ final class WatchAudioRecorderService: NSObject, ObservableObject {
     /// Anything smaller than this, not queued and not in use, is cleanup.
     private static let emptyFileThreshold = 8 * 1024
 
-    private static let settings: [String: Any] = [
-        AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
-        AVSampleRateKey: 16000.0,
-        AVNumberOfChannelsKey: 1,
-        AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+    /// The longest a note can be. The recorder stops itself here too, so
+    /// the cap holds even if the app's timer is held back.
+    static let maxDuration: TimeInterval = 60 * 60
+
+    /// Mono AAC at 16 kHz with a pinned bitrate, so a full hour stays under
+    /// 15 MB (24 kbps is about 10.8 MB an hour). The later entries are
+    /// fallbacks in case the encoder refuses a bitrate on some watch; each
+    /// stays at or under 32 kbps.
+    private static let settingsOptions: [[String: Any]] = [
+        [
+            AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
+            AVSampleRateKey: 16000.0,
+            AVNumberOfChannelsKey: 1,
+            AVEncoderBitRateKey: 24000
+        ],
+        [
+            AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
+            AVSampleRateKey: 16000.0,
+            AVNumberOfChannelsKey: 1,
+            AVEncoderBitRateKey: 32000
+        ],
+        [
+            AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
+            AVSampleRateKey: 16000.0,
+            AVNumberOfChannelsKey: 1,
+            AVEncoderAudioQualityKey: AVAudioQuality.low.rawValue
+        ]
     ]
 
     private static var documentsURL: URL {
@@ -88,14 +110,14 @@ final class WatchAudioRecorderService: NSObject, ObservableObject {
 
     private func makePreparedRecorder() -> AVAudioRecorder? {
         let url = Self.documentsURL.appendingPathComponent("\(UUID().uuidString).m4a")
-        guard let recorder = try? AVAudioRecorder(url: url, settings: Self.settings) else { return nil }
-        recorder.isMeteringEnabled = true
-        recorder.delegate = self
-        guard recorder.prepareToRecord() else {
+        for settings in Self.settingsOptions {
+            guard let recorder = try? AVAudioRecorder(url: url, settings: settings) else { continue }
+            recorder.isMeteringEnabled = true
+            recorder.delegate = self
+            if recorder.prepareToRecord() { return recorder }
             recorder.deleteRecording()
-            return nil
         }
-        return recorder
+        return nil
     }
 
     /// Removes header-only files left by prepared recorders that were never
@@ -128,12 +150,12 @@ final class WatchAudioRecorderService: NSObject, ObservableObject {
 
         var recorder = preparedRecorder ?? makePreparedRecorder()
         preparedRecorder = nil
-        if recorder?.record() != true {
+        if recorder?.record(forDuration: Self.maxDuration) != true {
             // The prepared one can go stale (route change, session reset).
             // Build a fresh one once before giving up.
             recorder?.deleteRecording()
             recorder = makePreparedRecorder()
-            guard let fresh = recorder, fresh.record() else {
+            guard let fresh = recorder, fresh.record(forDuration: Self.maxDuration) else {
                 recorder?.deleteRecording()
                 try? session.setActive(false, options: .notifyOthersOnDeactivation)
                 throw WatchAudioRecorderError.couldNotStart

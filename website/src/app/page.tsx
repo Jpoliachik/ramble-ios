@@ -8,7 +8,10 @@ import PopIn from "../components/pop-in";
 import {
   APP_PRICE,
   APP_STORE_URL,
-  CLOUD_PRICE,
+  FAIR_USE,
+  FREE_NOTES,
+  PRICE_STORY,
+  PRIVACY_WORDING,
   RETENTION,
   SITE_URL,
 } from "../lib/site";
@@ -60,8 +63,8 @@ const steps = [
 const privacyPoints = [
   {
     Icon: AudioLines,
-    title: "Audio stays on your phone",
-    body: "Your agent gets the transcript, never the recording.",
+    title: "Audio deleted after transcription",
+    body: "Your audio goes to a transcription provider and is deleted as soon as the text is ready.",
   },
   {
     Icon: Trash2,
@@ -77,15 +80,15 @@ const privacyPoints = [
 
 const included = [
   "Apple Watch and iPhone apps",
-  "On-device transcription",
-  "Reliable delivery to your agent, with automatic retries",
+  "Transcription included",
+  "Delivery to your agent, with automatic retries",
   "Webhooks to your own endpoint",
 ];
 
 const faqs: { q: string; a: ReactNode }[] = [
   {
     q: "Do I need my phone with me?",
-    a: "No. Your watch records on its own, even with no connection. Recordings sync to your iPhone when you're back in range, and go to your agent from there.",
+    a: "No. Your watch records on its own, even with no signal. It sends each thought over Wi-Fi, cellular, or your iPhone, whichever it has. Anything it can't send yet waits safely on the watch.",
   },
   {
     q: "Why not just talk to my agent directly?",
@@ -101,15 +104,17 @@ const faqs: { q: string; a: ReactNode }[] = [
   },
   {
     q: "How fast does it get to my agent?",
-    a: "Transcription takes seconds. After that it depends on your agent: some pick it up right away, others check in on a schedule.",
+    a: "Most thoughts are transcribed within seconds of reaching Ramble. After that it depends on your agent: some pick it up right away, others check in on a schedule.",
   },
   {
-    q: "What does the relay store?",
+    q: "What happens after my free notes?",
+    a: `Your first ${FREE_NOTES} notes are free. After that, new ones wait on your watch or iPhone, marked "Unlock to transcribe". Unlock once for ${APP_PRICE} and they transcribe on their own. Nothing is lost.`,
+  },
+  {
+    q: "What does Ramble's server keep?",
     a: (
       <>
-        Only the text waiting for your agent, with when it was recorded and how long it was, plus what it needs to
-        route it. Text is deleted when your agent picks it up, or after {RETENTION} if it never does. No audio, no
-        accounts, no names, emails, or IP addresses.{" "}
+        {PRIVACY_WORDING} No accounts, names, or emails.{" "}
         <Link href="/privacy" className={inlineLink}>
           Privacy policy
         </Link>
@@ -133,10 +138,14 @@ const faqs: { q: string; a: ReactNode }[] = [
     q: "What if it doesn't work for me?",
     a: (
       <>
-        Purchases go through Apple. You can request a refund at{" "}
+        Try it with your free notes first. Purchases go through Apple, so refunds do too, at{" "}
         <a href="https://reportaproblem.apple.com" target="_blank" rel="noopener noreferrer" className={inlineLink}>
           reportaproblem.apple.com
         </a>
+        . Stuck on something?{" "}
+        <Link href="/support" className={inlineLink}>
+          Support
+        </Link>
         .
       </>
     ),
@@ -247,9 +256,11 @@ export default function Home() {
         <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
           <div className="mx-auto max-w-md rounded-2xl bg-white p-6 shadow-sm ring-1 ring-stone-200/80">
             <p className="font-serif text-4xl font-semibold text-stone-900">
-              {APP_PRICE}
-              <span className="ml-2 font-sans text-sm font-normal text-stone-500">one time</span>
+              Free
+              <span className="ml-2 font-sans text-sm font-normal text-stone-500">to download</span>
             </p>
+            <p className="mt-3 text-base text-stone-700">{PRICE_STORY}</p>
+            <p className="mt-1 text-sm text-stone-500">One-time purchase. No subscription.</p>
             <ul className="mt-6 space-y-2.5">
               {included.map((item) => (
                 <li key={item} className="flex gap-2.5 text-sm text-stone-600">
@@ -259,8 +270,11 @@ export default function Home() {
               ))}
             </ul>
             <p className="mt-6 border-t border-stone-200 pt-4 text-sm leading-relaxed text-stone-500">
-              Optional upgrade: cloud transcription for {CLOUD_PRICE}, for sharper transcripts with accents, jargon,
-              or noise. Everything above works without it, and you can cancel any time.
+              Fair use: {FAIR_USE}, set far above normal use.{" "}
+              <Link href="/terms" className={inlineLink}>
+                Terms
+              </Link>
+              .
             </p>
           </div>
         </div>
@@ -282,6 +296,7 @@ export default function Home() {
             ))}
           </div>
           <p className="mx-auto mt-12 max-w-3xl text-center text-sm leading-relaxed text-stone-500">
+            {PRIVACY_WORDING}{" "}
             <Link href="/privacy" className={inlineLink}>
               Full privacy policy
             </Link>

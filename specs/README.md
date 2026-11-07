@@ -56,11 +56,11 @@ Group related requirements under `##` headings when a spec gets long. Keep the w
 
 | Spec | Covers |
 |---|---|
-| [watch.md](watch.md) | Recording on Apple Watch, the watch home screen and its states, history on the watch, uploading straight to the relay, stuck-note alerts, Siri and App Intents on the watch |
+| [watch.md](watch.md) | Recording on Apple Watch, the watch home screen and its states, history on the watch, uploading straight to the relay, no notifications, Siri and App Intents on the watch |
 | [phone.md](phone.md) | Recording on iPhone, the notes list and note detail, playback, history merged from the watch and the server, onboarding, Settings, Siri and App Intents on the phone |
-| [transcription.md](transcription.md) | What happens to uploaded audio on the server: providers and fallback, formatting options, recording length cap, failures, audio deletion, cost controls, usage monitoring |
+| [transcription.md](transcription.md) | What happens to uploaded audio on the server: the provider (Groq), formatting options, recording length cap, failures, audio deletion, cost controls, usage monitoring |
 | [delivery.md](delivery.md) | Connecting an agent, delivering transcripts to agents and the app, delivery status, wake-up hooks, webhooks, retention and deletion |
 | [relay-api.md](relay-api.md) | The relay's HTTP API: device auth, note upload, inbox reads and acks, pairing, rate limits, status codes |
-| [purchase.md](purchase.md) | Free notes, the one-time unlock, Restore Purchases, fair use, existing buyers |
+| [purchase.md](purchase.md) | Free notes, the one-time unlock, Restore Purchases, fair use (heavy-use monitoring, suspending a user), existing buyers |
 
 Split a spec when it passes about 300 lines, or when unrelated kinds of change keep landing in it, and update this index.

@@ -14,15 +14,21 @@ struct RecordingControlsView: View {
 
     @State private var showCancelConfirmation = false
 
-    private var durationWarning: String? {
-        guard isRecording, duration >= Constants.Recording.longWarningDuration else { return nil }
-        return "Long recording"
+    /// From 55:00 the timer counts down to the 60:00 stop.
+    private var isNearCap: Bool {
+        isRecording && duration >= Constants.Recording.warningDuration
+    }
+
+    private var timerText: String {
+        isNearCap
+            ? DateFormatters.formatDuration(max(0, Constants.Recording.maxDuration - duration))
+            : DateFormatters.formatDuration(duration)
     }
 
     var body: some View {
         VStack(spacing: 8) {
             if isRecording {
-                Text(DateFormatters.formatDuration(duration))
+                Text(timerText)
                     .font(.system(size: 52, weight: .bold, design: .serif))
                     .monospacedDigit()
                     .contentTransition(.numericText())
@@ -79,10 +85,10 @@ struct RecordingControlsView: View {
             }
 
             if isRecording {
-                if let warning = durationWarning {
-                    Text(warning)
+                if isNearCap {
+                    Text("Stops at 60:00")
                         .font(.caption2)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(.secondary)
                         .transition(.opacity)
                 } else if let source = inputSourceName {
                     Text("via \(source)")

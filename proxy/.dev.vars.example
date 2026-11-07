@@ -1,8 +1,17 @@
-GROQ_API_KEY=your-groq-api-key-here
-DEEPGRAM_API_KEY=your-deepgram-api-key-here
-OPENAI_API_KEY=your-openai-api-key-here
+# Local relay (`npm run dev`). Copy to .dev.vars, which git ignores.
+# `wrangler dev` runs the exact same Worker as production, with local D1, R2
+# and KV, so every endpoint works locally without any extra setup.
 
-# Dev bypass token — skips JWS subscription verification when the app sends
-# "Authorization: DevBypass <token>". Must match Secrets.devBypassToken in the iOS app.
-# Only used during local development. Do NOT set this in production.
-DEV_BYPASS_TOKEN=
+# Turns on the local-only developer bypass. Production never sets these, so it
+# never accepts the bypass. Debug simulator builds send this key in
+# X-Dev-Bypass instead of an App Attest assertion when creating an inbox
+# (Constants.Relay.localDevBypassKey in the iOS app).
+ENVIRONMENT=development
+DEV_BYPASS_KEY=ramble-local-dev-bypass-key
+
+# Needed for notes to transcribe locally.
+GROQ_API_KEY=your-groq-api-key-here
+
+# Optional: wake-up hooks and operator alerts.
+HOOK_ENCRYPTION_KEY=
+ALERT_WEBHOOK_URL=

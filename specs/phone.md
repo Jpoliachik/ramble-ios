@@ -1,7 +1,7 @@
 # iPhone app
 
 ## Purpose
-What the person sees and does in Ramble on iPhone: first launch, Home, recording, the notes list and note screen, playback, how history from the watch and Ramble's server comes together, Settings, stuck-note alerts, and Siri. Agents and delivery states are in [delivery.md](delivery.md); free notes, the unlock and fair use in [purchase.md](purchase.md); the watch in [watch.md](watch.md); the wire contract in [relay-api.md](relay-api.md).
+What the person sees and does in Ramble on iPhone: first launch, Home, recording, the notes list and note screen, playback, how history from the watch and Ramble's server comes together, Settings, notifications (none), and Siri. Agents and delivery states are in [delivery.md](delivery.md); free notes, the unlock and fair use in [purchase.md](purchase.md); the watch in [watch.md](watch.md); the wire contract in [relay-api.md](relay-api.md).
 
 ## First launch
 
@@ -17,6 +17,15 @@ Directly under "Get started" the intro SHALL show, in small type: "Ramble sends 
 - THEN nothing has been uploaded and the watch still shows "Set up"
 - AND after they tap "Get started", the watch is connected and its two notes upload
 
+### Requirement: Consent for earlier installs
+When this install finished onboarding in an earlier build but never tapped "Get started" under the consent line, the app SHALL show once, as a sheet that cannot be swiped away, "Transcripts now come from the cloud." with the same consent line and "Privacy" link, and a "Continue" button. Tapping "Continue" is the person's consent, exactly like "Get started"; there is no other step. Until it is tapped, the phone SHALL NOT upload any note or connect the watch, and phone notes read "Waiting to send".
+
+#### Scenario: Updating from an earlier build
+- GIVEN the person finished onboarding in an earlier build and has two phone notes not yet sent
+- WHEN they open the updated Ramble
+- THEN the consent sheet shows, nothing uploads and both notes read "Waiting to send"
+- AND after they tap "Continue", the sheet closes for good, the watch is connected and both notes upload
+
 #### Scenario: Skipping the agent
 - GIVEN the person is on "Where should notes go?"
 - WHEN they tap "Set up later", or save a webhook from the "Any webhook" row
@@ -31,15 +40,15 @@ The watch step SHALL read "Now, put it on your watch." with "Open the Watch app"
 - THEN Continue stays disabled, rechecked every 2 seconds, and enables once the install lands
 
 ### Requirement: Setup can't reach Ramble
-When the phone can't set itself up with Ramble's server (offline, or the server refuses new setups), it SHALL show "Ramble can't finish setting up right now. It will try again on its own.", keep recording notes as "Waiting to send", and retry each time Ramble opens ([relay-api.md](relay-api.md) owns the daily limit).
+When the phone can't set itself up with Ramble's server (offline, or the server refuses the setup for now), it SHALL show "Ramble can't finish setting up right now. It will try again on its own." on Home under the status line, keep recording notes as "Waiting to send", and retry each time Ramble opens ([relay-api.md](relay-api.md) owns the limits).
 
-#### Scenario: Daily setup limit reached
-- GIVEN the server refuses new setups for the day
+#### Scenario: Setup limit reached
+- GIVEN the server refuses this iPhone's setup for the day (relay-api.md "Rate limits")
 - WHEN the person finishes onboarding and records a note
 - THEN the message shows, the note reads "Waiting to send", and setup completes on a later open
 
 ### Requirement: The phone connects the watch
-The phone SHALL give the watch a credential that can only upload that watch's notes, read them back and read the account state, after the person taps "Get started" on first run, after a reinstall, when the paired watch changes, and whenever the watch says it has no working connection (no credential, or the server refused it), including when that message wakes the phone app in the background, with no control for the person ([watch.md](watch.md)). A reinstall that still finds the phone's earlier connection SHALL keep it (agents, free count and unlock stay); otherwise it starts fresh and agents must connect again ([delivery.md](delivery.md)).
+The phone SHALL give the watch a credential that can only upload that watch's notes, read them back and read the account state, after the person taps "Get started" on first run (or "Continue" on the consent sheet for earlier installs), after a reinstall, when the paired watch changes, and whenever the watch says it has no working connection (no credential, or the server refused it), including when that message wakes the phone app in the background, with no control for the person ([watch.md](watch.md)). When the watch says so, the phone SHALL make a new credential only if the one the watch gave up on is the phone's current one, the phone has none, or the paired watch changed; otherwise it SHALL send the watch its current credential again, so a working credential is never replaced. A reinstall that still finds the phone's earlier connection SHALL keep it (agents, free count and unlock stay); otherwise it starts fresh and agents must connect again ([delivery.md](delivery.md)).
 
 #### Scenario: First phone launch
 - GIVEN the watch has recorded notes but the phone app has never run
@@ -49,7 +58,12 @@ The phone SHALL give the watch a credential that can only upload that watch's no
 #### Scenario: Watch lost its connection
 - GIVEN the phone has been set up for weeks and the watch app was reinstalled
 - WHEN the watch app opens and tells the phone it has no connection
-- THEN the phone gives it a new one without being opened, and the watch's waiting notes upload
+- THEN the phone sends it its current credential, still working, without being opened, and the watch's waiting notes upload
+
+#### Scenario: Watch's credential refused
+- GIVEN the server refused the watch's credential, which is the phone's current one
+- WHEN the watch tells the phone it has no working connection
+- THEN the phone makes a new credential and sends it, and the watch's waiting notes upload under it
 
 ## Home
 
@@ -62,7 +76,7 @@ Home SHALL show the "Ramble" wordmark with an amber dot and a Settings button, o
 - THEN it shows a watch illustration, "TRY SAYING", and one example phrase at a time, changing every 3.5 seconds (the first phrase only with Reduce Motion), and "Or record here" above the record button
 
 ### Requirement: Status line shows the single worst state
-The status line SHALL show exactly one state, the first that applies below. Pills are tappable and open their fix; quiet states are plain text. Ages read "5m", "14h", "3d". Notes that couldn't transcribe, are too long, are over fair use, are silent, or are "Saved, no agent connected" never raise a pill.
+The status line SHALL show exactly one state, the first that applies below. Pills are tappable and open their fix; quiet states are plain text. Ages read "5m", "14h", "3d". Notes that couldn't transcribe, are too long, couldn't send, are silent, or are "Saved, no agent connected" never raise a pill.
 
 | Order | State | Words | Kind | Tap |
 |---|---|---|---|---|
@@ -122,24 +136,24 @@ The phone SHALL upload each of its own notes under the note's ID, retrying 10 se
 - THEN the row reads "Waiting to send", then "Transcribing…" once the server accepts it, and it is never counted twice
 
 ### Requirement: Held notes wait for their release
-A note refused for unlock SHALL stop retrying until the unlock; one refused for fair use SHALL retry at the time the server gives and whenever Ramble opens; a rate-limited upload SHALL wait the time the server gives ([purchase.md](purchase.md), [relay-api.md](relay-api.md)).
+A note refused for unlock SHALL stop retrying until the unlock; a rate-limited upload SHALL wait the time the server gives ([purchase.md](purchase.md), [relay-api.md](relay-api.md)).
 
 #### Scenario: Unlock releases held notes
 - GIVEN three phone notes read "Unlock to transcribe"
 - WHEN the person completes the unlock
 - THEN all three upload, oldest first, with no tap on any note
 
-#### Scenario: Fair use resets
-- GIVEN a phone note reads "Usage limit reached" with a reset on Dec 1
-- WHEN Ramble opens on Dec 1
-- THEN the note uploads
-
 ### Requirement: Refused for good
-When the server refuses a note's audio for good, the phone SHALL stop retrying it, keep the audio, and never alert about it: "Too long to transcribe" for a recording over the length limit, "Couldn't send" otherwise ([relay-api.md](relay-api.md)).
+When the server refuses a note's audio for good, the phone SHALL stop retrying it, keep the audio, and never alert about it: "Too long to transcribe" for a recording over the length limit, "Couldn't send" otherwise, including when the operator suspended this person's uploads ([relay-api.md](relay-api.md), [purchase.md](purchase.md)).
 
 #### Scenario: Damaged file
 - GIVEN the server refuses a phone note's audio as unreadable
 - WHEN the upload ends
+- THEN the row reads "Couldn't send", the audio stays playable, and no retry or alert follows
+
+#### Scenario: Suspended
+- GIVEN the operator suspended this person's uploads
+- WHEN a phone note uploads
 - THEN the row reads "Couldn't send", the audio stays playable, and no retry or alert follows
 
 ## Notes list
@@ -158,7 +172,6 @@ The list SHALL group notes by day, newest first, under "Today", "Yesterday", or 
 | Watch note not yet accepted | "Waiting on your watch" | tray |
 | Transcribing | spinner, "Transcribing…" | — |
 | Held for unlock (either device) | "Unlock to transcribe" | lock, amber |
-| Held for fair use | "Usage limit reached" | pause, amber |
 | Refused for good | "Too long to transcribe" or "Couldn't send" | warning, red |
 | Transcription failed | "Couldn't transcribe" | warning, red |
 | Silent | "No speech detected" | quiet |
@@ -206,12 +219,13 @@ Under the player, the note screen SHALL show one line saying where the note is. 
 | State | Title | Detail | Action |
 |---|---|---|---|
 | Not accepted yet | "Waiting to send" | the last error and "Ramble will try again on its own." | — |
+| Watch note not accepted yet | "Waiting on your watch" | — | — |
+| Webhook send in progress | "Sending to your webhook…" | — | — |
 | Transcribing | "Transcribing…" | "It goes out as soon as the transcript is ready." | — |
 | Held for unlock | "Unlock to transcribe" | "This note is saved. It transcribes as soon as you unlock Ramble." | "Unlock" |
-| Held for fair use | "Usage limit reached" | the detail in [purchase.md](purchase.md) ("… This note will transcribe on Dec 1. If this looks wrong, contact support.") | "Contact support" (an email to support@ramble.watch; purchase.md) |
 | Audio unreadable | "Couldn't transcribe" | "Ramble couldn't turn this audio into text." | "Retry" |
 | Transcription gave up | "Couldn't transcribe" | "Ramble couldn't reach a transcription service in time." | "Retry" |
-| Failed after 3 retries | "Couldn't transcribe" | either detail above, then "Ramble tried 3 more times." | — |
+| Failed again after its retry | "Couldn't transcribe" | either detail above, then "Ramble tried once more." | — |
 
 #### Scenario: Unlock from a held note
 - GIVEN a note shows "Unlock to transcribe"
@@ -219,15 +233,15 @@ Under the player, the note screen SHALL show one line saying where the note is. 
 - THEN the unlock screen opens ([purchase.md](purchase.md))
 
 ### Requirement: Retry a failed transcription
-"Retry" and More → "Retry Transcription" SHALL re-upload the note's audio from this iPhone as a retry under the same note ID ([relay-api.md](relay-api.md)), up to 3 times per note; the note then reads "Transcribing…", or is held like any upload ([purchase.md](purchase.md)). When a watch note's audio is still only on the watch, Retry SHALL first fetch it as "Audio on watch" does, or show "Open Ramble on your watch to sync.".
+"Retry" and More → "Retry Transcription" SHALL re-upload the note's audio from this iPhone as a retry under the same note ID ([relay-api.md](relay-api.md)), once per note; the note then reads "Transcribing…". A retry uses no free note and is never held for unlock ([purchase.md](purchase.md)). When a watch note's audio is still only on the watch, Retry SHALL first fetch it as "Audio on watch" does, or show "Open Ramble on your watch to sync.".
 
-#### Scenario: Third retry fails
-- GIVEN a phone note has failed after 2 retries
+#### Scenario: The retry fails too
+- GIVEN a phone note failed and has not been retried
 - WHEN the person taps "Retry" and it fails again
-- THEN the line reads "Couldn't transcribe" with "Ramble tried 3 more times." and no Retry button or menu item
+- THEN the line reads "Couldn't transcribe" with "Ramble tried once more." and no Retry button or menu item
 
 ### Requirement: More menu
-The "More" menu SHALL offer "Delete" (confirmed with "Delete Recording" under "Delete this recording?", "This will permanently delete the recording and its transcript."), "Retry Transcription" while a "Couldn't transcribe" note has retries left, and "Resend Webhook" (the same delivery as webhook "Retry") when a webhook is set up and the note has a webhook result.
+The "More" menu SHALL offer "Delete" (confirmed with "Delete Recording" under "Delete this recording?", "This will permanently delete the recording and its transcript."), "Retry Transcription" while a "Couldn't transcribe" note has not been retried, and "Resend Webhook" (the same delivery as webhook "Retry") when a webhook is set up and the note has a webhook result.
 
 #### Scenario: Resend to the webhook
 - GIVEN a webhook is set up and a note shows "Delivered to webhook"
@@ -252,25 +266,15 @@ When Ramble opens or returns to the foreground, periodically in the background a
 - WHEN Ramble runs in the background
 - THEN the transcript is saved to the note and shows next time the person opens the app
 
-## Stuck-note alerts
+## Notifications
 
-### Requirement: Phone alerts for stuck notes
-The phone SHALL send at most one notification per kind, counting every note in it, no more than once per cooldown, cleared when nothing is left in that kind; each note alerts once. Accepted, held and refused-for-good notes never trigger "Not sent yet", and watch notes are alerted on the watch ([watch.md](watch.md)). Notification permission SHALL be asked once, in the foreground, after onboarding, when the first note exists.
+### Requirement: No notifications
+Ramble on iPhone SHALL post no notifications and SHALL NOT ask for notification permission. Notes waiting to send or waiting for an agent show only in the app. At launch it SHALL remove any notification an earlier version posted or scheduled.
 
-| Kind | Fires when | Cooldown | Title | Body |
-|---|---|---|---|---|
-| Not sent | A phone note not accepted 6 hours after recording ended, or 6 hours after its release from a hold | 6 hours | "Not sent yet" | "1 note hasn't been sent yet. Open Ramble to send it." / "N notes haven't been sent yet. Open Ramble to send them." |
-| Still waiting | Agent copies still waiting 12 hours after the note reached the server (checked only when Ramble runs) | 12 hours | "Still waiting for your agent" | "Your agent hasn't picked up 1 note since 9:12 AM." ("yesterday" or a weekday when older) |
-
-#### Scenario: Alert while Ramble is closed
-- GIVEN a phone note can't upload and the person leaves the app
-- WHEN 6 hours pass, even if Ramble never runs again
-- THEN "Not sent yet" appears
-
-#### Scenario: First note
-- GIVEN onboarding is finished and the list is empty
-- WHEN the first note appears while Ramble is open
-- THEN the system notification prompt shows
+#### Scenario: Note stuck overnight
+- GIVEN a phone note has not uploaded for 12 hours
+- WHEN the person has not opened Ramble
+- THEN no notification appears, and the note shows as waiting to send next time Ramble opens
 
 ## Settings
 

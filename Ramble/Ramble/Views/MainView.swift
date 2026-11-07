@@ -7,6 +7,8 @@ import SwiftUI
 struct MainView: View {
     @StateObject private var viewModel = RecordingViewModel()
     @ObservedObject private var relay = RelayService.shared
+    @ObservedObject private var accountService = AccountService.shared
+    @State private var showUnlock = false
     @Environment(\.scenePhase) private var scenePhase
     @State private var showSettings = false
     @State private var scrollOffset: CGFloat = 0
@@ -33,7 +35,8 @@ struct MainView: View {
             recordings: viewModel.recordings,
             connections: relay.connections,
             hasAgent: relay.hasConnectedAgents,
-            hasWebhook: hasWebhook
+            hasWebhook: hasWebhook,
+            account: accountService.account
         )
     }
 
@@ -92,6 +95,16 @@ struct MainView: View {
                     .opacity(status.isPill ? 1 : 1 - scrollProgress)
                     .opacity(viewModel.isRecording && isListEmpty ? 0 : 1)
                     .allowsHitTesting(status.isPill)
+
+                    if relay.setupProblem {
+                        Text("Ramble can't finish setting up right now. It will try again on its own.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.horizontal, 20)
+                            .opacity(1 - scrollProgress)
+                    }
 
                     Spacer()
                 }
@@ -162,6 +175,9 @@ struct MainView: View {
             .sheet(isPresented: $showConnectAgent) {
                 ConnectAgentView(startPairing: connectStartsPairing)
             }
+            .sheet(isPresented: $showUnlock) {
+                UnlockSheet()
+            }
             .alert(
                 "Couldn't start recording",
                 isPresented: Binding(
@@ -184,17 +200,9 @@ struct MainView: View {
         .onAppear {
             triggerOnboardingToastIfNeeded()
         }
-        .task {
-            // Fills the "waiting for your agent" count; harmless when nothing is connected.
-            _ = try? await relay.refreshConnections()
-            // Now that the connection dates are fresh, pick up any recording
-            // that was skipped while the phone was locked.
-            RelayQueueService.shared.resumePendingJobs()
-        }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             refreshWebhookSetting()
-            Task { _ = try? await relay.refreshConnections() }
         }
         .onChange(of: shouldShowOnboardingToast) { _, newValue in
             // Catches the in-session case: MainView is already mounted when the
@@ -220,10 +228,10 @@ struct MainView: View {
             connectStartsPairing = false
             showConnectAgent = true
         case .didntSend:
-            openNewest { DeliveryStage($0).needsAttention }
-        case .notSent:
-            openNewest { DeliveryStage($0) == .onPhone }
-        case .working, .waiting, .allGood:
+            openNewest { DeliveryStage($0) == .didntSend }
+        case .toUnlock, .freeNotesLow:
+            showUnlock = true
+        case .sending, .transcribing, .waiting, .allGood:
             break
         }
     }

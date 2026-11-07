@@ -30,13 +30,13 @@ private func startRecordingFromIntent() async throws {
             ? WatchRecordingIntentError.microphoneDenied
             : WatchRecordingIntentError.couldNotStart
     }
-    WatchHapticService.recordStart()
+    // The start haptic comes from the manager, as for a tap
 }
 
+/// Same save, haptic and check as the button.
 @MainActor
 private func stopRecordingFromIntent() {
-    WatchHapticService.recordStop()
-    WatchRecordingManager.shared.stopRecordingAndTransfer()
+    WatchRecordingManager.shared.stopRecording()
 }
 
 struct WatchStartRecordingIntent: AppIntent {

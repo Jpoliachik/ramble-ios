@@ -35,13 +35,19 @@ final class RecordingManager: ObservableObject {
 
     private let audioRecorder = AudioRecorderService()
     private let storageService = StorageService.shared
-    private let transcriptionQueue = TranscriptionQueueService.shared
     private let connectivity = PhoneConnectivityService.shared
     private var currentRecording: Recording?
+    private var warnedNearCap = false
     private var cancellables = Set<AnyCancellable>()
 
     private init() {
         observeRecorder()
+        audioRecorder.onInterrupted = { [weak self] in
+            // A call, Siri or an alarm: save everything captured.
+            guard let self, self.isRecording else { return }
+            HapticService.recordStop()
+            self.stopRecording()
+        }
     }
 
     private func observeRecorder() {
@@ -49,6 +55,20 @@ final class RecordingManager: ObservableObject {
         audioRecorder.$currentDuration.assign(to: &$currentDuration)
         audioRecorder.$inputSourceName.assign(to: &$inputSourceName)
         audioRecorder.$audioLevel.assign(to: &$audioLevel)
+
+        // 55:00 warns once; 60:00 stops like a tapped stop.
+        audioRecorder.$currentDuration
+            .sink { [weak self] duration in
+                guard let self, self.currentRecording != nil else { return }
+                if duration >= Constants.Recording.maxDuration {
+                    HapticService.recordStop()
+                    self.stopRecording()
+                } else if duration >= Constants.Recording.warningDuration && !self.warnedNearCap {
+                    self.warnedNearCap = true
+                    HapticService.warning()
+                }
+            }
+            .store(in: &cancellables)
     }
 
     func startRecording() async {
@@ -66,11 +86,9 @@ final class RecordingManager: ObservableObject {
             return
         }
 
-        // Ask before recording so the prompt doesn't land mid-recording
-        await LegacySpeechTranscriptionService.requestAuthorizationIfNeeded()
-
-        let recording = Recording()
+        let recording = Recording(source: .phone)
         currentRecording = recording
+        warnedNearCap = false
 
         do {
             try audioRecorder.startRecording(to: recording.audioFileURL)
@@ -87,17 +105,17 @@ final class RecordingManager: ObservableObject {
     }
 
     func stopRecording() {
+        guard var recording = currentRecording else { return }
+        currentRecording = nil
         let duration = audioRecorder.stopRecording()
         connectivity.sendRecordingStopped()
 
-        guard var recording = currentRecording else { return }
-        recording.duration = duration
-
+        recording.duration = min(duration, Constants.Recording.maxDuration)
+        recording.activityLog.append(ActivityEntry("Recorded on iPhone", at: recording.createdAt))
         storageService.addRecording(recording)
-
-        transcriptionQueue.enqueue(recordingId: recording.id)
-
-        currentRecording = nil
+        UploadQueueService.shared.enqueue(recordingId: recording.id)
+        // Usually stopped with the phone about to go in a pocket.
+        BackgroundTaskService.shared.beginImmediateBackgroundProcessing()
     }
 
     func cancelRecording() {

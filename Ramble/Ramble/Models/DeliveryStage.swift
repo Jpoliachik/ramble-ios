@@ -2,107 +2,156 @@
 //  DeliveryStage.swift
 //  Ramble
 //
-//  Where one note is on its way to the agent or webhook, in the words the
-//  app uses everywhere: the list row icon, the pill on the note screen and
-//  the Home status line. Computed from fields Recording already has.
+//  Where one note is, in the words the app uses everywhere: the list row
+//  caption and icon, the pill on the note screen and the Home status line
+//  (specs/phone.md "Row states", specs/delivery.md "Delivery states").
 //
 
 import SwiftUI
 
 enum DeliveryStage: Equatable {
-    /// Waiting to transcribe, transcribing, or retrying a transcription.
+    /// Phone note not accepted by the server yet.
+    case waitingToSend
+    /// Watch note the server hasn't accepted yet.
+    case waitingOnWatch
     case transcribing
-    /// Transcription gave up. `needsModel` when the on-device model is missing.
-    case couldntTranscribe(needsModel: Bool)
-    /// Transcribed, but there was nowhere to send it.
-    case onPhone
-    case sending
-    /// The relay has it; the agent hasn't picked it up yet.
-    case waitingForAgent
-    case agentHasIt
-    /// Webhook only: the webhook accepted it.
-    case deliveredToWebhook
+    case heldForUnlock
+    case tooLong
+    case couldntSend
+    case couldntTranscribe
+    case noSpeech
+    /// No eligible agent and no webhook.
+    case noAgent
+    case webhookSending
     case didntSend
+    case waitingForAgent
+    /// Every agent copy was removed unread.
+    case notPickedUp
+    case agentHasIt
+    case deliveredToWebhook
 
+    @MainActor
     init(_ recording: Recording) {
+        self.init(recording, hasAgents: RelayService.shared.hasConnectedAgents)
+    }
+
+    /// `hasAgents` stands in for the relay's answer until the phone has
+    /// asked it about this note.
+    init(_ recording: Recording, hasAgents: Bool) {
+        if let hold = recording.hold {
+            switch hold {
+            case .unlock: self = .heldForUnlock
+            case .tooLong: self = .tooLong
+            case .couldntSend: self = .couldntSend
+            }
+            return
+        }
         switch recording.status {
-        case .recorded, .transcribing:
+        case .recorded:
+            self = recording.source == .watch ? .waitingOnWatch : .waitingToSend
+        case .transcribing:
             self = .transcribing
         case .failed:
-            self = .couldntTranscribe(needsModel: recording.isModelNotInstalled)
+            self = recording.retryRequested ? .waitingToSend : .couldntTranscribe
         case .completed:
-            switch recording.deliveryStatus {
-            case .pending, .sending: self = .sending
-            case .failed: self = .didntSend
-            case .none: self = .onPhone
-            case .delivered:
-                if recording.isWaitingForAgent {
-                    self = .waitingForAgent
-                } else if recording.relayStatus == .delivered {
-                    self = .agentHasIt
-                } else {
-                    self = .deliveredToWebhook
-                }
+            if !recording.hasSpeechTranscript {
+                self = .noSpeech
+                return
+            }
+            let delivery = recording.agentDelivery
+            let waiting = delivery.map { $0.waiting > 0 } ?? hasAgents
+            if recording.webhookStatus == .failed {
+                self = .didntSend
+            } else if waiting {
+                self = .waitingForAgent
+            } else if recording.webhookStatus == .pending || recording.webhookStatus == .sending {
+                self = .webhookSending
+            } else if let delivery, delivery.pickedUp > 0 {
+                self = .agentHasIt
+            } else if let delivery, delivery.copies > 0 {
+                self = .notPickedUp
+            } else if recording.webhookStatus == .delivered {
+                self = .deliveredToWebhook
+            } else {
+                self = .noAgent
             }
         }
     }
 
-    /// Short words for pills and row captions.
+    /// Full words, for the note screen's pill.
     var label: String {
         switch self {
+        case .waitingToSend: return "Waiting to send"
+        case .waitingOnWatch: return "Waiting on your watch"
         case .transcribing: return "Transcribing…"
-        case .couldntTranscribe(let needsModel): return needsModel ? "Needs speech model" : "Couldn't transcribe"
-        case .onPhone: return RelayService.shared.hasConnectedAgents ? "On iPhone · not sent" : "On iPhone · no agent"
-        case .sending: return "Sending…"
+        case .heldForUnlock: return "Unlock to transcribe"
+        case .tooLong: return "Too long to transcribe"
+        case .couldntSend: return "Couldn't send"
+        case .couldntTranscribe: return "Couldn't transcribe"
+        case .noSpeech: return "No speech detected"
+        case .noAgent: return "Saved, no agent connected"
+        case .webhookSending: return "Sending to your webhook…"
+        case .didntSend: return "Didn't send"
         case .waitingForAgent: return "Waiting for your agent"
+        case .notPickedUp: return "Not picked up"
         case .agentHasIt: return "Your agent has it"
         case .deliveredToWebhook: return "Delivered to webhook"
-        case .didntSend: return "Didn't send"
         }
     }
 
-    var isInProgress: Bool {
-        self == .transcribing || self == .sending
-    }
-
-    /// Something the person has to look at.
-    var needsAttention: Bool {
+    /// The list row's caption, or nil when the icon says enough.
+    var caption: String? {
         switch self {
-        case .couldntTranscribe, .didntSend: return true
-        default: return false
+        case .webhookSending, .waitingForAgent, .agentHasIt, .deliveredToWebhook: return nil
+        default: return label
         }
+    }
+
+    /// A spinner instead of an icon.
+    var isInProgress: Bool {
+        self == .transcribing || self == .webhookSending
+    }
+
+    /// Not accepted by the server yet, and nothing stops it being sent.
+    var isNotYetAccepted: Bool {
+        self == .waitingToSend || self == .waitingOnWatch
     }
 
     var isDone: Bool {
         self == .agentHasIt || self == .deliveredToWebhook
     }
 
-    /// The dot and icon color: green done, amber waiting, red stuck.
+    /// The dot and icon color.
     var tint: Color {
         switch self {
-        case .transcribing, .sending: return .secondary
-        case .onPhone: return .secondary
-        case .waitingForAgent: return .brandAmber
+        case .waitingToSend, .waitingOnWatch, .transcribing, .webhookSending: return .secondary
+        case .heldForUnlock, .waitingForAgent: return .brandAmber
+        case .tooLong, .couldntSend, .couldntTranscribe, .didntSend: return .red
+        case .noSpeech, .noAgent, .notPickedUp: return Color(.tertiaryLabel)
         case .agentHasIt, .deliveredToWebhook: return .green
-        case .couldntTranscribe(let needsModel): return needsModel ? .brandAmber : .red
-        case .didntSend: return .red
         }
     }
 
     /// Row icon. Nil while in progress, where the row shows a spinner.
     var systemImage: String? {
         switch self {
-        case .transcribing, .sending: return nil
-        case .onPhone, .waitingForAgent: return "tray"
+        case .transcribing, .webhookSending: return nil
+        case .waitingToSend, .waitingOnWatch, .noAgent, .waitingForAgent, .notPickedUp: return "tray"
+        case .heldForUnlock: return "lock.fill"
+        case .tooLong, .couldntSend, .couldntTranscribe, .didntSend: return "exclamationmark.triangle.fill"
+        case .noSpeech: return "waveform.slash"
         case .agentHasIt, .deliveredToWebhook: return "checkmark.circle.fill"
-        case .couldntTranscribe(let needsModel): return needsModel ? "arrow.down.circle.fill" : "exclamationmark.triangle.fill"
-        case .didntSend: return "exclamationmark.triangle.fill"
         }
     }
 
-    /// Row icon color. Done notes stay quiet so the list isn't a wall of green.
+    /// Row icon color. Done and quiet notes stay grey so the list isn't a
+    /// wall of color.
     var iconTint: Color {
-        isDone ? Color(.tertiaryLabel) : tint
+        switch self {
+        case .waitingToSend, .waitingOnWatch: return .secondary
+        case .agentHasIt, .deliveredToWebhook: return Color(.tertiaryLabel)
+        default: return tint
+        }
     }
 }
 
@@ -111,6 +160,7 @@ struct StatusPill: View {
     let text: String
     let dot: Color
     var action: String? = nil
+    var actionColor: Color = .brandAmber
 
     var body: some View {
         HStack(spacing: 7) {
@@ -122,7 +172,7 @@ struct StatusPill: View {
             if let action {
                 Text(action)
                     .fontWeight(.semibold)
-                    .foregroundStyle(Color.brandAmber)
+                    .foregroundStyle(actionColor)
             }
         }
         .font(.system(size: 14, weight: .medium))
