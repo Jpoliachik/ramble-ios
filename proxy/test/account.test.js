@@ -174,12 +174,12 @@ describe('purchases', () => {
     assert.equal((await entitle(sixth, { signed_transaction: unlockTx(first.account_token) })).status, 200);
   });
 
-  it('a sandbox purchase is a 7-day test unlock', async () => {
+  it('a sandbox purchase (TestFlight, App Review) unlocks for good', async () => {
     const { inbox_secret: secret, account_token: token } = await h.newInbox();
     await entitle(secret, { signed_transaction: unlockTx(token, { environment: 'Sandbox' }) });
     assert.equal((await account(secret)).unlocked, true);
-    h.now = T0 + 7 * DAY + 1;
-    assert.equal((await account(secret)).unlocked, false);
+    h.now = T0 + 60 * DAY;
+    assert.equal((await account(secret)).unlocked, true);
   });
 
   it('early buyers: a production download below FIRST_FREE_BUILD unlocks; sandbox and later builds do not', async () => {

@@ -123,7 +123,7 @@ Not collected: contact info, location, identifiers for tracking, browsing histor
 ## App Review notes
 
 ```
-Ramble gives every new install 25 free notes, then offers a one-time "Unlock Ramble" purchase. Sandbox purchases unlock for 7 days as a test. To test without an agent, record a note on the iPhone or watch: it transcribes and shows "Saved, no agent connected". Restore Purchases is in Settings.
+Ramble gives every new install 25 free notes, then offers a one-time "Unlock Ramble" purchase. To test without an agent, record a note on the iPhone or watch: it transcribes and shows "Saved, no agent connected". Restore Purchases is in Settings.
 ```
 
 TODO: confirm in ASC whether the reviewer needs a demo agent for "Connect your agent".

@@ -222,13 +222,13 @@ When Apple reports a refund or revocation through its server notifications (endp
 - WHEN Apple notifies the server of a refund
 - THEN the inbox has 22 free notes left
 
-### Requirement: Sandbox purchases unlock only as tests
-App Review tests the production build with sandbox purchases, so the production server SHALL verify a sandbox unlock purchase against Apple's sandbox and unlock the inbox for 7 days, marked as a test. A test unlock never counts as a real purchase, is never shown as "Unlocked" in usage or revenue counts, and lapses back to the free state after 7 days. Records from Xcode testing SHALL be rejected, and the server SHALL accept no developer bypass key. Early-buyer proof (below) SHALL count only when Apple marks the record as Production. A separate test server SHALL also accept sandbox records, for TestFlight.
+### Requirement: Sandbox purchases unlock like real ones
+TestFlight testers and App Review buy with sandbox purchases against the production server. The server SHALL verify a sandbox unlock purchase against Apple's root CA like any other and unlock the inbox for good, with the same binding, 5-inbox cap and fair use. A sandbox unlock SHALL NOT count in revenue or purchase counts. Records from Xcode testing SHALL be rejected, and the production server SHALL accept no developer bypass key. Early-buyer proof (below) SHALL count only when Apple marks the record as Production.
 
-#### Scenario: App Reviewer buys the unlock
-- GIVEN the production build on a sandbox Apple ID with 0 free notes left
-- WHEN the reviewer buys the unlock
-- THEN the inbox unlocks, held notes upload and transcribe, and the unlock lapses after 7 days
+#### Scenario: TestFlight tester buys the unlock
+- GIVEN a TestFlight build with 0 free notes left
+- WHEN the tester buys the unlock (free in sandbox)
+- THEN the inbox unlocks for good, and held notes upload and transcribe
 
 #### Scenario: Sandbox reviewer is not an early buyer
 - GIVEN a sandbox app purchase record (originalAppVersion is always "1.0" in sandbox)

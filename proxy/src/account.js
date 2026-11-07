@@ -24,7 +24,6 @@ export const FREE_NOTES = 25;
 export const INBOX_DAILY_CAP = 2000;
 export const MAX_INBOXES_PER_PURCHASE = 5;
 export const BINDING_ACTIVE_MS = 90 * DAY;
-export const TEST_UNLOCK_MS = 7 * DAY;
 export const MAX_VOCABULARY = 900;
 const DEFAULT_UNLOCK_PRODUCT = 'dev.goodloop.ramble.unlock';
 const DEFAULT_PREMIUM_PRODUCT = 'dev.goodloop.ramble.premium.monthly2';
@@ -56,7 +55,6 @@ export async function loadAccount(ctx, inboxId) {
     ...row,
     unlocked,
     activePurchase: unlocked ? row.purchase_id : null,
-    testUnlock: unlocked && row.test_until != null,
     fairUseSeconds,
     freeRemaining: Math.max(0, FREE_NOTES - row.free_notes_used),
   };
@@ -277,7 +275,9 @@ export async function bindPurchase(ctx, inboxId, proof) {
     }
   }
 
-  const testUntil = proof.environment === 'Sandbox' ? ctx.now + TEST_UNLOCK_MS : null;
+  // Sandbox (TestFlight, App Review) unlocks like a real purchase; it is kept
+  // out of revenue counts by its environment. test_until stays unused.
+  const testUntil = null;
   const since = ctx.now - BINDING_ACTIVE_MS;
   const [, bound] = await ctx.db.batch([
     ctx.db
