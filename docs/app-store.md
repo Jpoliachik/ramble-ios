@@ -95,7 +95,7 @@ Requires an Apple Watch paired with an iPhone.
 
 Short, one thought each, in this order. Mindfulness first: each headline is a brand promise, with a smaller second line where the frame needs one. The first screenshot shows the watch, not the phone.
 
-1. Stay in the moment. (Talk to your watch. Your agent handles it.)
+1. Stay in the moment. (Talk to your watch. Your agent handles it later.)
 2. Leave your phone behind. (Works with no phone and no signal.)
 3. Get it out of your head. (Messy is fine. Say it and move on.)
 4. Connect your agent with one message. (No accounts.)
