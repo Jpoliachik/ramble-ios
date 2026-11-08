@@ -96,7 +96,7 @@ Requires an Apple Watch paired with an iPhone.
 Short, one thought each, in this order. Mindfulness first: a short headline and a smaller second line. The first screenshot shows the watch, not the phone.
 
 1. Stay in the moment. (Talk to your watch. Your agent handles it later.)
-2. Leave your phone behind. (Works without your iPhone. No signal? It sends when you reconnect.)
+2. Leave your phone behind. (No iPhone needed. Sends when you reconnect.)
 3. Get it out of your head. (Messy is fine.)
 4. Connect your agent with one message. (No login. No OAuth. No accounts.)
 5. Private by design. (Audio deleted once transcribed. Your history stays on your iPhone.)
