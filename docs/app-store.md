@@ -97,7 +97,7 @@ Short, one thought each, in this order. Mindfulness first: each headline is a br
 
 1. Stay in the moment. (Talk to your watch. Your agent handles it later.)
 2. Leave your phone behind. (Works with no phone and no signal.)
-3. Get it out of your head. (Messy is fine. Say it and move on.)
+3. Get it out of your head. (Messy is fine.)
 4. Connect your agent with one message. (No accounts.)
 5. Nothing sticks around. (Deleted once your agent has it.)
 
