@@ -88,7 +88,7 @@ The status line SHALL show exactly one state, the first that applies below. Pill
 | 6 | A note has waited over 12 hours, agent checking in | "N notes waiting for your agent" | Pill | Your agent |
 | 7 | Notes not yet accepted by the server | spinner, "Sending 1 note…" / "Sending N notes…" | Quiet | — |
 | 8 | Notes transcribing | spinner, "Transcribing 1 note…" / "Transcribing N notes…" | Quiet | — |
-| 9 | Notes waiting for the agent | "N waiting for your agent" (amber) | Quiet | — |
+| 9 | Notes waiting for the agent | "N waiting for your agent" (grey) | Quiet | — |
 | 10 | Pickup not yet reported for a note | spinner, "Checking delivery…" | Quiet | — |
 | 11 | Everything delivered | "All delivered · checked in 5m ago" ("just now" under a minute; "All delivered" if never); empty list: "Your agent is connected" or "Sending to your webhook" | Quiet | — |
 
@@ -169,8 +169,8 @@ The list SHALL group notes by day, newest first, under "Today", "Yesterday", or 
 
 | State | Caption | Icon |
 |---|---|---|
-| Phone note not yet accepted | "Waiting to send" | tray |
-| Watch note not yet accepted | "Waiting on your watch" | tray |
+| Phone note not yet accepted | "Waiting to send" | clock |
+| Watch note not yet accepted | "Waiting on your watch" | clock |
 | Transcribing | spinner, "Transcribing…" | — |
 | Held for unlock (either device) | "Unlock to transcribe" | lock, amber |
 | Refused for good | "Too long to transcribe" or "Couldn't send" | warning, red |
@@ -179,9 +179,9 @@ The list SHALL group notes by day, newest first, under "Today", "Yesterday", or 
 | No agent and no webhook when recorded | "Saved, no agent connected" | tray, grey |
 | Webhook sending | — | spinner |
 | Webhook gave up | "Didn't send" | warning, red |
-| Agent copies waiting | — | tray, amber |
+| Agent copies waiting | — | tray, grey; amber once the note has waited over 12 hours |
 | Pickup not yet reported ("Checking delivery…") | — | tray, grey |
-| Every agent copy removed unread | "Not picked up" | tray, grey |
+| Every agent copy removed unread | "Not picked up" | tray, amber |
 | Picked up, or delivered to webhook | — | check, green |
 
 ### Requirement: Deleting a note

@@ -55,7 +55,7 @@ struct RecordingRowView: View {
                     .controlSize(.mini)
             } else if let symbol = stage.systemImage {
                 Image(systemName: symbol)
-                    .foregroundStyle(stage.iconTint)
+                    .foregroundStyle(stage.tint(for: recording))
                     .font(.subheadline)
                     .accessibilityLabel(stage.label)
             }

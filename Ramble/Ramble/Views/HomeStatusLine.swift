@@ -105,7 +105,7 @@ struct HomeStatusLine: View {
                         Circle().fill(dot).frame(width: 8, height: 8)
                     }
                     Text(text)
-                        .foregroundStyle(isWaiting ? Color.brandAmber : Color.secondary)
+                        .foregroundStyle(Color.secondary)
                 }
                 .font(.system(size: 14, weight: .medium))
                 .lineLimit(1)
@@ -114,11 +114,6 @@ struct HomeStatusLine: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var isWaiting: Bool {
-        if case .waiting = status { return true }
-        return false
     }
 
     private var text: String {
@@ -171,7 +166,8 @@ struct HomeStatusLine: View {
     private var dot: Color {
         switch status {
         case .didntSend: return .red
-        case .toUnlock, .noAgent, .freeNotesLow, .agentQuiet, .waitingLong, .waiting: return .brandAmber
+        case .toUnlock, .noAgent, .freeNotesLow, .agentQuiet, .waitingLong: return .brandAmber
+        case .waiting: return .secondary
         case .sending, .transcribing, .checking, .allGood: return .green
         }
     }

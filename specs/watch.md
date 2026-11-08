@@ -141,8 +141,8 @@ Recent SHALL group notes, newest first, into "Needs you · N", "Waiting · N" an
 |---|---|---|---|
 | Waiting to upload | Waiting | gray clock | none |
 | Uploading or being transcribed | Waiting | small spinner | none |
-| Transcribed | Done | green check | first line of the transcript, cut with an ellipsis |
-| Silent | Done | gray check | "No speech detected" |
+| Transcribed | Done | gray check | first line of the transcript, cut with an ellipsis |
+| Silent | Done | gray crossed-out waveform | "No speech detected" |
 | Held: free notes used up | Needs you | red mark | "Unlock to transcribe" |
 | Not yet accepted 6 hours after recording | Needs you | red mark | "Waiting 6 hours", "Waiting 7 hours", … |
 | Transcription failed (a retry from the iPhone updates it) | Needs you | red mark | "Couldn't transcribe" |

@@ -116,7 +116,7 @@ struct RecordingDetailView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                StatusPill(text: stage.label, dot: stage.tint)
+                StatusPill(text: stage.label, dot: stage.tint(for: recording))
             }
         }
     }

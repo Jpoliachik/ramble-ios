@@ -102,9 +102,9 @@ struct WatchRecordingRow: View {
         case .uploading, .transcribing:
             ProgressView().controlSize(.mini)
         case .done:
-            Image(systemName: "checkmark").foregroundStyle(.green)
-        case .silent:
             Image(systemName: "checkmark").foregroundStyle(.secondary)
+        case .silent:
+            Image(systemName: "waveform.slash").foregroundStyle(.secondary)
         case .heldUnlock, .stuck, .failed, .lost, .tooLong, .couldntSend:
             Image(systemName: "exclamationmark.circle").foregroundStyle(.red)
         }

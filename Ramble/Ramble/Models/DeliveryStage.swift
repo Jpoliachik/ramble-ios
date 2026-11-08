@@ -127,35 +127,37 @@ enum DeliveryStage: Equatable {
         self == .agentHasIt || self == .deliveredToWebhook
     }
 
-    /// The dot and icon color.
+    /// The dot and icon color. Green is done, amber needs the person, red
+    /// failed; everything on its way stays grey.
     var tint: Color {
         switch self {
-        case .waitingToSend, .waitingOnWatch, .transcribing, .webhookSending, .checkingDelivery: return .secondary
-        case .heldForUnlock, .waitingForAgent: return .brandAmber
+        case .waitingToSend, .waitingOnWatch, .transcribing, .webhookSending, .checkingDelivery, .waitingForAgent: return .secondary
+        case .heldForUnlock, .notPickedUp: return .brandAmber
         case .tooLong, .couldntSend, .couldntTranscribe, .didntSend: return .red
-        case .noSpeech, .noAgent, .notPickedUp: return Color(.tertiaryLabel)
+        case .noSpeech, .noAgent: return Color(.tertiaryLabel)
         case .agentHasIt, .deliveredToWebhook: return .green
         }
+    }
+
+    /// This note's dot color: a note waiting on its agent turns amber once
+    /// it has waited over 12 hours, the same rule as Home's pill.
+    func tint(for recording: Recording, now: Date = Date()) -> Color {
+        if self == .waitingForAgent && now.timeIntervalSince(recording.waitingSince) > HomeStatus.longWait {
+            return .brandAmber
+        }
+        return tint
     }
 
     /// Row icon. Nil while in progress, where the row shows a spinner.
     var systemImage: String? {
         switch self {
         case .transcribing, .webhookSending: return nil
-        case .waitingToSend, .waitingOnWatch, .noAgent, .waitingForAgent, .checkingDelivery, .notPickedUp: return "tray"
+        case .waitingToSend, .waitingOnWatch: return "clock"
+        case .noAgent, .waitingForAgent, .checkingDelivery, .notPickedUp: return "tray"
         case .heldForUnlock: return "lock.fill"
         case .tooLong, .couldntSend, .couldntTranscribe, .didntSend: return "exclamationmark.triangle.fill"
         case .noSpeech: return "waveform.slash"
         case .agentHasIt, .deliveredToWebhook: return "checkmark.circle.fill"
-        }
-    }
-
-    /// Row icon color. A delivered note's check is green so success is
-    /// unmistakable; quiet notes stay grey.
-    var iconTint: Color {
-        switch self {
-        case .waitingToSend, .waitingOnWatch, .checkingDelivery: return .secondary
-        default: return tint
         }
     }
 }

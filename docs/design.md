@@ -43,7 +43,7 @@ The watch uses `brand-amber` (dark value, `#F59E0B`) on black and system colors 
 
 **Website** (`website/src/app/globals.css`): `--color-brand: #d97706` for fills, `--color-brand-text: #b45309` for text and links, a warm `stone` neutral scale, and `cream` (`#f4f3ef`) / `cream-warm` (`#f9f5ed`) backgrounds.
 
-**Rules:** one amber accent per view. Don't use amber for warnings or destructive actions. Status colors other than amber and red should come from the system (secondary label, etc.) rather than new hues. System green means one thing: done, nothing left to do (a delivered or transcribed note's check, a connected agent).
+**Rules:** one amber accent per view. Don't use amber for warnings or destructive actions. Status colors other than amber and red should come from the system (secondary label, etc.) rather than new hues. System green means one thing: done, nothing left to do (a note your agent has, a connected agent). The watch can't see agent pickup, so its checks stay gray. A note that is simply on its way stays gray too; it turns amber only once it needs the person.
 
 ## Typography
 
