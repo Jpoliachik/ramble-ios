@@ -14,11 +14,11 @@ Pricing words follow `specs/purchase.md` ("What Ramble says about price"): the p
 | App Store URL | https://apps.apple.com/app/id6761857751 |
 | Bundle ID (iOS) | `dev.goodloop.Ramble` |
 | Bundle ID (watch) | `dev.goodloop.Ramble.watchkitapp` |
-| SKU | TODO: confirm in ASC |
-| Primary category | TODO: confirm in ASC (suggest Productivity) |
-| Secondary category | TODO: confirm in ASC (suggest Utilities) |
-| Age rating | TODO: confirm in ASC |
-| Copyright | TODO: confirm in ASC |
+| SKU | dev.goodloop.ramble |
+| Primary category | Productivity |
+| Secondary category | Utilities |
+| Age rating | 4+ |
+| Copyright | 2026 Good Loop Software |
 | Price | Free |
 | In-app purchase | "Unlock Ramble", non-consumable, $14.99, product ID `dev.goodloop.ramble.unlock`. Family Sharing off |
 | Subscription | `dev.goodloop.ramble.premium.monthly2` is removed from sale on release day (kept only as early-buyer proof on the server) |
