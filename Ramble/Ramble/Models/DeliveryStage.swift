@@ -150,12 +150,11 @@ enum DeliveryStage: Equatable {
         }
     }
 
-    /// Row icon color. Done and quiet notes stay grey so the list isn't a
-    /// wall of color.
+    /// Row icon color. A delivered note's check is green so success is
+    /// unmistakable; quiet notes stay grey.
     var iconTint: Color {
         switch self {
         case .waitingToSend, .waitingOnWatch, .checkingDelivery: return .secondary
-        case .agentHasIt, .deliveredToWebhook: return Color(.tertiaryLabel)
         default: return tint
         }
     }

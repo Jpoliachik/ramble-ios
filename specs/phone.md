@@ -182,7 +182,7 @@ The list SHALL group notes by day, newest first, under "Today", "Yesterday", or 
 | Agent copies waiting | — | tray, amber |
 | Pickup not yet reported ("Checking delivery…") | — | tray, grey |
 | Every agent copy removed unread | "Not picked up" | tray, grey |
-| Picked up, or delivered to webhook | — | quiet check |
+| Picked up, or delivered to webhook | — | check, green |
 
 ### Requirement: Deleting a note
 The iPhone is the only full history: it SHALL keep every note's transcript and audio until the person deletes it or deletes the app. Swiping a row SHALL offer "Delete", which removes the note from this iPhone without asking; the note SHALL never come back from a later transcript or watch delivery, and agent copies are unaffected ([delivery.md](delivery.md)).

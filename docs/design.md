@@ -43,7 +43,7 @@ The watch uses `brand-amber` (dark value, `#F59E0B`) on black and system colors 
 
 **Website** (`website/src/app/globals.css`): `--color-brand: #d97706` for fills, `--color-brand-text: #b45309` for text and links, a warm `stone` neutral scale, and `cream` (`#f4f3ef`) / `cream-warm` (`#f9f5ed`) backgrounds.
 
-**Rules:** one amber accent per view. Don't use amber for warnings or destructive actions. Status colors other than amber and red should come from the system (secondary label, etc.) rather than new hues.
+**Rules:** one amber accent per view. Don't use amber for warnings or destructive actions. Status colors other than amber and red should come from the system (secondary label, etc.) rather than new hues. System green means one thing: done, nothing left to do (a delivered or transcribed note's check, a connected agent).
 
 ## Typography
 
@@ -108,4 +108,4 @@ Haptics confirm the record loop so the person never has to look.
 
 ## Iconography
 
-SF Symbols only, matched to the text weight next to them. Prefer one glyph to a sentence. The waveform (`waveform`) and the bars mark mean "Ramble" or "recording". Status dots are small and colorless unless they need the person (then amber, or red for failure). Badges are dots, not counts.
+SF Symbols only, matched to the text weight next to them. Prefer one glyph to a sentence. The waveform (`waveform`) and the bars mark mean "Ramble" or "recording". Status dots are small and colorless unless they need the person (then amber, or red for failure) or the note is done (green). Badges are dots, not counts.
