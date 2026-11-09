@@ -179,7 +179,7 @@ export default function Home() {
             </h1>
             <p className="hero-enter-subtitle mt-6 max-w-xl text-base leading-relaxed text-stone-500 sm:text-lg lg:text-xl">
               <span className="block">Stay in the moment, capture the thought.</span>
-              <span className="block">Ramble gets it to your agent.</span>
+              <span className="block">Ramble gets it to your AI agent.</span>
             </p>
             <div className="hero-enter-buttons mt-10 flex flex-col items-center gap-3 lg:items-start">
               <div className="flex flex-col items-center gap-4 sm:flex-row">
