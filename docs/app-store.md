@@ -104,7 +104,7 @@ The iPhone screenshots (1290 × 2796) and the product page header (5244 × 2950 
 4. Connect your agent with one message. (No login. No OAuth. No accounts.)
 5. Private by design. (Audio deleted once transcribed. Your history stays on your iPhone.)
 
-## What's New
+## What's New (1.2.0)
 
 ```
 Ramble is now free to download. Your first 25 notes are free, then unlock once for $14.99. Every note is transcribed in the cloud, and your watch sends notes straight to Ramble, even without your iPhone nearby. If you bought Ramble before, there's nothing to unlock.
