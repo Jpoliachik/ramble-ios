@@ -43,6 +43,27 @@ The watch uses `brand-amber` (dark value, `#F59E0B`) on black and system colors 
 
 **Website** (`website/src/app/globals.css`): `--color-brand: #d97706` for fills, `--color-brand-text: #b45309` for text and links, a warm `stone` neutral scale, and `cream` (`#f4f3ef`) / `cream-warm` (`#f9f5ed`) backgrounds.
 
+### Sunset (marketing only)
+
+The App Store screenshots, the website and social images share a sunset palette: a dark sky over a warm horizon. It's mood, not UI. It never appears inside the watch or iPhone app, where amber stays the only saturated color.
+
+| Token | Value | Usage |
+|---|---|---|
+| ember | `#F0963F` | Left of the horizon, first step number |
+| coral | `#E2645C` | Middle of the horizon |
+| rose | `#B84A78` | Right of the horizon |
+| plum | `#7A408A` | Far right, fading into the sky |
+| sky | `#61402C` → `#5C2A36` → `#33203F` → `#241B36` | Deep background, left to right, darker at the top |
+| cream type | `#FBF1E3` | Text on the deep sky |
+
+- **Deep sunset** (sky + horizon glows) for a band that carries the brand: screenshots, the website's closing call to action. Type on it is cream; buttons are cream with ink text.
+- **Light wash** (the horizon colors at low opacity over cream) behind the website hero, so the page stays light and readable.
+- **Small touches** use the horizon colors as a short gradient: step numbers (ember, rose, wine, in order), the setup chat bubble, a thin rule along the top of a card.
+- **Waveform:** one faint band of rounded level bars along the bottom of a sunset area, cream on dark (about 15% opacity) or rust on light (about 13%). Busiest in the middle, quieter at the edges. One band only, never a doubled echo.
+- **The line:** in the screenshots, an amber line carries a note from device to device. It leaves the watch as level bars, goes dotted while there's no signal, and breaks into bars again where it arrives.
+
+Keep it subtle: one sunset band per page section at most, and never behind body text or docs.
+
 **Rules:** one amber accent per view. Don't use amber for warnings or destructive actions. Status colors other than amber and red should come from the system (secondary label, etc.) rather than new hues. System green means one thing: done, nothing left to do (a note your agent has, a connected agent). The watch can't see agent pickup, so its checks stay gray. A note that is simply on its way stays gray too; it turns amber only once it needs the person.
 
 ## Typography
