@@ -41,6 +41,7 @@ struct RecordingListView: View {
                 }
             }
             .listStyle(.insetGrouped)
+            .readableListWidth()
             .refreshable {
                 await BackgroundTaskService.shared.refresh()
             }

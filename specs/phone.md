@@ -1,7 +1,7 @@
 # iPhone app
 
 ## Purpose
-What the person sees and does in Ramble on iPhone: first launch, Home, recording, the notes list and note screen, playback, how history from the watch and Ramble's server comes together, Settings, notifications (none), and Siri. Agents and delivery states are in [delivery.md](delivery.md); free notes, the unlock and fair use in [purchase.md](purchase.md); the watch in [watch.md](watch.md); the wire contract in [relay-api.md](relay-api.md).
+What the person sees and does in Ramble on iPhone: first launch, Home, recording, the notes list and note screen, playback, how history from the watch and Ramble's server comes together, Settings, notifications (none), and Siri. Agents and delivery states are in [delivery.md](delivery.md); free notes, the unlock and fair use in [purchase.md](purchase.md); the watch in [watch.md](watch.md); the wire contract in [relay-api.md](relay-api.md). How the same app differs on iPad is in [ipad.md](ipad.md).
 
 ## First launch
 

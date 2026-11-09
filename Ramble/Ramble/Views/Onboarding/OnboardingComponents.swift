@@ -25,7 +25,8 @@ enum OnboardingStep: Int, CaseIterable {
         }
     }
 
-    static let bodyStepCount = 3
+    /// No watch step on iPad.
+    static var bodyStepCount: Int { ThisDevice.isPad ? 2 : 3 }
 }
 
 // MARK: - Pairing message

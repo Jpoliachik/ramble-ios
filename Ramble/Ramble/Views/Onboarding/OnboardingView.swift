@@ -54,17 +54,17 @@ struct OnboardingView: View {
                             },
                             onWebhookSaved: {
                                 skippedConnect = true
-                                advance(to: .watch)
+                                afterDestination()
                             },
                             onLater: {
                                 skippedConnect = true
-                                advance(to: .watch)
+                                afterDestination()
                             }
                         )
                     case .connect:
                         OnboardingConnectStep(
-                            onContinue: { advance(to: .watch) },
-                            onLater: { advance(to: .watch) }
+                            onContinue: afterDestination,
+                            onLater: afterDestination
                         )
                     case .watch:
                         OnboardingWatchStep(onFinish: finish)
@@ -112,6 +112,15 @@ struct OnboardingView: View {
     /// the phone set up with the server, connect the watch and upload.
     private func giveConsent() {
         Consent.give()
+    }
+
+    /// The watch step, except on iPad, where no watch can pair.
+    private func afterDestination() {
+        if ThisDevice.isPad {
+            finish()
+        } else {
+            advance(to: .watch)
+        }
     }
 
     private func finish() {

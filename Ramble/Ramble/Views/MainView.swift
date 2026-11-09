@@ -108,11 +108,13 @@ struct MainView: View {
 
                     Spacer()
                 }
+                // header lines up with the list's rows on iPad (ReadableWidth)
+                .frame(maxWidth: ReadableWidth.max + 40)
                 .animation(.easeInOut(duration: 0.2), value: status)
 
                 // Floating bottom controls
                 VStack(spacing: 10) {
-                    if isListEmpty && !viewModel.isRecording {
+                    if isListEmpty && !viewModel.isRecording && !ThisDevice.isPad {
                         Text("Or record here")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(.secondary)

@@ -95,7 +95,7 @@ final class AudioRecorderService: NSObject, ObservableObject {
         guard let port = port else { return nil }
         switch port.portType {
         case .builtInMic:
-            return "iPhone"
+            return ThisDevice.name
         case .bluetoothHFP:
             // Use device name (e.g., "AirPods Pro")
             return port.portName

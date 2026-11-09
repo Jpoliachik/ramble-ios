@@ -111,7 +111,7 @@ final class RecordingManager: ObservableObject {
         connectivity.sendRecordingStopped()
 
         recording.duration = min(duration, Constants.Recording.maxDuration)
-        recording.activityLog.append(ActivityEntry("Recorded on iPhone", at: recording.createdAt))
+        recording.activityLog.append(ActivityEntry("Recorded on \(ThisDevice.name)", at: recording.createdAt))
         storageService.addRecording(recording)
         UploadQueueService.shared.enqueue(recordingId: recording.id)
         // Usually stopped with the phone about to go in a pocket.

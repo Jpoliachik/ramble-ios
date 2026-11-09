@@ -178,7 +178,7 @@ enum AppAttestError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .deviceLocked:
-            return "Waiting for this iPhone to be unlocked"
+            return "Waiting for this \(ThisDevice.name) to be unlocked"
         case .serverNotConfigured:
             return "Transcription server not configured"
         case .challengeFailed:

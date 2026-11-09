@@ -33,7 +33,9 @@ struct SettingsView: View {
             Form {
                 destinationsSection
                 unlockSection
-                watchSection
+                if !ThisDevice.isPad {
+                    watchSection
+                }
                 transcriptionSection
                 appSection
                 aboutSection
@@ -527,7 +529,7 @@ struct PrivacyInfoSheet: View {
                     InfoBlock(
                         icon: "waveform",
                         title: "Transcription",
-                        text: "Recordings from your watch and iPhone go to Ramble's server, which sends the audio to a transcription provider and deletes it as soon as the transcript is ready. The privacy policy names the providers."
+                        text: "Recordings from your \(ThisDevice.isPad ? "iPad" : "watch and iPhone") go to Ramble's server, which sends the audio to a transcription provider and deletes it as soon as the transcript is ready. The privacy policy names the providers."
                     )
 
                     InfoBlock(
@@ -539,7 +541,7 @@ struct PrivacyInfoSheet: View {
                     InfoBlock(
                         icon: "paperplane",
                         title: "Webhooks go where you point them",
-                        text: "If you set up a webhook, transcripts go from your iPhone straight to your URL. Ramble's server never sees the URL or the secret."
+                        text: "If you set up a webhook, transcripts go from your \(ThisDevice.name) straight to your URL. Ramble's server never sees the URL or the secret."
                     )
 
                     InfoBlock(

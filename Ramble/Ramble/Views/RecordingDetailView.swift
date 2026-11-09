@@ -52,6 +52,7 @@ struct RecordingDetailView: View {
                         activitySection(recording)
                     }
                 }
+                .readableListWidth()
             }
         }
         .navigationTitle("Recording")

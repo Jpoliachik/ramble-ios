@@ -65,7 +65,7 @@ enum PurchaseCopy {
     static let subscriberSettingsRow = "Your old subscription is still active"
 
     /// The developer's note on the unlock sheet. Justin's own words; edit freely.
-    static let unlockTagline = "Unlimited notes from your watch and iPhone."
+    static var unlockTagline: String { ThisDevice.isPad ? "Unlimited notes from your iPad." : "Unlimited notes from your watch and iPhone." }
     static let unlockTaglineSecond = "Pay once, keep it forever."
     /// Followed by the signature name in italics: "Hi, I'm *Justin*!"
     static let developerNoteGreeting = "Hi, I'm "

@@ -86,9 +86,9 @@ enum RelayError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .attestationUnavailable: return "Couldn't verify this device with Apple. Try again in a moment."
-        case .deviceLocked: return "Waiting for this iPhone to be unlocked."
+        case .deviceLocked: return "Waiting for this \(ThisDevice.name) to be unlocked."
         case .notConsented: return "Ramble isn't set up yet."
-        case .unauthorized: return "Ramble's server didn't recognize this phone. Try again."
+        case .unauthorized: return "Ramble's server didn't recognize this \(ThisDevice.name). Try again."
         case .server(let status, let message, _): return message ?? "Ramble's server returned an error (\(status))."
         case .network(let detail): return detail
         }

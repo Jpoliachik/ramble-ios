@@ -198,7 +198,7 @@ struct ConnectAgentView: View {
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(Color.obInk)
                 }
-                Text("Notes stay on your iPhone until you connect one. It sets itself up from one message.")
+                Text("Notes stay on your \(ThisDevice.name) until you connect one. It sets itself up from one message.")
                     .font(.system(size: 15))
                     .foregroundStyle(Color.obInkSoft)
                     .fixedSize(horizontal: false, vertical: true)

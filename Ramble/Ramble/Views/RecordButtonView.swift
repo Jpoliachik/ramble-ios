@@ -78,7 +78,7 @@ struct CompactMicButton: View {
                 .shadow(color: .black.opacity(0.15), radius: 6, x: 0, y: 3)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Record on iPhone")
+        .accessibilityLabel("Record on \(ThisDevice.name)")
     }
 }
 
