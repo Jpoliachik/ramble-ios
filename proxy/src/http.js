@@ -69,6 +69,10 @@ export async function logId(value) {
   return (await sha256Hex(`ramble-log:${value}`)).slice(0, 12);
 }
 
+export function randomHex(bytes) {
+  return Array.from(crypto.getRandomValues(new Uint8Array(bytes)), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 export function randomToken(bytes) {
   const raw = String.fromCharCode(...crypto.getRandomValues(new Uint8Array(bytes)));
   return btoa(raw).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');

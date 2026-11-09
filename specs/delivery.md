@@ -297,13 +297,15 @@ Deleting waiting notes SHALL NOT delete the copy for the person's own devices, n
 ### Requirement: One privacy wording everywhere
 The agent screen's "TEMPORARY BY DESIGN" note, the website privacy page, the llms files and the relay docs SHALL use: "Ramble's server is a relay, not an archive. Your audio is sent to a transcription provider and deleted as soon as the transcript is ready. Transcripts are deleted when your agent picks them up, or after 30 days. Your full history lives only on your iPhone." No copy SHALL say that audio never leaves the device.
 
+Where the website and llms files describe what the server keeps (the privacy policy's short version, the landing page FAQ, the relay docs and the llms files), the privacy wording SHALL be followed by: "Ramble also keeps basic usage stats for each note, like its length and whether it came from your watch or iPhone, under a random ID. Never your audio or your words." No copy SHALL say that Ramble collects no data or no analytics.
+
 #### Scenario: Reading the agent screen
 - GIVEN an agent is connected
 - WHEN the person opens "Your agent"
 - THEN the privacy note uses that wording
 
 ### Requirement: Backups and the App Store label are disclosed
-The privacy policy SHALL name the one transcription provider Ramble sends audio to (Groq, [transcription.md](transcription.md)), say that transcripts go to the agents and webhook the person connects, and state that deleted transcripts can remain in the database's point-in-time backup for up to 30 days and are used only to recover from an outage. It is what the onboarding consent line links to ([phone.md](phone.md)). The App Store privacy label SHALL list Audio Data alongside the transcript data.
+The privacy policy SHALL name the one transcription provider Ramble sends audio to (Groq, [transcription.md](transcription.md)), say that transcripts go to the agents and webhook the person connects, and state that deleted transcripts can remain in the database's point-in-time backup for up to 30 days and are used only to recover from an outage. It is what the onboarding consent line links to ([phone.md](phone.md)). The App Store privacy label SHALL list Audio Data alongside the transcript data, and Product Interaction (not linked, no tracking, Analytics) for usage stats; each app's privacy manifest SHALL declare the same and no tracking. The privacy policy SHALL list the usage stats' fields, say they are kept indefinitely, used only to fix problems and see how Ramble is used, and never sold, shared or used for advertising ([relay-api.md](relay-api.md) "Usage stats").
 
 #### Scenario: Reading the privacy policy
 - GIVEN a person opens https://ramble.watch/privacy

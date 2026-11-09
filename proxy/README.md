@@ -24,6 +24,7 @@ The behavior is specified in [`specs/`](../specs/): the HTTP contract is [`relay
 | `src/notes.js` | Audio uploads, the transcription pipeline and retries, the device copy and acks |
 | `src/relay.js` | Pairing, agent copies, pull and ack, delivery status, wake-up hooks, old builds' text upload |
 | `src/legacy.js` | Old builds' `POST /transcribe` for early subscribers, until the fixed retirement date `LEGACY_RETIRES_AT` (2027-01-07 00:00 UTC) |
+| `src/usage.js` | Usage stats: one content-free row per finished note, the app label each device last sent (`specs/usage.md`) |
 | `src/ops.js` | Operator alerts: Groq key rejected or missing, a note stuck 30 minutes, permanent failures |
 | `src/transcribe.js`, `src/audio.js` | The Groq call, error classification, formatting; audio length from the container |
 | `src/apple.js`, `src/attest.js`, `src/ratelimit.js`, `src/crypto.js` | Apple-signed records, App Attest, the D1 rate limiter |
@@ -84,7 +85,51 @@ Merging to `main` deploys the Worker and applies migrations (`.github/workflows/
 - **Agent copies:** transcript text until the agent acks it or 30 days pass; afterwards a row without text, so the app can show "picked up" or "not picked up".
 - **Purchases:** Apple's original transaction ID, kind, environment, the operator's revoke time, `inbox_cap` (empty means 10) and `suspended` flag.
 - **Usage:** transcribed audio seconds per user (purchase, or inbox without one) per UTC month, for monitoring only.
+- **Usage stats (`note_events`):** one row per finished note under the inbox's random `usage_id`: device, times, length, result, tries, free or not, language, whether filler removal and vocabulary were on, app label. No inbox ID, note ID or text. Kept indefinitely. Inboxes also keep `phone_app` and `watch_app`, the last `X-Ramble-Client` each device sent.
 - **Operator data:** alert cooldowns, and rate-limit counters for App Attest and inbox creation.
+
+## Usage stats: where to look
+
+Read them in the Cloudflare dashboard (**D1 → ramble-relay → Console**), or from an agent with Cloudflare D1 access (Claude threads use the Cloudflare connector; Muse uses its own Cloudflare connection). Query `note_events` and `inboxes` only, and never select `notes.transcript` or `entries.text`: those are people's words. Times are Unix milliseconds, days are UTC.
+
+```sql
+-- Signups (new installs) per day
+SELECT date(created_at / 1000, 'unixepoch') AS day, COUNT(*) AS signups
+FROM inboxes GROUP BY day ORDER BY day DESC LIMIT 30;
+
+-- Daily active users (recorded at least one note that day)
+SELECT date(recorded_at / 1000, 'unixepoch') AS day, COUNT(DISTINCT user_id) AS users, COUNT(*) AS notes
+FROM note_events GROUP BY day ORDER BY day DESC LIMIT 30;
+
+-- Weekly active users
+SELECT strftime('%Y-W%W', recorded_at / 1000, 'unixepoch') AS week, COUNT(DISTINCT user_id) AS users, COUNT(*) AS notes
+FROM note_events GROUP BY week ORDER BY week DESC LIMIT 12;
+
+-- Notes per user, including installs that never recorded
+SELECT COUNT(*) AS users, ROUND(AVG(n), 1) AS avg_notes, MAX(n) AS most
+FROM (SELECT i.usage_id, COUNT(e.note_key) AS n FROM inboxes i
+      LEFT JOIN note_events e ON e.user_id = i.usage_id GROUP BY i.usage_id);
+
+-- How many users reach 10 notes, and how many days after install
+WITH ranked AS (
+  SELECT user_id, recorded_at, ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY recorded_at) AS n
+  FROM note_events)
+SELECT COUNT(*) AS users_at_10, ROUND(AVG((r.recorded_at - i.created_at) / 86400000.0), 1) AS avg_days
+FROM ranked r JOIN inboxes i ON i.usage_id = r.user_id WHERE r.n = 10;
+
+-- Note length, watch vs phone
+SELECT source, COUNT(*) AS notes, ROUND(AVG(duration) / 60, 1) AS avg_min,
+       SUM(duration > 1800) AS over_30_min
+FROM note_events GROUP BY source;
+
+-- Reliability: results, first-try share, wait from upload to final
+SELECT result, COUNT(*) AS notes, SUM(attempts = 1) AS first_try,
+       ROUND(AVG(finished_at - accepted_at) / 1000.0, 1) AS avg_wait_s
+FROM note_events GROUP BY result;
+
+-- Which app builds are in use
+SELECT phone_app, watch_app, COUNT(*) AS inboxes FROM inboxes GROUP BY 1, 2 ORDER BY inboxes DESC;
+```
 
 ## Operations: heavy users, suspending one, and revoking a refund
 

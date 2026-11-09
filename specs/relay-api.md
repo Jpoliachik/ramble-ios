@@ -139,7 +139,7 @@ The relay SHALL NOT receive App Store Server Notifications. A purchase the opera
 ## Notes
 
 ### Requirement: Note upload request
-`PUT /notes/:id` SHALL take the note's UUID in the path (any case, returned uppercase), the raw recording as the body with `Content-Type` `audio/mp4`, `audio/m4a`, `audio/x-m4a` or `audio/aac`, a `Content-Length`, and `X-Ramble-Recorded-At: <ISO 8601 with offset>`. Note IDs SHALL be scoped to the inbox, and `source` SHALL be `"watch"` or `"phone"` by the uploading credential. Any client-sent duration is ignored.
+`PUT /notes/:id` SHALL take the note's UUID in the path (any case, returned uppercase), the raw recording as the body with `Content-Type` `audio/mp4`, `audio/m4a`, `audio/x-m4a` or `audio/aac`, a `Content-Length`, and `X-Ramble-Recorded-At: <ISO 8601 with offset>`. Note IDs SHALL be scoped to the inbox, and `source` SHALL be `"watch"` or `"phone"` by the uploading credential. Any client-sent duration is ignored. `X-Ramble-Client` is described in [usage.md](usage.md).
 
 #### Scenario: Same UUID in two inboxes
 - GIVEN inbox A holds note `6F1C…`

@@ -61,6 +61,7 @@ Group related requirements under `##` headings when a spec gets long. Keep the w
 | [transcription.md](transcription.md) | What happens to uploaded audio on the server: the provider (Groq), formatting options, recording length cap, failures, audio deletion, cost controls, usage monitoring |
 | [delivery.md](delivery.md) | Connecting an agent, delivering transcripts to agents and the app, delivery status, wake-up hooks, webhooks, retention and deletion |
 | [relay-api.md](relay-api.md) | The relay's HTTP API: device auth, note upload, inbox reads and acks, pairing, rate limits, status codes |
+| [usage.md](usage.md) | Usage stats kept for the operator: one content-free row per note, the app version each device last sent |
 | [purchase.md](purchase.md) | Free notes, the one-time unlock, Restore Purchases, fair use (heavy-use monitoring, suspending a user), existing buyers |
 
 Split a spec when it passes about 300 lines, or when unrelated kinds of change keep landing in it, and update this index.

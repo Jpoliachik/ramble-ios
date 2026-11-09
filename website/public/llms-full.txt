@@ -4,7 +4,7 @@ Talk to your Apple Watch. Your agent handles it.
 
 Tap the watch and talk. The watch (or iPhone) sends the recording straight to Ramble's server, which transcribes it and holds the text until your agent picks it up and deals with it. No accounts.
 
-Ramble's server is a relay, not an archive. Your audio is sent to a transcription provider and deleted as soon as the transcript is ready. Transcripts are deleted when your agent picks them up, or after 30 days. Your full history lives only on your iPhone.
+Ramble's server is a relay, not an archive. Your audio is sent to a transcription provider and deleted as soon as the transcript is ready. Transcripts are deleted when your agent picks them up, or after 30 days. Your full history lives only on your iPhone. Ramble also keeps basic usage stats for each note, like its length and whether it came from your watch or iPhone, under a random ID. Never your audio or your words.
 
 # Part 1: Connect your agent
 
@@ -418,6 +418,6 @@ Support: support@ramble.watch, https://ramble.watch/support
 - Transcription: Groq Whisper v3 Turbo, the only provider. If Groq is overloaded or down, the note waits and is retried for up to 20 hours. Groq's API terms exclude training on the audio.
 - Requires iOS 26.2+ and watchOS 10.0+ (Series 4 and later, any SE, any Ultra).
 - Free to download. 25 notes free, then $14.99 once. No subscription.
-- No accounts. Ramble's server is a relay, not an archive. Your audio is sent to a transcription provider and deleted as soon as the transcript is ready. Transcripts are deleted when your agent picks them up, or after 30 days. Your full history lives only on your iPhone.
+- No accounts. Ramble's server is a relay, not an archive. Your audio is sent to a transcription provider and deleted as soon as the transcript is ready. Transcripts are deleted when your agent picks them up, or after 30 days. Your full history lives only on your iPhone. Ramble also keeps basic usage stats for each note, like its length and whether it came from your watch or iPhone, under a random ID. Never your audio or your words.
 - Website: https://ramble.watch
 - Docs: https://ramble.watch/docs (agent) and https://ramble.watch/docs/webhooks (webhooks)

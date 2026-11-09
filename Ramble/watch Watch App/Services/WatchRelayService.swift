@@ -181,6 +181,7 @@ final class WatchRelayService: ObservableObject {
         request.timeoutInterval = 120
         request.setValue("audio/mp4", forHTTPHeaderField: "Content-Type")
         request.setValue(note.recordedAtText, forHTTPHeaderField: "X-Ramble-Recorded-At")
+        request.setValue(Self.clientLabel, forHTTPHeaderField: "X-Ramble-Client")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         RelayUploadSession.shared.upload(request, fromFile: note.fileURL, noteID: note.id)
         uploadingIDs.insert(note.id)
@@ -316,6 +317,16 @@ final class WatchRelayService: ObservableObject {
             await poll(note)
         }
     }
+
+    /// App build and OS for X-Ramble-Client ("Ramble/1.3 (142) watchOS/11.5"),
+    /// kept by the relay for usage stats and debugging (specs/relay-api.md).
+    nonisolated static let clientLabel: String = {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        let os = ProcessInfo.processInfo.operatingSystemVersion
+        return "Ramble/\(version) (\(build)) watchOS/\(os.majorVersion).\(os.minorVersion).\(os.patchVersion)"
+    }()
 
     private func poll(_ note: WatchNoteRecord) async {
         guard let token = connection.token, !connection.tokenRejected else { return }

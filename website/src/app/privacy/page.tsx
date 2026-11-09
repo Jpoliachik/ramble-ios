@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { PAIR_CODE_TTL, PRIVACY_WORDING, PROVIDERS, RETENTION, SUPPORT_EMAIL } from "@/lib/site";
+import { PAIR_CODE_TTL, PRIVACY_WORDING, PROVIDERS, RETENTION, SUPPORT_EMAIL, USAGE_WORDING } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
   description:
-    "Ramble privacy policy. No accounts. Ramble's server is a relay, not an archive: audio is deleted once transcribed, and transcripts once your agent picks them up, or after 30 days.",
+    "Ramble privacy policy. No accounts. Ramble's server is a relay, not an archive: audio is deleted once transcribed, and transcripts once your agent picks them up, or after 30 days. Usage stats never include your audio or words.",
 };
 
 const link = "underline hover:text-stone-900";
@@ -15,7 +15,7 @@ const strong = "font-medium text-stone-900";
 const stored: [string, string, string][] = [
   [
     "Inbox",
-    "Random id, hash of the app's inbox secret, your transcription settings (language, vocabulary, filler words), the free-note count and whether it is unlocked",
+    "Random id, hash of the app's inbox secret, your transcription settings (language, vocabulary, filler words), the free-note count, whether it is unlocked, a separate random usage id, and the app version and iOS or watchOS version each device last sent",
     "Kept while you use Ramble",
   ],
   ["Watch connection", "Hash of the watch's token", "Replaced when the iPhone connects the watch again, or revoked"],
@@ -49,7 +49,11 @@ const stored: [string, string, string][] = [
     "Apple's purchase or app record ids, product, dates, the inboxes it unlocks, and audio hours used this month",
     "Kept while the purchase is valid",
   ],
-  ["Usage", "Lengths, providers, and outcomes per note. No audio or transcript text", "Kept for running the service"],
+  [
+    "Usage stats",
+    "One row per note, under the inbox's random usage id: when it was recorded and received, its length, which device recorded it, how it turned out (transcribed, no speech, or failed) and how many tries it took, whether it used a free note, its language setting, whether filler-word removal and vocabulary were on (not the words), and the app version. No note id, audio, or transcript text",
+    "Kept indefinitely, to fix problems and see how Ramble is used",
+  ],
   ["App Attest key", "Key id and public key from Apple App Attest", "Kept while you use Ramble"],
 ];
 
@@ -61,12 +65,14 @@ export default function PrivacyPolicy() {
           &larr; Back to Ramble
         </Link>
         <h1 className="mt-8 text-3xl font-semibold tracking-tight text-stone-900">Privacy Policy</h1>
-        <p className="mt-2 text-sm text-stone-500">Last updated: November 7, 2026</p>
+        <p className="mt-2 text-sm text-stone-500">Last updated: November 9, 2026</p>
 
         <div className="mt-10 space-y-8 text-sm leading-relaxed text-stone-600">
           <section>
             <h2 className={h2}>The short version</h2>
-            <p className="mt-2">{PRIVACY_WORDING}</p>
+            <p className="mt-2">
+              {PRIVACY_WORDING} {USAGE_WORDING}
+            </p>
             <p className="mt-2">
               Ramble has no accounts. We never ask for your name or email, and we identify inboxes, not people.
             </p>
@@ -156,6 +162,11 @@ export default function PrivacyPolicy() {
               </li>
               <li>
                 Your network address is used only to apply rate limits, and is never stored with your notes or logged.
+              </li>
+              <li>
+                <span className={strong}>Usage stats.</span> We use them only to find and fix problems and to see how
+                Ramble is used, for example how many notes people record and how long they are. They are never sold,
+                shared, or used for advertising, and never include your audio or your words.
               </li>
               <li>No names, emails, or payment details.</li>
             </ul>

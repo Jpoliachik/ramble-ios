@@ -11,6 +11,7 @@ import {
   APP_STORE_URL,
   FREE_NOTES,
   PRIVACY_WORDING,
+  USAGE_WORDING,
   RETENTION,
   SITE_URL,
 } from "../lib/site";
@@ -110,7 +111,7 @@ const faqs: { q: string; a: ReactNode }[] = [
     q: "What does Ramble's server keep?",
     a: (
       <>
-        {PRIVACY_WORDING} No accounts, names, or emails.{" "}
+        {PRIVACY_WORDING} {USAGE_WORDING} No accounts, names, or emails.{" "}
         <Link href="/privacy" className={inlineLink}>
           Privacy policy
         </Link>

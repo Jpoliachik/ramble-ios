@@ -542,6 +542,12 @@ struct PrivacyInfoSheet: View {
                         text: "If you set up a webhook, transcripts go from your iPhone straight to your URL. Ramble's server never sees the URL or the secret."
                     )
 
+                    InfoBlock(
+                        icon: "chart.bar",
+                        title: "Usage stats",
+                        text: PrivacyCopy.usage
+                    )
+
                     Link(destination: SettingsLinks.privacy) {
                         HStack {
                             Spacer()
