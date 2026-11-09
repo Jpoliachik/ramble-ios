@@ -75,8 +75,8 @@ enum PurchaseCopy {
         "Thanks for trying it 🙂",
     ]
     static let developerNoteThanks = [
-        "Thank you for unlocking Ramble. No ads, no subscriptions, ever. I promise I'll never sell your data.",
-        "If something isn't working, write to support@ramble.watch.",
+        "Thanks for your support!",
+        "If you have any issues, email support@ramble.watch (include a screenshot if you can 🙂).",
     ]
     static let developerNoteSignature = "Justin"
 }
