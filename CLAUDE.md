@@ -25,14 +25,6 @@ These rules are not optional. They apply to every change, however small:
 7. **Specs describe the present only.** No history, change logs, plans, or TODOs in specs. Plans go in a thread or in `docs/`.
 8. **Report it.** When you finish a task, say which specs you updated, or say "No spec change" with the reason.
 
-### Ideas for later
-
-- **Speaker diarization** — opt-in. Deepgram has `diarize=true`; Groq Turbo doesn't do speaker labels.
-- **Multiple language hints** — for people who codeswitch mid-recording.
-- **On-device Apple Speech** — possible opt-in fast follow, not at launch.
-- **Localization** — translate the app UI into additional languages.
-- **CarPlay** — hands-free recording in the car. Not supported today (the Siri phrases open the app on the phone). Needs Apple's approval for a CarPlay category that fits a voice-notes app, plus a CarPlay screen. Widen the marketing beyond the watch only once it exists.
-
 ### Release plan
 
 - Free download: 25 notes free, then a $14.99 one-time unlock, no subscription (`specs/purchase.md`)
