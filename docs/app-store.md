@@ -95,6 +95,8 @@ Requires an Apple Watch paired with an iPhone.
 
 Short, one thought each, in this order. Mindfulness first: a short headline and a smaller second line. The first screenshot shows the watch, not the phone.
 
+The iPhone screenshots (1290 × 2796) and the product page header (5244 × 2950 and 3840 × 1646) are in `images/appstore/2026-sunset/`. Their HTML source is in `source/` there (open `one-line.html?bg=t` for the shipped look); change the copy here first, then re-render.
+
 1. Stay in the moment. (Talk to your watch. Your agent handles it later.)
 2. Leave your phone behind. (No iPhone needed. Sends when you reconnect.)
 3. Get it out of your head. (Messy is fine.)

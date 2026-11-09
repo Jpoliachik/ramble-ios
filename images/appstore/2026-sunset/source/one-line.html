@@ -1,0 +1,768 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Ramble — One Line</title>
+<!--
+  One continuous 6450 x 2796 panorama, sliced into five 1290 x 2796 App Store frames.
+  Background is a swappable layer: set <body data-bg="a|b|c">.
+    a = deep warm gradient (sand -> terracotta -> dusky plum)
+    b = golden-hour sky (sunset -> night)
+    c = rich dark warm ink, glowing line, dark-mode screens
+-->
+<style>
+@font-face { font-family: "Newsreader"; src: url(fonts/nr-roman.woff2) format("woff2"); font-style: normal; font-weight: 200 800; }
+@font-face { font-family: "Newsreader"; src: url(fonts/nr-italic.woff2) format("woff2"); font-style: italic; font-weight: 200 800; }
+
+:root {
+  --amber: #D97706; --amber-dark: #F59E0B;
+  --serif: "Newsreader", "New York", Georgia, serif;
+  --sans: "Inter", -apple-system, "SF Pro Text", system-ui, sans-serif;
+  --w-secondary: rgba(235,235,245,.60); --w-platter: #1f1f21;
+  /* grid */
+  --gut: 110px; --top: 214px;
+  /* per-frame type colors (overridden per theme) */
+  --ink: #1B1410; --cream: #FBF1E3;
+  --t1: var(--ink); --t2: var(--ink); --t3: var(--ink); --t4: var(--ink); --t5: var(--ink);
+  --words: var(--ink);
+  /* phone screen, light mode */
+  --s-bg: #F2F2F7; --s-card: #FFFFFF; --s-ink: #141210; --s-soft: #403B33; --s-faint: #7A7163; --s-sec: rgba(60,60,67,.6);
+  --s-ter: rgba(60,60,67,.3); --s-sep: rgba(60,60,67,.18); --s-amber: #D97706; --s-amber-soft: #F9EBDA; --s-on-amber: #fff;
+  --s-fill: rgba(118,118,128,.12); --s-bubble: #2A2521; --s-bubble-ink: #FBF6EE; --s-status: #000;
+  --line-filter: drop-shadow(0 10px 14px rgba(70,30,10,.28));
+}
+/* ---------- background variants ---------- */
+:root { --line: #D97706; --node-fill: transparent; --a0: #D97706; --a1: #CD6B07; --a2: #BC5A08; --a3: #B45309; }
+body[data-bg="i"] { --a0: #C96A05; --a1: #BA5D07; --a2: #A64E08; --a3: #9A4608; }
+body[data-bg="f"] #bg {
+  background:
+    radial-gradient(760px 980px at 640px 1900px, rgba(255,246,234,0.42) 0%, rgba(255,246,234,0) 72%),
+    radial-gradient(780px 980px at 2050px 2050px, rgba(255,246,234,0.42) 0%, rgba(255,246,234,0) 72%),
+    radial-gradient(700px 900px at 3300px 1900px, rgba(255,246,234,0.42) 0%, rgba(255,246,234,0) 72%),
+    radial-gradient(800px 1000px at 4520px 1700px, rgba(255,246,234,0.42) 0%, rgba(255,246,234,0) 72%),
+    radial-gradient(720px 980px at 5896px 1950px, rgba(255,246,234,0.42) 0%, rgba(255,246,234,0) 72%),
+    radial-gradient(4200px 700px at 3200px 2350px, rgba(255,238,216,.30) 0%, rgba(255,238,216,0) 70%),
+    linear-gradient(180deg, rgba(255,250,242,.34) 0%, rgba(255,250,242,0) 38%),
+    linear-gradient(90deg, #F2E5D2 0%, #EFDAC3 20%, #EBCEB8 40%, #E5C2AF 60%, #DDB7AB 80%, #D1ADAF 100%);
+}
+body[data-bg="p"] { --t1: var(--cream); --t2: var(--cream); --t3: var(--cream); --t4: var(--cream); --t5: var(--cream); --words: #FFF4E4;
+  --a0: #FCC04A; --a1: #F9AE2A; --a2: #F59E0B; --a3: #F8AC3C; --echo: rgba(255,222,170,.62); --node-fill: transparent; }
+body[data-bg="p"] .copy p { opacity: .9; }
+body[data-bg="p"] .copy { text-shadow: 0 2px 24px rgba(40,16,24,.18); }
+body[data-bg="p"] #ink { filter: drop-shadow(0 0 7px rgba(250,170,40,.22)) drop-shadow(0 6px 10px rgba(40,10,24,.16)); }
+body[data-bg="p"] #bg {
+  background:
+    radial-gradient(860px 1050px at 640px 1880px, rgba(255,214,170,.14) 0%, rgba(255,214,170,0) 70%),
+    radial-gradient(860px 1050px at 2060px 2060px, rgba(255,214,170,.14) 0%, rgba(255,214,170,0) 70%),
+    radial-gradient(860px 1050px at 3240px 1600px, rgba(255,214,170,.14) 0%, rgba(255,214,170,0) 70%),
+    radial-gradient(860px 1050px at 4515px 1850px, rgba(255,214,170,.14) 0%, rgba(255,214,170,0) 70%),
+    radial-gradient(860px 1050px at 5896px 1950px, rgba(255,214,170,.14) 0%, rgba(255,214,170,0) 70%),
+    radial-gradient(1900px 1000px at 500px 2700px, rgba(244,150,70,.62) 0%, rgba(244,150,70,0) 70%),
+    radial-gradient(1900px 1000px at 1900px 2700px, rgba(238,118,72,.56) 0%, rgba(238,118,72,0) 70%),
+    radial-gradient(1900px 1000px at 3300px 2680px, rgba(220,98,96,.50) 0%, rgba(220,98,96,0) 70%),
+    radial-gradient(1900px 1000px at 4650px 2700px, rgba(184,82,122,.44) 0%, rgba(184,82,122,0) 70%),
+    radial-gradient(1800px 1000px at 5950px 2700px, rgba(128,72,136,.40) 0%, rgba(128,72,136,0) 70%),
+    radial-gradient(7000px 700px at 3225px 2850px, rgba(250,150,90,.22) 0%, rgba(250,150,90,0) 70%),
+    linear-gradient(180deg, rgba(14,6,18,.30) 0%, rgba(14,6,18,0) 45%),
+    linear-gradient(98deg, #7A5236 0%, #7E4639 20%, #74393F 40%, #60304A 60%, #4A2A4C 80%, #3A2546 100%);
+}
+body[data-bg="q"] { --t1: var(--cream); --t2: var(--cream); --t3: var(--cream); --t4: var(--cream); --t5: var(--cream); --words: #FFF4E4;
+  --a0: #FCC04A; --a1: #F9AE2A; --a2: #F59E0B; --a3: #F8AC3C; --echo: rgba(255,222,170,.62); --node-fill: transparent; }
+body[data-bg="q"] .copy p { opacity: .9; }
+body[data-bg="q"] .copy { text-shadow: 0 2px 24px rgba(40,16,24,.18); }
+body[data-bg="q"] #ink { filter: drop-shadow(0 0 7px rgba(250,170,40,.22)) drop-shadow(0 6px 10px rgba(40,10,24,.16)); }
+body[data-bg="q"] #bg {
+  background:
+    radial-gradient(860px 1050px at 640px 1880px, rgba(255,214,170,.11) 0%, rgba(255,214,170,0) 70%),
+    radial-gradient(860px 1050px at 2060px 2060px, rgba(255,214,170,.11) 0%, rgba(255,214,170,0) 70%),
+    radial-gradient(860px 1050px at 3240px 1600px, rgba(255,214,170,.11) 0%, rgba(255,214,170,0) 70%),
+    radial-gradient(860px 1050px at 4515px 1850px, rgba(255,214,170,.11) 0%, rgba(255,214,170,0) 70%),
+    radial-gradient(860px 1050px at 5896px 1950px, rgba(255,214,170,.11) 0%, rgba(255,214,170,0) 70%),
+    radial-gradient(2000px 1050px at 500px 2720px, rgba(250,150,64,.72) 0%, rgba(250,150,64,0) 70%),
+    radial-gradient(2000px 1050px at 1900px 2720px, rgba(244,114,64,.66) 0%, rgba(244,114,64,0) 70%),
+    radial-gradient(2000px 1050px at 3300px 2700px, rgba(226,92,92,.60) 0%, rgba(226,92,92,0) 70%),
+    radial-gradient(2000px 1050px at 4650px 2720px, rgba(188,74,120,.52) 0%, rgba(188,74,120,0) 70%),
+    radial-gradient(1900px 1050px at 5950px 2720px, rgba(122,64,138,.46) 0%, rgba(122,64,138,0) 70%),
+    radial-gradient(7000px 750px at 3225px 2880px, rgba(255,156,90,.28) 0%, rgba(255,156,90,0) 70%),
+    linear-gradient(180deg, rgba(14,6,18,.40) 0%, rgba(14,6,18,0) 45%),
+    linear-gradient(98deg, #61402C 0%, #653530 20%, #5C2A36 40%, #48223E 60%, #33203F 80%, #241B36 100%);
+}
+body[data-bg="l"] { --t1: var(--cream); --t2: var(--cream); --t3: var(--cream); --t4: var(--cream); --t5: var(--cream); --words: #FFF4E4;
+  --a0: #FCC04A; --a1: #F9AE2A; --a2: #F59E0B; --a3: #F8AC3C; --echo: rgba(255,222,170,.62); --node-fill: transparent; }
+body[data-bg="l"] .copy p { opacity: .9; }
+body[data-bg="l"] .copy { text-shadow: 0 2px 24px rgba(40,16,24,.18); }
+body[data-bg="l"] #ink { filter: drop-shadow(0 0 7px rgba(250,170,40,.22)) drop-shadow(0 6px 10px rgba(40,10,24,.16)); }
+body[data-bg="l"] #bg {
+  background:
+    radial-gradient(820px 1050px at 640px 1880px, rgba(255,214,150,.30) 0%, rgba(255,214,150,0) 70%),
+    radial-gradient(860px 1050px at 2060px 2060px, rgba(255,190,140,.26) 0%, rgba(255,190,140,0) 70%),
+    radial-gradient(900px 1050px at 3240px 1500px, rgba(255,176,150,.22) 0%, rgba(255,176,150,0) 70%),
+    radial-gradient(980px 1150px at 4515px 1850px, rgba(250,176,182,.20) 0%, rgba(250,176,182,0) 70%),
+    radial-gradient(860px 1100px at 5896px 1950px, rgba(240,178,206,.20) 0%, rgba(240,178,206,0) 70%),
+    radial-gradient(1500px 900px at 900px 300px, rgba(182,124,70,.5) 0%, rgba(182,124,70,0) 70%),
+    radial-gradient(1700px 1000px at 2300px 2700px, rgba(204,118,72,.45) 0%, rgba(204,118,72,0) 70%),
+    radial-gradient(1600px 900px at 3500px 350px, rgba(173,87,87,.42) 0%, rgba(173,87,87,0) 70%),
+    radial-gradient(1700px 1100px at 4700px 2600px, rgba(131,75,109,.45) 0%, rgba(131,75,109,0) 70%),
+    radial-gradient(1500px 900px at 6100px 400px, rgba(94,56,94,.50) 0%, rgba(94,56,94,0) 70%),
+    linear-gradient(180deg, rgba(40,18,28,.10) 0%, rgba(40,18,28,0) 30%, rgba(40,18,28,0) 72%, rgba(36,14,30,.30) 100%),
+    linear-gradient(98deg, #AE7D4C 0%, #B5734D 17%, #AC6354 34%, #9A565F 51%, #824B66 68%, #6A4265 84%, #59395D 100%);
+}
+body[data-bg="h"] #bg {
+  background:
+    radial-gradient(760px 980px at 640px 1900px, rgba(255,246,234,0.42) 0%, rgba(255,246,234,0) 72%),
+    radial-gradient(780px 980px at 2050px 2050px, rgba(255,246,234,0.42) 0%, rgba(255,246,234,0) 72%),
+    radial-gradient(700px 900px at 3300px 1900px, rgba(255,246,234,0.42) 0%, rgba(255,246,234,0) 72%),
+    radial-gradient(800px 1000px at 4520px 1700px, rgba(255,246,234,0.42) 0%, rgba(255,246,234,0) 72%),
+    radial-gradient(720px 980px at 5896px 1950px, rgba(255,246,234,0.42) 0%, rgba(255,246,234,0) 72%),
+    radial-gradient(4200px 700px at 3200px 2350px, rgba(255,238,216,.30) 0%, rgba(255,238,216,0) 70%),
+    linear-gradient(180deg, rgba(255,250,242,.34) 0%, rgba(255,250,242,0) 38%),
+    linear-gradient(90deg, #E9D7C0 0%, #E4C9AF 20%, #DEBBA3 40%, #D6AE9B 60%, #CCA298 80%, #BF989C 100%);
+}
+body[data-bg="i"] #bg {
+  background:
+    radial-gradient(760px 980px at 640px 1900px, rgba(255,246,234,0.42) 0%, rgba(255,246,234,0) 72%),
+    radial-gradient(780px 980px at 2050px 2050px, rgba(255,246,234,0.42) 0%, rgba(255,246,234,0) 72%),
+    radial-gradient(700px 900px at 3300px 1900px, rgba(255,246,234,0.42) 0%, rgba(255,246,234,0) 72%),
+    radial-gradient(800px 1000px at 4520px 1700px, rgba(255,246,234,0.42) 0%, rgba(255,246,234,0) 72%),
+    radial-gradient(720px 980px at 5896px 1950px, rgba(255,246,234,0.42) 0%, rgba(255,246,234,0) 72%),
+    radial-gradient(4200px 700px at 3200px 2350px, rgba(255,238,216,.30) 0%, rgba(255,238,216,0) 70%),
+    linear-gradient(180deg, rgba(255,250,242,.34) 0%, rgba(255,250,242,0) 38%),
+    linear-gradient(90deg, #DDC7AD 0%, #D6B898 20%, #CFA88B 40%, #C69985 60%, #BB8D84 80%, #AC8389 100%);
+}
+
+body[data-bg="g"] #bg {
+  background:
+    radial-gradient(760px 980px at 640px 1900px, rgba(255,246,234,0.34) 0%, rgba(255,246,234,0) 72%),
+    radial-gradient(780px 980px at 2050px 2050px, rgba(255,246,234,0.34) 0%, rgba(255,246,234,0) 72%),
+    radial-gradient(700px 900px at 3300px 1900px, rgba(255,246,234,0.34) 0%, rgba(255,246,234,0) 72%),
+    radial-gradient(800px 1000px at 4520px 1700px, rgba(255,246,234,0.34) 0%, rgba(255,246,234,0) 72%),
+    radial-gradient(720px 980px at 5896px 1950px, rgba(255,246,234,0.34) 0%, rgba(255,246,234,0) 72%),
+    radial-gradient(4200px 700px at 3200px 2350px, rgba(255,232,206,.30) 0%, rgba(255,232,206,0) 70%),
+    linear-gradient(180deg, rgba(255,248,238,.28) 0%, rgba(255,248,238,0) 38%),
+    linear-gradient(90deg, #F1DFC6 0%, #EDCDAE 20%, #E7BC9E 40%, #DEAC98 60%, #D19E99 80%, #C095A0 100%);
+}
+body[data-bg="d"] #bg {
+  background:
+    radial-gradient(760px 980px at 640px 1900px, rgba(255,248,236,0.62) 0%, rgba(255,248,236,0) 72%),
+    radial-gradient(780px 980px at 2050px 2050px, rgba(255,248,236,0.52) 0%, rgba(255,248,236,0) 72%),
+    radial-gradient(700px 900px at 3300px 1900px, rgba(255,248,236,0.52) 0%, rgba(255,248,236,0) 72%),
+    radial-gradient(760px 1000px at 4515px 1950px, rgba(255,248,236,0.52) 0%, rgba(255,248,236,0) 72%),
+    radial-gradient(720px 980px at 5884px 1950px, rgba(255,248,236,0.52) 0%, rgba(255,248,236,0) 72%),
+    linear-gradient(180deg, rgba(255,250,242,.30) 0%, rgba(255,250,242,0) 30%, rgba(0,0,0,0) 70%, rgba(92,60,30,.12) 100%),
+    linear-gradient(90deg, #EBDDC9 0%, #E6D4BC 40%, #E0C9AC 75%, #DAC1A0 100%);
+}
+body[data-bg="e"] {
+  --t1: var(--cream); --t2: var(--cream); --t3: var(--cream); --t4: var(--cream); --t5: var(--cream); --words: var(--cream);
+}
+body[data-bg="e"] #bg {
+  background:
+    radial-gradient(760px 980px at 640px 1900px, rgba(255,232,205,0.24) 0%, rgba(255,232,205,0) 72%),
+    radial-gradient(780px 980px at 2050px 2050px, rgba(255,232,205,0.2) 0%, rgba(255,232,205,0) 72%),
+    radial-gradient(700px 900px at 3300px 1900px, rgba(255,232,205,0.2) 0%, rgba(255,232,205,0) 72%),
+    radial-gradient(760px 1000px at 4515px 1950px, rgba(255,232,205,0.2) 0%, rgba(255,232,205,0) 72%),
+    radial-gradient(720px 980px at 5884px 1950px, rgba(255,232,205,0.2) 0%, rgba(255,232,205,0) 72%),
+    linear-gradient(180deg, rgba(255,240,222,.12) 0%, rgba(255,240,222,0) 30%, rgba(0,0,0,0) 70%, rgba(40,24,12,.18) 100%),
+    linear-gradient(90deg, #B9A088 0%, #AA9179 40%, #9C836E 75%, #8E7663 100%);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 6450px; height: 2796px; overflow: hidden; background: #1C1512; }
+body { font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+#pano { position: relative; width: 6450px; height: 2796px; overflow: hidden; }
+#bg { position: absolute; inset: 0; z-index: 0; }
+#flair { position: absolute; inset: 0; width: 6450px; height: 2796px; z-index: 0; pointer-events: none; }
+#sun { display: none; position: absolute; left: 1560px; top: 2330px; width: 380px; height: 380px; transform: translate(-50%,-50%); border-radius: 50%;
+  background: radial-gradient(circle at 50% 45%, #FFF1CF 0%, #FCCB6E 55%, #F7A43A 100%); box-shadow: 0 0 160px 60px rgba(252,203,110,.35); z-index: 0; }
+#stars { display: none; position: absolute; inset: 0; z-index: 0; }
+
+/* ---------- type grid: identical in every frame ---------- */
+.copy { position: absolute; top: var(--top); width: calc(1290px - 2 * var(--gut)); z-index: 10; }
+.copy h1 { font-family: var(--serif); font-weight: 500; font-size: 124px; line-height: 128px; height: 256px; letter-spacing: -3.2px; font-variation-settings: "opsz" 72; white-space: nowrap; }
+.copy p { margin-top: 44px; font-family: var(--serif); font-style: italic; font-weight: 400; font-size: 70px; line-height: 84px; letter-spacing: -0.6px; opacity: .76; font-variation-settings: "opsz" 36; }
+.copy.f1 { color: var(--t1); } .copy.f2 { color: var(--t2); } .copy.f3 { color: var(--t3); } .copy.f4 { color: var(--t4); } .copy.f5 { color: var(--t5); }
+
+/* iPhone screens in dark mode (app dark tokens, docs/design.md) */
+body.dark { --s-bg: #000000; --s-card: #1C1C1E; --s-ink: #F4EFE7; --s-soft: #C9C2B5; --s-faint: #8A8275; --s-sec: rgba(235,235,245,.6);
+  --s-ter: rgba(235,235,245,.3); --s-sep: rgba(84,84,88,.6); --s-amber: #FBBF5A; --s-amber-soft: #33230A; --s-on-amber: #1F1404;
+  --s-fill: rgba(118,118,128,.24); --s-status: #FFFFFF; --amber: #F59E0B; }
+body.dark .step .badge svg path { stroke: #1F1404; }
+body.dark .npill i, body.dark .hstat i { background: #30D158; }
+body.dark .hrow .ck { color: #30D158; }
+body.dark .hhead .wm i { background: #F59E0B; }
+body.dark .hrec { border-color: #F59E0B; } body.dark .hrec i { background: #F59E0B; }
+body.dark .npill { box-shadow: inset 0 0 0 1px rgba(255,255,255,.10); }
+body.dark .cap { background: rgba(118,118,128,.24); }
+.cap.prom { background: #D97706; color: #FFFFFF; padding: 0 14px; height: 34px; font-size: 15px; font-weight: 600; }
+body.dark .cap.prom { background: #F59E0B; color: #1F1404; }
+body.dark .nb .bk { box-shadow: none; }
+body.dark .msgclone { box-shadow: 0 10px 26px -10px rgba(0,0,0,.6), inset 0 0 0 1px rgba(255,255,255,.06); }
+body.dark .phone { box-shadow: 0 60px 100px -40px rgba(10,4,8,.7), 0 16px 32px -10px rgba(10,4,8,.4), inset 0 0 0 1.5px rgba(255,255,255,.26), 0 0 0 1.5px rgba(255,226,200,.14); }
+body.dark .phone.set { box-shadow: 0 50px 70px -30px rgba(10,4,8,.55), inset 0 0 0 1.5px rgba(255,255,255,.26), 0 0 0 1.5px rgba(255,226,200,.14); }
+/* ---------- layers ---------- */
+#line { position: absolute; inset: 0; width: 6450px; height: 2796px; z-index: 2; overflow: visible; }
+.dev { position: absolute; width: 0; height: 0; z-index: 3; }
+.dev.under { z-index: 1; }
+.dev > .watch, .dev > .phone, .dev > .flat { position: absolute; left: 0; top: 0; transform: translate(-50%,-50%) rotate(var(--r,0deg)) scale(var(--s,1)); }
+.over { position: absolute; z-index: 4; }
+
+/* ---------- Apple Watch, midnight aluminium, 1pt = 1px (46mm, 208 x 248) ---------- */
+.watch { width: 244px; height: 284px; }
+.watch .band { position: absolute; left: 36px; width: 172px;
+  background: linear-gradient(90deg, #15171B 0%, #2C3036 16%, #353A41 50%, #2C3036 84%, #15171B 100%); }
+.watch .band.top { bottom: 250px; height: 96px; border-radius: 26px 26px 0 0; -webkit-mask-image: linear-gradient(0deg, #000 35%, transparent 100%); mask-image: linear-gradient(0deg, #000 35%, transparent 100%); }
+.watch .band.bot { top: 250px; height: 330px; border-radius: 0 0 26px 26px; }
+.watch .band.bot .holes { position: absolute; left: 50%; top: 110px; transform: translateX(-50%); display: flex; flex-direction: column; gap: 22px; }
+.watch .band.bot .holes i { width: 10px; height: 10px; border-radius: 50%; background: rgba(0,0,0,.45); box-shadow: 0 1px 0 rgba(255,255,255,.08); display: block; }
+.watch .case { position: absolute; inset: 0; border-radius: 66px;
+  background: linear-gradient(150deg, #5A5F68 0%, #2E3238 30%, #1E2125 62%, #3A3F46 100%);
+  box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.22), inset 0 2px 2px rgba(255,255,255,.12), 0 34px 60px -20px rgba(20,8,4,.55), 0 10px 22px -8px rgba(20,8,4,.35); }
+.watch .crown { position: absolute; right: -11px; top: 68px; width: 15px; height: 44px; border-radius: 5px;
+  background: repeating-linear-gradient(180deg, #2A2D32 0 2px, #4A4F57 2px 4px); box-shadow: inset -2px 0 3px rgba(0,0,0,.4); }
+.watch .side { position: absolute; right: -5px; top: 140px; width: 7px; height: 56px; border-radius: 4px; background: linear-gradient(90deg,#2A2D32,#4A4F57); }
+.watch .glass { position: absolute; inset: 7px; border-radius: 60px; background: #030303; box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+.watch .screen { position: absolute; left: 18px; top: 18px; width: 208px; height: 248px; background: #000; border-radius: 46px; overflow: hidden; color: #fff; font-family: var(--sans); }
+.watch .glare { position: absolute; inset: 7px; border-radius: 60px; background: linear-gradient(160deg, rgba(255,255,255,.08) 0%, rgba(255,255,255,0) 32%); pointer-events: none; }
+.screen .clock { position: absolute; top: 9px; right: 26px; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.rbtn { position: absolute; left: 44px; top: 64px; width: 120px; height: 120px; border-radius: 50%; border: 5px solid var(--amber-dark); display: flex; align-items: center; justify-content: center; }
+.rbtn .fill { width: 100px; height: 100px; border-radius: 50%; background: var(--amber-dark); display: flex; align-items: center; justify-content: center; }
+.rbtn .bars { display: flex; gap: 8px; align-items: center; height: 56px; }
+.rbtn .bars i { display: block; width: 14px; border-radius: 7px; background: var(--amber-dark); }
+.rbtn svg.ok { width: 44px; height: 44px; color: #000; }
+.screen .hint { position: absolute; top: 37px; left: 0; right: 0; text-align: center; font-size: 13px; line-height: 16px; color: rgba(235,235,245,.6); }
+.wtimer { position: absolute; left: 60px; right: 60px; bottom: 16px; height: 32px; text-align: center; font-family: var(--serif); font-weight: 700; font-size: 26px; line-height: 32px; color: var(--amber-dark); font-variant-numeric: tabular-nums; }
+.hbtn { position: absolute; bottom: 16px; right: 26px; width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,.16); display: flex; align-items: center; justify-content: center; }
+.hbtn svg { width: 15px; height: 15px; color: #fff; }
+.wnav .back { position: absolute; top: 8px; left: 18px; width: 30px; height: 30px; border-radius: 50%; background: rgba(255,255,255,.16); display: flex; align-items: center; justify-content: center; }
+.wnav .back svg { width: 12px; height: 12px; }
+.wnav .title { position: absolute; top: 12px; left: 56px; font-size: 16px; font-weight: 600; }
+.wlist { position: absolute; inset: 46px 10px 0; display: flex; flex-direction: column; gap: 4px; }
+.wlist .sh { font-size: 13px; color: var(--w-secondary); padding: 2px 6px 2px; }
+.wlist .sh + .wrow { margin-top: 0; }
+.wrow { background: var(--w-platter); border-radius: 12px; padding: 7px 10px 8px 6px; display: flex; gap: 6px; align-items: flex-start; }
+.wrow .ic { width: 18px; flex: none; display: flex; justify-content: center; padding-top: 2px; color: var(--w-secondary); }
+.wrow .ic svg { width: 12px; height: 12px; }
+.wrow .tx { min-width: 0; flex: 1; }
+.wrow .r1 { display: flex; justify-content: space-between; gap: 4px; align-items: baseline; }
+.wrow .d { font-size: 13px; font-weight: 500; white-space: nowrap; }
+.wrow .du { font-size: 11.5px; color: var(--w-secondary); font-variant-numeric: tabular-nums; }
+.wrow .ln { font-size: 11.5px; color: var(--w-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+
+/* ---------- iPhone, dark titanium, 1pt = 1px (6.9", 440 x 956) ---------- */
+.phone { width: 468px; height: 984px; border-radius: 84px; padding: 14px;
+  background: linear-gradient(135deg, #6A6560 0%, #3A3734 30%, #2A2826 60%, #55504B 100%);
+  box-shadow: 0 60px 100px -40px rgba(20,8,4,.6), 0 16px 32px -10px rgba(20,8,4,.35), inset 0 0 0 1.5px rgba(255,255,255,.22); }
+.phone::before { content: ""; position: absolute; inset: 4px; border-radius: 80px; background: #050505; }
+.phone .btn { position: absolute; background: linear-gradient(90deg,#3A3734,#6A6560); border-radius: 3px; }
+.phone .scr { position: relative; width: 440px; height: 956px; border-radius: 70px; overflow: hidden; background: var(--s-bg); font-family: var(--sans); color: var(--s-ink); }
+.phone .island { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); width: 124px; height: 36px; border-radius: 18px; background: #000; z-index: 5; }
+.phone .sb { position: absolute; top: 0; left: 0; right: 0; height: 54px; z-index: 4; color: var(--s-status); }
+.phone .sb .t { position: absolute; left: 52px; top: 19px; font-size: 17px; font-weight: 600; letter-spacing: -0.3px; }
+.phone .sb .r { position: absolute; right: 36px; top: 21px; display: flex; gap: 7px; align-items: center; }
+
+/* note screen (Ramble) */
+.nb { position: absolute; top: 58px; left: 16px; height: 44px; display: flex; align-items: center; z-index: 2; }
+.nb .bk { width: 44px; height: 44px; border-radius: 50%; background: var(--s-card); box-shadow: 0 1px 4px rgba(0,0,0,.06); display: flex; align-items: center; justify-content: center; }
+.nb .bk svg { width: 12px; height: 20px; }
+.ntitle { position: absolute; top: 69px; left: 0; right: 0; text-align: center; font-size: 17px; font-weight: 600; letter-spacing: -0.4px; }
+.note { position: absolute; top: 114px; left: 16px; right: 16px; }
+.ncard { background: var(--s-card); border-radius: 26px; padding: 16px 20px 18px; }
+.ndu { font-size: 28px; font-weight: 600; letter-spacing: -0.5px; font-variant-numeric: tabular-nums; }
+.ndt { font-size: 12px; color: var(--s-sec); margin-top: 2px; }
+.npill { display: inline-flex; align-items: center; gap: 7px; margin-top: 10px; padding: 6px 12px 6px 10px; border-radius: 16px; background: var(--s-card); box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); font-size: 14px; font-weight: 500; }
+.npill i { width: 8px; height: 8px; border-radius: 50%; background: #34C759; display: block; }
+.nsh { font-size: 13px; color: var(--s-sec); padding: 22px 20px 7px; }
+.ntx { font-size: 17px; line-height: 22px; letter-spacing: -0.3px; }
+.phone.set { box-shadow: 0 50px 70px -30px rgba(40,20,8,.45), 0 10px 22px -8px rgba(40,20,8,.25), inset 0 0 0 1.5px rgba(255,255,255,.22); }
+
+/* Connect screen */
+.cx { position: absolute; inset: 54px 0 0; padding: 0 24px; color: var(--s-ink); }
+.grab { position: absolute; top: 6px; left: 50%; transform: translateX(-50%); width: 36px; height: 5px; border-radius: 3px; background: rgba(60,60,67,.3); }
+.cx h2 { font-family: var(--serif); font-weight: 500; font-size: 34px; letter-spacing: -0.6px; line-height: 1.1; margin-top: 30px; font-variation-settings: "opsz" 36; }
+.cx h2 em { color: var(--s-soft); }
+.steps { margin-top: 24px; }
+.step { display: flex; gap: 14px; }
+.step .rail { width: 28px; display: flex; flex-direction: column; align-items: center; gap: 6px; flex: none; }
+.step .badge { width: 28px; height: 28px; border-radius: 50%; background: var(--amber); display: flex; align-items: center; justify-content: center; flex: none; }
+.step .badge svg { width: 13px; height: 13px; }
+.step .rl { width: 2px; flex: 1; border-radius: 1px; background: var(--amber); }
+.step .body { padding-top: 3px; padding-bottom: 20px; flex: 1; min-width: 0; }
+.step .tt { font-size: 17px; font-weight: 600; letter-spacing: -0.3px; color: var(--s-ink); }
+.step .dd { font-size: 15px; color: var(--s-soft); margin-top: 4px; line-height: 1.33; letter-spacing: -0.1px; }
+.msg { margin-top: 12px; background: var(--s-card); border-radius: 18px; padding: 14px; }
+.msg .m { font-size: 15px; line-height: 1.34; color: var(--s-ink); letter-spacing: -0.15px; }
+.msg .meta { margin-top: 10px; display: flex; justify-content: space-between; align-items: center; }
+.msg .meta span { font-size: 12px; color: var(--s-faint); font-variant-numeric: tabular-nums; }
+.cap { height: 34px; padding: 0 14px; border-radius: 17px; background: rgba(118,118,128,.12); display: inline-flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 600; color: var(--s-ink); }
+.cap svg { width: 14px; height: 14px; }
+.pill { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; padding: 5px 10px; border-radius: 16px; background: var(--s-amber-soft); color: var(--s-amber); font-size: 14px; font-weight: 600; }
+.pill svg { width: 15px; height: 15px; }
+.zoomwrap { position: absolute; left: 3870px; top: 0; width: 1290px; height: 2796px; z-index: 1;
+  overflow: hidden; }
+.msgclone { position: absolute; z-index: 4; transform-origin: 0 0; margin: 0 !important; box-shadow: 0 8px 22px -10px rgba(70,40,20,.25); }
+/* chat (agent's app, generic) */
+.chatnav { position: absolute; top: 54px; left: 0; right: 0; height: 64px; display: flex; align-items: center; gap: 10px; padding-left: 16px; border-bottom: 0.5px solid var(--s-sep); }
+.chatnav .bk { width: 12px; height: 20px; }
+.chatnav .av { width: 34px; height: 34px; border-radius: 50%; background: var(--s-fill); display: flex; align-items: center; justify-content: center; }
+.chatnav .av svg { width: 18px; height: 18px; }
+.chatnav .nm { font-size: 17px; font-weight: 600; letter-spacing: -0.3px; }
+.chatday { position: absolute; top: 136px; left: 0; width: 440px; text-align: center; font-size: 12px; font-weight: 500; color: var(--s-sec); }
+
+/* home list (Ramble) */
+.hhead { position: absolute; top: 62px; left: 20px; right: 20px; height: 40px; display: flex; align-items: center; justify-content: space-between; }
+.hhead .wm { display: flex; align-items: center; gap: 8px; font-family: var(--serif); font-style: italic; font-weight: 700; font-size: 23px; letter-spacing: -0.3px; }
+.hhead .wm i { width: 12px; height: 12px; border-radius: 50%; background: var(--s-amber); display: block; }
+.hhead .gear { width: 40px; height: 40px; border-radius: 50%; background: var(--s-fill); display: flex; align-items: center; justify-content: center; }
+.hhead .gear svg { width: 20px; height: 20px; }
+.hstat { position: absolute; top: 108px; left: 20px; display: flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 500; color: var(--s-sec); }
+.hstat i { width: 8px; height: 8px; border-radius: 50%; background: #34C759; display: block; }
+.hlist { position: absolute; top: 146px; left: 16px; right: 16px; }
+.hsec { font-size: 15px; font-weight: 600; color: var(--s-sec); padding: 14px 20px 8px; }
+.hcard { background: var(--s-card); border-radius: 26px; overflow: hidden; }
+.hrow { display: flex; align-items: center; gap: 12px; padding: 12px 18px 12px 20px; position: relative; }
+.hrow + .hrow::before { content: ""; position: absolute; top: 0; left: 20px; right: 0; border-top: 0.5px solid var(--s-sep); }
+.hrow .tx { flex: 1; min-width: 0; }
+.hrow .r1 { display: flex; align-items: baseline; gap: 8px; }
+.hrow .du { font-size: 17px; font-weight: 600; letter-spacing: -0.2px; font-variant-numeric: tabular-nums; }
+.hrow .tm { font-size: 15px; color: var(--s-sec); }
+.hrow .pv { font-size: 15px; color: var(--s-sec); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 3px; letter-spacing: -0.1px; }
+.hrow .ck { width: 19px; height: 19px; flex: none; color: #34C759; }
+.hrow .ch { width: 8px; height: 14px; flex: none; color: var(--s-ter); }
+.hbot { position: absolute; left: 0; right: 0; bottom: 0; height: 170px; background: linear-gradient(180deg, transparent 0, var(--s-bg) 50px); }
+.hrec { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); width: 84px; height: 84px; border-radius: 50%; border: 4px solid var(--s-amber); display: flex; align-items: center; justify-content: center; }
+.hrec i { width: 66px; height: 66px; border-radius: 50%; background: var(--s-amber); display: block; }
+
+/* the pasted message, drawn over the line (panorama coordinates) */
+.bubble { background: var(--s-bubble); color: var(--s-bubble-ink); border-radius: 60px 60px 18px 60px; padding: 46px 56px 52px; font-family: var(--sans); font-size: 58px; line-height: 78px; letter-spacing: -1px;
+  box-shadow: 0 30px 60px -24px rgba(20,8,4,.35); }
+.bubble.tail::after { content: ""; position: absolute; right: -14px; bottom: 0; width: 60px; height: 52px; background: var(--s-bubble); border-bottom-left-radius: 46px 40px; clip-path: path("M0,0 C4,30 22,46 60,52 C40,52 10,50 0,40 Z"); }
+.chip { display: inline-flex; align-items: center; gap: 14px; padding: 14px 30px 14px 18px; border-radius: 60px; background: var(--s-amber-soft); color: var(--s-amber); font-family: var(--sans); font-size: 40px; font-weight: 600; letter-spacing: -0.6px; box-shadow: 0 16px 34px -14px rgba(20,8,4,.3); }
+.chip svg { width: 40px; height: 40px; }
+
+/* phone left behind: lying flat, far back */
+.flat { width: 468px; height: 984px; }
+.flat .ph { position: absolute; inset: 0; border-radius: 84px; background: linear-gradient(135deg, #6A6560 0%, #3A3734 35%, #2A2826 70%, #55504B 100%); box-shadow: inset 0 0 0 2px rgba(255,255,255,.18); }
+.flat .gl { position: absolute; inset: 14px; border-radius: 70px; background: linear-gradient(160deg, #1d1d20 0%, #050505 55%, #121214 100%); }
+.flat .gl::after { content: ""; position: absolute; inset: 0; border-radius: 70px; background: linear-gradient(120deg, rgba(255,255,255,.16) 0%, rgba(255,255,255,0) 30%); }
+.flat .is { position: absolute; top: 26px; left: 50%; transform: translateX(-50%); width: 124px; height: 36px; border-radius: 18px; background: #000; }
+.shadow { position: absolute; border-radius: 50%; background: radial-gradient(closest-side, rgba(30,12,6,.38), rgba(30,12,6,0)); z-index: 1; }
+
+.seam { display: none; position: absolute; top: 0; bottom: 0; width: 2px; background: red; z-index: 99; }
+body.debug .seam { display: block; }
+</style>
+</head>
+<body data-bg="q" class="dark">
+<div id="pano">
+  <div id="bg"></div>
+  <svg id="flair" viewBox="0 0 6450 2796" xmlns="http://www.w3.org/2000/svg"></svg>
+  <svg id="line" viewBox="0 0 6450 2796" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="amb" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="6450" y2="0">
+        <stop offset="0" style="stop-color:var(--a0)"/><stop offset="0.4" style="stop-color:var(--a1)"/><stop offset="0.75" style="stop-color:var(--a2)"/><stop offset="1" style="stop-color:var(--a3)"/>
+      </linearGradient>
+    </defs>
+    <path id="spine" fill="none" stroke="none"/>
+    <g id="ink" fill="url(#amb)" stroke="url(#amb)"></g>
+    <g id="words" font-family="Newsreader, Georgia, serif" font-style="italic" letter-spacing="-0.4" style="font-variation-settings:'opsz' 36"></g>
+  </svg>
+
+  <!-- ============ FRAME 1 ============ -->
+  <div class="copy f1" style="left:110px"><h1>Stay in the<br>moment.</h1><p>Talk to your watch.<br>Your agent handles it later.</p></div>
+  <div class="dev" style="left:640px; top:1900px; --s:3.55; --r:-8deg">
+    <div class="watch">
+      <div class="band top"></div><div class="band bot"><div class="holes"><i></i><i></i><i></i><i></i></div></div>
+      <div class="case"></div><div class="crown"></div><div class="side"></div><div class="glass"></div>
+      <div class="screen">
+        <div class="clock">7:50</div>
+        <div class="hint">Tap to talk</div>
+        <div class="rbtn"><div class="fill"></div></div>
+        <div class="hbtn"><svg viewBox="0 0 16 16"><circle cx="2.8" cy="4" r="1.2" fill="currentColor"/><circle cx="2.8" cy="8" r="1.2" fill="currentColor"/><circle cx="2.8" cy="12" r="1.2" fill="currentColor"/><path d="M6 4h8M6 8h8M6 12h8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></div>
+      </div>
+      <div class="glare"></div>
+    </div>
+  </div>
+
+  <!-- ============ FRAME 2 ============ -->
+  <div class="copy f2" style="left:1400px"><h1>Leave your<br>phone behind.</h1><p>No iPhone needed.<br>Sends when you reconnect.</p></div>
+  <div class="dev" style="left:1960px; top:2960px; --s:2.2; --r:-5deg; z-index:2">
+    <div class="phone set">
+      <div class="btn" style="left:-3px; top:180px; width:5px; height:34px"></div>
+      <div class="btn" style="left:-3px; top:240px; width:5px; height:62px"></div>
+      <div class="btn" style="left:-3px; top:318px; width:5px; height:62px"></div>
+      <div class="btn" style="right:-3px; top:260px; width:5px; height:100px"></div>
+      <div class="scr">
+        <div class="island"></div>
+        <div class="sb"><span class="t">8:41</span><span class="r">SBICONS</span></div>
+        <div class="nb"><div class="bk"><svg viewBox="0 0 12 20"><path d="M10 2L2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+        <div class="ntitle">Recording</div>
+        <div class="note">
+          <div class="ncard">
+            <div class="ndu">0:34</div>
+            <div class="ndt">Saturday, November 8 at 8:02 AM</div>
+            <div class="npill"><i></i>Your agent has it</div>
+          </div>
+          <div class="nsh">Transcript</div>
+          <div class="ncard ntx">Call Sam back about Thursday. And the trailer hitch, he said Friday works if we leave early.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="dev" style="left:2200px; top:2140px; --s:2.4; --r:6deg">
+    <div class="watch">
+      <div class="band top"></div><div class="band bot"><div class="holes"><i></i><i></i><i></i><i></i></div></div>
+      <div class="case"></div><div class="crown"></div><div class="side"></div><div class="glass"></div>
+      <div class="screen">
+        <div class="clock">8:02</div>
+        <div class="rbtn"><div class="fill"><svg class="ok" viewBox="0 0 16 16"><path d="M3.2 8.6l3.1 3.1 6.5-7.4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+        <div class="hbtn"><svg viewBox="0 0 16 16"><circle cx="2.8" cy="4" r="1.2" fill="currentColor"/><circle cx="2.8" cy="8" r="1.2" fill="currentColor"/><circle cx="2.8" cy="12" r="1.2" fill="currentColor"/><path d="M6 4h8M6 8h8M6 12h8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></div>
+      </div>
+      <div class="glare"></div>
+    </div>
+  </div>
+
+  <!-- ============ FRAME 3 ============ -->
+  <div class="copy f3" style="left:2690px"><h1>Get it out of<br>your head.</h1><p>Messy is fine.</p></div>
+  <div class="dev" style="left:3300px; top:1910px; --s:2.85; --r:-4deg">
+    <div class="watch">
+      <div class="band top"></div><div class="band bot"><div class="holes"><i></i><i></i><i></i><i></i></div></div>
+      <div class="case"></div><div class="crown"></div><div class="side"></div><div class="glass"></div>
+      <div class="screen">
+        <div class="clock">8:14</div>
+        <div class="rbtn"><div class="bars"><i style="height:38px"></i><i style="height:56px"></i><i style="height:30px"></i></div></div>
+        <div class="wtimer">2:47</div>
+      </div>
+      <div class="glare"></div>
+    </div>
+  </div>
+
+  <!-- ============ FRAME 4 ============ -->
+  <div class="copy f4" style="left:3980px"><h1>Connect your agent<br>with one message.</h1><p>No login. No OAuth. No accounts.</p></div>
+  <div class="zoomwrap">
+    <div class="dev under" style="left:645px; top:1990px; --s:2.5; --r:0deg">
+      <div class="phone">
+        <div class="btn" style="left:-3px; top:180px; width:5px; height:34px"></div>
+        <div class="btn" style="left:-3px; top:240px; width:5px; height:62px"></div>
+        <div class="btn" style="left:-3px; top:318px; width:5px; height:62px"></div>
+        <div class="scr">
+          <div class="island"></div>
+          <div class="sb"><span class="t">8:20</span><span class="r">SBICONS</span></div>
+          <div class="cx">
+            <h2>Connect <em>your agent.</em></h2>
+            <div class="steps">
+              <div class="step"><div class="rail"><div class="badge"><svg viewBox="0 0 13 13"><path d="M2.2 6.8l2.9 2.9 5.7-6.4" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="rl"></div></div>
+                <div class="body"><div class="tt">Copy this message</div>
+                  <div class="msg" id="msgsrc"><div class="m">I downloaded Ramble, connect it. My pairing code is K7QX-MP4D-HN3R. Instructions: https://ramble.watch/docs</div>
+                    <div class="meta"><span>Works once · 9:12 left</span><span class="cap prom"><svg viewBox="0 0 14 14"><rect x="4.2" y="1.2" width="8.4" height="9.4" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M2.2 4.4v6.6a2 2 0 002 2h5.6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Copy</span></div></div>
+                </div></div>
+              <div class="step"><div class="rail"><div class="badge"><svg viewBox="0 0 13 13"><path d="M2.2 6.8l2.9 2.9 5.7-6.4" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="rl"></div></div>
+                <div class="body"><div class="tt">Paste it to your agent</div><div class="dd">Send it in any chat with your agent.</div></div></div>
+              <div class="step"><div class="rail"><div class="badge"><svg viewBox="0 0 13 13"><path d="M2.2 6.8l2.9 2.9 5.7-6.4" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+                <div class="body" style="padding-bottom:0"><div class="tt">Connected</div>
+                  <div class="pill"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="7.5" fill="currentColor"/><path d="M4.8 8.3l2.2 2.2 4.3-4.8" fill="none" stroke="var(--s-amber-soft)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Checked in just now</div></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ FRAME 5 ============ -->
+  <div class="copy f5" style="left:5270px"><h1>Private<br>by design.</h1><p>Audio deleted once transcribed.<br>Your history stays on your iPhone.</p></div>
+  <div class="dev" style="left:5896px; top:2109px; --s:1.95; --r:0deg">
+    <div class="phone">
+      <div class="btn" style="left:-3px; top:180px; width:5px; height:34px"></div>
+      <div class="btn" style="left:-3px; top:240px; width:5px; height:62px"></div>
+      <div class="btn" style="left:-3px; top:318px; width:5px; height:62px"></div>
+      <div class="btn" style="right:-3px; top:260px; width:5px; height:100px"></div>
+      <div class="scr">
+        <div class="island"></div>
+        <div class="sb"><span class="t">8:21</span><span class="r">SBICONS</span></div>
+        <div class="hhead"><div class="wm"><i></i>Ramble</div><div class="gear"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="2.8" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 1.8l1.3 2.1 2.4-.6.6 2.4 2.1 1.3-1.1 2.2 1.1 2.2-2.1 1.3-.6 2.4-2.4-.6L10 18.2l-1.3-2.1-2.4.6-.6-2.4-2.1-1.3L4.7 10 3.6 7.8l2.1-1.3.6-2.4 2.4.6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></div></div>
+        <div class="hstat"><i></i>All delivered · checked in just now</div>
+        <div class="hlist">
+          <div class="hsec">Today</div>
+          <div class="hcard">
+            ROW|0:42|8:14 AM|Call Sam back about Thursday, and the trailer hitch
+            ROW|1:18|7:51 AM|So um, the garage thing. What if we just clear the left side
+            ROW|0:09|7:30 AM|Oat milk. And the good bread.
+          </div>
+          <div class="hsec">Yesterday</div>
+          <div class="hcard">
+            ROW|2:36|6:12 PM|Thoughts on the talk: open with the story about the bike
+            ROW|0:27|12:40 PM|Book the dentist, the Tuesday slot works
+            ROW|0:51|9:05 AM|Idea for Maya's birthday, something with kites
+          </div>
+        </div>
+        <div class="hbot"><div class="hrec"><i></i></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="seam" style="left:1290px"></div><div class="seam" style="left:2580px"></div><div class="seam" style="left:3870px"></div><div class="seam" style="left:5160px"></div>
+</div>
+
+<script>
+const params = new URLSearchParams(location.search);
+let FLAIR = '';
+if (params.get('bg')) document.body.dataset.bg = params.get('bg');
+if (['m','n','o'].includes(params.get('bg'))) { FLAIR = params.get('bg'); document.body.dataset.bg = 'l'; }
+let WAVE = { h: 210, op: .085, echo: 0 };
+let LINE = 'calm';   // 'calm' (t), 'r9' (s), 'sine'
+if (['s','t','u'].includes(params.get('bg'))) { LINE = { s: 'r9', t: 'calm', u: 'sine' }[params.get('bg')]; params.set('bg', 'r'); }
+if (params.get('line')) LINE = params.get('line');
+if (params.get('bg') === 'r') { document.body.dataset.bg = 'q'; document.body.classList.add('dark'); }
+if (['p','q','r'].includes(params.get('bg'))) { FLAIR = 'o'; }
+if (params.get('bg') === 'p') WAVE = { h: 250, op: .12, echo: .055 };
+if (params.get('bg') === 'q') WAVE = { h: 290, op: .15, echo: .07 };
+if (params.get('bg') === 'r') WAVE = { h: 290, op: .15, echo: 0 };
+if (params.has('debug')) document.body.classList.add('debug');
+
+// Status bar, list rows, check icons
+const SB = '<svg width="19" height="12" viewBox="0 0 19 12" fill="currentColor"><rect x="0" y="8" width="3.2" height="4" rx="1"/><rect x="5" y="5.5" width="3.2" height="6.5" rx="1"/><rect x="10" y="3" width="3.2" height="9" rx="1"/><rect x="15" y="0" width="3.2" height="12" rx="1"/></svg>' +
+  '<svg width="17" height="12" viewBox="0 0 17 12" fill="currentColor"><path d="M8.5 2.6c2.4 0 4.6.9 6.2 2.5l1.2-1.2C14 2 11.4.9 8.5.9S3 2 1.1 3.9l1.2 1.2C3.9 3.5 6.1 2.6 8.5 2.6zm0 3.3c1.5 0 2.8.6 3.8 1.5l1.2-1.2C12.2 4.9 10.4 4.2 8.5 4.2s-3.7.7-5 2l1.2 1.2c1-.9 2.3-1.5 3.8-1.5zm0 3.3c.6 0 1.1.2 1.5.6L8.5 11.3 7 9.8c.4-.4.9-.6 1.5-.6z"/></svg>' +
+  '<svg width="28" height="13" viewBox="0 0 28 13"><rect x="0.5" y="0.5" width="24" height="12" rx="3.8" fill="none" stroke="currentColor" stroke-opacity=".38"/><rect x="2" y="2" width="21" height="9" rx="2.5" fill="currentColor"/><path d="M26 4.5v4c.8-.3 1.3-1.1 1.3-2s-.5-1.7-1.3-2z" fill="currentColor" fill-opacity=".4"/></svg>';
+document.querySelectorAll('.sb .r').forEach(e => e.innerHTML = SB);
+document.querySelectorAll('.wrow .ic').forEach(e => { if (e.textContent === 'CHK') e.innerHTML = '<svg viewBox="0 0 12 12"><path d="M2 6.4l2.6 2.6L10 3.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>'; });
+document.querySelectorAll('.hcard').forEach(card => {
+  card.innerHTML = card.textContent.trim().split('\n').map(l => {
+    const [, du, tm, pv] = l.trim().split('|');
+    return `<div class="hrow"><div class="tx"><div class="r1"><span class="du">${du}</span><span class="tm">${tm}</span></div><div class="pv">${pv}</div></div>
+      <svg class="ck" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9.5" fill="currentColor"/><path d="M6 10.3l2.7 2.7 5.3-6" fill="none" stroke="var(--s-card)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <svg class="ch" viewBox="0 0 8 14"><path d="M1.5 1.5L6.5 7l-5 5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>`;
+  }).join('');
+});
+
+// ---------- The message box, lifted above the line ----------
+const msgSrc = document.getElementById('msgsrc'), panoRect = document.getElementById('pano').getBoundingClientRect();
+const mr = msgSrc.getBoundingClientRect();
+const MSGY = Math.round(mr.top - panoRect.top + mr.height / 2);
+const clone = msgSrc.cloneNode(true); clone.removeAttribute('id'); clone.classList.add('msgclone');
+clone.style.left = (mr.left - panoRect.left) + 'px'; clone.style.top = (mr.top - panoRect.top) + 'px';
+clone.style.width = msgSrc.offsetWidth + 'px'; clone.style.transform = 'scale(' + (mr.width / msgSrc.offsetWidth) + ')';
+document.getElementById('pano').appendChild(clone);
+
+// ---------- The one line ----------
+// One hand-placed path. Each node is [x, y, heading in degrees, handle in, handle out];
+// consecutive nodes become one cubic Bézier whose handles lie on the node's heading,
+// so every join (and every seam crossing) is G1-continuous.
+const STROKE = 28;
+const NODES = [
+  [1112, 1806,  -8,   0, 230],   // F1: leaves the watch along its tilt (the bars ride this straight run)
+  [1640, 1700, -20, 230, 190],
+  [1960, 1330, -46, 190, 190],   // F2: lifts clear of the phone; no signal for a stretch
+  [2270, 1075, -20, 160, 170],   // F2: reconnects
+  [2690,  975,  -3, 170, 330],   // F3: run A (words)
+  [3680,  965,   0, 330,  62],
+  [3790, 1080,  90,  62,  62],   // U-turn, r = 115
+  [3680, 1195, 180,  62, 330],
+  [2850, 1195, 180, 330, 125],   // run B (words), back to the left
+  [2690, 1445,  90, 135, 200],   // one wide sweep down, well clear of the band
+  [3010, 1745,  32, 170, 160],   // easing into the side of the case, behind the watch
+  [3690, 1715, -30, 160, 260],   // out by the crown
+  [4430, MSGY,  -5, 330, 240],   // a long, shallow rise into the message box
+  [4900, MSGY + 20, 16, 200, 170], // turning down under the box
+  [5345, 1622,  14, 170,   0],   // F5: the relay node
+];
+const rad = a => a * Math.PI / 180;
+function nodesToPath(nodes) {
+  let d = `M${nodes[0][0]},${nodes[0][1]}`;
+  for (let i = 0; i < nodes.length - 1; i++) {
+    const [x0, y0, a0, , o0] = nodes[i], [x1, y1, a1, i1] = nodes[i + 1];
+    const c1 = [x0 + Math.cos(rad(a0)) * o0, y0 + Math.sin(rad(a0)) * o0];
+    const c2 = [x1 - Math.cos(rad(a1)) * i1, y1 - Math.sin(rad(a1)) * i1];
+    d += ` C${c1[0].toFixed(1)},${c1[1].toFixed(1)} ${c2[0].toFixed(1)},${c2[1].toFixed(1)} ${x1},${y1}`;
+  }
+  return d;
+}
+// The line, built from math: a sine wave (frames 1-2), eased flat into the word runs with a true
+// semicircle and arcs (frame 3), then the same sine again (frames 3-5). Every join matches position and slope.
+const WAVE_A = +(params.get('wa') || 64), WAVE_L = +(params.get('wl') || 737), WAVE_SG = +(params.get('ws') || -1);
+const LP = [];
+{
+  const cosEase = u => (1 - Math.cos(Math.PI * Math.max(0, Math.min(1, u)))) / 2;   // 0 -> 1, flat at both ends
+  // 1) watch -> reconnect -> run A: a sine of constant amplitude riding a gently curving centre line
+  //    (two arcs and a straight); the amplitude tapers to 0 over the last half wavelength so it lands flat on run A
+  const A1 = WAVE_A, lam1 = WAVE_L, h0 = -8 * Math.PI / 180;
+  const C = []; { let cx = 1112 - A1 * Math.sin(h0), cy = 1806 + A1 * Math.cos(h0), ch = h0; C.push([cx, cy, ch]);
+    const st = len => { const n = Math.ceil(len / 4); for (let i = 0; i < n; i++) { cx += Math.cos(ch) * len / n; cy += Math.sin(ch) * len / n; C.push([cx, cy, ch]); } };
+    const ar = (deg, R) => { const len = Math.abs(deg) * Math.PI / 180 * R, n = Math.ceil(len / 4), dh = deg * Math.PI / 180 / n;
+      for (let i = 0; i < n; i++) { ch += dh / 2; cx += Math.cos(ch) * len / n; cy += Math.sin(ch) * len / n; ch += dh / 2; C.push([cx, cy, ch]); } };
+    ar(-30, 400); st(990); ar(38, 970); }
+  let U = 0; const UL = []; for (let i = 0; i < C.length; i++) { if (i) U += Math.hypot(C[i][0] - C[i - 1][0], C[i][1] - C[i - 1][1]); UL.push(U); }
+  for (let i = 0; i < C.length; i++) { const u = UL[i], e = 1 - cosEase((u - (U - lam1 / 2)) / (lam1 / 2)), off = -A1 * e * Math.cos(2 * Math.PI * u / lam1);   // starts on the upper crest, level with the watch
+    LP.push([C[i][0] - Math.sin(C[i][2]) * off, C[i][1] + Math.cos(C[i][2]) * off]); }
+  const A = A1, lam = lam1, x1 = LP[LP.length - 1][0], y1 = LP[LP.length - 1][1];
+  // 2) frame 3: straight runs, a true semicircle, one wide arc down, then behind the watch
+  let tx = x1, ty = y1, th = 0;
+  const straight = len => { const n = Math.ceil(len / 8); for (let i = 0; i < n; i++) { tx += Math.cos(th) * len / n; ty += Math.sin(th) * len / n; LP.push([tx, ty]); } };
+  const arc = (deg, R) => { const len = Math.abs(deg) * Math.PI / 180 * R, n = Math.ceil(len / 8), dh = deg * Math.PI / 180 / n;
+    for (let i = 0; i < n; i++) { th += dh / 2; tx += Math.cos(th) * len / n; ty += Math.sin(th) * len / n; th += dh / 2; LP.push([tx, ty]); } };
+  straight(990);            // run A
+  arc(180, 110);            // semicircle, r = 110
+  straight(830);            // run B
+  arc(-150, 150);           // one wide sweep down, clear of the band
+  straight(600);            // into the side of the case, behind the watch
+  arc(-60, 260);
+  straight(140);            // out by the crown
+  // 3) the sine again, amplitude easing in over half a wavelength, into the message box and on to the relay node
+  const px = tx, py = ty, m0 = Math.tan(th), qx = 5345, qy = 1622 - A, m1 = 0.12, mx = 4550, my = 1400;
+  const herm = (x, xa, ya, ma, xb, yb, mb) => { const t = (x - xa) / (xb - xa), L0 = xb - xa;
+    return (2*t**3 - 3*t**2 + 1) * ya + (t**3 - 2*t**2 + t) * L0 * ma + (-2*t**3 + 3*t**2) * yb + (t**3 - t**2) * L0 * mb; };
+  const base2 = x => x < mx ? herm(x, px, py, m0, mx, my, 0) : herm(x, mx, my, 0, qx, qy, m1);
+  const phi = Math.PI / 2 - 2 * Math.PI * (qx - px) / lam;   // ends on a trough, level, at the node
+  for (let x = px + 4; x <= qx + 0.01; x += 4) LP.push([x, base2(x) + cosEase((x - px) / (lam / 2)) * A * Math.sin(2 * Math.PI * (x - px) / lam + phi)]);
+}
+// t: the calmest version: few anchors, long low-curvature cubics, at most one inflection per frame
+const NODES_T = [
+  [1112, 1806,  -6,   0, 380],   // F1: leaves the watch nearly level
+  [1990, 1262, -38, 330, 330],   // F2: one gentle rise (no signal along here)
+  [2690,  975,   0, 330, 330],   // F3: run A (words), straight
+  [3680,  975,   0, 330,  61],
+  [3790, 1085,  90,  61,  61],   // semicircle, r = 110
+  [3680, 1195, 180,  61, 330],
+  [2850, 1195, 180, 330, 125],   // run B (words), straight
+  [2690, 1445,  90, 135, 200],   // one wide sweep down, clear of the band
+  [3010, 1745,  32, 170, 160],   // into the side of the case, behind the watch
+  [3690, 1715, -30, 160, 400],   // out by the crown
+  [4560, MSGY + 30,  0, 400, 380], // through the message box
+  [5345, 1622,  18, 300,   0],   // F5: the relay node
+];
+const d = LINE === 'sine' ? 'M' + LP.map(q => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join(' L') : nodesToPath(LINE === 'r9' ? NODES : NODES_T);
+const spine = document.getElementById('spine'), ink = document.getElementById('ink');
+spine.setAttribute('d', d);
+const L = spine.getTotalLength();
+const samples = []; for (let s = 0; s <= L; s += 3) { const p = spine.getPointAtLength(s); samples.push([s, p.x, p.y]); }
+const sNear = (x, y, from = 0) => { let best = 1e12, bs = 0; for (const [s, px, py] of samples) { if (s < from) continue; const dd = (px - x) ** 2 + (py - y) ** 2; if (dd < best) { best = dd; bs = s; } } return bs; };
+const at = s => { const a = spine.getPointAtLength(Math.max(0, s - 1)), b = spine.getPointAtLength(Math.min(L, s + 1)), p = spine.getPointAtLength(s);
+  return { x: p.x, y: p.y, ang: Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI }; };
+const ns = 'http://www.w3.org/2000/svg';
+const el = (tag, attrs, parent = ink) => { const e = document.createElementNS(ns, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent.appendChild(e); return e; };
+// a solid stretch of the spine, by arc length
+const solid = (s0, s1, w = STROKE) => el('path', { d, fill: 'none', 'stroke-width': w, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-dasharray': `${(s1 - s0).toFixed(1)} ${(L * 2).toFixed(0)}`, 'stroke-dashoffset': (-s0).toFixed(1) });
+// a bar standing across the spine: width along the path, height across it
+const bar = (s, h) => { const p = at(s), w = Math.min(STROKE, h);
+  el('rect', { x: (p.x - w / 2).toFixed(1), y: (p.y - h / 2).toFixed(1), width: w.toFixed(1), height: h.toFixed(1), rx: (w / 2).toFixed(1), stroke: 'none',
+    transform: `rotate(${p.ang.toFixed(2)} ${p.x.toFixed(1)} ${p.y.toFixed(1)})` }); };
+const ease = t => t * t * (3 - 2 * t);
+const level = i => [0.62, 1, 0.78, 0.92, 0.56, 0.84, 0.7][i % 7];
+const PITCH = 54;
+
+// 1) F1: evenly spaced voice bars easing down into the line
+const BARS1 = 7;
+for (let i = 0; i < BARS1; i++) {
+  const t = i / (BARS1 - 1);
+  bar(PITCH * 0.5 + i * PITCH, STROKE + 14 + 52 * level(i) * (1 - ease(t)));
+}
+const lineStart = PITCH * 0.5 + BARS1 * PITCH;
+
+// 2) solid until the signal drops, dotted while the note waits, a reconnect point, solid again
+const sAtX = (x, from = 0) => { for (const [s, px] of samples) if (s >= from && px >= x) return s; return L; };
+const dot0 = LINE === 'r9' ? sNear(1960, 1320) : sAtX(1900), sR = LINE === 'r9' ? sNear(2230, 1085) : sAtX(2250);
+solid(lineStart, dot0);
+const DOT = 50, nDots = Math.floor((sR - 40 - (dot0 + DOT)) / DOT);
+const dotStep = (sR - 40 - (dot0 + DOT)) / nDots;
+for (let k = 0; k <= nDots; k++) { const p = at(dot0 + DOT + k * dotStep); el('circle', { cx: p.x.toFixed(1), cy: p.y.toFixed(1), r: (STROKE / 2 - 3).toFixed(1), stroke: 'none' }); }
+const pR = at(sR);
+el('circle', { cx: pR.x, cy: pR.y, r: 30, fill: 'none', 'stroke-width': 5.5, opacity: .7 });
+
+// 3) F5: the line breaks into evenly spaced bars that shrink to nothing at the relay node
+const sLineEnd = LINE === 'r9' ? sNear(5110, MSGY + 90) : sAtX(5100, sAtX(4000, sAtX(3700, sAtX(3000)))), sNode = L;
+solid(sR, sLineEnd);
+const BARS2 = 4, step2 = (sNode - 34 - sLineEnd) / BARS2;
+for (let i = 1; i <= BARS2; i++) bar(sLineEnd + i * step2, 70 - (i - 1) * 16);
+const pN = at(sNode);
+el('circle', { cx: pN.x, cy: pN.y, r: 24, fill: 'var(--node-fill)', 'stroke-width': 7 });
+// after the node only a thin line goes on: the transcript, into the history list
+const thin = nodesToPath([[pN.x + 24, pN.y + 1.5, 4, 0, 50], [5470, 1628, 0, 50, 80], [5720, 1628, 0, 80, 0]]);
+el('path', { d: thin, fill: 'none', 'stroke-width': 8, 'stroke-linecap': 'round' });
+
+// 4) F3: the words ride just above the two calm runs, always left to right
+function offsetPath(s0, s1, off) {
+  const pts = [];
+  for (let k = 0; k <= 160; k++) {
+    const ss = s0 + (s1 - s0) * k / 160, a = spine.getPointAtLength(Math.max(0, ss - 2)), b = spine.getPointAtLength(Math.min(L, ss + 2)), p = spine.getPointAtLength(ss);
+    let nx = -(b.y - a.y), ny = (b.x - a.x); const n = Math.hypot(nx, ny) || 1; nx /= n; ny /= n;
+    if (ny > 0) { nx = -nx; ny = -ny; }
+    pts.push([p.x + nx * off, p.y + ny * off]);
+  }
+  if (pts[0][0] > pts[pts.length - 1][0]) pts.reverse();
+  return 'M' + pts.map(q => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join(' L');
+}
+const words = document.getElementById('words');
+const said = [];
+function say(id, s0, s1, text) {
+  el('path', { id, d: offsetPath(s0, s1, STROKE / 2 + 22), fill: 'none' }, words);
+  const t = el('text', { fill: 'var(--words)', 'text-anchor': 'middle', 'font-size': 60 }, words);
+  const tp = el('textPath', { href: '#' + id, startOffset: '50%' }, t); tp.textContent = text;
+  said.push([t, s1 - s0]);
+}
+say('wA', sNear(2690, 975), sNear(3680, LINE === 'r9' ? 965 : 975), 'so um, the garage thing… wait, oat milk…');
+const sB0 = sNear(3680, 1195, sNear(3790, 1085));
+say('wB', sB0, sNear(2850, 1195, sB0), 'and call Sam back about Thursday…');
+// one size for both runs: the largest that fits the longer one
+function fitWords() {
+  let size = 60;
+  for (const [t, len] of said) {
+    const tmp = el('text', { 'font-size': 60, x: 0, y: -100 }, words); tmp.textContent = t.textContent;
+    size = Math.min(size, 60 * (len - 30) / tmp.getComputedTextLength()); tmp.remove();
+  }
+  for (const [t] of said) t.setAttribute('font-size', size.toFixed(1));
+}
+
+
+// ---------- Flair: quiet rings and a waveform, under everything ----------
+(function () {
+  if (!FLAIR) return;
+  const F = document.getElementById('flair');
+  const mk = (tag, at) => { const e = document.createElementNS(ns, tag); for (const k in at) e.setAttribute(k, at[k]); F.appendChild(e); return e; };
+  const CREAM = '#FFF1DC';
+  const rings = FLAIR === 'm' || FLAIR === 'o', wave = FLAIR === 'n' || FLAIR === 'o';
+  if (rings) {
+    // [cx, cy, first radius, step, count, opacity]
+    const DEV = FLAIR === 'm'
+      ? [[640, 1835, 560, 92, 4, .16], [2200, 2100, 400, 80, 3, .14], [3300, 1860, 470, 88, 4, .16], [4515, 1990, 700, 96, 3, .12], [5896, 2109, 560, 92, 3, .12]]
+      : [[640, 1835, 580, 104, 3, .13], [2200, 2100, 420, 90, 2, .11], [3300, 1860, 490, 100, 3, .13], [4515, 1990, 720, 110, 2, .10], [5896, 2109, 580, 104, 2, .10]];
+    const cdefs = mk('defs', {});
+    cdefs.innerHTML = [0, 1, 2, 3, 4].map(i => `<clipPath id="fr${i}"><rect x="${i * 1290}" y="0" width="1290" height="2796"/></clipPath>`).join('');
+    for (const [cx, cy, r0, st, n, op] of DEV) { const fg = mk('g', { 'clip-path': `url(#fr${Math.floor(cx / 1290)})` });
+      for (let i = 0; i < n; i++) { const c = document.createElementNS(ns, 'circle');
+        for (const [a, v] of Object.entries({ cx, cy, r: r0 + i * st, fill: 'none', stroke: CREAM, 'stroke-width': 3, opacity: (op * (1 - i / (n + 0.6))).toFixed(3) })) c.setAttribute(a, v);
+        fg.appendChild(c); } }
+    // soft halo directly behind each device
+    for (const [cx, cy, r0] of DEV) {
+      const g = mk('circle', { cx, cy, r: r0 * 0.95, fill: 'url(#halo)' });
+    }
+    const defs = mk('defs', {}); defs.innerHTML = '<radialGradient id="halo"><stop offset="0" stop-color="#FFE7C2" stop-opacity="' + (FLAIR === 'm' ? .16 : .11) + '"/><stop offset="1" stop-color="#FFE7C2" stop-opacity="0"/></radialGradient>';
+    F.insertBefore(defs, F.firstChild);
+  }
+  if (FLAIR === 'm') {
+    // small rings at the beats of the line: the reconnect point and the relay node
+    for (const [x, y] of [[pR.x, pR.y], [pN.x, pN.y]]) for (const [r, op] of [[62, .30], [98, .16]])
+      mk('circle', { cx: x, cy: y, r, fill: 'none', stroke: CREAM, 'stroke-width': 2.5, opacity: op });
+  }
+  if (wave) {
+    // a faint waveform of rounded level bars along the low horizon, quiet at the start, busiest in the ramble, fading out
+    const PIT = 34, BW = 14, Y = FLAIR === 'n' ? 2470 : 2540;
+    const WH = FLAIR === 'n' ? 300 : WAVE.h;
+    const env = x => { const t = x / 6450; return 0.35 + 0.65 * Math.exp(-Math.pow((x - 3100) / 1900, 2)) - 0.25 * Math.max(0, (t - .8) / .2); };
+    const g = mk('g', { fill: CREAM, opacity: FLAIR === 'n' ? .12 : WAVE.op });
+    const ge = WAVE.echo ? mk('g', { fill: CREAM, opacity: WAVE.echo }) : null;
+    let k = 0;
+    for (let x = PIT / 2; x < 6450; x += PIT, k++) {
+      const rnd = (Math.sin(k * 12.9898) * 43758.5453) % 1, r = Math.abs(rnd);
+      const n = 0.42 + 0.16 * Math.sin(k * 0.61) + 0.10 * Math.sin(k * 0.23 + 2) + 0.38 * (r - 0.4);
+      const hh = Math.max(BW, WH * env(x) * n);
+      const e = document.createElementNS(ns, 'rect');
+      for (const [a, v] of Object.entries({ x: (x - BW / 2).toFixed(1), y: (Y - hh / 2).toFixed(1), width: BW, height: hh.toFixed(1), rx: BW / 2 })) e.setAttribute(a, v);
+      g.appendChild(e);
+      if (ge) { // a fainter, taller echo of the same waveform, half a step behind
+        const he = Math.max(BW, hh * 1.7 + 30), ee = document.createElementNS(ns, 'rect');
+        for (const [a, v] of Object.entries({ x: (x + PIT / 2 - BW / 2).toFixed(1), y: (Y - he / 2).toFixed(1), width: BW, height: he.toFixed(1), rx: BW / 2 })) ee.setAttribute(a, v);
+        ge.appendChild(ee); }
+    }
+  }
+})();
+
+document.fonts.ready.then(() => { fitWords(); document.body.dataset.ready = '1'; });
+</script>
+</body>
+</html>

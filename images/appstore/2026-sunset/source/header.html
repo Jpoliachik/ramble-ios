@@ -1,0 +1,143 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Ramble Header</title>
+<style>
+@font-face { font-family: "Newsreader"; src: url(../fonts/nr-roman.woff2) format("woff2"); font-style: normal; font-weight: 200 800; }
+@font-face { font-family: "Newsreader"; src: url(../fonts/nr-italic.woff2) format("woff2"); font-style: italic; font-weight: 200 800; }
+:root { --amber-dark: #F59E0B; --cream: #FBF1E3; --serif: "Newsreader", Georgia, serif; --sans: "Inter", -apple-system, system-ui, sans-serif; --w-secondary: rgba(235,235,245,.60); }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { overflow: hidden; background: #1C1512; }
+body { -webkit-font-smoothing: antialiased; font-family: var(--sans); }
+#stage { position: relative; overflow: hidden; }
+#bg { position: absolute; inset: 0;
+  background:
+    radial-gradient(34% 70% at 30% 46%, rgba(255,200,150,.12) 0%, rgba(255,200,150,0) 70%),
+    radial-gradient(42% 46% at 6% 104%, rgba(250,150,64,.74) 0%, rgba(250,150,64,0) 70%),
+    radial-gradient(42% 46% at 28% 104%, rgba(244,114,64,.68) 0%, rgba(244,114,64,0) 70%),
+    radial-gradient(42% 46% at 52% 102%, rgba(226,92,92,.62) 0%, rgba(226,92,92,0) 70%),
+    radial-gradient(42% 46% at 75% 104%, rgba(188,74,120,.54) 0%, rgba(188,74,120,0) 70%),
+    radial-gradient(40% 46% at 96% 104%, rgba(122,64,138,.48) 0%, rgba(122,64,138,0) 70%),
+    radial-gradient(110% 30% at 50% 108%, rgba(255,156,90,.30) 0%, rgba(255,156,90,0) 70%),
+    linear-gradient(180deg, rgba(14,6,18,.42) 0%, rgba(14,6,18,0) 50%),
+    linear-gradient(98deg, #61402C 0%, #653530 20%, #5C2A36 40%, #48223E 60%, #33203F 80%, #241B36 100%);
+}
+#fx { position: absolute; inset: 0; }
+.dev { position: absolute; width: 0; height: 0; }
+.dev > .watch { position: absolute; left: 0; top: 0; transform: translate(-50%,-50%) rotate(var(--r,0deg)) scale(var(--s,1)); }
+/* ---------- Apple Watch, midnight aluminium, 1pt = 1px (46mm, 208 x 248) ---------- */
+.watch { width: 244px; height: 284px; }
+.watch .band { position: absolute; left: 36px; width: 172px;
+  background: linear-gradient(90deg, #15171B 0%, #2C3036 16%, #353A41 50%, #2C3036 84%, #15171B 100%); }
+.watch .band.top { bottom: 250px; height: 96px; border-radius: 26px 26px 0 0; -webkit-mask-image: linear-gradient(0deg, #000 35%, transparent 100%); mask-image: linear-gradient(0deg, #000 35%, transparent 100%); }
+.watch .band.bot { top: 250px; height: 330px; border-radius: 0 0 26px 26px; }
+.watch .band.bot .holes { position: absolute; left: 50%; top: 110px; transform: translateX(-50%); display: flex; flex-direction: column; gap: 22px; }
+.watch .band.bot .holes i { width: 10px; height: 10px; border-radius: 50%; background: rgba(0,0,0,.45); box-shadow: 0 1px 0 rgba(255,255,255,.08); display: block; }
+.watch .case { position: absolute; inset: 0; border-radius: 66px;
+  background: linear-gradient(150deg, #5A5F68 0%, #2E3238 30%, #1E2125 62%, #3A3F46 100%);
+  box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.22), inset 0 2px 2px rgba(255,255,255,.12), 0 34px 60px -20px rgba(20,8,4,.55), 0 10px 22px -8px rgba(20,8,4,.35); }
+.watch .crown { position: absolute; right: -11px; top: 68px; width: 15px; height: 44px; border-radius: 5px;
+  background: repeating-linear-gradient(180deg, #2A2D32 0 2px, #4A4F57 2px 4px); box-shadow: inset -2px 0 3px rgba(0,0,0,.4); }
+.watch .side { position: absolute; right: -5px; top: 140px; width: 7px; height: 56px; border-radius: 4px; background: linear-gradient(90deg,#2A2D32,#4A4F57); }
+.watch .glass { position: absolute; inset: 7px; border-radius: 60px; background: #030303; box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+.watch .screen { position: absolute; left: 18px; top: 18px; width: 208px; height: 248px; background: #000; border-radius: 46px; overflow: hidden; color: #fff; font-family: var(--sans); }
+.watch .glare { position: absolute; inset: 7px; border-radius: 60px; background: linear-gradient(160deg, rgba(255,255,255,.08) 0%, rgba(255,255,255,0) 32%); pointer-events: none; }
+.screen .clock { position: absolute; top: 9px; right: 26px; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.rbtn { position: absolute; left: 44px; top: 64px; width: 120px; height: 120px; border-radius: 50%; border: 5px solid var(--amber-dark); display: flex; align-items: center; justify-content: center; }
+.rbtn .fill { width: 100px; height: 100px; border-radius: 50%; background: var(--amber-dark); display: flex; align-items: center; justify-content: center; }
+.rbtn .bars { display: flex; gap: 8px; align-items: center; height: 56px; }
+.rbtn .bars i { display: block; width: 14px; border-radius: 7px; background: var(--amber-dark); }
+.rbtn svg.ok { width: 44px; height: 44px; color: #000; }
+.screen .hint { position: absolute; top: 37px; left: 0; right: 0; text-align: center; font-size: 13px; line-height: 16px; color: rgba(235,235,245,.6); }
+.wtimer { position: absolute; left: 60px; right: 60px; bottom: 16px; height: 32px; text-align: center; font-family: var(--serif); font-weight: 700; font-size: 26px; line-height: 32px; color: var(--amber-dark); font-variant-numeric: tabular-nums; }
+.hbtn { position: absolute; bottom: 16px; right: 26px; width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,.16); display: flex; align-items: center; justify-content: center; }
+.hbtn svg { width: 15px; height: 15px; color: #fff; }
+
+.watch .band.bot { -webkit-mask-image: linear-gradient(180deg, #000 12%, transparent 48%); mask-image: linear-gradient(180deg, #000 12%, transparent 48%); }
+.copy { position: absolute; color: var(--cream); text-shadow: 0 2px 24px rgba(40,16,24,.18); }
+.copy .wm { display: flex; align-items: center; font-family: var(--serif); font-style: italic; font-weight: 700; letter-spacing: -0.01em; }
+.copy .wm i { display: block; border-radius: 50%; background: var(--amber-dark); }
+.copy h1 { font-family: var(--serif); font-weight: 500; letter-spacing: -0.025em; font-variation-settings: "opsz" 72; white-space: nowrap; }
+.copy p { font-family: var(--serif); font-style: italic; font-weight: 400; opacity: .9; letter-spacing: -0.008em; font-variation-settings: "opsz" 36; white-space: nowrap; }
+</style></head>
+<body>
+<div id="stage">
+  <div id="bg"></div>
+  <svg id="fx" xmlns="http://www.w3.org/2000/svg"></svg>
+  <div class="dev" id="watch">
+    <div class="watch">
+      <div class="band top"></div><div class="band bot"><div class="holes"><i></i><i></i><i></i><i></i></div></div>
+      <div class="case"></div><div class="crown"></div><div class="side"></div><div class="glass"></div>
+      <div class="screen">
+        <div class="clock">8:14</div>
+        <div class="rbtn"><div class="bars"><i style="height:38px"></i><i style="height:56px"></i><i style="height:30px"></i></div></div>
+        <div class="wtimer">2:47</div>
+      </div>
+      <div class="glare"></div>
+    </div>
+  </div>
+  <div class="copy" id="copy"><div class="wm"><i></i>Ramble</div><h1>Talk to<br>your watch.</h1><p>Your agent handles it later.</p></div>
+</div>
+<script>
+const q = new URLSearchParams(location.search);
+const W = +(q.get('w') || 5244), H = +(q.get('h') || 2950);
+const st = document.getElementById('stage');
+for (const e of [document.documentElement, document.body, st]) { e.style.width = W + 'px'; e.style.height = H + 'px'; }
+const wide = W / H > 2;
+// layout, in fractions of the canvas; everything that matters sits in the central 60% x upper 65%
+const S = wide ? 0.40 * H / 284 : 0.36 * H / 284;          // watch scale
+const WX = W * (wide ? 0.355 : 0.345), WY = H * (wide ? 0.40 : 0.37);
+const wd = document.getElementById('watch'); wd.style.left = WX + 'px'; wd.style.top = WY + 'px';
+wd.style.setProperty('--s', S); wd.style.setProperty('--r', '-6deg');
+const FS = wide ? 0.092 * H : 0.082 * H;                     // headline size
+const cp = document.getElementById('copy');
+cp.style.left = (W * (wide ? 0.475 : 0.47)) + 'px';
+cp.querySelector('h1').style.cssText = `font-size:${FS}px; line-height:${FS * 1.02}px;`;
+cp.querySelector('p').style.cssText = `font-size:${FS * 0.42}px; line-height:${FS * 0.5}px; margin-top:${FS * 0.3}px;`;
+const wm = cp.querySelector('.wm'); wm.style.cssText = `font-size:${FS * 0.3}px; gap:${FS * 0.09}px; margin-bottom:${FS * 0.28}px;`;
+wm.querySelector('i').style.cssText = `width:${FS * 0.12}px; height:${FS * 0.12}px;`;
+
+cp.style.top = (WY + 0.03 * H - cp.offsetHeight) + 'px';
+const ns = 'http://www.w3.org/2000/svg', fx = document.getElementById('fx');
+fx.setAttribute('viewBox', `0 0 ${W} ${H}`); fx.setAttribute('width', W); fx.setAttribute('height', H);
+const el = (t, a, p = fx) => { const e = document.createElementNS(ns, t); for (const k in a) e.setAttribute(k, a[k]); p.appendChild(e); return e; };
+const k = H / 2796;   // panorama unit
+const defs = el('defs', {});
+defs.innerHTML = `<linearGradient id="amb" gradientUnits="userSpaceOnUse" x1="${WX}" y1="0" x2="${W}" y2="0">
+  <stop offset="0" stop-color="#FCC04A"/><stop offset=".55" stop-color="#F59E0B" stop-opacity="1"/><stop offset=".86" stop-color="#F59E0B" stop-opacity=".85"/><stop offset="1" stop-color="#F8AC3C" stop-opacity="0"/></linearGradient>
+  <radialGradient id="halo"><stop offset="0" stop-color="#FFE7C2" stop-opacity=".11"/><stop offset="1" stop-color="#FFE7C2" stop-opacity="0"/></radialGradient>`;
+const CREAM = '#FFF1DC';
+// faint rings around the watch
+const R0 = 0.66 * 284 * S, RS = 0.13 * 284 * S;
+el('circle', { cx: WX, cy: WY, r: R0 * 0.95, fill: 'url(#halo)' });
+for (let i = 0; i < 3; i++) el('circle', { cx: WX, cy: WY, r: R0 + i * RS, fill: 'none', stroke: CREAM, 'stroke-width': 3 * k * 1.2, opacity: (0.13 * (1 - i / 3.6)).toFixed(3) });
+// the waveform band and its echo, low and calm
+{ const PIT = 34 * k * 1.15, BW = 14 * k * 1.15, Y = H * 0.86, WH = 0.105 * H;
+  const g = el('g', { fill: CREAM, opacity: .15 });
+  let i = 0;
+  for (let x = PIT / 2; x < W; x += PIT, i++) {
+    const r = Math.abs((Math.sin(i * 12.9898) * 43758.5453) % 1);
+    const n = 0.42 + 0.16 * Math.sin(i * 0.61) + 0.10 * Math.sin(i * 0.23 + 2) + 0.38 * (r - 0.4);
+    const env = 0.45 + 0.55 * Math.exp(-Math.pow((x - W * 0.5) / (W * 0.33), 2));
+    const hh = Math.max(BW, WH * env * n), he = Math.max(BW, hh * 1.7 + 30 * k);
+    el('rect', { x: x - BW / 2, y: Y - hh / 2, width: BW, height: hh, rx: BW / 2 }, g);
+  } }
+// the line: bars leave the watch, then one long easy curve under the words that fades out to the right
+const ink = el('g', { fill: 'url(#amb)', stroke: 'url(#amb)', style: 'filter: drop-shadow(0 0 7px rgba(250,170,40,.22))' });
+const SW = 28 * k * 1.25;
+const ang = -6 * Math.PI / 180;
+const x0 = WX + 130 * S, y0 = WY + 46 * S;
+// one calm wave: starts on a crest (level with the bars), one and a half even undulations, fades at the edge
+const A = 0.024 * H, LAM = (W * 1.02 - x0) / 1.5;
+const pts = []; for (let x = x0; x <= W * 1.02; x += 6) pts.push([x, y0 + A - A * Math.cos(2 * Math.PI * (x - x0) / LAM)]);
+let d = 'M' + pts.map(q => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join(' L');
+const spine = el('path', { d, fill: 'none', stroke: 'none' }, defs);
+const L = spine.getTotalLength();
+const at = s => { const a = spine.getPointAtLength(Math.max(0, s - 1)), b = spine.getPointAtLength(Math.min(L, s + 1)), p = spine.getPointAtLength(s); return { x: p.x, y: p.y, a: Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI }; };
+const ease = t => t * t * (3 - 2 * t), level = i => [0.62, 1, 0.78, 0.92, 0.56, 0.84, 0.7][i % 7];
+const PITCH = 54 * k * 1.25, NB = 7;
+for (let i = 0; i < NB; i++) { const s = PITCH * 0.5 + i * PITCH, p = at(s), h = SW + (14 + 52 * level(i) * (1 - ease(i / (NB - 1)))) * k * 1.25, w = SW;
+  el('rect', { x: p.x - w / 2, y: p.y - h / 2, width: w, height: h, rx: w / 2, stroke: 'none', transform: `rotate(${p.a} ${p.x} ${p.y})` }, ink); }
+const s0 = PITCH * 0.5 + NB * PITCH;
+el('path', { d, fill: 'none', 'stroke-width': SW, 'stroke-linecap': 'round', 'stroke-dasharray': `${L - s0} ${L * 2}`, 'stroke-dashoffset': -s0 }, ink);
+document.fonts.ready.then(() => document.body.dataset.ready = '1');
+</script>
+</body></html>
