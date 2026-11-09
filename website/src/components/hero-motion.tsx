@@ -49,12 +49,12 @@ const TYPE_MS = 38;
 
 // Beats of one loop, in ms from the start of the loop. Recording lasts as long
 // as the words take to type out.
-//   0 idle: record button, "Tap to record"
+//   0 idle: record button, "Tap to talk"
 //   1 recording: tap, bars inside the ring, timer, the words appear
-//   2 stopped: "Saved on watch", the thought leaves for the agent
+//   2 stopped: "Sent to agent" with a green check, the thought leaves for the agent
 //   3 it lands with your agent
 //   4 handled
-//   5 the watch is back to "Tap to record". You're done.
+//   5 the watch is back to "Tap to talk". You're done.
 // The next loop starts while the agent row is still settling, so there's no
 // visible restart.
 function beatsFor(said: string) {
@@ -265,15 +265,15 @@ export default function HeroMotion({ size }: { size?: number }) {
                       saved ? "opacity-100" : "opacity-0"
                     }`}
                   >
-                    <CircleCheck className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
-                    Saved on watch
+                    <CircleCheck className="h-3.5 w-3.5 text-[#34c759]" strokeWidth={2.25} aria-hidden="true" />
+                    Sent to agent
                   </span>
                   <span
                     className={`absolute text-[12px] text-stone-400 transition-opacity duration-300 ${
                       !recording && !saved ? "opacity-100" : "opacity-0"
                     }`}
                   >
-                    Tap to record
+                    Tap to talk
                   </span>
                 </div>
               </div>
