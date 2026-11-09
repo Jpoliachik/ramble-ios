@@ -86,7 +86,7 @@ WEBHOOKS
 Ramble can also send each transcript to an HTTPS endpoint you choose.
 
 PRICE
-Free to download. 25 notes free, then $14.99 once. One-time purchase. No subscription. Fair use: 100 hours of audio per calendar month per purchase. Refunds are handled by Apple.
+Free to download. 25 notes free, then $14.99 once. One-time purchase. No subscription. Refunds are handled by Apple.
 
 Requires an Apple Watch paired with an iPhone.
 ```

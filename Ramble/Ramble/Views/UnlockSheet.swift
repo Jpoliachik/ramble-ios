@@ -95,20 +95,11 @@ struct UnlockSheet: View {
                 statusText(PurchaseCopy.storeUnreachable, isError: false)
             }
 
-            VStack(spacing: 4) {
-                Text(PurchaseCopy.oneTime)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Color.obInkSoft)
-
-                Link(destination: PurchaseService.termsURL) {
-                    Text(PurchaseCopy.fairUse)
-                        .underline()
-                }
-                .font(.system(size: 13))
-                .foregroundStyle(Color.obInkFaint)
-            }
-            .multilineTextAlignment(.center)
-            .padding(.top, 4)
+            Text(PurchaseCopy.oneTime)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(Color.obInkSoft)
+                .multilineTextAlignment(.center)
+                .padding(.top, 4)
 
             if let message = purchases.state.message {
                 statusText(message, isError: purchases.state.isError)

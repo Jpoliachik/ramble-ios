@@ -110,7 +110,7 @@ The iPhone app SHALL open the unlock sheet from the "Unlock" button in Settings,
 - THEN the unlock sheet opens
 
 ### Requirement: Unlock sheet
-The unlock sheet SHALL show the price exactly as the App Store reports it for the person's storefront, the words "One-time purchase. No subscription.", the line "Includes up to 100 hours of audio each month." linking to the Terms of Use, "Restore Purchases", and links to the Terms of Use and Privacy Policy. It SHALL NOT show a built-in price.
+The unlock sheet SHALL show the price exactly as the App Store reports it for the person's storefront, the words "One-time purchase. No subscription.", "Restore Purchases", and links to the Terms of Use and Privacy Policy. It SHALL NOT show a built-in price.
 
 #### Scenario: Price from the store
 - GIVEN a storefront where the unlock costs €14,99
@@ -221,7 +221,7 @@ TestFlight testers and App Review buy with sandbox purchases against the product
 
 ## Fair use
 
-Fair use is stated in the Terms of Use as 100 hours of audio per calendar month per purchase. The server does not enforce it: it watches for heavy use and alerts the operator, who can suspend one user by hand. The product has no automatic cap and no override screen.
+Ramble has no usage limit. The Terms of Use say only that Ramble may pause uploads from a setup that abuses the service. The server watches for heavy use with an internal 100-hour monthly threshold and alerts the operator, who can suspend one user by hand. The product has no automatic cap and no override screen, and the threshold is never shown to people.
 
 ### Requirement: Heavy use is monitored, never refused
 The server SHALL keep a tally of transcribed audio per user per calendar month (UTC), where the user is the purchase an inbox is unlocked by (counted across every inbox bound to it), or the inbox when it has none. Only notes that finish with a transcript or as "No speech detected" SHALL count, by the length the server measured ([transcription.md](transcription.md)); old-build transcriptions count toward their subscription's original transaction. When a user's tally first passes 100 hours in a month, the server SHALL send the operator one alert naming the user and the month, and no further heavy-use alert for that user that month. Heavy use SHALL NOT refuse, hold or slow any note, and the person SHALL see nothing about it.
@@ -315,16 +315,16 @@ Apple keeps billing a subscription until the person cancels it. While an unlocke
 ## What Ramble says about price
 
 ### Requirement: One price story everywhere
-The app, website, Terms of Use, Privacy Policy and App Store listing SHALL describe pricing as "Free to download. 25 notes free, then $14.99 once." (the app uses the store's local price), with no monthly price. The Terms of Use and App Store description SHALL state fair use as "100 hours of audio per calendar month" per purchase, and that refunds are handled by Apple.
+The app, website, Terms of Use, Privacy Policy and App Store listing SHALL describe pricing as "Free to download. 25 notes free, then $14.99 once." (the app uses the store's local price), with no monthly price. The Terms of Use and App Store description SHALL state that refunds are handled by Apple. No copy SHALL state a usage amount, hours of audio, or a monthly allowance.
 
 #### Scenario: Terms page
 - GIVEN the published Terms of Use
 - WHEN someone reads the pricing section
-- THEN it states the 25 free notes, the one-time unlock, fair use with its hours, and that refunds are handled by Apple
-- AND it says nothing about auto-renewal
+- THEN it states the 25 free notes, the one-time unlock, and that refunds are handled by Apple
+- AND it says nothing about auto-renewal or hours of audio
 
 ### Requirement: Words to avoid
-Copy SHALL NOT call the free notes a "trial", and SHALL NOT say "unlimited" (fair use applies), "premium", "Subscribe", or "per month" or "/month" next to a price. The only monthly wording allowed is the fair-use line "100 hours of audio per calendar month", and the unlock sheet's "Includes up to 100 hours of audio each month.". "Subscription" SHALL appear only in "No subscription." and in messages to subscribers.
+Copy SHALL NOT call the free notes a "trial", and SHALL NOT say "unlimited" (fair use applies), "premium", "Subscribe", or "per month" or "/month" next to a price, and SHALL NOT mention monthly hours or any usage amount. "Subscription" SHALL appear only in "No subscription." and in messages to subscribers.
 
 #### Scenario: Out of free notes
 - GIVEN a person with 0 free notes left

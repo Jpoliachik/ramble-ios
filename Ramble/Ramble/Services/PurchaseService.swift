@@ -52,7 +52,6 @@ enum PurchaseState: Equatable {
 enum PurchaseCopy {
     static let unlocked = "Unlocked"
     static let oneTime = "One-time purchase. No subscription."
-    static let fairUse = "Includes up to 100 hours of audio each month."
     static let storeUnreachable = "Can't reach the App Store. Try again in a moment."
     static let failed = "Purchase didn't go through. Try again."
     static let pending = "Waiting for approval. Your notes are kept and will transcribe once it's approved."

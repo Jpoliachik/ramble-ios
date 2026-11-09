@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { FAIR_USE, FREE_NOTES, PRICE_STORY, PROVIDERS, RETENTION, SUPPORT_EMAIL } from "@/lib/site";
+import { FREE_NOTES, PRICE_STORY, PROVIDERS, RETENTION, SUPPORT_EMAIL } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Terms of Use",
@@ -97,10 +97,7 @@ export default function TermsOfUse() {
           <section>
             <h2 className={h2}>Fair use</h2>
             <p className="mt-2">
-              Each purchase includes {FAIR_USE} (UTC), counted across every
-              iPhone and Apple Watch it unlocks and reset on the 1st. Length is
-              measured by Ramble&apos;s server. Fair use exists to stop abuse
-              and is set far above normal use. Ramble may pause uploads from a
+              Ramble is for your own notes. Ramble may pause uploads from a
               setup that abuses the service. A note that was already accepted
               is always transcribed in full. Questions? Email{" "}
               <a href={`mailto:${SUPPORT_EMAIL}`} className={link}>
