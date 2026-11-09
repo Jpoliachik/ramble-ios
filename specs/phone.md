@@ -185,7 +185,7 @@ The list SHALL group notes by day, newest first, under "Today", "Yesterday", or 
 | Picked up, or delivered to webhook | — | check, green |
 
 ### Requirement: Deleting a note
-The iPhone is the only full history: it SHALL keep every note's transcript and audio until the person deletes it or deletes the app. Swiping a row SHALL offer "Delete", which removes the note from this iPhone without asking; the note SHALL never come back from a later transcript or watch delivery, and agent copies are unaffected ([delivery.md](delivery.md)).
+The iPhone is the only full history: it SHALL keep every note's transcript and audio until the person deletes it or deletes the app. Swiping a row SHALL offer "Delete", which asks first with the note screen's "Delete this recording?" dialog and then removes the note from this iPhone; the note SHALL never come back from a later transcript or watch delivery, and agent copies are unaffected ([delivery.md](delivery.md)).
 
 #### Scenario: Deleted before its transcript arrived
 - GIVEN the person deleted a note that was still transcribing

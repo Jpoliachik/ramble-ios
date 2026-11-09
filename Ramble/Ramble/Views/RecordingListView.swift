@@ -10,6 +10,7 @@ struct RecordingListView: View {
     let isRecording: Bool
     @Binding var scrollOffset: CGFloat
 
+    @State private var deleteTarget: Recording?
     @State private var showLockHint = false
     @State private var lockHintTask: Task<Void, Never>?
 
@@ -26,7 +27,7 @@ struct RecordingListView: View {
                             }
                             .swipeActions(edge: .trailing) {
                                 Button(role: .destructive) {
-                                    onDelete(recording)
+                                    deleteTarget = recording
                                 } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
@@ -42,6 +43,21 @@ struct RecordingListView: View {
             }
             .listStyle(.insetGrouped)
             .readableListWidth()
+            .confirmationDialog(
+                "Delete this recording?",
+                isPresented: Binding(
+                    get: { deleteTarget != nil },
+                    set: { if !$0 { deleteTarget = nil } }
+                ),
+                titleVisibility: .visible,
+                presenting: deleteTarget
+            ) { recording in
+                Button("Delete Recording", role: .destructive) {
+                    onDelete(recording)
+                }
+            } message: { _ in
+                Text("This will permanently delete the recording and its transcript.")
+            }
             .refreshable {
                 await BackgroundTaskService.shared.refresh()
             }

@@ -348,11 +348,19 @@ private struct AgentStatusCard: View {
                     .foregroundStyle(Color.obInk)
                 Spacer(minLength: 8)
                 if let onDisconnect {
-                    // Quiet grey: the confirmation dialog carries the red.
-                    Button("Disconnect", action: onDisconnect)
-                        .font(.system(size: 14))
-                        .buttonStyle(.plain)
-                        .foregroundStyle(Color.obInkFaint)
+                    // A small red X; the confirmation dialog asks first.
+                    Button(action: onDisconnect) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 24))
+                            .symbolRenderingMode(.hierarchical)
+                            .foregroundStyle(Color.red)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.trailing, -10)
+                    .padding(.vertical, -10)
+                    .accessibilityLabel("Disconnect \(AgentHealth.displayName(connection))")
                 }
             }
             Text(AgentHealth.summary(connection))

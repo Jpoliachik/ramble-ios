@@ -79,12 +79,12 @@ The agent screen SHALL be titled "Your agent" and give each agent a card: its na
 - AND it shows "If your agent lost its setup, connect it again with a fresh message." with a "Connect again" button
 
 ### Requirement: More than one agent stays quiet in the interface
-The agent screen SHALL offer further agents only through the footnote "Using more than one agent? **Connect another**", with "Connect another" in the amber accent so it reads as tappable. "Connect another" and "Connect again" each pair a separate connection; an existing one stays until disconnected. With more than one agent, the title SHALL read "Your agents", each card gets a "Disconnect", and the bottom action reads "Disconnect all".
+The agent screen SHALL offer further agents only through the footnote "Using more than one agent? **Connect another**", with "Connect another" in the amber accent so it reads as tappable. "Connect another" and "Connect again" each pair a separate connection; an existing one stays until disconnected. With more than one agent, the title SHALL read "Your agents", each card gets a small red X button on its right (accessibility label "Disconnect <name>") that asks first, and the bottom action reads "Disconnect all".
 
 #### Scenario: Two agents
 - GIVEN "Grok Bot" and "Muse" are connected
 - WHEN the person opens the agent screen
-- THEN it is titled "Your agents" and shows two cards, each with "Disconnect"
+- THEN it is titled "Your agents" and shows two cards, each with a red X that disconnects it after confirming
 
 ### Requirement: Disconnect cuts an agent off at once
 Disconnecting an agent SHALL revoke its key immediately, delete every copy waiting for it, and remove its wake-up hook. Other agents stay connected.
