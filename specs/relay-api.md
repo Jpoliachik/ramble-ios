@@ -299,12 +299,12 @@ A note's transcript SHALL stay readable by the person's devices until the phone 
 - THEN the response is `{"deleted": 0}` and item 41 remains
 
 ### Requirement: Delivery status
-`POST /inbox/status` (phone) with `{"recording_ids": [1–100 note IDs]}` SHALL return `{"recordings": [{"recording_id", "copies", "waiting", "picked_up", "removed", "first_picked_up_at"}], "missing": [ids]}`: agent copies made, still waiting, acked, and removed unread (expired, deleted, or agent disconnected), and the first ack time or `null`. IDs this inbox doesn't know are listed only in `missing`. States: [delivery.md](delivery.md).
+`POST /inbox/status` (phone) with `{"recording_ids": [1–100 note IDs]}` SHALL return `{"recordings": [{"recording_id", "copies", "waiting", "picked_up", "removed", "first_picked_up_at", "agents"}], "missing": [ids]}`: agent copies made, still waiting, acked, and removed unread (expired, deleted, or agent disconnected), the first ack time or `null`, and `agents`, one `{"connection_id", "name", "state", "picked_up_at"}` per copy in the order copies were made, with `state` `"waiting"`, `"picked_up"` or `"removed"`, and `name` `null` when the agent gave none or has since been disconnected. IDs this inbox doesn't know are listed only in `missing`. States: [delivery.md](delivery.md).
 
 #### Scenario: Removed unread
 - GIVEN a note copied to one agent, which was disconnected before pulling
 - WHEN the phone asks
-- THEN it gets `"copies": 1, "waiting": 0, "picked_up": 0, "removed": 1, "first_picked_up_at": null`
+- THEN it gets `"copies": 1, "waiting": 0, "picked_up": 0, "removed": 1, "first_picked_up_at": null`, and one entry in `agents` with `"state": "removed"` and `"name": null`
 
 ### Requirement: Agent name and wake-up hook
 `GET /agent` SHALL return `{"name", "hook": null | {"url", "header_names", "last_ping_at", "last_status"}}`, never header values; `PATCH /agent` with `{"name"?, "hook"?}` updates them and returns the same shape. `name` is 1–40 characters or `null`. A hook `{"url", "headers"}` SHALL be `https://` with a public hostname, at most 8 headers and 4 KB, none of `Host`, `Content-Type`, `Content-Length`, `Connection`, `Transfer-Encoding`, `User-Agent`, `Cookie`; otherwise `400`. Setting one sends a test ping (`"event": "ramble.test"`) and reports its status (`0` = no response); `null` removes it. Headers are stored only encrypted; without encryption, setting a hook gets `503`.

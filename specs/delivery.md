@@ -205,6 +205,23 @@ Once a note's transcript exists, the iPhone SHALL give it exactly one of the sta
 - WHEN the person connects an agent
 - THEN the note keeps that state, and no agent receives it
 
+### Requirement: Several agents are counted in the words
+When a note was copied to more than one agent, the two agent states SHALL count them, everywhere the state is shown: "Waiting for your agent" reads "Waiting for your agents" while every copy waits, otherwise "Waiting for <waiting> of <copies> agents"; "Your agent has it" reads "Your agents have it" when every copy was picked up, otherwise "<picked up> of <copies> agents have it". A note copied to one agent keeps the singular words. The states themselves, their order and colors are unchanged.
+
+#### Scenario: One of two picked up
+- GIVEN a note copied to "Grok Bot" and "Muse"
+- WHEN Muse picks it up and Grok Bot hasn't
+- THEN the note reads "Waiting for 1 of 2 agents"
+- AND once Grok Bot is disconnected before reading, it reads "1 of 2 agents have it"
+
+### Requirement: The note screen lists each agent
+When a note was copied to more than one agent, the note screen SHALL list each one under the delivery line, always shown, one compact row per agent: its name ("Agent" if it gave none or was disconnected) and "Has it · 9:15" (green dot), "Waiting" (grey) or "Not picked up" (amber). Each pickup SHALL also be logged in "Details" as "Picked up by <name>". A note copied to one agent shows no list.
+
+#### Scenario: Two agents on the note screen
+- GIVEN Muse picked a note up at 9:15 and Grok Bot hasn't
+- WHEN the person opens the note
+- THEN under "Waiting for 1 of 2 agents" they see "Grok Bot · Waiting" and "Muse · Has it · 9:15"
+
 ## Webhooks
 
 ### Requirement: One optional webhook destination

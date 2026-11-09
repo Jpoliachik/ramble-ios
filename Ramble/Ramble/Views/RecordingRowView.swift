@@ -57,7 +57,7 @@ struct RecordingRowView: View {
                 Image(systemName: symbol)
                     .foregroundStyle(stage.tint(for: recording))
                     .font(.subheadline)
-                    .accessibilityLabel(stage.label)
+                    .accessibilityLabel(stage.label(for: recording))
             }
         }
         .padding(.vertical, 6)

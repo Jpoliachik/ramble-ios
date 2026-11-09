@@ -105,6 +105,17 @@ enum DeliveryStage: Equatable {
         }
     }
 
+    /// `label`, counting agents when the note went to more than one
+    /// ("2 of 3 agents have it", "Waiting for your agents").
+    func label(for recording: Recording) -> String {
+        guard let delivery = recording.agentDelivery else { return label }
+        switch self {
+        case .agentHasIt: return delivery.hasItLabel
+        case .waitingForAgent: return delivery.waitingLabel
+        default: return label
+        }
+    }
+
     /// The list row's caption, or nil when the icon says enough.
     var caption: String? {
         switch self {

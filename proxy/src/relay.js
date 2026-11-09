@@ -139,6 +139,29 @@ export async function inboxStatus(request, ctx) {
     .prepare(`SELECT id FROM notes WHERE inbox_id = ? AND id IN (${marks})`)
     .bind(cred.inboxId, ...unique)
     .all();
+  // One row per copy, so the phone can show which agent has it. A
+  // disconnected agent's row is gone, so its copy comes back with no name.
+  const { results: perAgent } = await ctx.db
+    .prepare(
+      `SELECT e.recording_id, e.connection_id, c.name,
+              CASE WHEN e.acked_at IS NOT NULL THEN 'picked_up'
+                   WHEN ${WAITING} THEN 'waiting' ELSE 'removed' END AS state,
+              e.acked_at
+         FROM entries e LEFT JOIN connections c ON c.id = e.connection_id
+        WHERE e.inbox_id = ? AND e.recording_id IN (${marks}) ORDER BY e.id`,
+    )
+    .bind(ctx.now, cred.inboxId, ...unique)
+    .all();
+  const agentsById = new Map();
+  for (const a of perAgent) {
+    if (!agentsById.has(a.recording_id)) agentsById.set(a.recording_id, []);
+    agentsById.get(a.recording_id).push({
+      connection_id: a.connection_id,
+      name: a.name ?? null,
+      state: a.state,
+      picked_up_at: iso(a.acked_at),
+    });
+  }
   const byId = new Map(copies.map((r) => [r.recording_id, r]));
   const known = new Set([...notes.map((n) => n.id), ...byId.keys()]);
 
@@ -154,6 +177,7 @@ export async function inboxStatus(request, ctx) {
           picked_up: r.picked_up,
           removed: r.copies - r.waiting - r.picked_up,
           first_picked_up_at: iso(r.first_ack),
+          agents: agentsById.get(id) ?? [],
         };
       }),
     missing: unique.filter((id) => !known.has(id)),

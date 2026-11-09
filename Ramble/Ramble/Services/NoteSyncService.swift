@@ -230,11 +230,22 @@ final class NoteSyncService: ObservableObject {
                 waiting: item.waiting,
                 pickedUp: item.pickedUp,
                 removed: item.removed,
-                firstPickedUpAt: item.firstPickedUpAt
+                firstPickedUpAt: item.firstPickedUpAt,
+                agents: item.agents?.compactMap { copy in
+                    AgentCopy.State(rawValue: copy.state).map {
+                        AgentCopy(connectionId: copy.connectionId, name: copy.name, state: $0, pickedUpAt: copy.pickedUpAt)
+                    }
+                }
             )
             guard next != recordings[i].agentDelivery else { continue }
             let before = recordings[i].agentDelivery
-            if next.waiting == 0, next.pickedUp > 0, (before?.pickedUp ?? 0) == 0 {
+            if next.copies > 1, let copies = next.agents {
+                // Several agents: log each pickup by name, as it happens.
+                let alreadyPickedUp = Set((before?.agents ?? []).filter { $0.state == .pickedUp }.map(\.connectionId))
+                for copy in copies where copy.state == .pickedUp && !alreadyPickedUp.contains(copy.connectionId) {
+                    recordings[i].activityLog.append(ActivityEntry("Picked up by \(copy.name ?? "an agent")", at: copy.pickedUpAt ?? Date()))
+                }
+            } else if next.waiting == 0, next.pickedUp > 0, (before?.pickedUp ?? 0) == 0 {
                 recordings[i].activityLog.append(ActivityEntry("Picked up by your agent", at: next.firstPickedUpAt ?? Date()))
             } else if next.copies > 0, next.waiting == 0, next.pickedUp == 0, (before?.removed ?? 0) == 0 {
                 recordings[i].activityLog.append(ActivityEntry("Removed before your agent picked it up"))

@@ -14,7 +14,6 @@ struct RecordingDetailView: View {
     @State private var recording: Recording?
     @State private var showCopied = false
     @State private var showDeleteConfirmation = false
-    @State private var showDetails = false
     @State private var isTranscriptExpanded = false
     @State private var transcriptFullHeight: CGFloat = 0
     @State private var transcriptLimitedHeight: CGFloat = 0
@@ -117,7 +116,7 @@ struct RecordingDetailView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                StatusPill(text: stage.label, dot: stage.tint(for: recording))
+                StatusPill(text: stage.label(for: recording), dot: stage.tint(for: recording))
             }
         }
     }
@@ -326,12 +325,14 @@ struct RecordingDetailView: View {
         case .agentHasIt:
             let first = recording.agentDelivery?.firstPickedUpAt
             return DeliveryLine(
-                title: "Your agent has it",
+                title: stage.label(for: recording),
                 detail: first.map { "Picked up \(DateFormatters.timeFormatter.string(from: $0))" }
             )
+        case .waitingForAgent:
+            return DeliveryLine(title: stage.label(for: recording))
         case .didntSend:
             return DeliveryLine(title: "Didn't send", detail: lastWebhookFailure(recording), action: .resendWebhook)
-        case .noAgent, .webhookSending, .waitingForAgent, .checkingDelivery, .notPickedUp, .deliveredToWebhook:
+        case .noAgent, .webhookSending, .checkingDelivery, .notPickedUp, .deliveredToWebhook:
             return DeliveryLine(title: stage.label)
         }
     }
@@ -367,6 +368,11 @@ struct RecordingDetailView: View {
                     .buttonBorderShape(.capsule)
                     .tint(Color.brandAmber)
                     .controlSize(.small)
+                }
+            }
+            if let copies = recording.agentDelivery?.agents, copies.count > 1 {
+                ForEach(copies, id: \.connectionId) { copy in
+                    AgentCopyRow(copy: copy)
                 }
             }
             if line.action == .retryTranscription, audioRequest == .openWatch, !recording.hasAudio {
@@ -438,10 +444,10 @@ struct RecordingDetailView: View {
 
     // MARK: - Activity
 
-    /// Each logged step, folded away. Handy when something goes wrong.
+    /// Each logged step, always shown, in compact rows.
     private func activitySection(_ recording: Recording) -> some View {
-        Section {
-            DisclosureGroup("Details", isExpanded: $showDetails) {
+        Section("Details") {
+            Group {
                 ForEach(Array(recording.activityLog.enumerated()), id: \.offset) { _, entry in
                     HStack(spacing: 10) {
                         Text(entry.message)
@@ -463,7 +469,9 @@ struct RecordingDetailView: View {
                     }
                 }
             }
+            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
         }
+        .environment(\.defaultMinListRowHeight, 26)
     }
 
     // MARK: - Helpers
@@ -486,6 +494,46 @@ struct RecordingDetailView: View {
             .background(.ultraThinMaterial, in: .capsule)
             .shadow(radius: 4)
             .padding(.top, 8)
+    }
+}
+
+/// One agent's pickup, listed under the delivery line when a note went to
+/// several agents: "Muse · Has it 9:15", "Grok Bot · Waiting".
+private struct AgentCopyRow: View {
+    let copy: AgentCopy
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(dot)
+                .frame(width: 7, height: 7)
+            Text(copy.name ?? "Agent")
+                .font(.subheadline)
+                .lineLimit(1)
+            Spacer(minLength: 8)
+            Text(status)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var status: String {
+        switch copy.state {
+        case .pickedUp:
+            return copy.pickedUpAt.map { "Has it · \(DateFormatters.timeFormatter.string(from: $0))" } ?? "Has it"
+        case .waiting: return "Waiting"
+        case .removed: return "Not picked up"
+        }
+    }
+
+    private var dot: Color {
+        switch copy.state {
+        case .pickedUp: return .green
+        case .waiting: return Color(.tertiaryLabel)
+        case .removed: return .brandAmber
+        }
     }
 }
 

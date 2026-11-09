@@ -64,6 +64,17 @@ struct RelayDeliveryStatus: Decodable {
     let pickedUp: Int
     let removed: Int
     let firstPickedUpAt: Date?
+    /// One per copy; nil from a relay that only sends the counts.
+    let agents: [RelayAgentCopy]?
+}
+
+/// One agent's copy of a note, as POST /inbox/status reports it.
+struct RelayAgentCopy: Decodable {
+    let connectionId: String
+    let name: String?
+    /// "waiting", "picked_up" or "removed".
+    let state: String
+    let pickedUpAt: Date?
 }
 
 /// Transcription options kept with the inbox (GET/PUT /settings).

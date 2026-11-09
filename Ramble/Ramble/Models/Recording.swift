@@ -51,6 +51,38 @@ struct AgentDelivery: Codable, Hashable {
     var pickedUp: Int
     var removed: Int
     var firstPickedUpAt: Date?
+    /// Each agent's copy, in pairing order. Nil for notes checked before
+    /// the relay reported per agent.
+    var agents: [AgentCopy]? = nil
+
+    /// "Your agent has it", or "Your agents have it" / "2 of 3 agents have it".
+    var hasItLabel: String {
+        if copies <= 1 { return "Your agent has it" }
+        if pickedUp == copies { return "Your agents have it" }
+        return "\(pickedUp) of \(copies) agents have it"
+    }
+
+    /// "Waiting for your agent", or "Waiting for your agents" / "Waiting for 1 of 3 agents".
+    var waitingLabel: String {
+        if copies <= 1 { return "Waiting for your agent" }
+        if waiting == copies { return "Waiting for your agents" }
+        return "Waiting for \(waiting) of \(copies) agents"
+    }
+}
+
+/// One agent's copy of a note.
+struct AgentCopy: Codable, Hashable {
+    enum State: String, Codable {
+        case waiting
+        case pickedUp = "picked_up"
+        case removed
+    }
+
+    var connectionId: String
+    /// What the agent called itself; nil if unnamed or since disconnected.
+    var name: String?
+    var state: State
+    var pickedUpAt: Date?
 }
 
 struct Recording: Identifiable, Codable, Hashable {

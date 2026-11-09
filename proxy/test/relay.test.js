@@ -113,9 +113,11 @@ describe('the whole loop', () => {
     h.now += 30 * DAY;
     assert.equal((await pull(agent)).items.length, 0);
     await h.cron();
-    assert.deepEqual((await status(secret, [noteId(1)])).body.recordings[0], {
+    const { agents, ...counts } = (await status(secret, [noteId(1)])).body.recordings[0];
+    assert.deepEqual(counts, {
       recording_id: noteId(1), copies: 1, waiting: 0, picked_up: 0, removed: 1, first_picked_up_at: null,
     });
+    assert.deepEqual(agents.map((a) => a.state), ['removed']);
   });
 });
 
@@ -129,15 +131,36 @@ describe('delivery status', () => {
     const [item] = (await pull(a)).items;
     await ack(a, [item.id]);
     const res = await status(secret, [noteId(1), noteId(2)]);
+    const [ca, cb] = (await h.call('GET', '/connections', { auth: secret })).body.connections.map((c) => c.id);
     assert.deepEqual(res.body, {
       recordings: [
-        { recording_id: noteId(1), copies: 2, waiting: 1, picked_up: 1, removed: 0, first_picked_up_at: new Date(h.now).toISOString() },
+        {
+          recording_id: noteId(1), copies: 2, waiting: 1, picked_up: 1, removed: 0, first_picked_up_at: new Date(h.now).toISOString(),
+          agents: [
+            { connection_id: ca, name: null, state: 'picked_up', picked_up_at: new Date(h.now).toISOString() },
+            { connection_id: cb, name: null, state: 'waiting', picked_up_at: null },
+          ],
+        },
       ],
       missing: [noteId(2)],
     });
-    await h.call('DELETE', `/connections/${(await h.call('GET', '/connections', { auth: secret })).body.connections[1].id}`, { auth: secret });
+    await h.call('DELETE', `/connections/${cb}`, { auth: secret });
     assert.equal((await pull(b)).items, undefined);
-    assert.equal((await status(secret, [noteId(1)])).body.recordings[0].removed, 1);
+    const after = (await status(secret, [noteId(1)])).body.recordings[0];
+    assert.equal(after.removed, 1);
+    assert.deepEqual(after.agents.map((x) => [x.connection_id, x.state]), [[ca, 'picked_up'], [cb, 'removed']]);
+  });
+
+  it('names each agent that has a copy', async () => {
+    const secret = await h.inbox();
+    const a = await h.connect(secret, 'Grok Bot');
+    await h.connect(secret, 'Muse');
+    h.now = T0 + MINUTE;
+    await say(secret, 1);
+    const [item] = (await pull(a)).items;
+    await ack(a, [item.id]);
+    const { agents } = (await status(secret, [noteId(1)])).body.recordings[0];
+    assert.deepEqual(agents.map((x) => [x.name, x.state]), [['Grok Bot', 'picked_up'], ['Muse', 'waiting']]);
   });
 
   it("can't see another inbox, and needs the phone's credential", async () => {

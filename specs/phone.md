@@ -195,7 +195,7 @@ The iPhone is the only full history: it SHALL keep every note's transcript and a
 ## Note screen
 
 ### Requirement: Note header and transcript
-Tapping a row SHALL open the note screen titled "Recording" with the duration, "Thursday, November 6 at 9:12 AM", a status pill in the row's words, and the transcript. The transcript SHALL be selectable and clamped to 12 lines with "Show more" / "Show less"; "Copy" copies all of it and shows "Copied" for 1.5 seconds. Without a transcript the area reads "Waiting to send", "Transcribing…", "No transcript yet." or, for a silent note, "No speech detected", with no Copy button. The screen ends with a collapsed "Details" list of each logged step, its time to the second, and any HTTP status in green (under 300) or red.
+Tapping a row SHALL open the note screen titled "Recording" with the duration, "Thursday, November 6 at 9:12 AM", a status pill in the row's words, and the transcript. The transcript SHALL be selectable and clamped to 12 lines with "Show more" / "Show less"; "Copy" copies all of it and shows "Copied" for 1.5 seconds. Without a transcript the area reads "Waiting to send", "Transcribing…", "No transcript yet." or, for a silent note, "No speech detected", with no Copy button. The screen ends with an always-open, compact "Details" list of each logged step, its time to the second, and any HTTP status in green (under 300) or red.
 
 #### Scenario: Copying
 - GIVEN a note has a 40-line transcript
@@ -216,7 +216,7 @@ When the audio is on this iPhone, the note screen SHALL show a waveform player w
 - THEN the phone shows "Open Ramble on your watch to sync."
 
 ### Requirement: Delivery line
-Under the player, the note screen SHALL show one line saying where the note is. Delivery states use exactly the words in [delivery.md](delivery.md) ("Waiting for your agent", "Checking delivery…", "Your agent has it" with the first pickup time, "Not picked up", "Saved, no agent connected", "Nothing to send · no speech detected", "Delivered to webhook", "Didn't send" with "Retry"). Before delivery the line reads:
+Under the player, the note screen SHALL show one line saying where the note is. Delivery states use exactly the words in [delivery.md](delivery.md) ("Waiting for your agent", "Checking delivery…", "Your agent has it" with the first pickup time, "Not picked up", "Saved, no agent connected", "Nothing to send · no speech detected", "Delivered to webhook", "Didn't send" with "Retry"), counted for several agents and followed by one row per agent ([delivery.md](delivery.md)). Before delivery the line reads:
 
 | State | Title | Detail | Action |
 |---|---|---|---|
