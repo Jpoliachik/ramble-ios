@@ -4,7 +4,7 @@
 
 import { AppleVerifyError } from './apple.js';
 import { address, authenticate, limit } from './auth.js';
-import { DAY, fail, json, logId, randomToken, readJSON, sha256Hex, unavailable, utcMonth } from './http.js';
+import { DAY, fail, json, logId, randomHex, randomToken, readJSON, sha256Hex, unavailable, utcMonth } from './http.js';
 import { alert } from './ops.js';
 
 export const FREE_NOTES = 25;
@@ -136,8 +136,8 @@ export async function createInbox(request, ctx) {
 
   const secret = `rmbi_${randomToken(32)}`;
   await ctx.db
-    .prepare('INSERT INTO inboxes (id, secret_hash, created_at) VALUES (?, ?, ?)')
-    .bind(`inb_${randomToken(12)}`, await sha256Hex(secret), ctx.now)
+    .prepare('INSERT INTO inboxes (id, secret_hash, created_at, usage_id) VALUES (?, ?, ?, ?)')
+    .bind(`inb_${randomToken(12)}`, await sha256Hex(secret), ctx.now, randomHex(8))
     .run();
   return json({ inbox_secret: secret }, 201);
 }

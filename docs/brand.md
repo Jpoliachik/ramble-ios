@@ -111,6 +111,7 @@ Keep claims inside this list. If it isn't here, check the code before writing it
 - Connect an agent with a short single-use pairing code (like `K7QX-MP4D-HN3R`, expires in 10 minutes). No API keys or URLs.
 - Copy says "your agent." Muse is the agent we build and test with, so name it where someone needs to know what's tested, and don't headline "works with any agent."
 - No accounts. Privacy, in the words we use everywhere: "Ramble's server is a relay, not an archive. Your audio is sent to a transcription provider and deleted as soon as the transcript is ready. Transcripts are deleted when your agent picks them up, or after 30 days. Your full history lives only on your iPhone." Credentials are stored only as hashes.
+- Usage stats, in the words we use everywhere: "Ramble also keeps basic usage stats for each note, like its length and whether it came from your watch or iPhone, under a random ID. Never your audio or your words." Never claim "no data collected" or "no analytics".
 - Webhooks: one destination. Your iPhone sends a signed POST to any HTTPS endpoint once it has the transcript, with retries.
 - Pricing, word for word: "Free to download. 25 notes free, then $14.99 once." No subscription. Refunds are handled by Apple.
 - Never mention a usage number or monthly hours. The heavy-use threshold is an internal alarm for the operator, not a limit, and naming it makes people wonder if they're near it.

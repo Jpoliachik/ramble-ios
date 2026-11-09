@@ -20,6 +20,10 @@ export const PRICE_STORY = `Free to download. ${FREE_NOTES} notes free, then ${A
 export const PRIVACY_WORDING =
   "Ramble's server is a relay, not an archive. Your audio is sent to a transcription provider and deleted as soon as the transcript is ready. Transcripts are deleted when your agent picks them up, or after 30 days. Your full history lives only on your iPhone.";
 
+// specs/delivery.md "Usage stats wording". Use it verbatim, after PRIVACY_WORDING.
+export const USAGE_WORDING =
+  "Ramble also keeps basic usage stats for each note, like its length and whether it came from your watch or iPhone, under a random ID. Never your audio or your words.";
+
 // How long an agent's copy waits if it is never picked up.
 export const RETENTION = "30 days";
 

@@ -77,6 +77,7 @@ PRIVACY
 - Ramble's server is a relay, not an archive. Your audio is sent to a transcription provider and deleted as soon as the transcript is ready.
 - Transcripts are deleted when your agent picks them up, or after 30 days.
 - Your full history lives only on your iPhone.
+- Basic usage stats for each note, like its length, under a random ID. Never your audio or your words.
 - Disconnect any time.
 
 TRANSCRIPTION
@@ -111,14 +112,14 @@ Ramble is now free to download. Your first 25 notes are free, then unlock once f
 
 ## App Privacy (privacy label)
 
-Matches the privacy policy and `specs/delivery.md`. Ramble does no tracking and has no accounts. Proposed answers; **TODO: confirm in ASC** that each category maps as below.
+Matches the privacy policy, `specs/delivery.md` and each app's `PrivacyInfo.xcprivacy`. Ramble does no tracking and has no accounts. Proposed answers; **TODO: confirm in ASC** that each category maps as below.
 
 | Data type (Apple's name) | Collected | Linked to the user | Purpose | Why |
 | --- | --- | --- | --- | --- |
 | User Content → Audio Data | Yes | No | App Functionality | Each recording is uploaded and sent to Ramble's transcription provider (Groq), then deleted once transcribed, at most 1 day after upload |
 | User Content → Other User Content | Yes | No | App Functionality | Transcripts, held for the person's devices and agents, deleted on pickup or after 30 days (a point-in-time database backup keeps deleted rows up to 30 days for outage recovery) |
 | Purchases → Purchase History | Yes | No | App Functionality | Apple's signed purchase record, to unlock notes |
-| Usage Data or Diagnostics | TODO: decide | No | App Functionality | Per-note lengths, providers and outcomes, with no audio or text, used for usage monitoring and running the service |
+| Usage Data → Product Interaction | Yes | No | Analytics | One row per note under a random usage ID (device, times, length, result, tries, settings on or off, app version), never audio or text, kept to fix problems and see how Ramble is used (`specs/usage.md`) |
 
 Not collected: contact info, location, identifiers for tracking, browsing history. Webhook transcripts go from the iPhone straight to the person's own URL and never reach Ramble's server.
 

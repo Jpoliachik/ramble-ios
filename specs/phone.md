@@ -315,7 +315,7 @@ The "Your agent" row SHALL read "Not connected" (grey) with no agent; with one, 
 #### Scenario: How privacy works
 - GIVEN the person opens "How privacy works"
 - WHEN they read it
-- THEN it uses the privacy wording in [delivery.md](delivery.md), adds that webhook transcripts go from the phone straight to their URL, and links to the privacy policy
+- THEN it uses the privacy wording in [delivery.md](delivery.md), adds that webhook transcripts go from the phone straight to their URL, adds "Usage stats": "For each note, Ramble's server keeps when it was recorded, how long it is, whether it came from your watch or iPhone, whether it transcribed, and the app version, under a random ID. Never your audio or your words. This helps fix problems and shows how Ramble is used.", and links to the privacy policy
 
 #### Scenario: Delete all data
 - GIVEN there are notes

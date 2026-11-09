@@ -7,6 +7,7 @@ import {
   PAIR_CODE_EXAMPLE,
   PAIR_CODE_TTL,
   PRIVACY_WORDING,
+  USAGE_WORDING,
   RELAY_URL,
   RELAY_URL_LEGACY,
   RETENTION,
@@ -494,7 +495,9 @@ export default function AgentDocs() {
 
             <section className="space-y-4">
               <SectionHeader id="privacy">What the relay keeps</SectionHeader>
-              <p>{PRIVACY_WORDING}</p>
+              <p>
+                {PRIVACY_WORDING} {USAGE_WORDING}
+              </p>
               <p>
                 Every detail is in the{" "}
                 <Link href="/privacy" className={linkClass}>

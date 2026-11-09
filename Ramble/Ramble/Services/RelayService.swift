@@ -150,6 +150,16 @@ final class RelayService: ObservableObject {
         return ISO8601DateFormatter().date(from: string)
     }
 
+    /// App build and OS for X-Ramble-Client ("Ramble/1.3 (142) iOS/26.2"),
+    /// kept by the relay for usage stats and debugging (specs/relay-api.md).
+    nonisolated static let clientLabel: String = {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        let os = ProcessInfo.processInfo.operatingSystemVersion
+        return "Ramble/\(version) (\(build)) iOS/\(os.majorVersion).\(os.minorVersion).\(os.patchVersion)"
+    }()
+
     /// When recording started, in the phone's own offset
     /// (2026-11-01T07:59:00-05:00), for X-Ramble-Recorded-At.
     nonisolated static func localTimestamp(_ date: Date) -> String {
@@ -327,6 +337,7 @@ final class RelayService: ObservableObject {
         request.setValue("\(size)", forHTTPHeaderField: "Content-Length")
         request.setValue(Self.localTimestamp(recording.createdAt), forHTTPHeaderField: "X-Ramble-Recorded-At")
         if isRetry { request.setValue("1", forHTTPHeaderField: "X-Ramble-Retry") }
+        request.setValue(Self.clientLabel, forHTTPHeaderField: "X-Ramble-Client")
 
         let data: Data
         let response: URLResponse
@@ -451,6 +462,7 @@ final class RelayService: ObservableObject {
         request.httpBody = body
         if body != nil { request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
         if let auth { request.setValue("Bearer \(auth)", forHTTPHeaderField: "Authorization") }
+        request.setValue(Self.clientLabel, forHTTPHeaderField: "X-Ramble-Client")
         for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
 
         let data: Data

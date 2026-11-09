@@ -28,6 +28,7 @@ import {
 import { alertKeyProblem, alertPermanentFailure } from './ops.js';
 import { makeAgentCopies } from './relay.js';
 import { INLINE_PROVIDER_TIMEOUT_MS, TranscribeError } from './transcribe.js';
+import { clientLabel, recordNoteEvent, rememberClient } from './usage.js';
 
 export const AUDIO_TYPES = new Set(['audio/mp4', 'audio/m4a', 'audio/x-m4a', 'audio/aac']);
 export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
@@ -134,6 +135,8 @@ export async function uploadNote(request, rawId, ctx) {
   if (!ctx.env.AUDIO) return unavailable();
   const id = rawId.toUpperCase();
   const inboxId = cred.inboxId;
+  const app = clientLabel(request);
+  await rememberClient(ctx, cred, app);
 
   // Repeats are answered before the body is read, and count for nothing.
   let existing = await readNote(ctx, inboxId, id);
@@ -193,7 +196,7 @@ export async function uploadNote(request, rawId, ctx) {
   // Accepted now, after the (possibly long) body arrived.
   ctx = { ...ctx, now: ctx.clock() };
   const accepted = await acceptNote(ctx, {
-    cred, id, retry, account, contentType, seconds, audioKey, recordedAt, recordedMs,
+    cred, id, retry, account, contentType, seconds, audioKey, recordedAt, recordedMs, app,
   });
   if (accepted.response) {
     await ctx.env.AUDIO.delete(audioKey).catch(() => {});
@@ -238,19 +241,19 @@ async function acceptNote(ctx, u) {
                 ready_at = NULL, transcript_cleared_at = NULL, phone_acked_at = NULL, watch_received_at = NULL,
                 retry_count = retry_count + 1, attempts = 1, attempt_started_at = ?, next_attempt_at = NULL,
                 options = NULL, accepted_at = ?, content_type = ?, container_duration = ?, audio_key = ?,
-                audio_stored_at = ?
+                audio_stored_at = ?, app = ?
               WHERE inbox_id = ? AND id = ? AND status = 'failed' AND retry_count < ?`,
           )
-          .bind(now, now, u.contentType, u.seconds, u.audioKey, now, inboxId, u.id, MAX_HAND_RETRIES)
+          .bind(now, now, u.contentType, u.seconds, u.audioKey, now, u.app, inboxId, u.id, MAX_HAND_RETRIES)
       : db
           .prepare(
             `INSERT INTO notes (inbox_id, id, source, status, recorded_at, recorded_ms, received_at, accepted_at,
-                content_type, container_duration, attempts, attempt_started_at, audio_key, audio_stored_at, free_note)
-             SELECT ?, ?, ?, 'transcribing', ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ? WHERE ${freeSQL}
+                content_type, container_duration, attempts, attempt_started_at, audio_key, audio_stored_at, free_note, app)
+             SELECT ?, ?, ?, 'transcribing', ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ? WHERE ${freeSQL}
              ON CONFLICT (inbox_id, id) DO NOTHING`,
           )
           .bind(inboxId, u.id, u.cred.kind === 'inbox' ? 'phone' : 'watch', u.recordedAt, u.recordedMs, now, now,
-            u.contentType, u.seconds, now, u.audioKey, now, free ? 1 : 0, ...freeParams),
+            u.contentType, u.seconds, now, u.audioKey, now, free ? 1 : 0, u.app, ...freeParams),
     db
       .prepare(
         `UPDATE inboxes SET free_notes_used = free_notes_used + ?, last_upload_at = ? WHERE id = ? AND ${mine}`,
@@ -289,6 +292,7 @@ export async function getNote(request, rawId, ctx) {
 export async function listNotes(request, ctx) {
   const { cred, response } = await authenticate(request, ctx, ['inbox']);
   if (response) return response;
+  await rememberClient(ctx, cred, clientLabel(request));
 
   const after = new URL(request.url).searchParams.get('after');
   let afterAt = -1;
@@ -415,6 +419,11 @@ async function finishDone(ctx, note, out) {
 
   // Monitoring: the measured length counts once, when the note is done.
   await recordUsage(ctx, await usageUser(ctx, note.inbox_id), duration);
+  await recordNoteEvent(ctx, done);
+  console.log(
+    `[notes] done ${result} source=${done.source} duration=${Math.round(duration)}s ` +
+      `wait=${((ctx.now - done.accepted_at) / 1000).toFixed(1)}s attempts=${done.attempts} inbox=${await logId(done.inbox_id)}`,
+  );
   await deleteAudio(ctx, done);
 }
 
@@ -455,6 +464,8 @@ async function finishFailed(ctx, note, result, error) {
       .run();
   }
   console.log(`[notes] failed ${result} inbox=${await logId(note.inbox_id)}`);
+  // A failed note gives its free note back, so it never counts as one.
+  await recordNoteEvent(ctx, { ...failed, free_note: 0 });
   await alertPermanentFailure(ctx, result, error);
   await deleteAudio(ctx, failed);
 }
