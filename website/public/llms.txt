@@ -22,7 +22,7 @@ Ramble can also send each transcript to an HTTPS endpoint (webhook) from the iPh
 - [Requirements and troubleshooting](https://ramble.watch/docs/help): Minimum iOS and watchOS, and fixes for a missing watch app, notes waiting on the watch, held notes, transcription errors, and an agent that isn't picking up.
 - [Support](https://ramble.watch/support): support@ramble.watch, restoring a purchase, refunds.
 
-Requirements: iPhone on iOS 26.2 or later. Apple Watch on watchOS 10.0 or later (Series 4 and later, any SE, any Ultra). If the watch app doesn't appear after installing, the watch is usually on an older watchOS.
+Requirements: iPhone on iOS 18.6 or later. Apple Watch on watchOS 10.0 or later (Series 4 and later, any SE, any Ultra). If the watch app doesn't appear after installing, the watch is usually on an older watchOS.
 
 ## Links
 

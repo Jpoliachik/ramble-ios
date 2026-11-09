@@ -143,7 +143,7 @@ WatchConnectivity now carries only the watch token and account state (phone → 
 ### Tech Stack
 
 - SwiftUI for all UI
-- Deployment target: iOS 26.2, watchOS 10.0 (covers Series 4+ and first-gen SE; guard newer watch APIs with `#available`). If you change a deployment target, update `MIN_IOS`/`MIN_WATCHOS` in `website/src/lib/site.ts` and the requirements in `website/public/llms*.txt`
+- Deployment target: iOS 18.6, watchOS 10.0 (covers Series 4+ and first-gen SE; guard newer watch APIs with `#available`). If you change a deployment target, update `MIN_IOS`/`MIN_WATCHOS` in `website/src/lib/site.ts` and the requirements in `website/public/llms*.txt`
 
 ### Relay API
 

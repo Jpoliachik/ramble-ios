@@ -43,6 +43,6 @@ export const PAIR_CODE_TTL = "10 minutes";
 
 // Minimum OS versions. Keep in sync with IPHONEOS_DEPLOYMENT_TARGET and
 // WATCHOS_DEPLOYMENT_TARGET in Ramble/Ramble.xcodeproj.
-export const MIN_IOS = "26.2";
+export const MIN_IOS = "18.6";
 export const MIN_WATCHOS = "10.0";
 export const WATCH_MODELS = "Apple Watch Series 4 and later, every Apple Watch SE, and every Apple Watch Ultra";
