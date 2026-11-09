@@ -213,14 +213,14 @@ export default function HeroMotion({ size }: { size?: number }) {
           }}
         >
           <div className="relative">
-            {/* A short, faded band above and below, so it reads as a watch */}
+            {/* A short band stub above and below, so it reads as a watch */}
             <span
               aria-hidden="true"
-              className="absolute -top-[40px] left-1/2 h-[52px] w-[132px] -translate-x-1/2 rounded-t-[20px] bg-[linear-gradient(to_top,#2a2825_30%,rgba(42,40,37,0))]"
+              className="absolute -top-[26px] left-1/2 h-[40px] w-[124px] -translate-x-1/2 rounded-[14px] bg-stone-800"
             />
             <span
               aria-hidden="true"
-              className="absolute -bottom-[40px] left-1/2 h-[52px] w-[132px] -translate-x-1/2 rounded-b-[20px] bg-[linear-gradient(to_bottom,#2a2825_30%,rgba(42,40,37,0))]"
+              className="absolute -bottom-[26px] left-1/2 h-[40px] w-[124px] -translate-x-1/2 rounded-[14px] bg-stone-800"
             />
             <span aria-hidden="true" className="absolute -left-[6px] top-[34%] h-10 w-[7px] rounded-l-sm bg-brand/85" />
             <span aria-hidden="true" className="absolute -right-[8px] top-[22%] h-8 w-[9px] rounded-r-md bg-stone-700" />

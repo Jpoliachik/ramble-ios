@@ -250,14 +250,16 @@ export default function Home() {
             <CopyTextButton text={`${SETUP_MESSAGE}\n${SITE_URL}/docs`} label="Copy message" />
           </div>
 
-          <p className="mt-14 text-center text-sm text-stone-500">
-            Have your own endpoint?
-                Ramble can also send each transcript to any HTTPS URL.{" "}
-                <Link href="/docs/webhooks" className={inlineLink}>
-                  Webhook docs
-                </Link>
-                .
-          </p>
+          <div className="mt-14 space-y-1.5 text-center text-sm text-stone-500">
+            <p>Works best with personal agents like Muse, Grok Bot and Dot.</p>
+            <p>
+              Have your own custom endpoint?{" "}
+              <Link href="/docs/webhooks" className={inlineLink}>
+                Webhooks work too
+              </Link>
+              .
+            </p>
+          </div>
         </div>
       </section>
 
