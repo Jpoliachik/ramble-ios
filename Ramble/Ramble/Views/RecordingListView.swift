@@ -105,15 +105,18 @@ private struct TrySayingView: View {
 
     var body: some View {
         VStack(spacing: 24) {
-            OnboardingWatchFrame {
-                OnboardingRecordGlyph()
-                    .phaseAnimator([false, true]) { glyph, inhale in
-                        glyph.scaleEffect(reduceMotion ? 1 : (inhale ? 1.06 : 0.96))
-                    } animation: { _ in .easeInOut(duration: 1.4) }
+            // No watch to point at on iPad: just the ideas, above the mic button.
+            if !ThisDevice.isPad {
+                OnboardingWatchFrame {
+                    OnboardingRecordGlyph()
+                        .phaseAnimator([false, true]) { glyph, inhale in
+                            glyph.scaleEffect(reduceMotion ? 1 : (inhale ? 1.06 : 0.96))
+                        } animation: { _ in .easeInOut(duration: 1.4) }
+                }
+                .scaleEffect(1.2)
+                .padding(.vertical, 18)
+                .accessibilityHidden(true)
             }
-            .scaleEffect(1.2)
-            .padding(.vertical, 18)
-            .accessibilityHidden(true)
 
             TimelineView(.periodic(from: .now, by: Self.interval)) { context in
                 let index = reduceMotion ? 0 : Int(context.date.timeIntervalSinceReferenceDate / Self.interval) % Self.ideas.count
