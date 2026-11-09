@@ -13,23 +13,27 @@ import SwiftUI
 struct OnboardingIntroStep: View {
     let onContinue: () -> Void
 
-    @State private var beat = 0
+    /// On iPad (no watch) only the last beat, "Your agent handles it.", plays.
+    @State private var beat = ThisDevice.isPad ? IntroBeat.agentHandles.rawValue : 0
     @State private var fill: CGFloat = 0
 
     private static let beatDuration: Double = 6
+    private static var beats: [IntroBeat] { ThisDevice.isPad ? [.agentHandles] : IntroBeat.allCases }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            IntroSegmentBar(count: IntroBeat.allCases.count, current: beat, fill: fill)
-                .padding(.horizontal, 24)
-                .padding(.top, 12)
+            if !ThisDevice.isPad {
+                IntroSegmentBar(count: IntroBeat.allCases.count, current: beat, fill: fill)
+                    .padding(.horizontal, 24)
+                    .padding(.top, 12)
+            }
 
             OnboardingWordmark(size: 20)
                 .padding(.horizontal, 24)
                 .padding(.top, 18)
 
             TabView(selection: $beat) {
-                ForEach(IntroBeat.allCases) { item in
+                ForEach(Self.beats) { item in
                     IntroBeatPage(beat: item)
                         .padding(.horizontal, 24)
                         .tag(item.rawValue)
