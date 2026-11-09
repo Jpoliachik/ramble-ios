@@ -17,6 +17,8 @@ enum OnboardingStep: Int, CaseIterable {
 
     /// 1-based position in the 3-step body. The intro returns nil (no dots shown).
     var progressIndex: Int? {
+        // iPad is intro → connect only: no dots, no Back.
+        if ThisDevice.isPad { return nil }
         switch self {
         case .intro: return nil
         case .destination: return 1
@@ -25,8 +27,7 @@ enum OnboardingStep: Int, CaseIterable {
         }
     }
 
-    /// No watch step on iPad.
-    static var bodyStepCount: Int { ThisDevice.isPad ? 2 : 3 }
+    static let bodyStepCount = 3
 }
 
 // MARK: - Pairing message

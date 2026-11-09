@@ -43,7 +43,8 @@ struct OnboardingView: View {
                         OnboardingIntroStep(
                             onContinue: {
                                 giveConsent()
-                                advance(to: .destination)
+                                // iPad: straight to connecting an agent (webhooks live in Settings)
+                                advance(to: ThisDevice.isPad ? .connect : .destination)
                             }
                         )
                     case .destination:
