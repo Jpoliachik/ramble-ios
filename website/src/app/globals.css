@@ -40,6 +40,37 @@
     Menlo, monospace;
 }
 
+/* Sunset touches, from the App Store screenshots: ember, rose, wine, indigo.
+   Light wash for the hero; the deep sky for the closing band. */
+.sunset-wash {
+  background:
+    radial-gradient(38% 60% at 12% 100%, rgba(244, 150, 70, 0.22), rgba(244, 150, 70, 0) 70%),
+    radial-gradient(38% 60% at 40% 100%, rgba(238, 118, 72, 0.18), rgba(238, 118, 72, 0) 70%),
+    radial-gradient(38% 60% at 68% 100%, rgba(220, 98, 96, 0.16), rgba(220, 98, 96, 0) 70%),
+    radial-gradient(38% 60% at 92% 100%, rgba(150, 82, 140, 0.14), rgba(150, 82, 140, 0) 70%),
+    linear-gradient(180deg, #f4f3ef 0%, #f6efe6 55%, #f3e3d6 100%);
+}
+
+.sunset-deep {
+  background:
+    radial-gradient(32% 70% at 8% 100%, rgba(250, 150, 64, 0.72), rgba(250, 150, 64, 0) 70%),
+    radial-gradient(32% 70% at 30% 100%, rgba(244, 114, 64, 0.66), rgba(244, 114, 64, 0) 70%),
+    radial-gradient(32% 70% at 52% 100%, rgba(226, 92, 92, 0.6), rgba(226, 92, 92, 0) 70%),
+    radial-gradient(32% 70% at 73% 100%, rgba(188, 74, 120, 0.52), rgba(188, 74, 120, 0) 70%),
+    radial-gradient(30% 70% at 93% 100%, rgba(122, 64, 138, 0.46), rgba(122, 64, 138, 0) 70%),
+    linear-gradient(180deg, rgba(14, 6, 18, 0.4) 0%, rgba(14, 6, 18, 0) 55%),
+    linear-gradient(98deg, #61402c 0%, #653530 20%, #5c2a36 40%, #48223e 60%, #33203f 80%, #241b36 100%);
+}
+
+/* One step along the sunset per number: ember, rose, wine. */
+.sunset-step-1 { background: linear-gradient(135deg, #e07a2e, #c9542f); }
+.sunset-step-2 { background: linear-gradient(135deg, #c9542f, #b03f5c); }
+.sunset-step-3 { background: linear-gradient(135deg, #b03f5c, #6e3474); }
+
+.sunset-bubble { background: linear-gradient(120deg, #c2410c 0%, #b03f5c 100%); }
+
+.sunset-rule { background: linear-gradient(90deg, #f0963f, #e2645c, #b84a78, #7a408a); }
+
 @media (prefers-reduced-motion: no-preference) {
   html {
     scroll-behavior: smooth;
