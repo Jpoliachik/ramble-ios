@@ -110,7 +110,7 @@ The iPhone app SHALL open the unlock sheet from the "Unlock" button in Settings,
 - THEN the unlock sheet opens
 
 ### Requirement: Unlock sheet
-The unlock sheet SHALL show the price exactly as the App Store reports it for the person's storefront, the words "One-time purchase. No subscription.", "Restore Purchases", and links to the Terms of Use and Privacy Policy. It SHALL NOT show a built-in price.
+The unlock sheet SHALL show where the person stands ("N of 25 free notes left.", or "You've used your 25 free notes. New ones wait safely until you unlock." at 0), a short note signed by the developer (a thank-you note once unlocked), the price exactly as the App Store reports it for the person's storefront, the words "One-time purchase. No subscription.", "Restore Purchases", and links to the Terms of Use and Privacy Policy. It SHALL NOT show a built-in price.
 
 #### Scenario: Price from the store
 - GIVEN a storefront where the unlock costs €14,99
@@ -120,7 +120,15 @@ The unlock sheet SHALL show the price exactly as the App Store reports it for th
 #### Scenario: Store unreachable
 - GIVEN the App Store price cannot be loaded
 - WHEN the person opens the unlock sheet
-- THEN the button reads "Unlock", disabled, above "Can't reach the App Store. Try again in a moment."
+- THEN the button reads "Unlock", disabled, above "Can't reach the App Store. Try again in a moment." with "Try again", which reloads the price
+
+### Requirement: Results show beside their control
+A purchase result SHALL show under the unlock button and a Restore result under "Restore Purchases". While a purchase is pending or finishing, its message SHALL replace the unlock button.
+
+#### Scenario: Restore finds nothing
+- GIVEN a person on the unlock sheet with nothing to restore
+- WHEN they tap "Restore Purchases"
+- THEN "No purchase found for this Apple ID." shows under "Restore Purchases"
 
 ### Requirement: Purchase outcomes
 The app SHALL show the person the outcome of every purchase attempt, and no outcome SHALL lose a held note.

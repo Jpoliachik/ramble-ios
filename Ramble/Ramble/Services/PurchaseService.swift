@@ -63,6 +63,20 @@ enum PurchaseCopy {
     static let subscriberTitle = "Cloud transcription is now included for everyone."
     static let subscriberBody = "You don't need your subscription anymore. Apple keeps billing it until you cancel."
     static let subscriberSettingsRow = "Your old subscription is still active"
+
+    /// The developer's note on the unlock sheet. Justin's own words; edit freely.
+    static let developerNoteTitle = "A note from Justin"
+    static let developerNoteSubtitle = "I make Ramble"
+    static let developerNote = [
+        "Hi, I'm Justin. I built Ramble because my best thoughts show up on walks, far from my phone, and I wanted them handled by the time I got home.",
+        "There are no ads and no subscription, and I never sell what you say. One payment keeps Ramble running, and keeps everything you say going to your agent.",
+        "Thanks for trying it.",
+    ]
+    static let developerNoteThanks = [
+        "Thank you. Your unlock keeps Ramble running, with no ads and no subscription.",
+        "If something isn't working, write to support@ramble.watch. It comes straight to me.",
+    ]
+    static let developerNoteSignature = "Justin"
 }
 
 @MainActor
