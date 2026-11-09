@@ -1,8 +1,8 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><title>Ramble Header</title>
 <style>
-@font-face { font-family: "Newsreader"; src: url(../fonts/nr-roman.woff2) format("woff2"); font-style: normal; font-weight: 200 800; }
-@font-face { font-family: "Newsreader"; src: url(../fonts/nr-italic.woff2) format("woff2"); font-style: italic; font-weight: 200 800; }
+@font-face { font-family: "Newsreader"; src: url(fonts/nr-roman.woff2) format("woff2"); font-style: normal; font-weight: 200 800; }
+@font-face { font-family: "Newsreader"; src: url(fonts/nr-italic.woff2) format("woff2"); font-style: italic; font-weight: 200 800; }
 :root { --amber-dark: #F59E0B; --cream: #FBF1E3; --serif: "Newsreader", Georgia, serif; --sans: "Inter", -apple-system, system-ui, sans-serif; --w-secondary: rgba(235,235,245,.60); }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { overflow: hidden; background: #1C1512; }
@@ -57,6 +57,19 @@ body { -webkit-font-smoothing: antialiased; font-family: var(--sans); }
 .copy .wm i { display: block; border-radius: 50%; background: var(--amber-dark); }
 .copy h1 { font-family: var(--serif); font-weight: 500; letter-spacing: -0.025em; font-variation-settings: "opsz" 72; white-space: nowrap; }
 .copy p { font-family: var(--serif); font-style: italic; font-weight: 400; opacity: .9; letter-spacing: -0.008em; font-variation-settings: "opsz" 36; white-space: nowrap; }
+/* Default: the website hero's light sunset wash (website/src/app/globals.css .sunset-wash). ?theme=deep keeps the dark sky. */
+body.wash { background: #F4F3EF; }
+body.wash #bg { background:
+    radial-gradient(38% 60% at 12% 100%, rgba(244,150,70,.22), rgba(244,150,70,0) 70%),
+    radial-gradient(38% 60% at 40% 100%, rgba(238,118,72,.18), rgba(238,118,72,0) 70%),
+    radial-gradient(38% 60% at 68% 100%, rgba(220,98,96,.16), rgba(220,98,96,0) 70%),
+    radial-gradient(38% 60% at 92% 100%, rgba(150,82,140,.14), rgba(150,82,140,0) 70%),
+    linear-gradient(180deg, #F4F3EF 0%, #F6EFE6 55%, #F3E3D6 100%); }
+body.wash .copy { color: #1A1917; text-shadow: none; }
+body.wash .copy p { color: #B45309; opacity: 1; }
+body.wash .copy .wm { color: #1A1917; }
+body.wash .watch .case { box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.22), inset 0 2px 2px rgba(255,255,255,.12), 0 22px 36px -14px rgba(90,50,30,.30), 0 8px 16px -8px rgba(90,50,30,.22); }
+body.wash .dev > .watch { will-change: transform; }
 </style></head>
 <body>
 <div id="stage">
@@ -82,6 +95,8 @@ const W = +(q.get('w') || 5244), H = +(q.get('h') || 2950);
 const st = document.getElementById('stage');
 for (const e of [document.documentElement, document.body, st]) { e.style.width = W + 'px'; e.style.height = H + 'px'; }
 const wide = W / H > 2;
+const WASH = q.get('theme') !== 'deep';
+if (WASH) document.body.classList.add('wash');
 // layout, in fractions of the canvas; everything that matters sits in the central 60% x upper 65%
 const S = wide ? 0.40 * H / 284 : 0.36 * H / 284;          // watch scale
 const WX = W * (wide ? 0.355 : 0.345), WY = H * (wide ? 0.40 : 0.37);
@@ -104,7 +119,10 @@ const defs = el('defs', {});
 defs.innerHTML = `<linearGradient id="amb" gradientUnits="userSpaceOnUse" x1="${WX}" y1="0" x2="${W}" y2="0">
   <stop offset="0" stop-color="#FCC04A"/><stop offset=".55" stop-color="#F59E0B" stop-opacity="1"/><stop offset=".86" stop-color="#F59E0B" stop-opacity=".85"/><stop offset="1" stop-color="#F8AC3C" stop-opacity="0"/></linearGradient>
   <radialGradient id="halo"><stop offset="0" stop-color="#FFE7C2" stop-opacity=".11"/><stop offset="1" stop-color="#FFE7C2" stop-opacity="0"/></radialGradient>`;
-const CREAM = '#FFF1DC';
+const CREAM = WASH ? '#B4593A' : '#FFF1DC';
+if (WASH) defs.innerHTML = `<linearGradient id="amb" gradientUnits="userSpaceOnUse" x1="${WX}" y1="0" x2="${W}" y2="0">
+  <stop offset="0" stop-color="#F59E0B"/><stop offset=".55" stop-color="#E58A0A"/><stop offset=".86" stop-color="#D97706" stop-opacity=".85"/><stop offset="1" stop-color="#D97706" stop-opacity="0"/></linearGradient>
+  <radialGradient id="halo"><stop offset="0" stop-color="#F6B26B" stop-opacity=".14"/><stop offset="1" stop-color="#F6B26B" stop-opacity="0"/></radialGradient>`;
 // faint rings around the watch
 const R0 = 0.66 * 284 * S, RS = 0.13 * 284 * S;
 el('circle', { cx: WX, cy: WY, r: R0 * 0.95, fill: 'url(#halo)' });
