@@ -288,6 +288,11 @@ Ramble on iPhone SHALL post no notifications and SHALL NOT ask for notification 
 ### Requirement: Settings structure
 Settings SHALL open as a sheet with "Done" and, in order: "Where notes go" ("Your agent", "Webhook"); the free-notes and unlock row ([purchase.md](purchase.md)); "Watch" ("Ramble on Apple Watch": "Installed" with a check, "Not installed yet. Install it from the Watch app." with "Install", or "No Apple Watch paired. You can record on iPhone."); "Transcription"; "App"; and a footer "Ramble <version> (<build>)" with "Privacy Policy" and "Terms of Use". It SHALL NOT offer a choice of transcription model, and release builds SHALL expose no debug screen, developer bypass key, or server address override.
 
+#### Scenario: Watch app shows up while Settings is open
+- GIVEN Settings is open and the "Watch" group says "Not installed yet."
+- WHEN the watch app becomes installed, or the watch reports in after an update
+- THEN within a few seconds the row shows "Installed" with a check, without closing Settings
+
 #### Scenario: Tapping the version
 - GIVEN a release build
 - WHEN the person taps the version line 4 times

@@ -69,7 +69,17 @@ struct SettingsView: View {
                 ConnectAgentView()
             }
             .task {
-                watchState = WatchInstallState.current()
+                // The watch flags can change while Settings is open (WCSession
+                // finishing activation, the watch reporting in after an update,
+                // an install from the Watch app). Re-read them every couple of
+                // seconds so the row never sits on a stale answer.
+                guard !ThisDevice.isPad else { return }
+                while !Task.isCancelled {
+                    watchState = WatchInstallState.current()
+                    try? await Task.sleep(for: .seconds(2))
+                }
+            }
+            .task {
                 guard relay.hasInbox else { return }
                 _ = try? await relay.refreshConnections()
                 await accountService.refresh()
