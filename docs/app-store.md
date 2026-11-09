@@ -4,7 +4,7 @@ This file is the source of truth for the App Store listing. Change the copy here
 
 Fields marked **TODO: confirm in ASC** haven't been checked against App Store Connect yet. Fill them in from the live listing the next time someone pulls it.
 
-Pricing words follow `specs/purchase.md` ("What Ramble says about price"): the price story is "Free to download. 25 notes free, then $14.99 once." Never "trial", "unlimited", "premium", "Subscribe", or a price per month. Privacy words follow `specs/delivery.md` ("One privacy wording everywhere"). No on-device transcription claims, and no open-source claims.
+Pricing words follow `specs/purchase.md` ("What Ramble says about price"): the price story is "Free to download. 25 notes free, then $14.99 once." Never "trial", "premium", "Subscribe", or a price per month. Privacy words follow `specs/delivery.md` ("One privacy wording everywhere"). No on-device transcription claims, and no open-source claims.
 
 ## App information
 
