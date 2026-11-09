@@ -11,7 +11,7 @@ export const APP_STORE_URL = "https://apps.apple.com/app/id6761857751";
 export const SUPPORT_EMAIL = "support@ramble.watch";
 
 // Pricing (specs/purchase.md "What Ramble says about price"). Never add a
-// monthly price, "trial", "unlimited", "premium" or "Subscribe".
+// monthly price, "trial", "premium" or "Subscribe".
 export const FREE_NOTES = 25;
 export const APP_PRICE = "$14.99";
 export const PRICE_STORY = `Free to download. ${FREE_NOTES} notes free, then ${APP_PRICE} once.`;

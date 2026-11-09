@@ -75,26 +75,18 @@ struct UnlockSheet: View {
                 Text("Unlock ") + Text("Ramble").italic().foregroundColor(.brandAmber)
             }
 
-            if !isUnlocked, let line = countLine {
-                Text(line)
-                    .font(.system(size: 15))
-                    .foregroundStyle(Color.obInkSoft)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
+            if !isUnlocked {
+                VStack(spacing: 2) {
+                    Text(PurchaseCopy.unlockTagline)
+                        .foregroundStyle(Color.obInk)
+                    Text(PurchaseCopy.unlockTaglineSecond)
+                        .foregroundStyle(Color.obInkSoft)
+                }
+                .font(.system(size: 16))
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
-    }
-
-    /// Where the person stands, from the count the server last reported.
-    private var countLine: String? {
-        guard let account = accounts.account else { return nil }
-        if account.freeNotesRemaining == 0 {
-            return "You've used your \(account.freeNotesTotal) free notes. New ones wait safely until you unlock."
-        }
-        let left = account.freeNotesRemaining
-        return left == 1
-            ? "1 of \(account.freeNotesTotal) free notes left."
-            : "\(left) of \(account.freeNotesTotal) free notes left."
     }
 
     // MARK: - Unlocked
@@ -245,17 +237,10 @@ private struct DeveloperNote: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 12) {
-                Text("J")
-                    .font(.system(size: 20, design: .serif).italic().weight(.semibold))
-                    .foregroundStyle(Color.brandAmber)
-                    .frame(width: 40, height: 40)
-                    .background(Circle().fill(Color.brandAmberSoft))
-                    .accessibilityHidden(true)
-                Text(PurchaseCopy.developerNoteTitle)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Color.obInk)
-            }
+            (Text(PurchaseCopy.developerNoteGreeting) + Text(PurchaseCopy.developerNoteSignature).italic() + Text("!"))
+                .font(.system(size: 24, design: .serif).weight(.medium))
+                .foregroundStyle(Color.obInk)
+                .tracking(-0.3)
 
             VStack(alignment: .leading, spacing: 10) {
                 ForEach(paragraphs, id: \.self) { paragraph in
@@ -268,15 +253,12 @@ private struct DeveloperNote: View {
             }
 
             Text(PurchaseCopy.developerNoteSignature)
-                .font(.system(size: 22, design: .serif).italic())
+                .font(.system(size: 24, design: .serif).italic())
                 .foregroundStyle(Color.obInk)
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color(.secondarySystemGroupedBackground))
-        )
+        .background(RoundedRectangle(cornerRadius: 16).fill(Color.brandAmberSoft))
         .accessibilityElement(children: .combine)
     }
 

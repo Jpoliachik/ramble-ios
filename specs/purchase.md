@@ -110,7 +110,7 @@ The iPhone app SHALL open the unlock sheet from the "Unlock" button in Settings,
 - THEN the unlock sheet opens
 
 ### Requirement: Unlock sheet
-The unlock sheet SHALL show where the person stands ("N of 25 free notes left.", or "You've used your 25 free notes. New ones wait safely until you unlock." at 0), a short note signed by the developer (a thank-you note once unlocked), the price exactly as the App Store reports it for the person's storefront, the words "One-time purchase. No subscription.", "Restore Purchases", and links to the Terms of Use and Privacy Policy. It SHALL NOT show a built-in price.
+The unlock sheet SHALL show what the unlock buys ("Unlimited notes from your watch and iPhone." and "Pay once, keep it forever."), a short note signed by the developer (a thank-you note once unlocked), the price exactly as the App Store reports it for the person's storefront, the words "One-time purchase. No subscription.", "Restore Purchases", and links to the Terms of Use and Privacy Policy. It SHALL NOT show a built-in price.
 
 #### Scenario: Price from the store
 - GIVEN a storefront where the unlock costs €14,99
@@ -332,7 +332,7 @@ The app, website, Terms of Use, Privacy Policy and App Store listing SHALL descr
 - AND it says nothing about auto-renewal or hours of audio
 
 ### Requirement: Words to avoid
-Copy SHALL NOT call the free notes a "trial", and SHALL NOT say "unlimited" (fair use applies), "premium", "Subscribe", or "per month" or "/month" next to a price, and SHALL NOT mention monthly hours or any usage amount. "Subscription" SHALL appear only in "No subscription." and in messages to subscribers.
+Copy SHALL NOT call the free notes a "trial", and SHALL NOT say "premium", "Subscribe", or "per month" or "/month" next to a price, and SHALL NOT mention monthly hours or any usage amount. "Subscription" SHALL appear only in "No subscription." and in messages to subscribers.
 
 #### Scenario: Out of free notes
 - GIVEN a person with 0 free notes left

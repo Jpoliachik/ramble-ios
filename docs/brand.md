@@ -121,7 +121,7 @@ Keep claims inside this list. If it isn't here, check the code before writing it
 - Don't say "no servers" or "no data on our servers." The relay is a server. Say what it holds and when it deletes it.
 - Don't say audio never leaves your device or never reaches the server. It does, and it's deleted as soon as the transcript is ready. Don't call Ramble on-device or offline transcription.
 - Don't say "open source," "read the code," or "verify it yourself," and don't mention self-hosting.
-- Don't call the free notes a "trial," and don't say "unlimited" (fair use applies), "premium," "Subscribe," or "per month" next to a price. "Subscription" appears only in "No subscription."
+- Don't call the free notes a "trial," and don't say "premium," "Subscribe," or "per month" next to a price. "Subscription" appears only in "No subscription."
 - Don't claim a transcription model is better for noise or accents. No independent benchmark backs that.
 - Don't promise MCP or dedicated ChatGPT, Claude, or Grok integrations, speaker labels, or end-to-end encryption until they ship. The Connect screen's "Works with Muse, Grok Bot, ChatGPT and more" is the one sanctioned agent list.
 - Don't use fear-based privacy marketing or compare directly to other apps.
