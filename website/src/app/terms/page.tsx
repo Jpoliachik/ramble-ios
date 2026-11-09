@@ -78,7 +78,7 @@ export default function TermsOfUse() {
               <li>
                 <span className={strong}>Held notes.</span> Notes recorded after
                 your free notes are used are kept on your device as &ldquo;Unlock
-                to transcribe&rdquo; and transcribe once you unlock.
+                to send&rdquo; and send once you unlock.
               </li>
               <li>
                 <span className={strong}>Devices.</span> One purchase unlocks
@@ -111,8 +111,8 @@ export default function TermsOfUse() {
             <h2 className={h2}>Early buyers</h2>
             <p className="mt-2">
               If you bought Ramble before it became free to download, or ever
-              subscribed to its old cloud subscription, every note transcribes
-              with no unlock needed, within fair use. Apple keeps billing a
+              subscribed to its old cloud subscription, there&apos;s nothing to
+              unlock. Apple keeps billing a
               subscription until you cancel it in your Apple ID settings.
             </p>
           </section>

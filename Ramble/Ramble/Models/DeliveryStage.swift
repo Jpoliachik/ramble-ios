@@ -89,7 +89,7 @@ enum DeliveryStage: Equatable {
         case .waitingToSend: return "Waiting to send"
         case .waitingOnWatch: return "Waiting on your watch"
         case .transcribing: return "Transcribing…"
-        case .heldForUnlock: return "Unlock to transcribe"
+        case .heldForUnlock: return "Unlock to send"
         case .tooLong: return "Too long to transcribe"
         case .couldntSend: return "Couldn't send"
         case .couldntTranscribe: return "Couldn't transcribe"

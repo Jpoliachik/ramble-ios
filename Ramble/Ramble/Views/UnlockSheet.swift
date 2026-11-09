@@ -67,7 +67,7 @@ struct UnlockSheet: View {
                 Text("Unlock ") + Text("Ramble").italic()
             }
 
-            OnboardingBody(text: "Every note from your watch and iPhone transcribes.")
+            OnboardingBody(text: "Keep sending every note from your watch and iPhone.")
         }
     }
 

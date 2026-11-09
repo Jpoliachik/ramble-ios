@@ -104,7 +104,7 @@ const faqs: { q: string; a: ReactNode }[] = [
   },
   {
     q: "What happens after my free notes?",
-    a: `Your first ${FREE_NOTES} notes are free. After that, new ones wait on your watch or iPhone, marked "Unlock to transcribe". Unlock once for ${APP_PRICE} and they transcribe on their own. Nothing is lost.`,
+    a: `Your first ${FREE_NOTES} notes are free. After that, new ones wait on your watch or iPhone, marked "Unlock to send". Unlock once for ${APP_PRICE} and they send on their own. Nothing is lost.`,
   },
   {
     q: "What does Ramble's server keep?",

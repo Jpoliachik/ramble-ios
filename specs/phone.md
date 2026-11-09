@@ -140,7 +140,7 @@ The phone SHALL upload each of its own notes under the note's ID, retrying 10 se
 A note refused for unlock SHALL stop retrying until the unlock; a rate-limited upload SHALL wait the time the server gives ([purchase.md](purchase.md), [relay-api.md](relay-api.md)).
 
 #### Scenario: Unlock releases held notes
-- GIVEN three phone notes read "Unlock to transcribe"
+- GIVEN three phone notes read "Unlock to send"
 - WHEN the person completes the unlock
 - THEN all three upload, oldest first, with no tap on any note
 
@@ -172,7 +172,7 @@ The list SHALL group notes by day, newest first, under "Today", "Yesterday", or 
 | Phone note not yet accepted | "Waiting to send" | clock |
 | Watch note not yet accepted | "Waiting on your watch" | clock |
 | Transcribing | spinner, "Transcribing…" | — |
-| Held for unlock (either device) | "Unlock to transcribe" | lock, amber |
+| Held for unlock (either device) | "Unlock to send" | lock, amber |
 | Refused for good | "Too long to transcribe" or "Couldn't send" | warning, red |
 | Transcription failed | "Couldn't transcribe" | warning, red |
 | Silent | "No speech detected" | quiet |
@@ -224,13 +224,13 @@ Under the player, the note screen SHALL show one line saying where the note is. 
 | Watch note not accepted yet | "Waiting on your watch" | — | — |
 | Webhook send in progress | "Sending to your webhook…" | — | — |
 | Transcribing | "Transcribing…" | "It goes out as soon as the transcript is ready." | — |
-| Held for unlock | "Unlock to transcribe" | "This note is saved. It transcribes as soon as you unlock Ramble." | "Unlock" |
+| Held for unlock | "Unlock to send" | "This note is saved. It sends as soon as you unlock Ramble." | "Unlock" |
 | Audio unreadable | "Couldn't transcribe" | "Ramble couldn't turn this audio into text." | "Retry" |
 | Transcription gave up | "Couldn't transcribe" | "Ramble couldn't reach a transcription service in time." | "Retry" |
 | Failed again after its retry | "Couldn't transcribe" | either detail above, then "Ramble tried once more." | — |
 
 #### Scenario: Unlock from a held note
-- GIVEN a note shows "Unlock to transcribe"
+- GIVEN a note shows "Unlock to send"
 - WHEN the person taps "Unlock"
 - THEN the unlock screen opens ([purchase.md](purchase.md))
 

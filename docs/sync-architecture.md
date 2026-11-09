@@ -192,7 +192,7 @@ relay's clock. Exact table: `specs/relay-api.md`.
 | "Set up" on the watch | No token yet (phone never ran or not past "Get started"), or the relay answered 401. Watch sends `needsConnection` each open | [M1][U1] |
 | Note stays "Waiting" with the app closed | The background upload was started from a pass, so it's discretionary; open the app | [N3][F3] |
 | Waiting away from the iPhone in Low Power Mode | Wi-Fi and cellular are off away from the phone | (unverified) |
-| "Unlock to transcribe" persists after buying | The phone's context or `unlocked` user info hasn't reached the watch; opening the watch app reads `GET /account` | [A1][U1] |
+| "Unlock to send" persists after buying | The phone's context or `unlocked` user info hasn't reached the watch; opening the watch app reads `GET /account` | [A1][U1] |
 | Transcript arrives but "Audio on watch" on the phone | `transferFile` is paced; open the watch app, or tap the row while it's open | [T1][F1] |
 | Watch never retries in the background | Refresh budget is small without a complication | [K3][K4] |
 

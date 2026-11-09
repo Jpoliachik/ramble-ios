@@ -180,7 +180,7 @@ enum WatchNoteDisplay: Equatable {
         case .waiting, .uploading, .transcribing: return nil
         case .done(let preview): return preview
         case .silent: return "No speech detected"
-        case .heldUnlock: return "Unlock to transcribe"
+        case .heldUnlock: return "Unlock to send"
         case .stuck(let since): return WatchFormat.waitingReason(since: since)
         case .failed: return "Couldn't transcribe"
         case .lost: return "Audio lost"
@@ -311,7 +311,7 @@ enum WatchAlert: String, Identifiable, Hashable {
         case .micBusy: return "Microphone is busy"
         case .noPhone: return "Ramble isn't on your iPhone"
         case .setUp: return "Open Ramble on your iPhone"
-        case .unlock: return "Unlock to transcribe"
+        case .unlock: return "Unlock to send"
         }
     }
 
@@ -337,7 +337,7 @@ enum WatchAlert: String, Identifiable, Hashable {
         case .unlock:
             return [
                 "You've used your free notes. Your notes are safe on this watch.",
-                "Unlock Ramble on your iPhone and they'll transcribe on their own."
+                "Unlock Ramble on your iPhone and they'll send on their own."
             ]
         }
     }

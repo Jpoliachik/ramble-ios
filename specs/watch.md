@@ -36,7 +36,7 @@ The watch SHALL pick at most one bar alert in this order: "Mic off", "Mic busy",
 | "Mic busy" | For 3 seconds after a start fails for any reason other than permission | "Microphone is busy" (read by VoiceOver; no detail screen, since tapping again is the fix) | none |
 | "No phone" | The paired iPhone does not have Ramble | "Ramble isn't on your iPhone" | "Your notes are safe on this watch, but they can't reach your agent yet." / "Install Ramble on your iPhone and open it once. Waiting notes will send on their own." |
 | "Set up" | Ramble is on the iPhone, but the watch is not connected to it yet, or the server no longer accepts the watch's connection | "Open Ramble on your iPhone" | "Your notes are safe on this watch, but they can't send yet." / "Open Ramble on your iPhone once. Waiting notes will send on their own." |
-| "Unlock" | A note is held because the free notes are used up | "Unlock to transcribe" | "You've used your free notes. Your notes are safe on this watch." / "Unlock Ramble on your iPhone and they'll transcribe on their own." |
+| "Unlock" | A note is held because the free notes are used up | "Unlock to send" | "You've used your free notes. Your notes are safe on this watch." / "Unlock Ramble on your iPhone and they'll send on their own." |
 
 #### Scenario: Highest alert wins
 - GIVEN microphone permission is off and the paired iPhone doesn't have Ramble
@@ -143,7 +143,7 @@ Recent SHALL group notes, newest first, into "Needs you · N", "Waiting · N" an
 | Uploading or being transcribed | Waiting | small spinner | none |
 | Transcribed | Done | gray check | first line of the transcript, cut with an ellipsis |
 | Silent | Done | gray crossed-out waveform | "No speech detected" |
-| Held: free notes used up | Needs you | red mark | "Unlock to transcribe" |
+| Held: free notes used up | Needs you | red mark | "Unlock to send" |
 | Not yet accepted 6 hours after recording | Needs you | red mark | "Waiting 6 hours", "Waiting 7 hours", … |
 | Transcription failed (a retry from the iPhone updates it) | Needs you | red mark | "Couldn't transcribe" |
 | Audio lost before the server accepted it | Needs you | red mark | "Audio lost" |
@@ -153,7 +153,7 @@ Recent SHALL group notes, newest first, into "Needs you · N", "Waiting · N" an
 #### Scenario: A held note needs the person
 - GIVEN the only note on the watch is held because the free notes are used up
 - WHEN the person opens Recent
-- THEN it is listed under "Needs you · 1" with a red mark and "Unlock to transcribe"
+- THEN it is listed under "Needs you · 1" with a red mark and "Unlock to send"
 
 ### Requirement: Notes leave Recent
 A transcribed or silent note SHALL leave Recent 24 hours after its transcript arrives; a failed, refused or lost note SHALL leave 24 hours after the person first sees it. Notes that are waiting, held or stuck SHALL stay until they are done. When Recent passes 50 notes, only done, failed, refused or lost notes SHALL be dropped, oldest first.
@@ -221,10 +221,10 @@ The watch SHALL keep a note's audio until both the transcript is done (or transc
 - THEN the watch sends the audio to the iPhone and deletes it once the iPhone confirms
 
 ### Requirement: Held for unlock
-When the server holds a note because the free notes are used up, the watch SHALL keep the note and its audio, show "Unlock to transcribe", and stop retrying it. It SHOULD upload held notes, oldest first, as soon as the iPhone says Ramble is unlocked or connects the watch again, even with the watch app closed; it SHALL do so at the latest the next time the app opens and the server reports the unlock. The money side is in purchase.md.
+When the server holds a note because the free notes are used up, the watch SHALL keep the note and its audio, show "Unlock to send", and stop retrying it. It SHOULD upload held notes, oldest first, as soon as the iPhone says Ramble is unlocked or connects the watch again, even with the watch app closed; it SHALL do so at the latest the next time the app opens and the server reports the unlock. The money side is in purchase.md.
 
 #### Scenario: Purchase on the iPhone
-- GIVEN two notes on the watch show "Unlock to transcribe"
+- GIVEN two notes on the watch show "Unlock to send"
 - WHEN the person unlocks Ramble on their iPhone and the watch is in reach
 - THEN the watch uploads both notes, oldest first, usually without the watch app being opened, and at the latest when it next opens
 - AND the "Unlock" alert goes away

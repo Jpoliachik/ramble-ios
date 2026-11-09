@@ -120,10 +120,10 @@ export default function HelpDocs() {
                   Microphone and turn on Ramble.
                 </p>
               </Question>
-              <Question id="unlock" q="A note says “Unlock to transcribe”">
+              <Question id="unlock" q="A note says “Unlock to send”">
                 <p>
                   Your {FREE_NOTES} free notes are used. The note is saved on the device that recorded it. Unlock Ramble
-                  in Settings on your iPhone, and held notes transcribe on their own, from the watch too. Bought it
+                  in Settings on your iPhone, and held notes send on their own, from the watch too. Bought it
                   already? Tap Restore Purchases in Settings.
                 </p>
               </Question>
