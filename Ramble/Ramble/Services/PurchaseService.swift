@@ -71,7 +71,7 @@ enum PurchaseCopy {
     static let developerNoteGreeting = "Hi, I'm "
     static let developerNote = [
         "I made Ramble so I could leave my phone behind and still catch every spark, then let my agent handle it while I stay present, playing with my kids or out on a run.",
-        "No ads. One-time purchase, no subscription.",
+        "It's helped me cut my screen time and capture a lot of good ideas along the way. I hope it does the same for you.",
         "Thanks for trying it 🙂",
     ]
     static let developerNoteThanks = [
