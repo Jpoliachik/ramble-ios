@@ -252,14 +252,9 @@ private struct DeveloperNote: View {
                     .frame(width: 40, height: 40)
                     .background(Circle().fill(Color.brandAmberSoft))
                     .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(PurchaseCopy.developerNoteTitle)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color.obInk)
-                    Text(PurchaseCopy.developerNoteSubtitle)
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color.obInkFaint)
-                }
+                Text(PurchaseCopy.developerNoteTitle)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Color.obInk)
             }
 
             VStack(alignment: .leading, spacing: 10) {
