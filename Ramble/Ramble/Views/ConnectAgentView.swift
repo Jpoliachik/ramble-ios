@@ -348,11 +348,10 @@ private struct AgentStatusCard: View {
                     .foregroundStyle(Color.obInk)
                 Spacer(minLength: 8)
                 if let onDisconnect {
-                    // A small red X; the confirmation dialog asks first.
+                    // A small red trash can; the confirmation dialog asks first.
                     Button(action: onDisconnect) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 24))
-                            .symbolRenderingMode(.hierarchical)
+                        Image(systemName: "trash")
+                            .font(.system(size: 19, weight: .medium))
                             .foregroundStyle(Color.red)
                             .frame(width: 44, height: 44)
                             .contentShape(Rectangle())
