@@ -11,7 +11,7 @@ const OUT = process.argv[3];
 (async () => {
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 6450, height: 2796 }, deviceScaleFactor: 1 });
-  await page.goto('file://' + SRC + '?bg=t');
+  await page.goto('file://' + SRC + '?bg=t&ipad=1');
   await page.evaluate(() => document.fonts.ready);
   await page.waitForTimeout(1500);
   for (let i = 0; i < 5; i++) {

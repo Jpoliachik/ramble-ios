@@ -258,6 +258,12 @@ body.dark .phone.set { box-shadow: 0 50px 70px -30px rgba(10,4,8,.55), inset 0 0
 .phone .sb { position: absolute; top: 0; left: 0; right: 0; height: 54px; z-index: 4; color: var(--s-status); }
 .phone .sb .t { position: absolute; left: 52px; top: 19px; font-size: 17px; font-weight: 600; letter-spacing: -0.3px; }
 .phone .sb .r { position: absolute; right: 36px; top: 21px; display: flex; gap: 7px; align-items: center; }
+/* iPad (?ipad=1), 660 x 880 screen, the 13" iPad's 3:4 */
+body.ipad .phone { width: 700px; height: 920px; border-radius: 46px; padding: 20px; }
+body.ipad .phone::before { border-radius: 42px; }
+body.ipad .phone .scr { width: 660px; height: 880px; border-radius: 26px; }
+body.ipad .phone .sb .t { left: 30px; top: 14px; font-size: 15px; }
+body.ipad .phone .sb .r { right: 28px; top: 16px; }
 
 /* note screen (Ramble) */
 .nb { position: absolute; top: 58px; left: 16px; height: 44px; display: flex; align-items: center; z-index: 2; }
@@ -516,6 +522,19 @@ if (params.get('bg') === 'q') WAVE = { h: 290, op: .15, echo: .07 };
 if (params.get('bg') === 'r') WAVE = { h: 290, op: .15, echo: 0 };
 if (params.has('debug')) document.body.classList.add('debug');
 
+// ?ipad=1: the phones become iPads (for the 13" iPad set, see ipad-render.js)
+if (params.has('ipad')) {
+  document.body.classList.add('ipad');
+  document.querySelectorAll('.phone .island, .phone .btn').forEach(e => e.remove());
+  // per phone, in page order: [left, top, scale]
+  const IPAD = [[1960, 2700, 1.85], [645, 1990, 1.75], [5805, 1920, 1.7]];
+  document.querySelectorAll('.dev > .phone').forEach((p, i) => {
+    const [l, t, s] = IPAD[i], d = p.parentElement;
+    d.style.left = l + 'px'; d.style.top = t + 'px'; d.style.setProperty('--s', s);
+  });
+  document.querySelectorAll('.copy p').forEach(e => { e.innerHTML = e.innerHTML.replace('on your iPhone', 'on your iPad'); });
+}
+
 // Status bar, list rows, check icons
 const SB = '<svg width="19" height="12" viewBox="0 0 19 12" fill="currentColor"><rect x="0" y="8" width="3.2" height="4" rx="1"/><rect x="5" y="5.5" width="3.2" height="6.5" rx="1"/><rect x="10" y="3" width="3.2" height="9" rx="1"/><rect x="15" y="0" width="3.2" height="12" rx="1"/></svg>' +
   '<svg width="17" height="12" viewBox="0 0 17 12" fill="currentColor"><path d="M8.5 2.6c2.4 0 4.6.9 6.2 2.5l1.2-1.2C14 2 11.4.9 8.5.9S3 2 1.1 3.9l1.2 1.2C3.9 3.5 6.1 2.6 8.5 2.6zm0 3.3c1.5 0 2.8.6 3.8 1.5l1.2-1.2C12.2 4.9 10.4 4.2 8.5 4.2s-3.7.7-5 2l1.2 1.2c1-.9 2.3-1.5 3.8-1.5zm0 3.3c.6 0 1.1.2 1.5.6L8.5 11.3 7 9.8c.4-.4.9-.6 1.5-.6z"/></svg>' +
@@ -626,7 +645,9 @@ const NODES_T = [
   [4560, MSGY + 30,  0, 400, 380], // through the message box
   [5345, 1622,  18, 300,   0],   // F5: the relay node
 ];
-const d = LINE === 'sine' ? 'M' + LP.map(q => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join(' L') : nodesToPath(LINE === 'r9' ? NODES : NODES_T);
+// the iPad's message box is wider and shorter: stay level through it for longer
+if (params.has('ipad')) NODES_T[10] = [4640, MSGY, 0, 420, 560];
+const d =LINE === 'sine' ? 'M' + LP.map(q => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join(' L') : nodesToPath(LINE === 'r9' ? NODES : NODES_T);
 const spine = document.getElementById('spine'), ink = document.getElementById('ink');
 spine.setAttribute('d', d);
 const L = spine.getTotalLength();
