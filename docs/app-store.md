@@ -96,7 +96,7 @@ Requires an Apple Watch paired with an iPhone.
 
 Short, one thought each, in this order. Mindfulness first: a short headline and a smaller second line. The first screenshot shows the watch, not the phone.
 
-The iPhone screenshots (1206 × 2622, the size App Store Connect accepted) and the product page header (5244 × 2950 and 3840 × 1646) are in `images/appstore/2026-sunset/`. Their HTML source is in `source/` there (open `one-line.html?bg=t` for the shipped look; it renders at 1290 × 2796, so scale to 1206 × 2622); change the copy here first, then re-render. Ramble is iPhone only (the watch pairs only with an iPhone), so there is no iPad set. Apple Watch screenshots (422 × 514, Ultra simulator) are in `watch/`, and the unlock sheet screenshot for the in-app purchase review is in `review/`.
+The iPhone screenshots (1206 × 2622, the size App Store Connect accepted) and the product page header (5244 × 2950 and 3840 × 1646) are in `images/appstore/2026-sunset/`. Their HTML source is in `source/` there (open `one-line.html?bg=t` for the shipped look; it renders at 1290 × 2796, so scale to 1206 × 2622); change the copy here first, then re-render. The 13-inch iPad set (2064 × 2752) in `ipad/` is cut from the same panorama: `node source/ipad-render.js <abs path to one-line.html> <out dir>`, then `python3 source/ipad-crop.py <out dir>`. Apple Watch screenshots (422 × 514, Ultra simulator) are in `watch/`, and the unlock sheet screenshot for the in-app purchase review is in `review/`.
 
 1. Stay in the moment. (Talk to your watch. Your agent handles it later.)
 2. Leave your phone behind. (No iPhone needed. Sends when you reconnect.)
