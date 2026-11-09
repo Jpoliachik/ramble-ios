@@ -31,6 +31,7 @@ These rules are not optional. They apply to every change, however small:
 - **Multiple language hints** — for people who codeswitch mid-recording.
 - **On-device Apple Speech** — possible opt-in fast follow, not at launch.
 - **Localization** — translate the app UI into additional languages.
+- **CarPlay** — hands-free recording in the car. Not supported today (the Siri phrases open the app on the phone). Needs Apple's approval for a CarPlay category that fits a voice-notes app, plus a CarPlay screen. Widen the marketing beyond the watch only once it exists.
 
 ### Release plan
 
