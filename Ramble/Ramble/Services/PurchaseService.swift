@@ -72,7 +72,7 @@ enum PurchaseCopy {
     static let developerNote = [
         "I made Ramble so I could leave my phone behind and still catch every spark, then let my agent handle it while I stay present, playing with my kids or out on a run.",
         "No ads, no subscriptions, ever. I promise I'll never sell your data.",
-        "Thanks for trying it.",
+        "Thanks for trying it 🙂",
     ]
     static let developerNoteThanks = [
         "Thank you for unlocking Ramble. No ads, no subscriptions, ever. I promise I'll never sell your data.",

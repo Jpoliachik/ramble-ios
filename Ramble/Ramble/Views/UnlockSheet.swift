@@ -238,9 +238,8 @@ private struct DeveloperNote: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             (Text(PurchaseCopy.developerNoteGreeting) + Text(PurchaseCopy.developerNoteSignature).italic() + Text("!"))
-                .font(.system(size: 24, design: .serif).weight(.medium))
+                .font(.system(size: 17, design: .serif))
                 .foregroundStyle(Color.obInk)
-                .tracking(-0.3)
 
             VStack(alignment: .leading, spacing: 10) {
                 ForEach(paragraphs, id: \.self) { paragraph in
@@ -258,12 +257,69 @@ private struct DeveloperNote: View {
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 16).fill(Color.brandAmberSoft))
+        .background(SunsetWash().clipShape(RoundedRectangle(cornerRadius: 16)))
         .accessibilityElement(children: .combine)
     }
 
     private var paragraphs: [String] {
         isUnlocked ? PurchaseCopy.developerNoteThanks : PurchaseCopy.developerNote
+    }
+}
+
+/// The website hero's light sunset wash (website/src/app/globals.css
+/// `.sunset-wash`): ember, coral, rose and plum glows rising from the bottom
+/// over a warm cream. In dark mode the same glows sit over a dark warm base.
+private struct SunsetWash: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    private struct Glow {
+        let x: CGFloat
+        let color: Color
+        let opacity: Double
+    }
+
+    private let glows = [
+        Glow(x: 0.12, color: Color(red: 244 / 255, green: 150 / 255, blue: 70 / 255), opacity: 0.22),
+        Glow(x: 0.40, color: Color(red: 238 / 255, green: 118 / 255, blue: 72 / 255), opacity: 0.18),
+        Glow(x: 0.68, color: Color(red: 220 / 255, green: 98 / 255, blue: 96 / 255), opacity: 0.16),
+        Glow(x: 0.92, color: Color(red: 150 / 255, green: 82 / 255, blue: 140 / 255), opacity: 0.14),
+    ]
+
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            let h = geo.size.height
+            ZStack {
+                LinearGradient(colors: baseColors, startPoint: .top, endPoint: .bottom)
+                ForEach(glows.indices, id: \.self) { i in
+                    let glow = glows[i]
+                    let boost = colorScheme == .dark ? 1.4 : 1.0
+                    // CSS radial-gradient(38% 60% at x 100%, color, transparent 70%),
+                    // drawn as a blurred ellipse so it has no hard edges.
+                    Ellipse()
+                        .fill(glow.color.opacity(glow.opacity * boost * 1.6))
+                        .frame(width: w * 0.5, height: h * 0.8)
+                        .position(x: w * glow.x, y: h)
+                        .blur(radius: 36)
+                }
+            }
+        }
+        .accessibilityHidden(true)
+    }
+
+    private var baseColors: [Color] {
+        if colorScheme == .dark {
+            return [
+                Color(red: 0.13, green: 0.11, blue: 0.10),
+                Color(red: 0.15, green: 0.12, blue: 0.11),
+                Color(red: 0.19, green: 0.13, blue: 0.12),
+            ]
+        }
+        return [
+            Color(red: 244 / 255, green: 243 / 255, blue: 239 / 255),
+            Color(red: 246 / 255, green: 239 / 255, blue: 230 / 255),
+            Color(red: 243 / 255, green: 227 / 255, blue: 214 / 255),
+        ]
     }
 }
 
