@@ -5,6 +5,7 @@ import HeroFlow from "../components/hero-flow";
 import HeroMotion from "../components/hero-motion";
 import CopyTextButton from "../components/copy-text-button";
 import PopIn from "../components/pop-in";
+import Waveform from "../components/waveform";
 import {
   APP_PRICE,
   APP_STORE_URL,
@@ -25,7 +26,7 @@ const secondaryButton =
   "inline-flex items-center gap-2 rounded-full border border-stone-300 px-6 py-3 text-sm font-medium text-stone-700 transition-colors hover:border-stone-400 hover:bg-stone-100";
 const inlineLink = "text-brand-text underline-offset-2 hover:underline";
 const stepBadge =
-  "flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-stone-900 font-serif text-sm font-semibold text-white";
+  "flex h-9 w-9 shrink-0 items-center justify-center rounded-full font-serif text-sm font-semibold text-white shadow-sm";
 
 function AppleLogo() {
   return (
@@ -65,16 +66,19 @@ const privacyPoints = [
     Icon: AudioLines,
     title: "Audio deleted after transcription",
     body: "Your audio goes to a transcription provider and is deleted as soon as the text is ready.",
+    tint: "bg-[#f9ebda] text-[#b45309]",
   },
   {
     Icon: Trash2,
     title: "Deleted once delivered",
     body: `Gone as soon as your agent picks it up, or after ${RETENTION} if it never does.`,
+    tint: "bg-[#f7e2e1] text-[#a63a4f]",
   },
   {
     Icon: UserX,
     title: "No accounts",
     body: "No email, no name, no login.",
+    tint: "bg-[#efe3ef] text-[#6e3474]",
   },
 ];
 
@@ -158,7 +162,12 @@ export default function Home() {
   return (
     <main className="flex-1">
       {/* Hero */}
-      <section className="mx-auto max-w-5xl px-6 pt-32 pb-20 sm:pt-40 sm:pb-28">
+      <section className="sunset-wash relative overflow-hidden">
+        <Waveform
+          height={90}
+          className="pointer-events-none absolute inset-x-0 bottom-4 h-14 w-full text-[#b4593a] opacity-[0.13] sm:h-20"
+        />
+        <div className="relative mx-auto max-w-5xl px-6 pt-32 pb-24 sm:pt-40 sm:pb-32">
         <div className="grid items-center gap-16 lg:grid-cols-[minmax(0,1fr)_auto] lg:gap-12">
           <div className="flex flex-col items-center text-center lg:items-start lg:text-left">
             <div className="hero-enter-logo">
@@ -191,6 +200,7 @@ export default function Home() {
             <HeroMotion />
           </div>
         </div>
+        </div>
       </section>
 
       {/* How it works */}
@@ -202,7 +212,7 @@ export default function Home() {
           <ol className="mt-14 grid gap-10 sm:grid-cols-3 sm:gap-8">
             {steps.map((step, i) => (
               <li key={step.title} className="text-left">
-                <div className={stepBadge}>{i + 1}</div>
+                <div className={`${stepBadge} sunset-step-${i + 1}`}>{i + 1}</div>
                 <h3 className="mt-4 text-sm font-semibold text-stone-900">{step.title}</h3>
                 <p className="mt-1 text-sm leading-relaxed text-stone-500">{step.body}</p>
               </li>
@@ -228,7 +238,7 @@ export default function Home() {
             </div>
             <div className="mt-5 flex flex-col text-sm">
               <PopIn className="max-w-[90%] self-end">
-                <p className="rounded-2xl rounded-br-md bg-brand-text px-4 py-2.5 text-white">
+                <p className="rounded-2xl rounded-br-md sunset-bubble px-4 py-2.5 text-white">
                   {SETUP_MESSAGE}
                   <br />
                   <span className="whitespace-nowrap underline underline-offset-2">{SITE_HOST}/docs</span>
@@ -254,7 +264,8 @@ export default function Home() {
       {/* Pricing */}
       <section className="border-t border-stone-200 bg-stone-50">
         <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
-          <div className="mx-auto max-w-md rounded-2xl bg-white p-6 shadow-sm ring-1 ring-stone-200/80">
+          <div className="relative mx-auto max-w-md overflow-hidden rounded-2xl bg-white p-6 shadow-sm ring-1 ring-stone-200/80">
+            <div aria-hidden="true" className="sunset-rule absolute inset-x-0 top-0 h-1" />
             <p className="font-serif text-4xl font-semibold text-stone-900">
               Free
               <span className="ml-2 font-sans text-sm font-normal text-stone-500">to download</span>
@@ -285,9 +296,9 @@ export default function Home() {
         <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
           <SectionHeading eyebrow="Privacy">Your thoughts don&apos;t stick around</SectionHeading>
           <div className="mt-14 grid gap-10 sm:grid-cols-3 sm:gap-8">
-            {privacyPoints.map(({ Icon, title, body }) => (
+            {privacyPoints.map(({ Icon, title, body, tint }) => (
               <div key={title} className="flex flex-col items-center text-center sm:items-start sm:text-left">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sage-100 text-sage-600">
+                <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${tint}`}>
                   <Icon className="h-5 w-5" aria-hidden="true" />
                 </div>
                 <h3 className="mt-4 text-base font-semibold text-stone-900">{title}</h3>
@@ -326,16 +337,25 @@ export default function Home() {
       </section>
 
       {/* Final CTA */}
-      <section className="border-t border-stone-200">
-        <div className="mx-auto max-w-5xl px-6 py-20 text-center sm:py-24">
-          <h2 className="font-serif text-3xl font-semibold tracking-tight text-stone-900 sm:text-4xl">
+      <section className="sunset-deep relative overflow-hidden">
+        <Waveform
+          height={90}
+          className="pointer-events-none absolute inset-x-0 bottom-4 h-14 w-full text-[#fff1dc] opacity-[0.15] sm:h-20"
+        />
+        <div className="relative mx-auto max-w-5xl px-6 pt-20 pb-28 text-center sm:pt-24 sm:pb-32">
+          <h2 className="font-serif text-3xl font-semibold tracking-tight text-[#fbf1e3] sm:text-4xl">
             Get it off your mind.
           </h2>
-          <p className="mt-4 text-base text-stone-500">
+          <p className="mt-4 font-serif text-lg italic text-[#fbf1e3]/80">
             Leave the phone. Keep the thought.
           </p>
           <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-            <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className={primaryButton}>
+            <a
+              href={APP_STORE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-full bg-[#fbf1e3] px-6 py-3 text-sm font-medium text-stone-900 shadow-sm transition-colors hover:bg-white"
+            >
               <AppleLogo />
               Get Ramble
             </a>
