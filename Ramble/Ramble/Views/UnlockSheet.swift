@@ -297,10 +297,10 @@ private struct SunsetWash: View {
                     // CSS radial-gradient(38% 60% at x 100%, color, transparent 70%),
                     // drawn as a blurred ellipse so it has no hard edges.
                     Ellipse()
-                        .fill(glow.color.opacity(glow.opacity * boost * 1.6))
-                        .frame(width: w * 0.5, height: h * 0.8)
+                        .fill(glow.color.opacity(glow.opacity * boost * 0.45))
+                        .frame(width: w * 0.6, height: h * 1.1)
                         .position(x: w * glow.x, y: h)
-                        .blur(radius: 36)
+                        .blur(radius: 48)
                 }
             }
         }
@@ -316,9 +316,9 @@ private struct SunsetWash: View {
             ]
         }
         return [
-            Color(red: 244 / 255, green: 243 / 255, blue: 239 / 255),
-            Color(red: 246 / 255, green: 239 / 255, blue: 230 / 255),
-            Color(red: 243 / 255, green: 227 / 255, blue: 214 / 255),
+            Color(red: 247 / 255, green: 239 / 255, blue: 229 / 255),
+            Color(red: 246 / 255, green: 236 / 255, blue: 225 / 255),
+            Color(red: 244 / 255, green: 230 / 255, blue: 219 / 255),
         ]
     }
 }
