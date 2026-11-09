@@ -49,12 +49,12 @@ const TYPE_MS = 38;
 
 // Beats of one loop, in ms from the start of the loop. Recording lasts as long
 // as the words take to type out.
-//   0 idle: record button, "Tap to record"
+//   0 idle: record button, "Tap to talk"
 //   1 recording: tap, bars inside the ring, timer, the words appear
-//   2 stopped: "Saved on watch", the thought leaves for the agent
+//   2 stopped: "Sent to agent" with a green check, the thought leaves for the agent
 //   3 it lands with your agent
 //   4 handled
-//   5 the watch is back to "Tap to record". You're done.
+//   5 the watch is back to "Tap to talk". You're done.
 // The next loop starts while the agent row is still settling, so there's no
 // visible restart.
 function beatsFor(said: string) {
@@ -187,12 +187,12 @@ export default function HeroMotion({ size }: { size?: number }) {
 
         {/* What you say */}
         <div
-          className={`absolute left-[4px] top-[48px] z-20 w-[250px] transition-all duration-500 ease-out ${
+          className={`absolute left-[4px] top-[86px] z-20 transition-all duration-500 ease-out ${
             bubbleVisible ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
           }`}
         >
           <div className="relative rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-stone-200/80">
-            <p className="min-h-[2.6em] font-serif text-[16px] italic leading-snug text-stone-800">
+            <p className="min-w-[180px] whitespace-nowrap font-serif text-[16px] italic leading-snug text-stone-800">
               <span aria-hidden="true">“</span>
               {words}
               {recording && typed < thought.said.length && (
@@ -213,10 +213,19 @@ export default function HeroMotion({ size }: { size?: number }) {
           }}
         >
           <div className="relative">
+            {/* A short band stub above and below, so it reads as a watch */}
+            <span
+              aria-hidden="true"
+              className="absolute -top-[26px] left-1/2 h-[40px] w-[124px] -translate-x-1/2 rounded-[14px] bg-stone-800"
+            />
+            <span
+              aria-hidden="true"
+              className="absolute -bottom-[26px] left-1/2 h-[40px] w-[124px] -translate-x-1/2 rounded-[14px] bg-stone-800"
+            />
             <span aria-hidden="true" className="absolute -left-[6px] top-[34%] h-10 w-[7px] rounded-l-sm bg-brand/85" />
             <span aria-hidden="true" className="absolute -right-[8px] top-[22%] h-8 w-[9px] rounded-r-md bg-stone-700" />
             <span aria-hidden="true" className="absolute -right-[6px] top-[47%] h-11 w-[7px] rounded-r-sm bg-stone-700" />
-            <div className="rounded-[52px] bg-stone-900 p-[9px] shadow-[0_30px_60px_-14px_rgba(26,25,23,0.45)] ring-1 ring-black/5">
+            <div className="relative rounded-[52px] bg-stone-900 p-[9px] shadow-[0_30px_60px_-14px_rgba(26,25,23,0.45)] ring-1 ring-black/5">
               <div className="relative h-[230px] overflow-hidden rounded-[44px] bg-black">
                 <span className="absolute right-[26px] top-[18px] text-[14px] font-semibold tabular-nums text-white">
                   9:41
@@ -265,15 +274,15 @@ export default function HeroMotion({ size }: { size?: number }) {
                       saved ? "opacity-100" : "opacity-0"
                     }`}
                   >
-                    <CircleCheck className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
-                    Saved on watch
+                    <CircleCheck className="h-3.5 w-3.5 text-[#34c759]" strokeWidth={2.25} aria-hidden="true" />
+                    Sent to agent
                   </span>
                   <span
                     className={`absolute text-[12px] text-stone-400 transition-opacity duration-300 ${
                       !recording && !saved ? "opacity-100" : "opacity-0"
                     }`}
                   >
-                    Tap to record
+                    Tap to talk
                   </span>
                 </div>
               </div>
