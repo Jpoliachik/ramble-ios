@@ -9,9 +9,7 @@ import Waveform from "../components/waveform";
 import {
   APP_PRICE,
   APP_STORE_URL,
-  FAIR_USE,
   FREE_NOTES,
-  PRICE_STORY,
   PRIVACY_WORDING,
   RETENTION,
   SITE_URL,
@@ -82,12 +80,6 @@ const privacyPoints = [
   },
 ];
 
-const included = [
-  "Apple Watch and iPhone apps",
-  "Transcription included",
-  "Delivery to your agent, with automatic retries",
-  "Webhooks to your own endpoint",
-];
 
 const faqs: { q: string; a: ReactNode }[] = [
   {
@@ -266,29 +258,18 @@ export default function Home() {
       {/* Pricing */}
       <section className="border-t border-stone-200 bg-stone-50">
         <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
-          <div className="relative mx-auto max-w-md overflow-hidden rounded-2xl bg-white p-6 shadow-sm ring-1 ring-stone-200/80">
+          {/* Reads as the spec's pricing line: "Free to download. 25 notes free, then $14.99 once." */}
+          <div className="relative mx-auto max-w-md overflow-hidden rounded-2xl bg-white px-6 pt-9 pb-8 text-center shadow-sm ring-1 ring-stone-200/80">
             <div aria-hidden="true" className="sunset-rule absolute inset-x-0 top-0 h-1" />
-            <p className="font-serif text-4xl font-semibold text-stone-900">
-              Free
-              <span className="ml-2 font-sans text-sm font-normal text-stone-500">to download</span>
+            <h2 className="font-serif text-4xl font-semibold tracking-tight text-stone-900">Free to download.</h2>
+            <p className="mt-3 text-base text-stone-700">
+              {FREE_NOTES} notes free, then {APP_PRICE} once.
             </p>
-            <p className="mt-3 text-base text-stone-700">{PRICE_STORY}</p>
-            <p className="mt-1 text-sm text-stone-500">One-time purchase. No subscription.</p>
-            <ul className="mt-6 space-y-2.5">
-              {included.map((item) => (
-                <li key={item} className="flex gap-2.5 text-sm text-stone-600">
-                  <span aria-hidden="true" className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-stone-400" />
-                  {item}
-                </li>
-              ))}
-            </ul>
-            <p className="mt-6 border-t border-stone-200 pt-4 text-sm leading-relaxed text-stone-500">
-              Fair use: {FAIR_USE}, set far above normal use.{" "}
-              <Link href="/terms" className={inlineLink}>
-                Terms
-              </Link>
-              .
-            </p>
+            <p className="mt-1 text-sm text-stone-500">No subscription.</p>
+            <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className={`${primaryButton} mt-7`}>
+              <AppleLogo />
+              Get Ramble
+            </a>
           </div>
         </div>
       </section>
