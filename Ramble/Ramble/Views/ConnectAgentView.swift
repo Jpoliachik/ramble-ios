@@ -160,9 +160,12 @@ struct ConnectAgentView: View {
                         note = nil
                         isPairing = true
                     } label: {
-                        Text("Using more than one agent? **Connect another**")
-                            .font(.footnote)
+                        (Text("Using more than one agent? ")
                             .foregroundStyle(Color.obInkFaint)
+                         + Text("Connect another")
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Color.brandAmber))
+                            .font(.footnote)
                     }
                     .buttonStyle(.plain)
                     .padding(.horizontal, 4)
