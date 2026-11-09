@@ -157,5 +157,5 @@ One provider and model for everyone: Groq Whisper v3 Turbo. There is no fallback
 
 - **Transcript browsing UX for v1:** Just scroll the list. No search, no tags, no folders.
 - **Watch complication:** Not in v1.
-- **Pricing:** Free download, 25 notes free, then $14.99 once. Fair use (100 hours/month per purchase, in the Terms) is monitored, not enforced: one operator alert per user per month past 100 hours, and a manual per-user suspend switch (`proxy/README.md`). Early $4.99 buyers and active subscribers are unlocked (`specs/purchase.md`).
+- **Pricing:** Free download, 25 notes free, then $14.99 once. No usage limit. Heavy use is monitored internally: one operator alert per user per month past 100 hours, and a manual per-user suspend switch (`proxy/README.md`). The 100-hour figure is never shown to people, anywhere. Early $4.99 buyers and active subscribers are unlocked (`specs/purchase.md`).
 - **Platform:** Apple only (iPhone + Apple Watch). No Android, no web.

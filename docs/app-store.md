@@ -86,7 +86,7 @@ WEBHOOKS
 Ramble can also send each transcript to an HTTPS endpoint you choose.
 
 PRICE
-Free to download. 25 notes free, then $14.99 once. One-time purchase. No subscription. Fair use: 100 hours of audio per calendar month per purchase. Refunds are handled by Apple.
+Free to download. 25 notes free, then $14.99 once. One-time purchase. No subscription. Refunds are handled by Apple.
 
 Requires an Apple Watch paired with an iPhone.
 ```
@@ -106,7 +106,7 @@ The iPhone screenshots (1290 × 2796) and the product page header (5244 × 2950 
 ## What's New
 
 ```
-Ramble is now free to download. Your first 25 notes are free, then unlock once for $14.99. Every note is transcribed in the cloud, and your watch sends notes straight to Ramble, even without your iPhone nearby. If you bought Ramble before, every note transcribes with no unlock needed.
+Ramble is now free to download. Your first 25 notes are free, then unlock once for $14.99. Every note is transcribed in the cloud, and your watch sends notes straight to Ramble, even without your iPhone nearby. If you bought Ramble before, there's nothing to unlock.
 ```
 
 ## App Privacy (privacy label)

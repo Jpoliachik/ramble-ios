@@ -306,8 +306,8 @@ struct RecordingDetailView: View {
             return DeliveryLine(title: "Transcribing…", detail: "It goes out as soon as the transcript is ready.")
         case .heldForUnlock:
             return DeliveryLine(
-                title: "Unlock to transcribe",
-                detail: "This note is saved. It transcribes as soon as you unlock Ramble.",
+                title: "Unlock to send",
+                detail: "This note is saved. It sends as soon as you unlock Ramble.",
                 action: .unlock
             )
         case .tooLong, .couldntSend:

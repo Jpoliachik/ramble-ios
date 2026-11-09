@@ -88,7 +88,7 @@ Merging to `main` deploys the Worker and applies migrations (`.github/workflows/
 
 ## Operations: heavy users, suspending one, and revoking a refund
 
-Fair use (100 hours of audio a month per purchase, in the Terms) is not enforced. The relay keeps a monthly tally per user, where the user is the purchase an inbox is unlocked by (`unlock:…`, `sub:…`, `app:…`) or the inbox ID (`inb_…`) when it has none, and sends one alert to `ALERT_WEBHOOK_URL` the first time a user passes 100 hours in a UTC month. Nothing is refused. The global backstop is a spend limit in the Groq console.
+There is no usage limit, and the 100-hour figure below is internal: it is never shown to people (not in the app, the Terms or the listing). The relay keeps a monthly tally per user, where the user is the purchase an inbox is unlocked by (`unlock:…`, `sub:…`, `app:…`) or the inbox ID (`inb_…`) when it has none, and sends one alert to `ALERT_WEBHOOK_URL` the first time a user passes 100 hours in a UTC month. Nothing is refused. The global backstop is a spend limit in the Groq console.
 
 If one user needs stopping, suspend them by hand. Uploads (`PUT /notes/:id` and old builds' `POST /transcribe`) from a suspended inbox, or from any inbox bound to a suspended purchase, get `403` with `"reason": "suspended"`; the apps show "Couldn't send" and stop retrying. Notes already accepted still transcribe, and everyone else is unaffected. Each command is one line:
 

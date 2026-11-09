@@ -112,7 +112,8 @@ Keep claims inside this list. If it isn't here, check the code before writing it
 - Copy says "your agent." Muse is the agent we build and test with, so name it where someone needs to know what's tested, and don't headline "works with any agent."
 - No accounts. Privacy, in the words we use everywhere: "Ramble's server is a relay, not an archive. Your audio is sent to a transcription provider and deleted as soon as the transcript is ready. Transcripts are deleted when your agent picks them up, or after 30 days. Your full history lives only on your iPhone." Credentials are stored only as hashes.
 - Webhooks: one destination. Your iPhone sends a signed POST to any HTTPS endpoint once it has the transcript, with retries.
-- Pricing, word for word: "Free to download. 25 notes free, then $14.99 once." No subscription. Fair use is 100 hours of audio per calendar month. Refunds are handled by Apple.
+- Pricing, word for word: "Free to download. 25 notes free, then $14.99 once." No subscription. Refunds are handled by Apple.
+- Never mention a usage number or monthly hours. The heavy-use threshold is an internal alarm for the operator, not a limit, and naming it makes people wonder if they're near it.
 
 ## What not to say
 
@@ -120,7 +121,7 @@ Keep claims inside this list. If it isn't here, check the code before writing it
 - Don't say "no servers" or "no data on our servers." The relay is a server. Say what it holds and when it deletes it.
 - Don't say audio never leaves your device or never reaches the server. It does, and it's deleted as soon as the transcript is ready. Don't call Ramble on-device or offline transcription.
 - Don't say "open source," "read the code," or "verify it yourself," and don't mention self-hosting.
-- Don't call the free notes a "trial," and don't say "unlimited" (fair use applies), "premium," "Subscribe," or "per month" next to a price. "Subscription" appears only in "No subscription."
+- Don't call the free notes a "trial," and don't say "premium," "Subscribe," or "per month" next to a price. "Subscription" appears only in "No subscription."
 - Don't claim a transcription model is better for noise or accents. No independent benchmark backs that.
 - Don't promise MCP or dedicated ChatGPT, Claude, or Grok integrations, speaker labels, or end-to-end encryption until they ship. The Connect screen's "Works with Muse, Grok Bot, ChatGPT and more" is the one sanctioned agent list.
 - Don't use fear-based privacy marketing or compare directly to other apps.

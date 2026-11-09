@@ -45,7 +45,7 @@ The watch uses `brand-amber` (dark value, `#F59E0B`) on black and system colors 
 
 ### Sunset (marketing only)
 
-The App Store screenshots, the website and social images share a sunset palette: a dark sky over a warm horizon. It's mood, not UI. It never appears inside the watch or iPhone app, where amber stays the only saturated color.
+The App Store screenshots, the website and social images share a sunset palette: a dark sky over a warm horizon. It's mood, not UI. Inside the apps it appears in one place only, the light wash behind Justin's note on the iPhone unlock sheet; everywhere else amber stays the only saturated color.
 
 | Token | Value | Usage |
 |---|---|---|

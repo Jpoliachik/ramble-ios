@@ -52,18 +52,33 @@ enum PurchaseState: Equatable {
 enum PurchaseCopy {
     static let unlocked = "Unlocked"
     static let oneTime = "One-time purchase. No subscription."
-    static let fairUse = "Includes up to 100 hours of audio each month."
     static let storeUnreachable = "Can't reach the App Store. Try again in a moment."
     static let failed = "Purchase didn't go through. Try again."
-    static let pending = "Waiting for approval. Your notes are kept and will transcribe once it's approved."
-    static let finishing = "Purchase complete. Finishing setup. Your notes will transcribe shortly."
+    static let pending = "Waiting for approval. Your notes are kept and will send once it's approved."
+    static let finishing = "Purchase complete. Finishing setup. Your notes will send shortly."
     static let nothingToRestore = "No purchase found for this Apple ID."
     static let tooManyInboxes = "This purchase is in use on 10 iPhones. Each fresh start after a reinstall counts as one. Contact support@ramble.watch to add more."
     static let earlyBuyerTitle = "You're all set."
-    static let earlyBuyerBody = "You bought Ramble early, so every note transcribes. No unlock needed."
+    static let earlyBuyerBody = "You bought Ramble early, so there's nothing to unlock."
     static let subscriberTitle = "Cloud transcription is now included for everyone."
     static let subscriberBody = "You don't need your subscription anymore. Apple keeps billing it until you cancel."
     static let subscriberSettingsRow = "Your old subscription is still active"
+
+    /// The developer's note on the unlock sheet. Justin's own words; edit freely.
+    static let unlockTagline = "Unlimited notes from your watch and iPhone."
+    static let unlockTaglineSecond = "Pay once, keep it forever."
+    /// Followed by the signature name in italics: "Hi, I'm *Justin*!"
+    static let developerNoteGreeting = "Hi, I'm "
+    static let developerNote = [
+        "I made Ramble so I could leave my phone behind and still catch every spark, then let my agent handle it while I stay present, playing with my kids or out on a run.",
+        "It's helped me cut my screen time and capture a lot of good ideas along the way. I hope it does the same for you.",
+        "Thanks for trying it 🙂",
+    ]
+    static let developerNoteThanks = [
+        "Thanks for your support!",
+        "If you have any issues, email support@ramble.watch (include a screenshot if you can 🙂).",
+    ]
+    static let developerNoteSignature = "Justin"
 }
 
 @MainActor

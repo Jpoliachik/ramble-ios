@@ -152,7 +152,7 @@ struct HomeStatusLine: View {
     private var action: String? {
         switch status {
         case .didntSend: return "Fix"
-        case .toUnlock: return "Unlock"
+        case .toUnlock, .freeNotesLow: return "Unlock"
         case .noAgent: return "Connect"
         default: return nil
         }
