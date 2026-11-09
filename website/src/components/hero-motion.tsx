@@ -187,12 +187,12 @@ export default function HeroMotion({ size }: { size?: number }) {
 
         {/* What you say */}
         <div
-          className={`absolute left-[4px] top-[48px] z-20 w-[250px] transition-all duration-500 ease-out ${
+          className={`absolute left-[4px] top-[86px] z-20 transition-all duration-500 ease-out ${
             bubbleVisible ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
           }`}
         >
           <div className="relative rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-stone-200/80">
-            <p className="min-h-[2.6em] font-serif text-[16px] italic leading-snug text-stone-800">
+            <p className="min-w-[180px] whitespace-nowrap font-serif text-[16px] italic leading-snug text-stone-800">
               <span aria-hidden="true">“</span>
               {words}
               {recording && typed < thought.said.length && (
@@ -213,10 +213,19 @@ export default function HeroMotion({ size }: { size?: number }) {
           }}
         >
           <div className="relative">
+            {/* A short, faded band above and below, so it reads as a watch */}
+            <span
+              aria-hidden="true"
+              className="absolute -top-[40px] left-1/2 h-[52px] w-[132px] -translate-x-1/2 rounded-t-[20px] bg-[linear-gradient(to_top,#2a2825_30%,rgba(42,40,37,0))]"
+            />
+            <span
+              aria-hidden="true"
+              className="absolute -bottom-[40px] left-1/2 h-[52px] w-[132px] -translate-x-1/2 rounded-b-[20px] bg-[linear-gradient(to_bottom,#2a2825_30%,rgba(42,40,37,0))]"
+            />
             <span aria-hidden="true" className="absolute -left-[6px] top-[34%] h-10 w-[7px] rounded-l-sm bg-brand/85" />
             <span aria-hidden="true" className="absolute -right-[8px] top-[22%] h-8 w-[9px] rounded-r-md bg-stone-700" />
             <span aria-hidden="true" className="absolute -right-[6px] top-[47%] h-11 w-[7px] rounded-r-sm bg-stone-700" />
-            <div className="rounded-[52px] bg-stone-900 p-[9px] shadow-[0_30px_60px_-14px_rgba(26,25,23,0.45)] ring-1 ring-black/5">
+            <div className="relative rounded-[52px] bg-stone-900 p-[9px] shadow-[0_30px_60px_-14px_rgba(26,25,23,0.45)] ring-1 ring-black/5">
               <div className="relative h-[230px] overflow-hidden rounded-[44px] bg-black">
                 <span className="absolute right-[26px] top-[18px] text-[14px] font-semibold tabular-nums text-white">
                   9:41
