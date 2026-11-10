@@ -284,14 +284,14 @@ Ramble on Apple Watch SHALL post no notifications and SHALL NOT ask for notifica
 ## Siri and shortcuts
 
 ### Requirement: Watch shortcuts
-"Start a Ramble" and "Start recording with Ramble" SHALL open the app and start recording silently with the start haptic; if already recording, nothing changes. A failed start SHALL play the failure haptic and say "Allow microphone in Settings." when the microphone is off, or "Couldn't start recording." otherwise. "Stop my Ramble" and "Stop recording with Ramble" SHALL stop and save like the button and say "Saved.", or say "No recording in progress." when nothing is recording. "Ramble" and "Toggle Ramble" SHALL start or stop silently, with the haptic telling which.
+The watch SHALL offer one action, "Ramble", that works like the record button: it starts recording when nothing is recording and stops and saves like the button when something is. Siri phrases "Ramble", "Toggle Ramble", "Start a Ramble", "Start recording with Ramble", "Stop my Ramble" and "Stop recording with Ramble" all run it. It SHALL bring Ramble to the front before it starts, so a recording started from a shortcut or the Action button keeps going and shows its timer. It SHALL be silent both ways, with the start or stop haptic telling which. A failed start SHALL play the failure haptic and say "Allow microphone in Settings." when the microphone is off, or "Couldn't start recording." otherwise. A person can put it on the Apple Watch Ultra Action button through a shortcut of their own with Show on Apple Watch on.
 
-#### Scenario: Start by voice
-- GIVEN nothing is recording
-- WHEN the person says "Start a Ramble"
-- THEN Ramble opens and records, with the start haptic and no spoken reply
+#### Scenario: Start from the Action button
+- GIVEN nothing is recording and the Action button runs a shortcut with the Ramble action
+- WHEN the person presses the Action button
+- THEN Ramble opens and records, with the start haptic and no spoken reply, and keeps recording
 
-#### Scenario: Stop by voice
+#### Scenario: Stop from the same action
 - GIVEN the watch is recording
-- WHEN the person says "Stop my Ramble"
-- THEN the note is saved with the same check and haptic as a button stop, and Siri says "Saved."
+- WHEN the person presses the Action button again, or says "Stop my Ramble"
+- THEN the note is saved with the same check and haptic as a button stop, and nothing is spoken
