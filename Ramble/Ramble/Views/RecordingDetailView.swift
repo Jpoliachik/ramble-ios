@@ -204,6 +204,19 @@ struct RecordingDetailView: View {
 
     // MARK: - Audio
 
+    private static let shareNameFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd HHmm"
+        return formatter
+    }()
+
+    /// "Ramble 2026-11-06 0912.m4a"
+    private static func shareFileName(for recording: Recording) -> String {
+        let ext = recording.audioFileURL.pathExtension.isEmpty ? "m4a" : recording.audioFileURL.pathExtension
+        return "Ramble \(shareNameFormatter.string(from: recording.createdAt)).\(ext)"
+    }
+
     @ViewBuilder
     private func audioSection(_ recording: Recording) -> some View {
         Section {
@@ -222,7 +235,10 @@ struct RecordingDetailView: View {
     @ViewBuilder
     private func audioContent(_ recording: Recording) -> some View {
         if recording.hasAudio {
-            AudioPlayerView(audioURL: recording.audioFileURL)
+            AudioPlayerView(
+                audioURL: recording.audioFileURL,
+                shareFileName: Self.shareFileName(for: recording)
+            )
         } else if recording.isAudioOnWatch {
             Button {
                 HapticService.buttonTap()

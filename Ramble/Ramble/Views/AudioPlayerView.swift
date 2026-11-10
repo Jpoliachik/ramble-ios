@@ -8,11 +8,14 @@ import SwiftUI
 
 struct AudioPlayerView: View {
     let audioURL: URL
+    /// File name the audio is shared under, e.g. "Ramble 2026-11-06 0912.m4a".
+    var shareFileName: String?
 
     @StateObject private var player = AudioPlayerService()
     @State private var peaks: [Float] = Self.placeholderPeaks
     @State private var isSeeking = false
     @State private var seekProgress: Double = 0
+    @State private var shareURL: URL?
 
     private var displayProgress: Double {
         isSeeking ? seekProgress : player.progress
@@ -29,6 +32,7 @@ struct AudioPlayerView: View {
                 peaks = extracted
             }
             player.load(url: audioURL)
+            shareURL = Self.shareableCopy(of: audioURL, named: shareFileName)
         }
         .onDisappear {
             player.stop()
@@ -103,6 +107,26 @@ struct AudioPlayerView: View {
 
             Spacer()
 
+            HStack(spacing: 14) {
+                Text("-\(DateFormatters.formatDuration(max(0, player.duration - player.currentTime)))")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .fixedSize()
+
+                if let shareURL {
+                    ShareLink(item: shareURL) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Export audio")
+                }
+            }
+        }
+        // Play/pause sits in the true center, whatever is on either side.
+        .overlay {
             Button {
                 HapticService.buttonTap()
                 player.togglePlayback()
@@ -112,14 +136,30 @@ struct AudioPlayerView: View {
                     .contentTransition(.symbolEffect(.replace))
             }
             .buttonStyle(.plain)
+        }
+    }
 
-            Spacer()
+    // MARK: - Export
 
-            Text("-\(DateFormatters.formatDuration(max(0, player.duration - player.currentTime)))")
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .fixedSize()
+    /// Shares the original recording, untouched, under a readable name.
+    /// Falls back to the stored file if the copy can't be made.
+    private static func shareableCopy(of url: URL, named name: String?) -> URL? {
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        guard let name, !name.isEmpty else { return url }
+
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SharedAudio", isDirectory: true)
+            .appendingPathComponent(url.deletingPathExtension().lastPathComponent, isDirectory: true)
+        let destination = directory.appendingPathComponent(name)
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            if FileManager.default.fileExists(atPath: destination.path) {
+                try FileManager.default.removeItem(at: destination)
+            }
+            try FileManager.default.copyItem(at: url, to: destination)
+            return destination
+        } catch {
+            return url
         }
     }
 

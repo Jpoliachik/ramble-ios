@@ -55,16 +55,21 @@ struct MockAudioPlayerView: View {
 
             Spacer()
 
+            HStack(spacing: 14) {
+                Text("-\(DateFormatters.formatDuration(recording.duration))")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .fixedSize()
+
+                Image(systemName: "square.and.arrow.up")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .overlay {
             Image(systemName: "play.fill")
                 .font(.title3)
-
-            Spacer()
-
-            Text("-\(DateFormatters.formatDuration(recording.duration))")
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .fixedSize()
         }
     }
 
