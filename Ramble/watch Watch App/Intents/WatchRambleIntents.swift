@@ -43,6 +43,8 @@ struct WatchStartRecordingIntent: AppIntent {
     static var title: LocalizedStringResource = "Start a Ramble"
     static var description: IntentDescription = "Start recording on your watch"
     static var openAppWhenRun = true
+    @available(watchOS 26.0, *)
+    static var supportedModes: IntentModes { .foreground(.immediate) }
 
     @MainActor
     func perform() async throws -> some IntentResult {
@@ -57,6 +59,8 @@ struct WatchStopRecordingIntent: AppIntent {
     static var title: LocalizedStringResource = "Stop my Ramble"
     static var description: IntentDescription = "Stop the current recording and send it"
     static var openAppWhenRun = true
+    @available(watchOS 26.0, *)
+    static var supportedModes: IntentModes { .foreground(.immediate) }
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
@@ -73,6 +77,8 @@ struct WatchToggleRecordingIntent: AppIntent {
     static var title: LocalizedStringResource = "Ramble"
     static var description: IntentDescription = "Start or stop a recording"
     static var openAppWhenRun = true
+    @available(watchOS 26.0, *)
+    static var supportedModes: IntentModes { .foreground(.immediate) }
 
     @MainActor
     func perform() async throws -> some IntentResult {
