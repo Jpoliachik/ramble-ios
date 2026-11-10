@@ -284,10 +284,13 @@ Ramble on Apple Watch SHALL post no notifications and SHALL NOT ask for notifica
 ## Siri and shortcuts
 
 ### Requirement: Watch shortcuts
-The watch SHALL offer one action, "Ramble", that works like the record button: it starts recording when nothing is recording and stops and saves like the button when something is. Siri phrases "Ramble", "Toggle Ramble", "Start a Ramble", "Start recording with Ramble", "Stop my Ramble" and "Stop recording with Ramble" all run it. It SHALL bring Ramble to the front before it starts, so a recording started from a shortcut or the Action button keeps going and shows its timer. It SHALL be silent both ways, with the start or stop haptic telling which. A failed start SHALL play the failure haptic and say "Allow microphone in Settings." when the microphone is off, or "Couldn't start recording." otherwise. A person can put it on the Apple Watch Ultra Action button through a shortcut of their own with Show on Apple Watch on.
+The watch SHALL offer one action, "Ramble", that works like the record button: it starts recording when nothing is recording and stops and saves like the button when something is. Siri phrases "Ramble", "Toggle Ramble", "Start a Ramble", "Start recording with Ramble", "Stop my Ramble" and "Stop recording with Ramble" all run it. It SHALL bring Ramble to the front before it starts, so a recording started from Siri or the control keeps going and shows its timer. It SHALL be silent both ways, with the start or stop haptic telling which. A failed start SHALL play the failure haptic and say "Allow microphone in Settings." when the microphone is off, or "Couldn't start recording." otherwise.
+
+### Requirement: Ramble control
+On watchOS 26 and later, the watch app SHALL offer a "Ramble" control that runs the same action. A person can assign it to the Apple Watch Ultra Action button, or add it to Control Center or the Smart Stack. It runs on the watch, not the iPhone. Shortcuts built on the iPhone run the iPhone app's actions, so they are not a way to record on the watch.
 
 #### Scenario: Start from the Action button
-- GIVEN nothing is recording and the Action button runs a shortcut with the Ramble action
+- GIVEN nothing is recording and the Action button is set to the Ramble control
 - WHEN the person presses the Action button
 - THEN Ramble opens and records, with the start haptic and no spoken reply, and keeps recording
 

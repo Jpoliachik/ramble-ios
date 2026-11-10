@@ -88,6 +88,7 @@ The site is a static export (`output: "export"`) deployed on Vercel from the `we
 
 - **Ramble** — Main iOS app (SwiftUI)
 - **watch Watch App** — watchOS companion app
+- **RambleWatchControls** — widget extension embedded in the watch app: the "Ramble" control (Action button, Control Center, Smart Stack). watchOS 26+ only
 
 ### Source Layout
 

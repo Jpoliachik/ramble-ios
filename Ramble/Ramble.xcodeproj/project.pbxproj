@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		8A290E652F2153450020317A /* watch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 8A290E5B2F2153440020317A /* watch Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		8AB9C9B12F86DE7A003C7BD8 /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8AB9C9B02F86DE7A003C7BD8 /* StoreKit.framework */; };
+		C0A100000000000000000002 /* RambleWatchControls.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = C0A100000000000000000001 /* RambleWatchControls.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -18,6 +19,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 8A290E5A2F2153440020317A;
 			remoteInfo = "watch Watch App";
+		};
+		C0A100000000000000000003 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8A290E252F2152E10020317A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C0A10000000000000000000B;
+			remoteInfo = RambleWatchControls;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -33,11 +41,23 @@
 			name = "Embed Watch Content";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C0A100000000000000000005 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				C0A100000000000000000002 /* RambleWatchControls.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		8A290E2D2F2152E10020317A /* Ramble.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ramble.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8A290E5B2F2153440020317A /* watch Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "watch Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		C0A100000000000000000001 /* RambleWatchControls.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RambleWatchControls.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		8AB9C9B02F86DE7A003C7BD8 /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
@@ -55,6 +75,13 @@
 				Info.plist,
 			);
 			target = 8A290E5A2F2153440020317A /* watch Watch App */;
+		};
+		C0A100000000000000000006 /* Exceptions for "RambleWatchControls" folder in "RambleWatchControls" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = C0A10000000000000000000B /* RambleWatchControls */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -75,6 +102,14 @@
 			path = "watch Watch App";
 			sourceTree = "<group>";
 		};
+		C0A100000000000000000007 /* RambleWatchControls */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				C0A100000000000000000006 /* Exceptions for "RambleWatchControls" folder in "RambleWatchControls" target */,
+			);
+			path = RambleWatchControls;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -93,6 +128,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C0A100000000000000000009 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -101,6 +143,7 @@
 			children = (
 				8A290E2F2F2152E10020317A /* Ramble */,
 				8A290E5C2F2153440020317A /* watch Watch App */,
+				C0A100000000000000000007 /* RambleWatchControls */,
 				8AB9C9AF2F86DE7A003C7BD8 /* Frameworks */,
 				8A290E2E2F2152E10020317A /* Products */,
 			);
@@ -111,6 +154,7 @@
 			children = (
 				8A290E2D2F2152E10020317A /* Ramble.app */,
 				8A290E5B2F2153440020317A /* watch Watch App.app */,
+				C0A100000000000000000001 /* RambleWatchControls.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -157,10 +201,12 @@
 				8A290E572F2153440020317A /* Sources */,
 				8A290E582F2153440020317A /* Frameworks */,
 				8A290E592F2153440020317A /* Resources */,
+				C0A100000000000000000005 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				C0A100000000000000000004 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				8A290E5C2F2153440020317A /* watch Watch App */,
@@ -171,6 +217,28 @@
 			productName = "watch Watch App";
 			productReference = 8A290E5B2F2153440020317A /* watch Watch App.app */;
 			productType = "com.apple.product-type.application";
+		};
+		C0A10000000000000000000B /* RambleWatchControls */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C0A10000000000000000000C /* Build configuration list for PBXNativeTarget "RambleWatchControls" */;
+			buildPhases = (
+				C0A100000000000000000008 /* Sources */,
+				C0A100000000000000000009 /* Frameworks */,
+				C0A10000000000000000000A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				C0A100000000000000000007 /* RambleWatchControls */,
+			);
+			name = RambleWatchControls;
+			packageProductDependencies = (
+			);
+			productName = RambleWatchControls;
+			productReference = C0A100000000000000000001 /* RambleWatchControls.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -187,6 +255,9 @@
 					};
 					8A290E5A2F2153440020317A = {
 						CreatedOnToolsVersion = 26.2;
+					};
+					C0A10000000000000000000B = {
+						CreatedOnToolsVersion = 26.6;
 					};
 				};
 			};
@@ -206,6 +277,7 @@
 			targets = (
 				8A290E2C2F2152E10020317A /* Ramble */,
 				8A290E5A2F2153440020317A /* watch Watch App */,
+				C0A10000000000000000000B /* RambleWatchControls */,
 			);
 		};
 /* End PBXProject section */
@@ -219,6 +291,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		8A290E592F2153440020317A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C0A10000000000000000000A /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -242,6 +321,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C0A100000000000000000008 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -249,6 +335,11 @@
 			isa = PBXTargetDependency;
 			target = 8A290E5A2F2153440020317A /* watch Watch App */;
 			targetProxy = 8A290E632F2153450020317A /* PBXContainerItemProxy */;
+		};
+		C0A100000000000000000004 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C0A10000000000000000000B /* RambleWatchControls */;
+			targetProxy = C0A100000000000000000003 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -516,6 +607,62 @@
 			};
 			name = Release;
 		};
+		C0A10000000000000000000D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = SW6VLKWS7Q;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = RambleWatchControls/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Ramble;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dev.goodloop.Ramble.watchkitapp.controls;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
+		};
+		C0A10000000000000000000E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = SW6VLKWS7Q;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = RambleWatchControls/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Ramble;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dev.goodloop.Ramble.watchkitapp.controls;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -542,6 +689,15 @@
 			buildConfigurations = (
 				8A290E672F2153450020317A /* Debug */,
 				8A290E682F2153450020317A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C0A10000000000000000000C /* Build configuration list for PBXNativeTarget "RambleWatchControls" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C0A10000000000000000000D /* Debug */,
+				C0A10000000000000000000E /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
