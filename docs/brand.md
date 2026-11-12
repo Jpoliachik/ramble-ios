@@ -110,7 +110,7 @@ Use these as written, or start from them.
 
 **Short paragraph (~50 words):** Your best thoughts come when you're away from a screen. Ramble keeps them without pulling you back to one. Tap your Apple Watch, say it the messy way it came to you, and put your arm down. Nothing comes back. No signal? It sends later. Your agent picks it up and takes care of it. You only check in if it needs you.
 
-**No reply. On purpose.** Send a thought to your agent and it answers, asks a follow-up, and now you're solving the problem on your phone. Ramble skips all that. Say it, put your arm down, and get back to your run. The thinking can wait.
+**No reply. On purpose.** Most agents write back, then ask a follow-up, and you end up on your phone. Ramble doesn't reply. Say it, put your arm down, and keep going.
 
 ### By audience
 

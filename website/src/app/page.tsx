@@ -219,7 +219,7 @@ export default function Home() {
         <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
           <SectionHeading
             eyebrow="One-way"
-            sub="Send a thought to your agent and it answers, asks a follow-up, and now you're solving the problem on your phone. Ramble skips all that. Say it, put your arm down, and get back to your run. The thinking can wait."
+            sub="Most agents write back, then ask a follow-up, and you end up on your phone. Ramble doesn't reply. Say it, put your arm down, and keep going."
           >
             No reply. On purpose.
           </SectionHeading>
