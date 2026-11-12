@@ -147,7 +147,7 @@ Keep claims inside this list. If it isn't here, check the code before writing it
 ## What Ramble is not
 
 - **Not a conversation.** Your agent doesn't reply on your watch. It's a one-way hand-off, and that's the point.
-- **Not a voice memo.** A memo waits for you to deal with it. Ramble hands the thought to your agent.
+- **Not a voice memo.** A memo doesn't go anywhere. It sits there until you deal with it. Ramble sends the thought straight to your agent.
 - **Not a notes app.** It captures voice and delivers text. Your agent or your own system keeps it.
 - **Not an assistant.** No built-in LLM. Ramble feeds your agent; it isn't one.
 

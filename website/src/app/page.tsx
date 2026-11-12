@@ -93,7 +93,7 @@ const faqs: { q: string; a: ReactNode }[] = [
   },
   {
     q: "Isn't this just a voice memo?",
-    a: "A memo waits for you to deal with it. Ramble hands the thought to your agent, so it's taken care of when you get back.",
+    a: "A memo doesn't go anywhere. It sits there until you deal with it. Ramble sends the thought straight to your agent, which takes care of it.",
   },
   {
     q: "Does my agent reply on my watch?",
