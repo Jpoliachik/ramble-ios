@@ -19,6 +19,7 @@ struct RecordingDetailView: View {
     @State private var transcriptLimitedHeight: CGFloat = 0
     @State private var showUnlock = false
     @State private var audioRequest: AudioRequest = .idle
+    @State private var shareURL: URL?
     @ObservedObject private var relay = RelayService.shared
 
     private enum AudioRequest {
@@ -62,6 +63,23 @@ struct RecordingDetailView: View {
                     moreMenu(recording)
                 }
             }
+            // Share sits on its own at the bottom right, clear of the player.
+            if let shareURL {
+                ToolbarItemGroup(placement: .bottomBar) {
+                    Spacer()
+                    ShareLink(item: shareURL) {
+                        Label("Share audio", systemImage: "square.and.arrow.up")
+                    }
+                    .accessibilityLabel("Share audio")
+                }
+            }
+        }
+        .task(id: recording?.hasAudio) {
+            guard let recording, recording.hasAudio else {
+                shareURL = nil
+                return
+            }
+            shareURL = Self.shareableCopy(of: recording.audioFileURL, named: Self.shareFileName(for: recording))
         }
         .confirmationDialog(
             "Delete this recording?",
@@ -217,6 +235,27 @@ struct RecordingDetailView: View {
         return "Ramble \(shareNameFormatter.string(from: recording.createdAt)).\(ext)"
     }
 
+    /// Shares the original recording, untouched, under a readable name.
+    /// Falls back to the stored file if the copy can't be made.
+    private static func shareableCopy(of url: URL, named name: String) -> URL? {
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SharedAudio", isDirectory: true)
+            .appendingPathComponent(url.deletingPathExtension().lastPathComponent, isDirectory: true)
+        let destination = directory.appendingPathComponent(name)
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            if FileManager.default.fileExists(atPath: destination.path) {
+                try FileManager.default.removeItem(at: destination)
+            }
+            try FileManager.default.copyItem(at: url, to: destination)
+            return destination
+        } catch {
+            return url
+        }
+    }
+
     @ViewBuilder
     private func audioSection(_ recording: Recording) -> some View {
         Section {
@@ -235,10 +274,7 @@ struct RecordingDetailView: View {
     @ViewBuilder
     private func audioContent(_ recording: Recording) -> some View {
         if recording.hasAudio {
-            AudioPlayerView(
-                audioURL: recording.audioFileURL,
-                shareFileName: Self.shareFileName(for: recording)
-            )
+            AudioPlayerView(audioURL: recording.audioFileURL)
         } else if recording.isAudioOnWatch {
             Button {
                 HapticService.buttonTap()
@@ -360,8 +396,17 @@ struct RecordingDetailView: View {
 
     private func deliverySection(_ recording: Recording) -> some View {
         let line = deliveryLine(for: recording)
+        let stage = DeliveryStage(recording)
+        // Done reads as done: the same green check as the list row.
+        let isDone = stage == .agentHasIt || stage == .deliveredToWebhook
         return Section {
             HStack(spacing: 12) {
+                if isDone {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(.green)
+                        .accessibilityHidden(true)
+                }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(line.title)
                         .font(.body.weight(.medium))

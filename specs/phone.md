@@ -203,11 +203,11 @@ Tapping a row SHALL open the note screen titled "Recording" with the duration, "
 - THEN the whole transcript is on the clipboard and "Copied" shows for 1.5 seconds
 
 ### Requirement: Playback
-When the audio is on this iPhone, the note screen SHALL show a waveform player with play/pause, drag-to-seek, elapsed time and remaining time ("-1:02"), and a small share button at the bottom right that opens the system share sheet with the original audio file, untouched, named "Ramble 2026-11-06 0912.m4a" from the recorded time; leaving the screen stops playback. Once the watch no longer keeps the audio ([watch.md](watch.md)), "Audio on watch" goes away and the screen shows "Audio file not available".
+When the audio is on this iPhone, the note screen SHALL show a waveform player with play/pause, drag-to-seek, elapsed time and remaining time ("-1:02"), and a share button ("Share audio") on its own in the bottom toolbar at the bottom right of the screen, outside the player, that opens the system share sheet with the original audio file, untouched, named "Ramble 2026-11-06 0912.m4a" from the recorded time; leaving the screen stops playback. Once the watch no longer keeps the audio ([watch.md](watch.md)), "Audio on watch" goes away and the screen shows "Audio file not available".
 
 #### Scenario: Exporting the audio
 - GIVEN a note recorded November 6 at 9:12 AM has its audio on this iPhone
-- WHEN the person taps the share button in the player
+- WHEN the person taps the share button at the bottom right
 - THEN the share sheet offers the original audio as "Ramble 2026-11-06 0912.m4a"
 
 #### Scenario: Audio on the watch, watch app open
@@ -221,7 +221,7 @@ When the audio is on this iPhone, the note screen SHALL show a waveform player w
 - THEN the phone shows "Open Ramble on your watch to sync."
 
 ### Requirement: Delivery line
-Under the player, the note screen SHALL show one line saying where the note is. Delivery states use exactly the words in [delivery.md](delivery.md) ("Waiting for your agent", "Checking delivery…", "Your agent has it" with the first pickup time, "Not picked up", "Saved, no agent connected", "Nothing to send · no speech detected", "Delivered to webhook", "Didn't send" with "Retry"), counted for several agents and followed by one row per agent ([delivery.md](delivery.md)). Before delivery the line reads:
+Under the player, the note screen SHALL show one line saying where the note is. Delivery states use exactly the words in [delivery.md](delivery.md) ("Waiting for your agent", "Checking delivery…", "Your agent has it" with the first pickup time, "Not picked up", "Saved, no agent connected", "Nothing to send · no speech detected", "Delivered to webhook", "Didn't send" with "Retry"), counted for several agents and followed by one row per agent ([delivery.md](delivery.md)). When the note is done ("Your agent has it" or "Delivered to webhook"), a green filled check SHALL lead the line, the same check the list row shows; no other state shows it. Before delivery the line reads:
 
 | State | Title | Detail | Action |
 |---|---|---|---|
