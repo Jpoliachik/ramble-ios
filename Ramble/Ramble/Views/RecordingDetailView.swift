@@ -63,16 +63,6 @@ struct RecordingDetailView: View {
                     moreMenu(recording)
                 }
             }
-            // Share sits on its own at the bottom right, clear of the player.
-            if let shareURL {
-                ToolbarItemGroup(placement: .bottomBar) {
-                    Spacer()
-                    ShareLink(item: shareURL) {
-                        Label("Share audio", systemImage: "square.and.arrow.up")
-                    }
-                    .accessibilityLabel("Share audio")
-                }
-            }
         }
         .task(id: recording?.hasAudio) {
             guard let recording, recording.hasAudio else {
@@ -268,6 +258,21 @@ struct RecordingDetailView: View {
             #else
             audioContent(recording)
             #endif
+        } header: {
+            HStack {
+                Text("Audio")
+                Spacer()
+                if let shareURL {
+                    ShareLink(item: shareURL) {
+                        Label("Share", systemImage: "square.and.arrow.up")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.bordered)
+                    .buttonBorderShape(.capsule)
+                    .controlSize(.small)
+                    .accessibilityLabel("Share audio")
+                }
+            }
         }
     }
 

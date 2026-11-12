@@ -203,11 +203,11 @@ Tapping a row SHALL open the note screen titled "Recording" with the duration, "
 - THEN the whole transcript is on the clipboard and "Copied" shows for 1.5 seconds
 
 ### Requirement: Playback
-When the audio is on this iPhone, the note screen SHALL show a waveform player with play/pause, drag-to-seek, elapsed time and remaining time ("-1:02"), and a share button ("Share audio") on its own in the bottom toolbar at the bottom right of the screen, outside the player, that opens the system share sheet with the original audio file, untouched, named "Ramble 2026-11-06 0912.m4a" from the recorded time; leaving the screen stops playback. Once the watch no longer keeps the audio ([watch.md](watch.md)), "Audio on watch" goes away and the screen shows "Audio file not available".
+When the audio is on this iPhone, the note screen SHALL show a waveform player with play/pause, drag-to-seek, elapsed time and remaining time ("-1:02"), and a small "Share" button in the "Audio" header above the player, styled like the transcript's "Copy", that opens the system share sheet with the original audio file, untouched, named "Ramble 2026-11-06 0912.m4a" from the recorded time; leaving the screen stops playback. Once the watch no longer keeps the audio ([watch.md](watch.md)), "Audio on watch" goes away and the screen shows "Audio file not available".
 
 #### Scenario: Exporting the audio
 - GIVEN a note recorded November 6 at 9:12 AM has its audio on this iPhone
-- WHEN the person taps the share button at the bottom right
+- WHEN the person taps "Share" in the Audio header
 - THEN the share sheet offers the original audio as "Ramble 2026-11-06 0912.m4a"
 
 #### Scenario: Audio on the watch, watch app open
