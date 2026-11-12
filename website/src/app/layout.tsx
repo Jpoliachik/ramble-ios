@@ -4,11 +4,11 @@ import Header from "../components/header";
 import { BASE_PATH, SITE_URL } from "../lib/site";
 import "./globals.css";
 
-const TITLE = "Ramble: Talk to your watch. Your agent handles it.";
+const TITLE = "Ramble for Apple Watch: Say it. Let it go.";
 const DESCRIPTION =
-  "Stay in the moment. Capture a thought on your Apple Watch, leave your phone behind, and your agent handles it. Works offline. Transcripts are deleted once delivered.";
+  "One-way voice notes from your Apple Watch to your agent. Say a thought and get back to your day. No reply to wait for, no signal needed. Your agent picks it up later.";
 const SHORT_DESCRIPTION =
-  "Stay in the moment. Capture the thought on your watch. Your agent handles it.";
+  "Say a thought to your Apple Watch and let it go. No reply to wait for. Your agent picks it up later.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -25,10 +25,10 @@ export const metadata: Metadata = {
     url: SITE_URL,
     images: [
       {
-        url: `${SITE_URL}/og-image.png?v=2`,
+        url: `${SITE_URL}/og-image.png?v=3`,
         width: 1200,
         height: 630,
-        alt: "Ramble: Talk to your watch. Your agent handles it.",
+        alt: "Ramble for Apple Watch: Say it to your watch. Then let it go.",
       },
     ],
   },
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: TITLE,
     description: SHORT_DESCRIPTION,
-    images: [`${SITE_URL}/og-image.png?v=2`],
+    images: [`${SITE_URL}/og-image.png?v=3`],
   },
 };
 

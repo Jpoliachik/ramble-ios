@@ -52,11 +52,11 @@ const steps = [
   },
   {
     title: "Let it go",
-    body: "No reply to wait for. Works offline, too.",
+    body: "Nothing comes back to your wrist. No signal? It waits and sends later.",
   },
   {
-    title: "Come back later",
-    body: "Your agent picks it up and gets to work.",
+    title: "It gets handled",
+    body: "Your agent picks it up and takes care of it. You only check in if it needs you.",
   },
 ];
 
@@ -88,12 +88,12 @@ const faqs: { q: string; a: ReactNode }[] = [
     a: "No. Your watch records on its own, even with no signal. It sends each thought over Wi-Fi, cellular, or your iPhone, whichever it has. Anything it can't send yet waits safely on the watch.",
   },
   {
-    q: "Why not just talk to my agent directly?",
-    a: "Then you're on your phone, waiting for a reply. With Ramble you say it and keep going. Your agent works on it while you get on with your day.",
+    q: "My agent has a watch app. Why Ramble?",
+    a: "Agent apps are built for a conversation: they answer, ask follow-ups, and need a connection. Ramble is built for the opposite. Say it, put your arm down, and nothing comes back. No signal? It waits on your watch and sends later. Your agent works on it while you get on with your day.",
   },
   {
-    q: "Why not use my agent's own app?",
-    a: "Most agent apps don't have a real Watch app, and the ones that do need a connection. Ramble records with no phone and no signal, queues everything up, and makes sure each thought reaches your agent once you're back online. It's also simple on purpose: you say it and move on, instead of staring at your phone waiting for a reply.",
+    q: "Isn't this just a voice memo?",
+    a: "A memo doesn't go anywhere. It sits there until you deal with it. Ramble sends the thought straight to your agent, which takes care of it.",
   },
   {
     q: "Does my agent reply on my watch?",
@@ -120,10 +120,10 @@ const faqs: { q: string; a: ReactNode }[] = [
     ),
   },
   {
-    q: "Do webhooks still work?",
+    q: "Can it send somewhere else?",
     a: (
       <>
-        Yes. Ramble can still send every transcript to your own HTTPS endpoint, alongside your agent or instead of it.{" "}
+        Yes. Ramble can send every transcript to your own HTTPS endpoint, alongside your agent or instead of it.{" "}
         <Link href="/docs/webhooks" className={inlineLink}>
           Webhook docs
         </Link>
@@ -167,12 +167,12 @@ export default function Home() {
               <HeroFlow />
             </div>
             <h1 className="hero-enter-title font-serif text-[1.9rem] font-semibold leading-[1.15] tracking-tight text-stone-900 min-[400px]:text-4xl sm:text-5xl lg:text-[2.9rem] lg:leading-[1.1]">
-              <span className="block whitespace-nowrap">Talk to your watch.</span>
-              <span className="block whitespace-nowrap italic text-brand-text">Your agent handles it.</span>
+              <span className="block whitespace-nowrap">Say it to your watch.</span>
+              <span className="block whitespace-nowrap italic text-brand-text">Then let it go.</span>
             </h1>
             <p className="hero-enter-subtitle mt-6 max-w-xl text-base leading-relaxed text-stone-500 sm:text-lg lg:text-xl">
-              <span className="block">Stay in the moment, capture the thought.</span>
-              <span className="block">Ramble gets it to your AI agent.</span>
+              <span className="block">No reply to wait for, no signal needed.</span>
+              <span className="block">Your agent picks it up later.</span>
             </p>
             <div className="hero-enter-buttons mt-10 flex flex-col items-center gap-3 lg:items-start">
               <div className="flex flex-col items-center gap-4 sm:flex-row">
@@ -214,6 +214,18 @@ export default function Home() {
         </div>
       </section>
 
+      {/* One-way on purpose */}
+      <section className="border-t border-stone-200">
+        <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
+          <SectionHeading
+            eyebrow="One-way"
+            sub="Most agents write back, then ask a follow-up, and you end up on your phone. Ramble doesn't reply. Say it, put your arm down, and keep going."
+          >
+            No reply. On purpose.
+          </SectionHeading>
+        </div>
+      </section>
+
       {/* Connect your agent */}
       <section id="connect" className="scroll-mt-20 border-t border-stone-200">
         <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
@@ -244,7 +256,7 @@ export default function Home() {
           </div>
 
           <div className="mt-14 space-y-1.5 text-center text-sm text-stone-500">
-            <p>Works best with personal agents like Muse, Grok Bot and Dot.</p>
+            <p>Works with Muse, Grok Bot, ChatGPT and more.</p>
             <p>
               Have your own custom endpoint?{" "}
               <Link href="/docs/webhooks" className={inlineLink}>
@@ -259,10 +271,10 @@ export default function Home() {
       {/* Pricing */}
       <section className="border-t border-stone-200 bg-stone-50">
         <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
-          {/* Reads as the spec's pricing line: "Free to download. 25 notes free, then $14.99 once." */}
+          {/* Reads as the spec's pricing line: "Free to try. 25 notes free, then $14.99 once." */}
           <div className="relative mx-auto max-w-md overflow-hidden rounded-2xl bg-white px-6 pt-9 pb-8 text-center shadow-sm ring-1 ring-stone-200/80">
             <div aria-hidden="true" className="sunset-rule absolute inset-x-0 top-0 h-1" />
-            <h2 className="font-serif text-4xl font-semibold tracking-tight text-stone-900">Free to download.</h2>
+            <h2 className="font-serif text-4xl font-semibold tracking-tight text-stone-900">Free to try.</h2>
             <p className="mt-3 text-base text-stone-700">
               {FREE_NOTES} notes free, then {APP_PRICE} once.
             </p>
@@ -278,7 +290,7 @@ export default function Home() {
       {/* Privacy */}
       <section className="border-t border-stone-200">
         <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
-          <SectionHeading eyebrow="Privacy">Your thoughts don&apos;t stick around</SectionHeading>
+          <SectionHeading eyebrow="Privacy-first design">Your thoughts don&apos;t stick around</SectionHeading>
           <div className="mt-14 grid gap-10 sm:grid-cols-3 sm:gap-8">
             {privacyPoints.map(({ Icon, title, body, tint }) => (
               <div key={title} className="flex flex-col items-center text-center sm:items-start sm:text-left">

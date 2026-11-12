@@ -4,7 +4,7 @@ This file is the source of truth for the App Store listing. Change the copy here
 
 Fields marked **TODO: confirm in ASC** haven't been checked against App Store Connect yet. Fill them in from the live listing the next time someone pulls it.
 
-Pricing words follow `specs/purchase.md` ("What Ramble says about price"): the price story is "Free to download. 25 notes free, then $14.99 once." Never "trial", "premium", "Subscribe", or a price per month. Privacy words follow `specs/delivery.md` ("One privacy wording everywhere"). No on-device transcription claims, and no open-source claims.
+Pricing words follow `specs/purchase.md` ("What Ramble says about price"): the price story is "Free to try. 25 notes free, then $14.99 once." Never "trial", "premium", "Subscribe", or a price per month. Privacy words follow `specs/delivery.md` ("One privacy wording everywhere"). No on-device transcription claims, and no open-source claims.
 
 ## App information
 
@@ -43,31 +43,35 @@ The brand doc avoids "notes," but the name is the field that ranks most heavily 
 ## Subtitle [30 / 30]
 
 ```
-Say it. Your agent handles it.
+Send thoughts to your AI agent
 ```
 
-## Keywords [99 / 100]
+This field ranks in search, so it carries the words people type (thoughts, AI, agent). The mood ("Say it. Let it go.") lives in the screenshots and promo text.
 
-Commas with no spaces. Don't repeat words that are already in the name or subtitle, because Apple indexes those fields anyway. Don't use competitor or agent brand names, because Apple rejects them.
+## Keywords [100 / 100]
+
+Commas with no spaces. Don't repeat words that are already in the name or subtitle, because Apple indexes those fields anyway. Don't use competitor or agent brand names, because Apple rejects them. "offline" is fair because recording works offline; never imply offline transcription.
 
 ```
-ai,assistant,memo,dictation,transcribe,speech,mindful,wrist,todo,reminder,idea,journal,walk,offline
+assistant,memo,dictation,transcribe,speech,mindful,wrist,todo,reminder,idea,walk,run,offline,capture
 ```
 
-## Promotional text [147 / 170]
+## Promotional text [148 / 170]
 
 You can change this field without a new app version.
 
 ```
-Go for a ramble and leave your phone behind. Say the thought to your Apple Watch, let it go, and get back to your day. Your agent handles it later.
+Say the thought to your Apple Watch and let it go. No reply to wait for, no signal needed. Your agent picks it up later, and you stay where you are.
 ```
 
 ## Description
 
 ```
-Stay in the moment. Say the thought to your Apple Watch, let it go, and get back to your day. Your agent picks it up and handles it later.
+Say it. Let it go. Ramble is the one-way line from your Apple Watch to your agent.
 
-Your best ideas show up on a walk, in the car, halfway through a run. Ramble keeps them without pulling you back to your phone. An idea, a to-do, a reminder. Messy is fine, and there's no reply to wait for. Your watch sends each thought over Wi-Fi, cellular, or your iPhone. No signal? It waits on your watch and goes out when you reconnect.
+A thought comes on a run, at the park, in the middle of dinner. Tap your watch, say it, and put your arm down. Nothing comes back: no reply, no follow-up, no pull into solving it right now. Your agent picks it up later and takes care of it. You only check in if it needs you.
+
+No signal? It waits on your watch and sends when you're back online, over Wi-Fi, cellular, or your iPhone. An idea, a to-do, a reminder. Messy is fine.
 
 SETUP
 In Settings, tap Your agent, then Connect your agent. Copy the message and paste it to your agent. That's it.
@@ -81,13 +85,13 @@ PRIVACY
 - Disconnect any time.
 
 TRANSCRIPTION
-Ramble transcribes in the cloud, using providers that don't train on your audio. Set your language and add names to the vocabulary for better results.
+Ramble transcribes in the cloud, using a provider that doesn't train on your audio. Set your language and add names to the vocabulary for better results.
 
 WEBHOOKS
 Ramble can also send each transcript to an HTTPS endpoint you choose.
 
 PRICE
-Free to download. 25 notes free, then $14.99 once. One-time purchase. No subscription. Refunds are handled by Apple.
+Free to try. 25 notes free, then $14.99 once. One-time purchase. No subscription. Refunds are handled by Apple.
 
 Requires an Apple Watch paired with an iPhone.
 ```
@@ -96,13 +100,13 @@ Requires an Apple Watch paired with an iPhone.
 
 Short, one thought each, in this order. Mindfulness first: a short headline and a smaller second line. The first screenshot shows the watch, not the phone.
 
-The iPhone screenshots (1206 × 2622, the size App Store Connect accepted) and the product page header (5244 × 2950 and 3840 × 1646) are in `images/appstore/2026-sunset/`. Their HTML source is in `source/` there (open `one-line.html?bg=t` for the shipped look; it renders at 1290 × 2796, so scale to 1206 × 2622); change the copy here first, then re-render. iPad gets one plain 13-inch screenshot (2064 × 2752), `ipad/ipad-1.png`: Home on an iPad on the sunset background, with no headline. The watch can't pair with an iPad, so the iPad listing doesn't pitch anything. Render it with `node source/ipad-render.js <abs path to one-line.html> <out png>`. Apple Watch screenshots (422 × 514, Ultra simulator) are in `watch/`, and the unlock sheet screenshot for the in-app purchase review is in `review/`.
+The iPhone screenshots (1206 × 2622, the size App Store Connect accepted) and the product page header (5244 × 2950 and 3840 × 1646) are in `images/appstore/2026-sunset/`. Their HTML source is in `source/` there (open `one-line.html?bg=w` for the shipped look: the light sunset wash of the web hero and one flowing line; it renders at 1290 × 2796, so scale to 1206 × 2622); change the copy here first, then re-render. iPad gets one plain 13-inch screenshot (2064 × 2752), `ipad/ipad-1.png`: Home on an iPad on the sunset background, with no headline. The watch can't pair with an iPad, so the iPad listing doesn't pitch anything. Render it with `node source/ipad-render.js <abs path to one-line.html> <out png>`. Apple Watch screenshots (422 × 514, Ultra simulator) are in `watch/`, and the unlock sheet screenshot for the in-app purchase review is in `review/`.
 
-1. Stay in the moment. (Talk to your watch. Your agent handles it later.)
-2. Leave your phone behind. (No iPhone needed. Sends when you reconnect.)
+1. Stay in the moment. (Say it. Let it go. Nothing comes back to your wrist.)
+2. Leave your phone behind. (No signal needed. It sends later.)
 3. Get it out of your head. (Messy is fine.)
-4. Connect your agent with one message. (No login. No OAuth. No accounts.)
-5. Private by design. (Audio deleted once transcribed. Your history stays on your iPhone.)
+4. Connect your agent with one message. (No login. No accounts.)
+5. Private by design. (Deleted after delivery. History stays only on your phone.)
 
 ## What's New (1.2.0)
 

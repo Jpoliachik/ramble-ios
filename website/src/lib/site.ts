@@ -14,7 +14,7 @@ export const SUPPORT_EMAIL = "support@ramble.watch";
 // monthly price, "trial", "premium" or "Subscribe".
 export const FREE_NOTES = 25;
 export const APP_PRICE = "$14.99";
-export const PRICE_STORY = `Free to download. ${FREE_NOTES} notes free, then ${APP_PRICE} once.`;
+export const PRICE_STORY = `Free to try. ${FREE_NOTES} notes free, then ${APP_PRICE} once.`;
 
 // specs/delivery.md "One privacy wording everywhere". Use it verbatim.
 export const PRIVACY_WORDING =

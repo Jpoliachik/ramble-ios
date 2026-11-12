@@ -1,6 +1,6 @@
 # Ramble
 
-> Talk to your Apple Watch. Your agent handles it. Tap the watch and talk; the watch sends the recording straight to Ramble's server, which transcribes it and holds the text until your agent picks it up. No accounts.
+> Ramble for Apple Watch: one-way voice notes from your Apple Watch to your agent. Say it and let it go: nothing replies on the watch, and it records with no phone or signal and sends later. Tap the watch and talk; the watch sends the recording straight to Ramble's server, which transcribes it and holds the text until your agent picks it up. No accounts.
 
 Pairing: in Ramble on iPhone, Settings → Your agent → Connect your agent copies a message with a single-use code like K7QX-MP4D-HN3R. The user pastes it to their agent. The agent exchanges the code for a token, then pulls new transcripts and acknowledges them, which deletes them.
 
@@ -8,7 +8,7 @@ Privacy: Ramble's server is a relay, not an archive. Your audio is sent to a tra
 
 Transcription: Groq Whisper v3 Turbo, the only provider. When Groq is overloaded or down, the note waits and is retried.
 
-Price: Free to download. 25 notes free, then $14.99 once. No subscription.
+Price: Free to try. 25 notes free, then $14.99 once. No subscription.
 
 Relay: https://api.ramble.watch (https://ramble-transcription-proxy.jpoliachik.workers.dev serves the identical API)
 

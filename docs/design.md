@@ -17,7 +17,7 @@ Ramble is a mindfulness app as much as a capture app. Every design choice should
 ## Brand at a glance
 
 - **Name:** Ramble. App Store: "Ramble: Voice Notes for Watch".
-- **Tagline:** "Talk to your watch. Your agent handles it." App Store subtitle: "Say it. Your agent handles it."
+- **Tagline:** "Say it. Let it go." App Store subtitle: "Send thoughts to your AI agent"
 - **Color:** Deep amber is the only saturated color. It means "on" and "captured", never "danger".
 - **Wordmark:** brand-amber dot + "Ramble" in bold italic New York serif (`OnboardingWordmark`).
 - **Logo mark:** amber circle with three rounded bars riding to its right (`RambleBarsMark`, mirrors `website/src/components/animated-logo.tsx`).

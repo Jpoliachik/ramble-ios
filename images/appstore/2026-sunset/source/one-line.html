@@ -164,6 +164,25 @@ body[data-bg="e"] #bg {
     linear-gradient(180deg, rgba(255,240,222,.12) 0%, rgba(255,240,222,0) 30%, rgba(0,0,0,0) 70%, rgba(40,24,12,.18) 100%),
     linear-gradient(90deg, #B9A088 0%, #AA9179 40%, #9C836E 75%, #8E7663 100%);
 }
+/* w: the light sunset wash of the website hero and the product page header, with the flowing line */
+body[data-bg="w"] { --t1: #1A1917; --t2: #1A1917; --t3: #1A1917; --t4: #1A1917; --t5: #1A1917; --words: #8C4A1C;
+  --a0: #F59E0B; --a1: #EE930A; --a2: #E58A0A; --a3: #D97706; --node-fill: transparent; }
+body[data-bg="w"] .copy p { color: #B45309; opacity: 1; }
+body[data-bg="w"] #ink { filter: drop-shadow(0 6px 10px rgba(150,70,20,.16)); }
+body[data-bg="w"] .watch .case { box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.22), inset 0 2px 2px rgba(255,255,255,.12), 0 34px 60px -20px rgba(90,50,30,.40), 0 10px 22px -8px rgba(90,50,30,.26); }
+body[data-bg="w"].dark .phone { box-shadow: 0 60px 100px -40px rgba(90,50,30,.45), 0 16px 32px -10px rgba(90,50,30,.25), inset 0 0 0 1.5px rgba(255,255,255,.26); }
+body[data-bg="w"].dark .phone.set { box-shadow: 0 50px 70px -30px rgba(90,50,30,.40), inset 0 0 0 1.5px rgba(255,255,255,.26); }
+body[data-bg="w"] #bg {
+  background:
+    radial-gradient(1500px 1250px at 300px 2900px, rgba(244,146,80,.34) 0%, rgba(244,146,80,0) 70%),
+    radial-gradient(1500px 1250px at 1600px 2950px, rgba(236,122,92,.31) 0%, rgba(236,122,92,0) 70%),
+    radial-gradient(1500px 1250px at 2950px 2900px, rgba(218,104,122,.29) 0%, rgba(218,104,122,0) 70%),
+    radial-gradient(1500px 1250px at 4400px 2950px, rgba(188,96,146,.28) 0%, rgba(188,96,146,0) 70%),
+    radial-gradient(1500px 1250px at 5900px 2900px, rgba(146,88,170,.27) 0%, rgba(146,88,170,0) 70%),
+    linear-gradient(180deg, rgba(200,150,200,0) 55%, rgba(196,140,196,.12) 100%),
+    linear-gradient(90deg, rgba(250,210,176,.18) 0%, rgba(242,192,186,.14) 50%, rgba(226,188,214,.18) 100%),
+    linear-gradient(180deg, #F4F3EF 0%, #F6EFE6 50%, #F3E3D6 100%);
+}
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { width: 6450px; height: 2796px; overflow: hidden; background: #1C1512; }
@@ -372,7 +391,7 @@ body.debug .seam { display: block; }
   </svg>
 
   <!-- ============ FRAME 1 ============ -->
-  <div class="copy f1" style="left:110px"><h1>Stay in the<br>moment.</h1><p>Talk to your watch.<br>Your agent handles it later.</p></div>
+  <div class="copy f1" style="left:110px"><h1>Stay in the<br>moment.</h1><p>Say it. Let it go.<br>Nothing comes back to your wrist.</p></div>
   <div class="dev" style="left:640px; top:1900px; --s:3.55; --r:-8deg">
     <div class="watch">
       <div class="band top"></div><div class="band bot"><div class="holes"><i></i><i></i><i></i><i></i></div></div>
@@ -388,7 +407,7 @@ body.debug .seam { display: block; }
   </div>
 
   <!-- ============ FRAME 2 ============ -->
-  <div class="copy f2" style="left:1400px"><h1>Leave your<br>phone behind.</h1><p>No iPhone needed.<br>Sends when you reconnect.</p></div>
+  <div class="copy f2" style="left:1400px"><h1>Leave your<br>phone behind.</h1><p>No signal needed.<br>It sends later.</p></div>
   <div class="dev" style="left:1960px; top:2960px; --s:2.2; --r:-5deg; z-index:2">
     <div class="phone set">
       <div class="btn" style="left:-3px; top:180px; width:5px; height:34px"></div>
@@ -441,7 +460,7 @@ body.debug .seam { display: block; }
   </div>
 
   <!-- ============ FRAME 4 ============ -->
-  <div class="copy f4" style="left:3980px"><h1>Connect your agent<br>with one message.</h1><p>No login. No OAuth. No accounts.</p></div>
+  <div class="copy f4" style="left:3980px"><h1>Connect your agent<br>with one message.</h1><p>No login. No accounts.</p></div>
   <div class="zoomwrap">
     <div class="dev under" style="left:645px; top:1990px; --s:2.5; --r:0deg">
       <div class="phone">
@@ -472,7 +491,7 @@ body.debug .seam { display: block; }
   </div>
 
   <!-- ============ FRAME 5 ============ -->
-  <div class="copy f5" style="left:5270px"><h1>Private<br>by design.</h1><p>Audio deleted once transcribed.<br>Your history stays on your iPhone.</p></div>
+  <div class="copy f5" style="left:5270px"><h1>Private<br>by design.</h1><p>Deleted after delivery.<br>History stays only on your phone.</p></div>
   <div class="dev" style="left:5896px; top:2109px; --s:1.95; --r:0deg">
     <div class="phone">
       <div class="btn" style="left:-3px; top:180px; width:5px; height:34px"></div>
@@ -520,6 +539,14 @@ if (['p','q','r'].includes(params.get('bg'))) { FLAIR = 'o'; }
 if (params.get('bg') === 'p') WAVE = { h: 250, op: .12, echo: .055 };
 if (params.get('bg') === 'q') WAVE = { h: 290, op: .15, echo: .07 };
 if (params.get('bg') === 'r') WAVE = { h: 290, op: .15, echo: 0 };
+if (params.get('bg') === 'w') { LINE = 'flow'; FLAIR = 'o'; WAVE = { h: 260, op: .10, echo: 0 };
+  // flow layout: frame 2's watch sits higher, frame 3's watch moves right so the hairpin curls into its side
+  const devs = document.querySelectorAll('#pano > .dev');
+  devs[2].style.top = '1960px';
+  devs[3].style.left = '3420px'; devs[3].style.top = '2010px';
+  // frame 4's phone a little smaller (its top stays put); frame 5's phone leans a little
+  const d4 = document.querySelector('.zoomwrap > .dev'); d4.style.setProperty('--s', 2.25); d4.style.top = (760 + 492 * 2.25) + 'px';
+  devs[devs.length - 1].style.setProperty('--r', '5deg'); devs[devs.length - 1].style.left = '5850px'; }
 if (params.has('debug')) document.body.classList.add('debug');
 
 // ?ipad=1: the phones become iPads (for the 13" iPad set, see ipad-render.js)
@@ -532,7 +559,7 @@ if (params.has('ipad')) {
     const [l, t, s] = IPAD[i], d = p.parentElement;
     d.style.left = l + 'px'; d.style.top = t + 'px'; d.style.setProperty('--s', s);
   });
-  document.querySelectorAll('.copy p').forEach(e => { e.innerHTML = e.innerHTML.replace('on your iPhone', 'on your iPad'); });
+  document.querySelectorAll('.copy p').forEach(e => { e.innerHTML = e.innerHTML.replace('on your phone', 'on your iPad'); });
 }
 
 // Status bar, list rows, check icons
@@ -647,7 +674,64 @@ const NODES_T = [
 ];
 // the iPad's message box is wider and shorter: stay level through it for longer
 if (params.has('ipad')) NODES_T[10] = [4640, MSGY, 0, 420, 560];
-const d =LINE === 'sine' ? 'M' + LP.map(q => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join(' L') : nodesToPath(LINE === 'r9' ? NODES : NODES_T);
+// flow: one hand-drawn line through all five frames (Justin's sketch). A centripetal Catmull-Rom spline through
+// loose points, so it bends like a pen stroke: up out of the watch, a hairpin with the words, round into the
+// watch, across the phone under the message, and level into the relay node.
+// Frames 1-2 and 4-5 are a centripetal Catmull-Rom spline through loose points. Frame 3's S is drawn by
+// curvature instead: each turn is a raised-cosine curvature bump (zero at both ends), so the curvature never
+// jumps and the S reads as one pen stroke. The whole line is then resampled and Gaussian-smoothed.
+const FLOW_START = [1112, 1806, -42];   // F1: leaves the watch rising; dotted until it reconnects in F2
+const FLOW_C = [[3740, 1830], [3990, MSGY + 120], [4300, MSGY + 30], [4700, MSGY + 20],      // F4: out by the crown, up into the message
+  [5060, MSGY + 90], [5345, 1622]];                                                         // F5: easing down into the relay node
+// F1-F3 as one stroke: [kind, turn in degrees or length, arc length]. One long, gentle bend levels the rise
+// across F1-F3, flows straight into the hairpin, then one wide turn the other way curls into the watch.
+const FLOW_S = [['c', 42, 2350], ['c', 158, 820], ['s', 380], ['c', -166, 1000], ['s', 200]];
+function crPoints(P, alpha = 0.5) {
+  const Q = [[2 * P[0][0] - P[1][0], 2 * P[0][1] - P[1][1]], ...P, [2 * P[P.length - 1][0] - P[P.length - 2][0], 2 * P[P.length - 1][1] - P[P.length - 2][1]]];
+  const out = [P[0]];
+  for (let i = 1; i < Q.length - 2; i++) {
+    const [p0, p1, p2, p3] = [Q[i - 1], Q[i], Q[i + 1], Q[i + 2]];
+    const tj = (a, b) => Math.pow(Math.hypot(b[0] - a[0], b[1] - a[1]), alpha);
+    const t0 = 0, t1 = t0 + tj(p0, p1), t2 = t1 + tj(p1, p2), t3 = t2 + tj(p2, p3);
+    const n = Math.ceil(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) / 4);
+    for (let k = 1; k <= n; k++) {
+      const t = t1 + (t2 - t1) * k / n, L2 = (a, b, ta, tb) => [0, 1].map(j => (tb - t) / (tb - ta) * a[j] + (t - ta) / (tb - ta) * b[j]);
+      const A1 = L2(p0, p1, t0, t1), A2 = L2(p1, p2, t1, t2), A3 = L2(p2, p3, t2, t3);
+      const B1 = L2(A1, A2, t0, t2), B2 = L2(A2, A3, t1, t3);
+      out.push(L2(B1, B2, t1, t2));
+    }
+  }
+  return out;
+}
+function turtle(x, y, th, segs) {
+  const out = [];
+  for (const [kind, a, b] of segs) {
+    if (kind === 's') { const n = Math.ceil(a / 4); for (let i = 0; i < n; i++) { x += Math.cos(th) * a / n; y += Math.sin(th) * a / n; out.push([x, y]); } }
+    else { const dth = a * Math.PI / 180, n = Math.ceil(b / 4), ds = b / n;
+      for (let i = 0; i < n; i++) { const s = (i + 0.5) * ds; th += dth / b * (1 - Math.cos(2 * Math.PI * s / b)) * ds; x += Math.cos(th) * ds; y += Math.sin(th) * ds; out.push([x, y]); } }
+  }
+  return out;
+}
+function flowPath() {
+  const [xa, ya, ha] = FLOW_START;
+  const B = [[xa, ya], ...turtle(xa, ya, ha * Math.PI / 180, FLOW_S)];
+  const C = crPoints([B[B.length - 1], ...FLOW_C]);   // joins under the F3 watch
+  let P = [...B, ...C.slice(1)];
+  // resample every 4 px, then a Gaussian blur along the line (endpoints pinned)
+  const R = [P[0]]; let acc = 0;
+  for (let i = 1; i < P.length; i++) { const dd = Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]); acc += dd;
+    while (acc >= 4) { const t = 1 - (acc - 4) / dd; R.push([P[i - 1][0] + (P[i][0] - P[i - 1][0]) * t, P[i - 1][1] + (P[i][1] - P[i - 1][1]) * t]); acc -= 4; } }
+  R.push(P[P.length - 1]);
+  const SIG = 14, W = 3 * SIG, G = [];
+  for (let k = -W; k <= W; k++) G.push(Math.exp(-k * k / (2 * SIG * SIG)));
+  for (let pass = 0; pass < 2; pass++) {
+    const Rn = R.map((p, i) => { const w = Math.min(W, i, R.length - 1 - i); if (w === 0) return p;
+      let sx = 0, sy = 0, sw = 0; for (let k = -w; k <= w; k++) { const g = G[k + W]; sx += R[i + k][0] * g; sy += R[i + k][1] * g; sw += g; } return [sx / sw, sy / sw]; });
+    R.splice(0, R.length, ...Rn);
+  }
+  return 'M' + R.map(q => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join(' L');
+}
+const d = LINE === 'flow' ? flowPath() : LINE === 'sine' ? 'M' + LP.map(q => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join(' L') : nodesToPath(LINE === 'r9' ? NODES : NODES_T);
 const spine = document.getElementById('spine'), ink = document.getElementById('ink');
 spine.setAttribute('d', d);
 const L = spine.getTotalLength();
@@ -667,35 +751,8 @@ const ease = t => t * t * (3 - 2 * t);
 const level = i => [0.62, 1, 0.78, 0.92, 0.56, 0.84, 0.7][i % 7];
 const PITCH = 54;
 
-// 1) F1: evenly spaced voice bars easing down into the line
-const BARS1 = 7;
-for (let i = 0; i < BARS1; i++) {
-  const t = i / (BARS1 - 1);
-  bar(PITCH * 0.5 + i * PITCH, STROKE + 14 + 52 * level(i) * (1 - ease(t)));
-}
-const lineStart = PITCH * 0.5 + BARS1 * PITCH;
-
-// 2) solid until the signal drops, dotted while the note waits, a reconnect point, solid again
 const sAtX = (x, from = 0) => { for (const [s, px] of samples) if (s >= from && px >= x) return s; return L; };
-const dot0 = LINE === 'r9' ? sNear(1960, 1320) : sAtX(1900), sR = LINE === 'r9' ? sNear(2230, 1085) : sAtX(2250);
-solid(lineStart, dot0);
-const DOT = 50, nDots = Math.floor((sR - 40 - (dot0 + DOT)) / DOT);
-const dotStep = (sR - 40 - (dot0 + DOT)) / nDots;
-for (let k = 0; k <= nDots; k++) { const p = at(dot0 + DOT + k * dotStep); el('circle', { cx: p.x.toFixed(1), cy: p.y.toFixed(1), r: (STROKE / 2 - 3).toFixed(1), stroke: 'none' }); }
-const pR = at(sR);
-el('circle', { cx: pR.x, cy: pR.y, r: 30, fill: 'none', 'stroke-width': 5.5, opacity: .7 });
-
-// 3) F5: the line breaks into evenly spaced bars that shrink to nothing at the relay node
-const sLineEnd = LINE === 'r9' ? sNear(5110, MSGY + 90) : sAtX(5100, sAtX(4000, sAtX(3700, sAtX(3000)))), sNode = L;
-solid(sR, sLineEnd);
-const BARS2 = 4, step2 = (sNode - 34 - sLineEnd) / BARS2;
-for (let i = 1; i <= BARS2; i++) bar(sLineEnd + i * step2, 70 - (i - 1) * 16);
-const pN = at(sNode);
-el('circle', { cx: pN.x, cy: pN.y, r: 24, fill: 'var(--node-fill)', 'stroke-width': 7 });
-// after the node only a thin line goes on: the transcript, into the history list
-const thin = nodesToPath([[pN.x + 24, pN.y + 1.5, 4, 0, 50], [5470, 1628, 0, 50, 80], [5720, 1628, 0, 80, 0]]);
-el('path', { d: thin, fill: 'none', 'stroke-width': 8, 'stroke-linecap': 'round' });
-
+let pR, pN;
 // 4) F3: the words ride just above the two calm runs, always left to right
 function offsetPath(s0, s1, off) {
   const pts = [];
@@ -716,12 +773,66 @@ function say(id, s0, s1, text) {
   const tp = el('textPath', { href: '#' + id, startOffset: '50%' }, t); tp.textContent = text;
   said.push([t, s1 - s0]);
 }
+if (LINE === 'flow') {
+// flow: voice bars out of the watch break into dots (no signal), the dots close up and join into the line
+// as it reconnects, and the line runs solid to the relay node
+const sSolid = sAtX(2480), sNodeF = L;
+{
+  const BARSF = 6;
+  for (let i = 0; i < BARSF; i++) bar(PITCH * 0.5 + i * PITCH, STROKE + 12 + 58 * level(i) * (1 - ease(i / (BARSF - 1))));
+  let s = PITCH * 0.5 + BARSF * PITCH + 8;
+  const s0 = s;
+  while (s < sSolid - 30) {
+    const t = (s - s0) / (sSolid - s0), p = at(s);
+    el('circle', { cx: p.x.toFixed(1), cy: p.y.toFixed(1), r: (STROKE / 2 - 4 + 2 * t).toFixed(1), stroke: 'none' });
+    s += 66 - 30 * ease(t);
+  }
+  solid(sSolid, sNodeF - 24);
+  pR = at(sSolid);
+  pN = at(sNodeF);
+  el('circle', { cx: pN.x, cy: pN.y, r: 24, fill: 'var(--node-fill)', 'stroke-width': 7 });
+  const thin = nodesToPath([[pN.x + 24, pN.y + 1.5, 4, 0, 50], [5470, 1628, 0, 50, 80], [5720, 1628, 0, 80, 0]]);
+  el('path', { d: thin, fill: 'none', 'stroke-width': 8, 'stroke-linecap': 'round' });
+}
+say('wA', sNear(2620, 1014), sNear(3430, 1012), 'so um, the garage thing… wait, oat milk…');
+const sB0f = sNear(3450, 1335, sNear(3539, 1262));
+say('wB', sB0f, sNear(2700, 1700, sB0f), 'and call Sam back about Thursday…');
+} else {
+// 1) F1: evenly spaced voice bars easing down into the line
+const BARS1 = 7;
+for (let i = 0; i < BARS1; i++) {
+  const t = i / (BARS1 - 1);
+  bar(PITCH * 0.5 + i * PITCH, STROKE + 14 + 52 * level(i) * (1 - ease(t)));
+}
+const lineStart = PITCH * 0.5 + BARS1 * PITCH;
+
+// 2) solid until the signal drops, dotted while the note waits, a reconnect point, solid again
+const dot0 = LINE === 'r9' ? sNear(1960, 1320) : sAtX(1900), sR = LINE === 'r9' ? sNear(2230, 1085) : sAtX(2250);
+solid(lineStart, dot0);
+const DOT = 50, nDots = Math.floor((sR - 40 - (dot0 + DOT)) / DOT);
+const dotStep = (sR - 40 - (dot0 + DOT)) / nDots;
+for (let k = 0; k <= nDots; k++) { const p = at(dot0 + DOT + k * dotStep); el('circle', { cx: p.x.toFixed(1), cy: p.y.toFixed(1), r: (STROKE / 2 - 3).toFixed(1), stroke: 'none' }); }
+pR = at(sR);
+el('circle', { cx: pR.x, cy: pR.y, r: 30, fill: 'none', 'stroke-width': 5.5, opacity: .7 });
+
+// 3) F5: the line breaks into evenly spaced bars that shrink to nothing at the relay node
+const sLineEnd = LINE === 'r9' ? sNear(5110, MSGY + 90) : sAtX(5100, sAtX(4000, sAtX(3700, sAtX(3000)))), sNode = L;
+solid(sR, sLineEnd);
+const BARS2 = 4, step2 = (sNode - 34 - sLineEnd) / BARS2;
+for (let i = 1; i <= BARS2; i++) bar(sLineEnd + i * step2, 70 - (i - 1) * 16);
+pN = at(sNode);
+el('circle', { cx: pN.x, cy: pN.y, r: 24, fill: 'var(--node-fill)', 'stroke-width': 7 });
+// after the node only a thin line goes on: the transcript, into the history list
+const thin = nodesToPath([[pN.x + 24, pN.y + 1.5, 4, 0, 50], [5470, 1628, 0, 50, 80], [5720, 1628, 0, 80, 0]]);
+el('path', { d: thin, fill: 'none', 'stroke-width': 8, 'stroke-linecap': 'round' });
+
 say('wA', sNear(2690, 975), sNear(3680, LINE === 'r9' ? 965 : 975), 'so um, the garage thing… wait, oat milk…');
 const sB0 = sNear(3680, 1195, sNear(3790, 1085));
 say('wB', sB0, sNear(2850, 1195, sB0), 'and call Sam back about Thursday…');
+}
 // one size for both runs: the largest that fits the longer one
 function fitWords() {
-  let size = 60;
+  let size = LINE === 'flow' ? 78 : 60;
   for (const [t, len] of said) {
     const tmp = el('text', { 'font-size': 60, x: 0, y: -100 }, words); tmp.textContent = t.textContent;
     size = Math.min(size, 60 * (len - 30) / tmp.getComputedTextLength()); tmp.remove();
@@ -735,11 +846,11 @@ function fitWords() {
   if (!FLAIR) return;
   const F = document.getElementById('flair');
   const mk = (tag, at) => { const e = document.createElementNS(ns, tag); for (const k in at) e.setAttribute(k, at[k]); F.appendChild(e); return e; };
-  const CREAM = '#FFF1DC';
+  const WASH = document.body.dataset.bg === 'w', CREAM = WASH ? '#B4593A' : '#FFF1DC';
   const rings = FLAIR === 'm' || FLAIR === 'o', wave = FLAIR === 'n' || FLAIR === 'o';
   if (rings) {
     // [cx, cy, first radius, step, count, opacity]
-    const DEV = FLAIR === 'm'
+    const DEV = WASH ? [[640, 1835, 580, 104, 3, .10], [2200, 1960, 420, 90, 2, .08], [3420, 2010, 490, 100, 3, .10], [4515, 1990, 720, 110, 2, .08], [5850, 2109, 580, 104, 2, .08]] : FLAIR === 'm'
       ? [[640, 1835, 560, 92, 4, .16], [2200, 2100, 400, 80, 3, .14], [3300, 1860, 470, 88, 4, .16], [4515, 1990, 700, 96, 3, .12], [5896, 2109, 560, 92, 3, .12]]
       : [[640, 1835, 580, 104, 3, .13], [2200, 2100, 420, 90, 2, .11], [3300, 1860, 490, 100, 3, .13], [4515, 1990, 720, 110, 2, .10], [5896, 2109, 580, 104, 2, .10]];
     const cdefs = mk('defs', {});
@@ -752,13 +863,25 @@ function fitWords() {
     for (const [cx, cy, r0] of DEV) {
       const g = mk('circle', { cx, cy, r: r0 * 0.95, fill: 'url(#halo)' });
     }
-    const defs = mk('defs', {}); defs.innerHTML = '<radialGradient id="halo"><stop offset="0" stop-color="#FFE7C2" stop-opacity="' + (FLAIR === 'm' ? .16 : .11) + '"/><stop offset="1" stop-color="#FFE7C2" stop-opacity="0"/></radialGradient>';
+    const defs = mk('defs', {}); defs.innerHTML = '<radialGradient id="halo"><stop offset="0" stop-color="' + (WASH ? '#F6B26B' : '#FFE7C2') + '" stop-opacity="' + (WASH ? .16 : FLAIR === 'm' ? .16 : .11) + '"/><stop offset="1" stop-color="' + (WASH ? '#F6B26B' : '#FFE7C2') + '" stop-opacity="0"/></radialGradient>';
     F.insertBefore(defs, F.firstChild);
   }
   if (FLAIR === 'm') {
     // small rings at the beats of the line: the reconnect point and the relay node
     for (const [x, y] of [[pR.x, pR.y], [pN.x, pN.y]]) for (const [r, op] of [[62, .30], [98, .16]])
       mk('circle', { cx: x, cy: y, r, fill: 'none', stroke: CREAM, 'stroke-width': 2.5, opacity: op });
+  }
+  if (WASH) {
+    // frame 5: a large, quiet lock behind the phone
+    const lx = 5470, ly = 1330, k = 0.78;
+    const lg = mk('g', { opacity: .42, transform: `translate(${lx} ${ly}) scale(${k}) translate(${-lx} ${-ly})` });
+    const ld = mk('defs', {}); ld.innerHTML = '<linearGradient id="lockg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F1B48A" stop-opacity=".55"/><stop offset="1" stop-color="#D98CA6" stop-opacity=".40"/></linearGradient>';
+    const sh = document.createElementNS(ns, 'path');
+    for (const [a, v] of Object.entries({ d: `M${lx - 230},${ly - 40} V${ly - 300} A230,230 0 0 1 ${lx + 230},${ly - 300} V${ly - 40}`, fill: 'none', stroke: 'url(#lockg)', 'stroke-width': 96, 'stroke-linecap': 'round' })) sh.setAttribute(a, v);
+    lg.appendChild(sh);
+    const bd = document.createElementNS(ns, 'rect');
+    for (const [a, v] of Object.entries({ x: lx - 380, y: ly - 60, width: 760, height: 620, rx: 110, fill: 'url(#lockg)' })) bd.setAttribute(a, v);
+    lg.appendChild(bd);
   }
   if (wave) {
     // a faint waveform of rounded level bars along the low horizon, quiet at the start, busiest in the ramble, fading out

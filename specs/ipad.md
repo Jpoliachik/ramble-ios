@@ -14,7 +14,7 @@ Wherever the app's own words name the device it runs on ("Record on iPhone", "vi
 - THEN the recording screen reads "via iPad" and the note's activity log reads "Recorded on iPad"
 
 ### Requirement: No watch setup on iPad
-On an iPad, onboarding SHALL open on a single intro screen, "Your agent handles it.", with no story bar and the same "Get started" button and consent line, instead of the three beats. "Get started" SHALL go straight to connecting an agent, skipping "Where should notes go?" (a webhook is set up in Settings) and the watch step, with no progress bar or Back. Once the agent connects, or the person chooses "Set up later", onboarding finishes and shows "You're all set" on Home. Settings SHALL NOT show the "Watch" group, Home SHALL NOT show "Or record here" above the record button, and Home with no notes SHALL show only the "TRY SAYING" ideas, without the watch drawing.
+On an iPad, onboarding SHALL open on a single intro screen, "Let it go.", with no story bar and the same "Get started" button and consent line, instead of the three beats. "Get started" SHALL go straight to connecting an agent, skipping "Where should notes go?" (a webhook is set up in Settings) and the watch step, with no progress bar or Back. Once the agent connects, or the person chooses "Set up later", onboarding finishes and shows "You're all set" on Home. Settings SHALL NOT show the "Watch" group, Home SHALL NOT show "Or record here" above the record button, and Home with no notes SHALL show only the "TRY SAYING" ideas, without the watch drawing.
 
 #### Scenario: Onboarding on iPad
 - GIVEN Ramble is opened for the first time on an iPad
