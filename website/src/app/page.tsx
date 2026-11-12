@@ -55,8 +55,8 @@ const steps = [
     body: "Nothing comes back to your wrist. No signal? It waits and sends later.",
   },
   {
-    title: "Come back later",
-    body: "Your agent picks it up. You deal with it when you're ready.",
+    title: "It gets handled",
+    body: "Your agent picks it up and takes care of it. You only check in if it needs you.",
   },
 ];
 

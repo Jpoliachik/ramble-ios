@@ -8,7 +8,7 @@ Your best thoughts show up when you're away from a screen: on a walk, in the car
 
 Sending a thought to your agent usually starts a conversation. It replies, asks a follow-up, and now you're solving the problem on a screen instead of being where you are.
 
-Ramble lets you keep the thought without leaving the moment. Say it to your watch, let it go, and get back to what you were doing. Nothing comes back. Your agent picks it up later, and you deal with it when you choose.
+Ramble lets you keep the thought without leaving the moment. Say it to your watch, let it go, and get back to what you were doing. Nothing comes back. Your agent picks it up later and takes care of it. You only check in if it needs you.
 
 **Ramble is a mindfulness app.** The product is less time on your phone and fewer conversations you didn't mean to start. A one-way hand-off from your watch to your agent is how it gets there.
 
@@ -108,7 +108,7 @@ Use these as written, or start from them.
 
 **One sentence:** Ramble for Apple Watch lets you say a thought and let it go: no reply to wait for, no signal needed, and your agent picks it up later.
 
-**Short paragraph (~50 words):** Your best thoughts come when you're away from a screen. Ramble keeps them without pulling you back to one. Tap your Apple Watch, say it the messy way it came to you, and put your arm down. Nothing comes back. No signal? It sends later. Your agent picks it up, and you deal with it when you're ready.
+**Short paragraph (~50 words):** Your best thoughts come when you're away from a screen. Ramble keeps them without pulling you back to one. Tap your Apple Watch, say it the messy way it came to you, and put your arm down. Nothing comes back. No signal? It sends later. Your agent picks it up and takes care of it. You only check in if it needs you.
 
 **No reply. On purpose.** Send a thought to your agent and it answers, asks a follow-up, and now you're solving the problem on your phone. Ramble skips all that. Say it, put your arm down, and get back to your run. The thinking can wait.
 

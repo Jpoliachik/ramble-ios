@@ -69,7 +69,7 @@ Say the thought to your Apple Watch and let it go. No reply to wait for, no sign
 ```
 Say it. Let it go. Ramble is the one-way line from your Apple Watch to your agent.
 
-A thought comes on a run, at the park, in the middle of dinner. Tap your watch, say it, and put your arm down. Nothing comes back: no reply, no follow-up, no pull into solving it right now. Your agent picks it up later, and you deal with it when you're ready.
+A thought comes on a run, at the park, in the middle of dinner. Tap your watch, say it, and put your arm down. Nothing comes back: no reply, no follow-up, no pull into solving it right now. Your agent picks it up later and takes care of it. You only check in if it needs you.
 
 No signal? It waits on your watch and sends when you're back online, over Wi-Fi, cellular, or your iPhone. An idea, a to-do, a reminder. Messy is fine.
 
