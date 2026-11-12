@@ -38,6 +38,8 @@ Use plain `<img>` tags with `BASE_PATH` from `src/lib/site.ts` (currently empty)
 
 - `src/components/code-block.tsx` — Client component with copy-to-clipboard button, used in docs pages
 - `src/components/docs-sidebar.tsx` — Docs page switcher + "On this page" nav; pass `page="agent"` or `page="webhooks"`
+- `src/components/app-json-ld.tsx` — SoftwareApplication JSON-LD on the landing page, built from `site.ts` facts. Never add ratings or download counts
+- Every indexed page sets `alternates.canonical` to its own path in its `metadata`; a new page needs one too
 - `src/lib/site.ts` — Shared constants (prices, retention, relay URL, pairing code). Several are placeholders
 - `public/llms.txt` / `public/llms-full.txt` — Agent-readable summary and full reference; keep in sync with the docs pages
 - Footer is in `src/app/layout.tsx` (shared across all pages)

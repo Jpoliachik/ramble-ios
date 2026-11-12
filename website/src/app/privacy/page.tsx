@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   title: "Privacy Policy",
   description:
     "Ramble privacy policy. No accounts. Ramble's server is a relay, not an archive: audio is deleted once transcribed, and transcripts once your agent picks them up, or after 30 days. Usage stats never include your audio or words.",
+  alternates: { canonical: "/privacy" },
 };
 
 const link = "underline hover:text-stone-900";

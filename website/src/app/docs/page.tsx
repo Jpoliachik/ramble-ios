@@ -17,6 +17,7 @@ import {
 export const metadata: Metadata = {
   title: "Connect your agent",
   description: "Pair Ramble with your agent using a short code. Your agent picks up each transcript and Ramble deletes it.",
+  alternates: { canonical: "/docs" },
 };
 
 const RELAY_HOST = new URL(RELAY_URL).host;

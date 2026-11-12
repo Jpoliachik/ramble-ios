@@ -8,6 +8,7 @@ export const metadata: Metadata = {
   title: "Webhook Docs",
   description:
     "Ramble can POST every transcript to your own HTTPS endpoint. Payload format, signature verification, retries, and automation platform guides.",
+  alternates: { canonical: "/docs/webhooks" },
 };
 
 function StepHeader({ id, step, children }: { id: string; step: number; children: string }) {

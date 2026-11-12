@@ -15,6 +15,7 @@ import {
 export const metadata: Metadata = {
   title: "Requirements and troubleshooting",
   description: `Ramble needs iOS ${MIN_IOS} and watchOS ${MIN_WATCHOS} or later. Fixes for the common problems: a missing watch app, notes waiting on the watch, held notes, and an agent that isn't picking up.`,
+  alternates: { canonical: "/docs/help" },
 };
 
 function SectionHeader({ id, children }: { id: string; children: React.ReactNode }) {

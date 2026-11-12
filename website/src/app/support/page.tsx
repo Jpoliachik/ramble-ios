@@ -5,6 +5,7 @@ import { SUPPORT_EMAIL } from "@/lib/site";
 export const metadata: Metadata = {
   title: "Support",
   description: `Get help with Ramble. Email ${SUPPORT_EMAIL}, or find quick answers on restoring a purchase, refunds, and setting up the watch.`,
+  alternates: { canonical: "/support" },
 };
 
 const link = "text-brand-text underline-offset-2 hover:underline";
