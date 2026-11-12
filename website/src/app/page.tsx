@@ -95,6 +95,19 @@ const faqs: { q: string; a: ReactNode }[] = [
     a: "No. Your watch records on its own, even with no signal. It sends each thought over Wi-Fi, cellular, or your iPhone, whichever it has. Anything it can't send yet waits safely on the watch.",
   },
   {
+    q: "Can I start it with the Action button?",
+    a: (
+      <>
+        Yes, on Apple Watch Ultra with watchOS 26 or later. On the watch, open Settings → Action Button and choose
+        Ramble. Press once to record, again to stop.{" "}
+        <Link href="/docs/help#action-button" className={inlineLink}>
+          More
+        </Link>
+        .
+      </>
+    ),
+  },
+  {
     q: "My agent has a watch app. Why Ramble?",
     a: "Agent apps are built for a conversation: they answer, ask follow-ups, and need a connection. Ramble is built for the opposite. Say it, put your arm down, and nothing comes back. No signal? It waits on your watch and sends later. Your agent works on it while you get on with your day.",
   },

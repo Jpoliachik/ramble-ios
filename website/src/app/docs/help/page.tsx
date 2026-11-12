@@ -102,6 +102,17 @@ export default function HelpDocs() {
                   App Store.
                 </p>
               </Question>
+              <Question id="action-button" q="Put Ramble on the Action button">
+                <p>
+                  On an Apple Watch Ultra with watchOS 26 or later, open Settings on the watch → Action Button and choose
+                  Ramble. Press once to start recording, and again to stop. You can also add the same Ramble control to
+                  Control Center or the Smart Stack on any watch with watchOS 26.
+                </p>
+                <p>
+                  Don&rsquo;t pick Shortcut. A shortcut made in the Shortcuts app runs Ramble on your iPhone, not the
+                  watch, so it can&rsquo;t record on your wrist.
+                </p>
+              </Question>
               <Question id="set-up" q="The watch shows “Set up”">
                 <p>
                   The watch isn&rsquo;t connected to Ramble yet. Open Ramble on your iPhone once, and tap Get started if
