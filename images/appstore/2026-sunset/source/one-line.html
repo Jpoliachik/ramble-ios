@@ -794,9 +794,9 @@ const sSolid = sAtX(2480), sNodeF = L;
   const thin = nodesToPath([[pN.x + 24, pN.y + 1.5, 4, 0, 50], [5470, 1628, 0, 50, 80], [5720, 1628, 0, 80, 0]]);
   el('path', { d: thin, fill: 'none', 'stroke-width': 8, 'stroke-linecap': 'round' });
 }
-say('wA', sNear(2650, 1008), sNear(3380, 1000), 'so um, the garage thing… wait, oat milk…');
-const sB0f = sNear(3341, 1391, sNear(3539, 1262));
-say('wB', sB0f, sNear(2760, 1640, sB0f), 'and call Sam back about Thursday…');
+say('wA', sNear(2620, 1014), sNear(3430, 1012), 'so um, the garage thing… wait, oat milk…');
+const sB0f = sNear(3450, 1335, sNear(3539, 1262));
+say('wB', sB0f, sNear(2700, 1700, sB0f), 'and call Sam back about Thursday…');
 } else {
 // 1) F1: evenly spaced voice bars easing down into the line
 const BARS1 = 7;
@@ -832,7 +832,7 @@ say('wB', sB0, sNear(2850, 1195, sB0), 'and call Sam back about Thursday…');
 }
 // one size for both runs: the largest that fits the longer one
 function fitWords() {
-  let size = 60;
+  let size = LINE === 'flow' ? 78 : 60;
   for (const [t, len] of said) {
     const tmp = el('text', { 'font-size': 60, x: 0, y: -100 }, words); tmp.textContent = t.textContent;
     size = Math.min(size, 60 * (len - 30) / tmp.getComputedTextLength()); tmp.remove();
