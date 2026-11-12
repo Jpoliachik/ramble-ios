@@ -106,7 +106,7 @@ The iPhone screenshots (1206 × 2622, the size App Store Connect accepted) and t
 2. Leave your phone behind. (No signal needed. It sends later.)
 3. Get it out of your head. (Messy is fine.)
 4. Connect your agent with one message. (No login. No accounts.)
-5. Private by design. (Audio deleted once transcribed. Your history stays on your iPhone.)
+5. Private by design. (Deleted after delivery. History stays only on your phone.)
 
 ## What's New (1.2.0)
 

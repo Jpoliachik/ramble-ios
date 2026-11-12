@@ -491,7 +491,7 @@ body.debug .seam { display: block; }
   </div>
 
   <!-- ============ FRAME 5 ============ -->
-  <div class="copy f5" style="left:5270px"><h1>Private<br>by design.</h1><p>Audio deleted once transcribed.<br>Your history stays on your iPhone.</p></div>
+  <div class="copy f5" style="left:5270px"><h1>Private<br>by design.</h1><p>Deleted after delivery.<br>History stays only on your phone.</p></div>
   <div class="dev" style="left:5896px; top:2109px; --s:1.95; --r:0deg">
     <div class="phone">
       <div class="btn" style="left:-3px; top:180px; width:5px; height:34px"></div>
@@ -559,7 +559,7 @@ if (params.has('ipad')) {
     const [l, t, s] = IPAD[i], d = p.parentElement;
     d.style.left = l + 'px'; d.style.top = t + 'px'; d.style.setProperty('--s', s);
   });
-  document.querySelectorAll('.copy p').forEach(e => { e.innerHTML = e.innerHTML.replace('on your iPhone', 'on your iPad'); });
+  document.querySelectorAll('.copy p').forEach(e => { e.innerHTML = e.innerHTML.replace('on your phone', 'on your iPad'); });
 }
 
 // Status bar, list rows, check icons
