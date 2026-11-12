@@ -192,11 +192,9 @@ struct RecordingDetailView: View {
                         }
                     } label: {
                         Label("Copy", systemImage: showCopied ? "checkmark" : "doc.on.doc")
-                            .font(.caption)
+                            .contentTransition(.symbolEffect(.replace))
                     }
-                    .buttonStyle(.bordered)
-                    .buttonBorderShape(.capsule)
-                    .controlSize(.small)
+                    .buttonStyle(.headerPill)
                 }
             }
         }
@@ -265,11 +263,8 @@ struct RecordingDetailView: View {
                 if let shareURL {
                     ShareLink(item: shareURL) {
                         Label("Share", systemImage: "square.and.arrow.up")
-                            .font(.caption)
                     }
-                    .buttonStyle(.bordered)
-                    .buttonBorderShape(.capsule)
-                    .controlSize(.small)
+                    .buttonStyle(.headerPill)
                     .accessibilityLabel("Share audio")
                 }
             }
@@ -561,6 +556,42 @@ struct RecordingDetailView: View {
             .shadow(radius: 4)
             .padding(.top, 8)
     }
+}
+
+/// The small capsule action in a section header ("Copy", "Share"): a card-
+/// colored pill (white in light mode, the card gray in dark) with an
+/// accent-tinted icon and title centered on one line.
+struct HeaderPillButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .labelStyle(HeaderPillLabelStyle())
+            .font(.footnote.weight(.medium))
+            .textCase(nil)
+            .foregroundStyle(.tint)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Color(.secondarySystemGroupedBackground), in: .capsule)
+            .contentShape(.capsule)
+            .opacity(configuration.isPressed ? 0.5 : 1)
+            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
+    }
+}
+
+/// Icon and title centered on each other, the icon one step smaller so it
+/// sits on the text's line instead of pushing the capsule taller.
+private struct HeaderPillLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(alignment: .center, spacing: 5) {
+            configuration.icon
+                .imageScale(.small)
+            configuration.title
+        }
+        .lineLimit(1)
+    }
+}
+
+extension ButtonStyle where Self == HeaderPillButtonStyle {
+    static var headerPill: HeaderPillButtonStyle { HeaderPillButtonStyle() }
 }
 
 /// One agent's pickup, listed under the delivery line when a note went to
