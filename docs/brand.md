@@ -6,9 +6,11 @@ The source of truth for what Ramble stands for and how we talk about it. Use it 
 
 Your best thoughts show up when you're away from a screen: on a walk, in the car, at the stove, halfway through a run. Reaching for your phone to save one pulls you out of the moment, and then the phone keeps you.
 
-Ramble lets you keep the thought without leaving the moment. Say it to your watch, let it go, and get back to what you were doing. Your agent picks it up and handles it later.
+Sending a thought to your agent usually starts a conversation. It replies, asks a follow-up, and now you're solving the problem on a screen instead of being where you are.
 
-**Ramble is a mindfulness app that happens to capture voice.** The product is less time on your phone. Capture and delivery are how we get there.
+Ramble lets you keep the thought without leaving the moment. Say it to your watch, let it go, and get back to what you were doing. Nothing comes back. Your agent picks it up later, and you deal with it when you choose.
+
+**Ramble is a mindfulness app.** The product is less time on your phone and fewer conversations you didn't mean to start. A one-way hand-off from your watch to your agent is how it gets there.
 
 ## The name
 
@@ -21,28 +23,36 @@ Use both meanings in copy. "Go for a ramble" works. "Just ramble" works. Never u
 
 ## What Ramble is
 
-A watch app that hands what you say to your agent.
+The one-way line from your Apple Watch to your agent.
 
-Tap your Apple Watch, talk, and put your arm down. The watch sends it to Ramble's server, which transcribes it, and the transcript goes to your agent, which handles it later. No screen to read, no reply to wait for. The watch is where you use Ramble. The phone holds your history and the settings, and it can stay in your pocket or at home.
+Tap your Apple Watch, talk, and put your arm down. The watch sends it to Ramble's server, which transcribes it, and the transcript goes to your agent, which picks it up later. No screen to read, no reply to wait for, and no signal needed. The watch is where you use Ramble. The phone holds your history and the settings, and it can stay in your pocket or at home.
+
+**Category phrase** (use these exact words wherever a page or listing says what Ramble is): *One-way voice notes from your Apple Watch to your agent.*
+
+**First mention:** "Ramble for Apple Watch", or "Ramble" next to ramble.watch. Other products are called Ramble, so the name alone isn't enough to find it.
 
 ## Positioning
 
-**Talk to your watch. Your agent handles it.**
+**Say it. Let it go.**
 
-People with a personal agent still need a way to hand it things in the moment. Ramble is that hand-off, and it ends there on purpose: one tap, one thought, no conversation. It feeds your agent. It doesn't compete with note apps or assistants.
+Agents can take a voice message from a watch. What they can't do is stay quiet. Their apps are built for a conversation: they answer, ask follow-ups, and need a connection. Ramble is built for the opposite. One tap, one thought, nothing back, and it works with no signal. Your agent's own apps are for working things out together. Ramble is for the moments you don't want to.
+
+Lead with what the person gets to do (say it and let it go), not with what the agent does. "Your agent picks it up later" belongs in body copy, where the word doing the work is *later*.
 
 ## The four promises
 
 Every piece of copy should support at least one of these, and none should undercut them.
 
-1. **Stay in the moment.** A thought takes seconds. Tap, talk, done. Then you're back.
-2. **Leave your phone behind.** Your watch is enough. It records with no phone and no signal, and sends when it has a connection again.
-3. **Let it go.** Nothing gets lost and nothing pulls you back in. No reply on your wrist. Your agent has it.
+1. **Let it go.** No reply on your wrist, no follow-up question, no being pulled into solving it right now. The thinking can wait.
+2. **Leave your phone behind.** Your watch is enough. It records with no phone and no signal, waits on your watch, and sends when it has a connection again.
+3. **Stay in the moment.** A thought takes seconds. Tap, talk, done. Then you're back.
 4. **Nothing sticks around.** No accounts. Audio is deleted as soon as the transcript is ready. Transcripts are deleted once your agent picks them up. We say exactly what's kept, where, and for how long.
 
 ## Who it's for
 
-**Primary: people who want less phone in their day and already use a personal agent.** They walk, run, drive, cook, and parent. They have ideas and to-dos at awkward moments, and they're tired of the phone being the only place to put them. They don't want another inbox. They want to say it and know it landed.
+**Primary: people who already run their day through a personal agent and want to be less on their phone.** They walk, run, drive, cook, and parent. They have ideas and to-dos at awkward moments, and they're tired of every thought turning into a session on a screen. They don't want another inbox or another conversation. They want to say it and know it landed.
+
+**Not for:** people who want a back-and-forth with their agent on the wrist, or an archive of recordings.
 
 **Secondary: builders.** Developers and tinkerers who pipe voice into their own stack via webhook. Speak to them on the docs pages, not in the hero.
 
@@ -68,7 +78,7 @@ Ramble sounds like a calm friend who respects your time.
 
 ### Words we like
 
-moment, walk, say it, let it go, back to your day, your agent handles it, messy is fine, leave your phone, quick, quiet, later, picks it up
+moment, walk, say it, let it go, back to your day, nothing comes back, no reply, one-way, out of your head, messy is fine, leave your phone, no signal, quick, quiet, later, picks it up
 
 ### Words we avoid
 
@@ -77,7 +87,8 @@ moment, walk, say it, let it go, back to your day, your agent handles it, messy 
 | productivity, hustle, crush, 10x, optimize | Ramble is about doing less on your phone, not doing more | "get back to your day" |
 | never miss a thing, capture everything | Fear of missing out is the opposite of the brand | "keep the thought" |
 | AI-powered, smart, revolutionary, game-changing, seamless | Hype that says nothing | say what it does |
-| notes, note-taking | Ramble isn't a notes app; your agent is where things live | "thought," "what you say" ("notes" is fine in the price line and on-screen states the specs set) |
+| notes, note-taking | Ramble isn't a notes app; your agent is where things live | "thought," "what you say" ("notes" is fine in the price line, the category phrase, and on-screen states the specs set) |
+| talk to your agent, chat, conversation (about Ramble) | Ramble is one-way; agents' own apps are the conversation | "say it," "hand it off," "let it go" |
 | instantly, real-time | Agents pick up on their own schedule | "later," "when your agent checks in" |
 | ramble on, rambling (as long or tedious) | Undercuts quick capture | "just say it," "messy is fine" |
 
@@ -85,19 +96,25 @@ moment, walk, say it, let it go, back to your day, your agent handles it, messy 
 
 Use these as written, or start from them.
 
-**Tagline:** Talk to your watch. Your agent handles it.
+**Tagline:** Say it. Let it go.
 
-**Short line** (subtitle, social bio): Say it. Your agent handles it.
+**Hero:** Say it to your watch. Then let it go.
 
-**Mindful line** (promo text, campaign): Stay in the moment. Leave your phone behind.
+**Category phrase:** One-way voice notes from your Apple Watch to your agent.
 
-**One sentence:** Ramble lets you capture a thought on your Apple Watch and hand it to your agent, so you can stay in the moment and leave your phone behind.
+**Search line** (App Store subtitle): Send thoughts to your AI agent
 
-**Short paragraph (~50 words):** Your best thoughts come when you're away from a screen. Ramble keeps them without pulling you back to one. Tap your Apple Watch, say it the messy way it came to you, and get back to your day. Your agent picks it up and handles it. No phone, no reply to wait for.
+**Mindful line** (promo text, campaign): Thoughts now. Action later.
+
+**One sentence:** Ramble for Apple Watch lets you say a thought and let it go: no reply to wait for, no signal needed, and your agent picks it up later.
+
+**Short paragraph (~50 words):** Your best thoughts come when you're away from a screen. Ramble keeps them without pulling you back to one. Tap your Apple Watch, say it the messy way it came to you, and put your arm down. Nothing comes back. No signal? It sends later. Your agent picks it up, and you deal with it when you're ready.
+
+**No reply. On purpose.** Send a thought to your agent and it answers, asks a follow-up, and now you're solving the problem on your phone. Ramble skips all that. Say it, put your arm down, and get back to your run. The thinking can wait.
 
 ### By audience
 
-- **Agent owners:** "Tap your watch and talk. Your agent picks it up and takes care of it. Connect with a short code. No keys, no setup."
+- **Agent owners:** "Your agent's apps are for working things out together. Ramble is for the moments you don't want to. Say it to your watch, and your agent picks it up later. Connect with one message. No keys, no setup."
 - **Privacy-minded:** "No accounts. Ramble's server is a relay, not an archive. Your audio is sent to a transcription provider and deleted as soon as the transcript is ready. Transcripts are deleted when your agent picks them up, or after 30 days. Your full history lives only on your iPhone."
 - **Builders:** "Every transcript can POST to your own endpoint. Signed requests, automatic retries, full API docs."
 - **Transcription:** "Accurate transcripts, with no model to pick. Messy is fine."
@@ -129,9 +146,12 @@ Keep claims inside this list. If it isn't here, check the code before writing it
 
 ## What Ramble is not
 
+- **Not a conversation.** Your agent doesn't reply on your watch. It's a one-way hand-off, and that's the point.
+- **Not a voice memo.** A memo waits for you to deal with it. Ramble hands the thought to your agent.
 - **Not a notes app.** It captures voice and delivers text. Your agent or your own system keeps it.
 - **Not an assistant.** No built-in LLM. Ramble feeds your agent; it isn't one.
-- **Not a conversation.** Your agent doesn't reply on your watch. It's a one-way hand-off, and that's the point.
+
+When copy explains the difference, say "your agent's app" and "a voice memo" in general terms. Never name another app.
 
 ## Product principles
 

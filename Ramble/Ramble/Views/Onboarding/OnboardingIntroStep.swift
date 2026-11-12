@@ -3,7 +3,7 @@
 //  Ramble
 //
 //  Three short beats that say what Ramble is: say it to your watch, leave
-//  your phone behind, your agent handles it. Each beat has one small loop.
+//  your phone behind, then let it go. Each beat has one small loop.
 //  A story-style bar fills while a beat plays, then moves on by itself.
 //  Swiping works too, and "Get started" is always there.
 //
@@ -13,7 +13,7 @@ import SwiftUI
 struct OnboardingIntroStep: View {
     let onContinue: () -> Void
 
-    /// On iPad (no watch) only the last beat, "Your agent handles it.", plays.
+    /// On iPad (no watch) only the last beat, "Let it go.", plays.
     @State private var beat = ThisDevice.isPad ? IntroBeat.agentHandles.rawValue : 0
     @State private var fill: CGFloat = 0
 
@@ -92,15 +92,18 @@ private enum IntroBeat: Int, CaseIterable, Identifiable {
         case .leavePhone:
             return Text("Leave your phone ") + Text("behind.").italic().foregroundColor(Color.obInkSoft)
         case .agentHandles:
-            return Text("Your agent ") + Text("handles it.").italic().foregroundColor(Color.obInkSoft)
+            // On iPad this is the only beat, so it stands alone without "Then".
+            return ThisDevice.isPad
+                ? Text("Let it ") + Text("go.").italic().foregroundColor(Color.obInkSoft)
+                : Text("Then ") + Text("let it go.").italic().foregroundColor(Color.obInkSoft)
         }
     }
 
     var body: String {
         switch self {
         case .sayIt: return "Tap once and talk. That's it."
-        case .leavePhone: return "Notes wait on your watch and catch up later."
-        case .agentHandles: return "Ramble sends each note to your agent, or any webhook."
+        case .leavePhone: return "No signal? It waits on your watch and sends later."
+        case .agentHandles: return "No reply to wait for. Your agent picks it up later."
         }
     }
 }
@@ -359,7 +362,7 @@ private struct LeavePhoneIllustration: View {
     }
 }
 
-// MARK: - Beat 3: your agent handles it
+// MARK: - Beat 3: let it go
 
 private struct AgentHandlesIllustration: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion

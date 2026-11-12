@@ -23,8 +23,8 @@ export default function OgFrame() {
             <span className="font-serif text-[30px] font-semibold italic text-stone-900">Ramble</span>
           </div>
           <h1 className="mt-8 font-serif text-[64px] font-semibold leading-[1.08] tracking-tight text-stone-900">
-            <span className="block">Talk to your watch.</span>
-            <span className="block italic text-brand-text">Your agent handles it.</span>
+            <span className="block">Say it to your watch.</span>
+            <span className="block italic text-brand-text">Then let it go.</span>
           </h1>
         </div>
         <HeroMotion size={500} />

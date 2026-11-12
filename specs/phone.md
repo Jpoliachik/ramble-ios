@@ -6,7 +6,7 @@ What the person sees and does in Ramble on iPhone: first launch, Home, recording
 ## First launch
 
 ### Requirement: Onboarding steps
-On first launch the app SHALL show onboarding as a sheet that cannot be swiped away: three intro beats ("Say it to your watch.", "Leave your phone behind.", "Your agent handles it.", each moving on after 6 seconds or by swiping, with "Get started" always visible), then "Where should notes go?", then connecting an agent ("Add your agent", [delivery.md](delivery.md)) unless skipped, then the watch step.
+On first launch the app SHALL show onboarding as a sheet that cannot be swiped away: three intro beats ("Say it to your watch.", "Leave your phone behind.", "Then let it go.", each moving on after 6 seconds or by swiping, with "Get started" always visible), then "Where should notes go?", then connecting an agent ("Add your agent", [delivery.md](delivery.md)) unless skipped, then the watch step.
 
 ### Requirement: Consent line under "Get started"
 Directly under "Get started" the intro SHALL show, in small type: "Ramble sends your recordings to a cloud service to turn them into text, then sends the text to your agent." followed by a "Privacy" link to the Privacy Policy, which names the transcription providers. Tapping "Get started" is the person's consent; there is no separate step or checkbox. Until it is tapped on this install, the phone SHALL NOT upload any note or connect the watch, so neither device sends audio before consent.

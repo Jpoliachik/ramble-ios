@@ -1,6 +1,6 @@
 # Ramble — Complete Reference
 
-Talk to your Apple Watch. Your agent handles it.
+Ramble for Apple Watch: one-way voice notes from your Apple Watch to your agent. Say it and let it go. Nothing replies on the watch, and it records with no phone or signal and sends later.
 
 Tap the watch and talk. The watch (or iPhone) sends the recording straight to Ramble's server, which transcribes it and holds the text until your agent picks it up and deals with it. No accounts.
 
