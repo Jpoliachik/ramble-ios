@@ -1,6 +1,8 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { AudioLines, Bot, Trash2, UserX } from "lucide-react";
+import AppJsonLd from "../components/app-json-ld";
 import HeroFlow from "../components/hero-flow";
 import HeroMotion from "../components/hero-motion";
 import CopyTextButton from "../components/copy-text-button";
@@ -16,7 +18,12 @@ import {
   SITE_URL,
 } from "../lib/site";
 
-const SITE_HOST = SITE_URL.replace(/^https?:\/\//, "");
+// Title and description come from the root layout. Each page sets its own canonical.
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+};
+
+const SITE_HOST =SITE_URL.replace(/^https?:\/\//, "");
 const SETUP_MESSAGE = "I just downloaded Ramble. Help me set it up!";
 
 const primaryButton =
@@ -154,6 +161,7 @@ const faqs: { q: string; a: ReactNode }[] = [
 export default function Home() {
   return (
     <main className="flex-1">
+      <AppJsonLd />
       {/* Hero */}
       <section className="sunset-wash relative overflow-hidden">
         <Waveform

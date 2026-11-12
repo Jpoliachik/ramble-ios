@@ -5,6 +5,7 @@ import { FREE_NOTES, PRICE_STORY, PROVIDERS, RETENTION, SUPPORT_EMAIL } from "@/
 export const metadata: Metadata = {
   title: "Terms of Use",
   description: "Ramble terms of use: price, fair use, refunds, and the relay. Simple terms for a simple app.",
+  alternates: { canonical: "/terms" },
 };
 
 const link = "underline hover:text-stone-900";
