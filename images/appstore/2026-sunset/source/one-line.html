@@ -677,14 +677,15 @@ if (params.has('ipad')) NODES_T[10] = [4640, MSGY, 0, 420, 560];
 // flow: one hand-drawn line through all five frames (Justin's sketch). A centripetal Catmull-Rom spline through
 // loose points, so it bends like a pen stroke: up out of the watch, a hairpin with the words, round into the
 // watch, across the phone under the message, and level into the relay node.
-const FLOW = [
-  [1112, 1806], [1380, 1600], [1720, 1385], [2110, 1190], [2520, 1060],       // F1-F2: rising, dotted until it reconnects
-  [2960, 1004], [3340, 1010], [3590, 1130],                                   // F3: run A, one wide hairpin
-  [3420, 1320], [3000, 1520], [2760, 1760], [2860, 1960], [3110, 2010],       //     run B down to the left, round into the watch
-  [3420, 1975], [3740, 1830], [3990, MSGY + 120], [4300, MSGY + 30], [4700, MSGY + 20], // F4: out by the crown, up into the message
-  [5060, MSGY + 90], [5345, 1622],                                            // F5: easing down into the relay node
-];
-function flowPath(P, alpha = 0.5) {
+// Frames 1-2 and 4-5 are a centripetal Catmull-Rom spline through loose points. Frame 3's S is drawn by
+// curvature instead: each turn is a raised-cosine curvature bump (zero at both ends), so the curvature never
+// jumps and the S reads as one pen stroke. The whole line is then resampled and Gaussian-smoothed.
+const FLOW_A = [[1112, 1806], [1380, 1600], [1720, 1385], [2110, 1190], [2520, 1060]];   // F1-F2: rising, dotted until it reconnects
+const FLOW_C = [[3740, 1830], [3990, MSGY + 120], [4300, MSGY + 30], [4700, MSGY + 20],      // F4: out by the crown, up into the message
+  [5060, MSGY + 90], [5345, 1622]];                                                         // F5: easing down into the relay node
+// F3: [kind, turn in degrees or length, arc length]
+const FLOW_S = [['c', 0, 520], ['s', 260], ['c', 158, 760], ['s', 380], ['c', -166, 1000], ['s', 200]];
+function crPoints(P, alpha = 0.5) {
   const Q = [[2 * P[0][0] - P[1][0], 2 * P[0][1] - P[1][1]], ...P, [2 * P[P.length - 1][0] - P[P.length - 2][0], 2 * P[P.length - 1][1] - P[P.length - 2][1]]];
   const out = [P[0]];
   for (let i = 1; i < Q.length - 2; i++) {
@@ -699,9 +700,38 @@ function flowPath(P, alpha = 0.5) {
       out.push(L2(B1, B2, t1, t2));
     }
   }
-  return 'M' + out.map(q => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join(' L');
+  return out;
 }
-const d = LINE === 'flow' ? flowPath(FLOW) : LINE === 'sine' ? 'M' + LP.map(q => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join(' L') : nodesToPath(LINE === 'r9' ? NODES : NODES_T);
+function turtle(x, y, th, segs) {
+  const out = [];
+  for (const [kind, a, b] of segs) {
+    if (kind === 's') { const n = Math.ceil(a / 4); for (let i = 0; i < n; i++) { x += Math.cos(th) * a / n; y += Math.sin(th) * a / n; out.push([x, y]); } }
+    else { const dth = a * Math.PI / 180, n = Math.ceil(b / 4), ds = b / n;
+      for (let i = 0; i < n; i++) { const s = (i + 0.5) * ds; th += dth / b * (1 - Math.cos(2 * Math.PI * s / b)) * ds; x += Math.cos(th) * ds; y += Math.sin(th) * ds; out.push([x, y]); } }
+  }
+  return out;
+}
+function flowPath() {
+  const A = crPoints(FLOW_A), [xa, ya] = A[A.length - 1], [xp, yp] = A[A.length - 2];
+  const S = FLOW_S.map(q => q.slice()); const th0 = Math.atan2(ya - yp, xa - xp); S[0][1] = -th0 * 180 / Math.PI;   // first bump levels the line
+  const B = turtle(xa, ya, th0, S);
+  const C = crPoints([B[B.length - 1], ...FLOW_C]);
+  let P = [...A, ...B, ...C.slice(1)];
+  // resample every 4 px, then a Gaussian blur along the line (endpoints pinned)
+  const R = [P[0]]; let acc = 0;
+  for (let i = 1; i < P.length; i++) { const dd = Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]); acc += dd;
+    while (acc >= 4) { const t = 1 - (acc - 4) / dd; R.push([P[i - 1][0] + (P[i][0] - P[i - 1][0]) * t, P[i - 1][1] + (P[i][1] - P[i - 1][1]) * t]); acc -= 4; } }
+  R.push(P[P.length - 1]);
+  const SIG = 14, W = 3 * SIG, G = [];
+  for (let k = -W; k <= W; k++) G.push(Math.exp(-k * k / (2 * SIG * SIG)));
+  for (let pass = 0; pass < 2; pass++) {
+    const Rn = R.map((p, i) => { const w = Math.min(W, i, R.length - 1 - i); if (w === 0) return p;
+      let sx = 0, sy = 0, sw = 0; for (let k = -w; k <= w; k++) { const g = G[k + W]; sx += R[i + k][0] * g; sy += R[i + k][1] * g; sw += g; } return [sx / sw, sy / sw]; });
+    R.splice(0, R.length, ...Rn);
+  }
+  return 'M' + R.map(q => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join(' L');
+}
+const d = LINE === 'flow' ? flowPath() : LINE === 'sine' ? 'M' + LP.map(q => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join(' L') : nodesToPath(LINE === 'r9' ? NODES : NODES_T);
 const spine = document.getElementById('spine'), ink = document.getElementById('ink');
 spine.setAttribute('d', d);
 const L = spine.getTotalLength();
@@ -764,9 +794,9 @@ const sSolid = sAtX(2480), sNodeF = L;
   const thin = nodesToPath([[pN.x + 24, pN.y + 1.5, 4, 0, 50], [5470, 1628, 0, 50, 80], [5720, 1628, 0, 80, 0]]);
   el('path', { d: thin, fill: 'none', 'stroke-width': 8, 'stroke-linecap': 'round' });
 }
-say('wA', sNear(2640, 1040), sNear(3380, 1004), 'so um, the garage thing… wait, oat milk…');
-const sB0f = sNear(3500, 1260, sNear(3590, 1130));
-say('wB', sB0f, sNear(2800, 1680, sB0f), 'and call Sam back about Thursday…');
+say('wA', sNear(2700, 1000), sNear(3420, 984), 'so um, the garage thing… wait, oat milk…');
+const sB0f = sNear(3453, 1325, sNear(3581, 1232));
+say('wB', sB0f, sNear(2861, 1568, sB0f), 'and call Sam back about Thursday…');
 } else {
 // 1) F1: evenly spaced voice bars easing down into the line
 const BARS1 = 7;
@@ -843,8 +873,8 @@ function fitWords() {
   }
   if (WASH) {
     // frame 5: a large, quiet lock behind the phone
-    const lx = 5600, ly = 1580;
-    const lg = mk('g', { opacity: .9 });
+    const lx = 5470, ly = 1330, k = 0.78;
+    const lg = mk('g', { opacity: .9, transform: `translate(${lx} ${ly}) scale(${k}) translate(${-lx} ${-ly})` });
     const ld = mk('defs', {}); ld.innerHTML = '<linearGradient id="lockg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F1B48A" stop-opacity=".55"/><stop offset="1" stop-color="#D98CA6" stop-opacity=".40"/></linearGradient>';
     const sh = document.createElementNS(ns, 'path');
     for (const [a, v] of Object.entries({ d: `M${lx - 230},${ly - 40} V${ly - 300} A230,230 0 0 1 ${lx + 230},${ly - 300} V${ly - 40}`, fill: 'none', stroke: 'url(#lockg)', 'stroke-width': 96, 'stroke-linecap': 'round' })) sh.setAttribute(a, v);
