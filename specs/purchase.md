@@ -323,7 +323,7 @@ Apple keeps billing a subscription until the person cancels it. While an unlocke
 ## What Ramble says about price
 
 ### Requirement: One price story everywhere
-The app, website, Terms of Use, Privacy Policy and App Store listing SHALL describe pricing as "Free to download. 25 notes free, then $14.99 once." (the app uses the store's local price), with no monthly price. The Terms of Use and App Store description SHALL state that refunds are handled by Apple. No copy SHALL state a usage amount, hours of audio, or a monthly allowance.
+The app, website, Terms of Use, Privacy Policy and App Store listing SHALL describe pricing as "Free to try. 25 notes free, then $14.99 once." (the app uses the store's local price), with no monthly price. The Terms of Use and App Store description SHALL state that refunds are handled by Apple. No copy SHALL state a usage amount, hours of audio, or a monthly allowance.
 
 #### Scenario: Terms page
 - GIVEN the published Terms of Use

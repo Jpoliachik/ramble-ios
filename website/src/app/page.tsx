@@ -271,10 +271,10 @@ export default function Home() {
       {/* Pricing */}
       <section className="border-t border-stone-200 bg-stone-50">
         <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
-          {/* Reads as the spec's pricing line: "Free to download. 25 notes free, then $14.99 once." */}
+          {/* Reads as the spec's pricing line: "Free to try. 25 notes free, then $14.99 once." */}
           <div className="relative mx-auto max-w-md overflow-hidden rounded-2xl bg-white px-6 pt-9 pb-8 text-center shadow-sm ring-1 ring-stone-200/80">
             <div aria-hidden="true" className="sunset-rule absolute inset-x-0 top-0 h-1" />
-            <h2 className="font-serif text-4xl font-semibold tracking-tight text-stone-900">Free to download.</h2>
+            <h2 className="font-serif text-4xl font-semibold tracking-tight text-stone-900">Free to try.</h2>
             <p className="mt-3 text-base text-stone-700">
               {FREE_NOTES} notes free, then {APP_PRICE} once.
             </p>
@@ -290,7 +290,7 @@ export default function Home() {
       {/* Privacy */}
       <section className="border-t border-stone-200">
         <div className="mx-auto max-w-5xl px-6 py-20 sm:py-28">
-          <SectionHeading eyebrow="Privacy">Your thoughts don&apos;t stick around</SectionHeading>
+          <SectionHeading eyebrow="Privacy-first design">Your thoughts don&apos;t stick around</SectionHeading>
           <div className="mt-14 grid gap-10 sm:grid-cols-3 sm:gap-8">
             {privacyPoints.map(({ Icon, title, body, tint }) => (
               <div key={title} className="flex flex-col items-center text-center sm:items-start sm:text-left">

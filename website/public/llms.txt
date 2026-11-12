@@ -8,7 +8,7 @@ Privacy: Ramble's server is a relay, not an archive. Your audio is sent to a tra
 
 Transcription: Groq Whisper v3 Turbo, the only provider. When Groq is overloaded or down, the note waits and is retried.
 
-Price: Free to download. 25 notes free, then $14.99 once. No subscription.
+Price: Free to try. 25 notes free, then $14.99 once. No subscription.
 
 Relay: https://api.ramble.watch (https://ramble-transcription-proxy.jpoliachik.workers.dev serves the identical API)
 
