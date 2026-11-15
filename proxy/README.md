@@ -46,7 +46,8 @@ Secrets (`npx wrangler secret put NAME`):
 |---|---|
 | `GROQ_API_KEY` | The transcription provider |
 | `HOOK_ENCRYPTION_KEY` | Encrypts agents' wake-up hook headers at rest. Without it, setting a hook answers 503 |
-| `ALERT_WEBHOOK_URL` | Where operator alerts are POSTed as plain text (for example an ntfy topic). Unset: nothing is sent |
+| `TELEGRAM_BOT_TOKEN` | Token of the operator's Telegram bot (from @BotFather). Operator alerts are sent by this bot. Unset: nothing is sent |
+| `TELEGRAM_CHAT_ID` | The chat the bot sends alerts to (the operator's own chat with the bot). Unset: nothing is sent |
 
 Vars (`[vars]`): `RETENTION_SECONDS`, `APPLE_BUNDLE_ID`, `UNLOCK_PRODUCT_ID`, `PREMIUM_PRODUCT_ID`, `RELAY_BASE_URL`, and one set at release: `FIRST_FREE_BUILD` (build number of the first free-notes build). Without it no paid download counts as an early buyer (old subscribers still do). Old builds' paths (`POST /transcribe`, text `POST /inbox`) answer 410 from 2027-01-07 00:00 UTC, a date fixed in `src/legacy.js`, not a var.
 
@@ -69,7 +70,8 @@ Merging to `main` deploys the Worker and applies migrations (`.github/workflows/
    ```bash
    npx wrangler secret put GROQ_API_KEY          # console.groq.com → API Keys
    npx wrangler secret put HOOK_ENCRYPTION_KEY   # paste the output of: openssl rand -base64 32
-   npx wrangler secret put ALERT_WEBHOOK_URL     # https://ntfy.sh/ramble-alerts-<openssl rand -hex 12>?email=<you>: each alert arrives by email (or subscribe in the ntfy app). Any plain-text POST URL works
+   npx wrangler secret put TELEGRAM_BOT_TOKEN    # Telegram → @BotFather → /newbot → copy the token
+   npx wrangler secret put TELEGRAM_CHAT_ID      # send your bot any message, then open https://api.telegram.org/bot<token>/getUpdates and copy result[0].message.chat.id
    ```
    Keep `HOOK_ENCRYPTION_KEY` stable: changing it makes stored hook headers unreadable. Only after this version is deployed (the Worker running before it still calls Deepgram and OpenAI), delete the ones no longer read: `npx wrangler secret delete NAME` for `DEEPGRAM_API_KEY`, `OPENAI_API_KEY`, `DEV_BYPASS_TOKEN` and `ANALYTICS_TOKEN`, if they exist (`npx wrangler secret list`).
 4. **Groq spend limit.** On the paid Developer tier, set a monthly spend limit (about $50) in console.groq.com; it is the only global cost cap. The free tier never bills, so it needs none, but its rate limits cap throughput: past them Groq answers 429 and notes wait for a retry (the stuck-note alert fires after 30 minutes).
@@ -133,7 +135,7 @@ SELECT phone_app, watch_app, COUNT(*) AS inboxes FROM inboxes GROUP BY 1, 2 ORDE
 
 ## Operations: heavy users, suspending one, and revoking a refund
 
-There is no usage limit, and the 100-hour figure below is internal: it is never shown to people (not in the app, the Terms or the listing). The relay keeps a monthly tally per user, where the user is the purchase an inbox is unlocked by (`unlock:…`, `sub:…`, `app:…`) or the inbox ID (`inb_…`) when it has none, and sends one alert to `ALERT_WEBHOOK_URL` the first time a user passes 100 hours in a UTC month. Nothing is refused. The global backstop is a spend limit in the Groq console.
+There is no usage limit, and the 100-hour figure below is internal: it is never shown to people (not in the app, the Terms or the listing). The relay keeps a monthly tally per user, where the user is the purchase an inbox is unlocked by (`unlock:…`, `sub:…`, `app:…`) or the inbox ID (`inb_…`) when it has none, and sends one Telegram alert the first time a user passes 100 hours in a UTC month. Nothing is refused. The global backstop is a spend limit in the Groq console.
 
 If one user needs stopping, suspend them by hand. Uploads (`PUT /notes/:id` and old builds' `POST /transcribe`) from a suspended inbox, or from any inbox bound to a suspended purchase, get `403` with `"reason": "suspended"`; the apps show "Couldn't send" and stop retrying. Notes already accepted still transcribe, and everyone else is unaffected. Each command is one line:
 

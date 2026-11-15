@@ -14,4 +14,5 @@ GROQ_API_KEY=your-groq-api-key-here
 
 # Optional: wake-up hooks and operator alerts.
 HOOK_ENCRYPTION_KEY=
-ALERT_WEBHOOK_URL=
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=

@@ -1,4 +1,5 @@
-// Operator alerts, posted to one external webhook (ALERT_WEBHOOK_URL), each
+// Operator alerts, sent as Telegram messages from the operator's bot
+// (TELEGRAM_BOT_TOKEN to TELEGRAM_CHAT_ID), each
 // with a 6-hour cooldown per alert key. See specs/transcription.md "Operator".
 // Messages never carry transcript text or credentials. Everything else is in
 // Cloudflare's logs.
@@ -33,17 +34,20 @@ export async function alert(ctx, key, message) {
 }
 
 async function post(ctx, message) {
-  const url = ctx.env.ALERT_WEBHOOK_URL;
-  if (!url) return;
+  const token = ctx.env.TELEGRAM_BOT_TOKEN;
+  const chatId = ctx.env.TELEGRAM_CHAT_ID;
+  if (!token || !chatId) return;
   try {
-    await ctx.fetch(url, {
+    // Telegram Bot API sendMessage. The URL carries the token, so never log it.
+    const res = await ctx.fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
-      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-      body: `Ramble relay: ${message}`,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text: `Ramble relay: ${message}` }),
       signal: AbortSignal.timeout(5000),
     });
+    if (!res.ok) console.error(`[ops] telegram alert failed: HTTP ${res.status}`);
   } catch (err) {
-    console.error(`[ops] alert webhook failed: ${err.message}`);
+    console.error(`[ops] telegram alert failed: ${err.name}`);
   }
 }
 

@@ -173,8 +173,8 @@ describe('operator', () => {
     assert.ok(!failed[0].includes(secret));
   });
 
-  it('sends nothing without an alert webhook', async () => {
-    h.envExtra = { ALERT_WEBHOOK_URL: undefined };
+  it('sends nothing without a Telegram bot', async () => {
+    h.envExtra = { TELEGRAM_BOT_TOKEN: undefined };
     const secret = await h.inbox();
     const [{ id }] = h.rows('SELECT id FROM inboxes');
     h.db.sqlite.exec(`INSERT INTO usage (user_id, month, seconds) VALUES ('${id}', '2026-11', ${100 * 3600 - 1})`);

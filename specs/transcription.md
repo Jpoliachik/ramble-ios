@@ -279,10 +279,10 @@ The same alert SHALL repeat at most once every 6 hours while it still holds; per
 - WHEN checks run until 15:59
 - THEN no second stuck-note alert is sent before 16:00
 
-### Requirement: Alerts go to one external webhook
-The server SHALL POST every alert, including alerts defined in relay-api.md, to one alert webhook outside Ramble, such as a phone push service, configured by the operator. Messages SHALL contain no transcript text and no inbox secrets. When no alert webhook is set, nothing is sent.
+### Requirement: Alerts go to the operator on Telegram
+The server SHALL send every alert, including alerts defined in relay-api.md, as one Telegram message from the operator's bot to the operator's chat, both configured by the operator. Messages SHALL contain no transcript text and no inbox secrets. When the bot or the chat is not set, nothing is sent. A failed send is logged and not retried.
 
-#### Scenario: Webhook set
-- GIVEN the alert webhook is configured
+#### Scenario: Bot set
+- GIVEN the Telegram bot and chat are configured
 - WHEN an alert fires
-- THEN one POST with a short plain-text message goes to that webhook
+- THEN one short plain-text message arrives in that chat

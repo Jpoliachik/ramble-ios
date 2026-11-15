@@ -92,7 +92,7 @@ export function createHarness() {
     measured: 12,
     envExtra: {},
   };
-  h.env = () => ({ DB: h.db, AUDIO: h.bucket, HOOK_ENCRYPTION_KEY: 'k', ALERT_WEBHOOK_URL: 'https://alerts.example/hook', ...h.envExtra });
+  h.env = () => ({ DB: h.db, AUDIO: h.bucket, HOOK_ENCRYPTION_KEY: 'k', TELEGRAM_BOT_TOKEN: 't', TELEGRAM_CHAT_ID: '1', ...h.envExtra });
 
   h.deps = (extra = {}) => ({
     now: h.now,
@@ -100,8 +100,8 @@ export function createHarness() {
     verifyAssertion: async () => ({ valid: h.attestOK, reason: 'stub' }),
     handleAttest: async () => ({ status: 'ok' }),
     fetch: async (url, init) => {
-      if (url === 'https://alerts.example/hook') {
-        h.alerts.push(init.body);
+      if (url === 'https://api.telegram.org/bott/sendMessage') {
+        h.alerts.push(JSON.parse(init.body).text);
         return new Response('ok');
       }
       h.fetches.push({ url, headers: init.headers, body: JSON.parse(init.body) });
