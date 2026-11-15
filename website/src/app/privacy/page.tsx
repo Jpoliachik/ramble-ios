@@ -66,7 +66,7 @@ export default function PrivacyPolicy() {
           &larr; Back to Ramble
         </Link>
         <h1 className="mt-8 text-3xl font-semibold tracking-tight text-stone-900">Privacy Policy</h1>
-        <p className="mt-2 text-sm text-stone-500">Last updated: November 9, 2026</p>
+        <p className="mt-2 text-sm text-stone-500">Last updated: November 15, 2026</p>
 
         <div className="mt-10 space-y-8 text-sm leading-relaxed text-stone-600">
           <section>
@@ -223,6 +223,15 @@ export default function PrivacyPolicy() {
               Purchases are handled by Apple through the App Store. To unlock your notes, the app sends Ramble&apos;s
               server Apple&apos;s signed purchase record, which holds ids, the product, and dates. Ramble never receives
               your name, email, or payment details.
+            </p>
+          </section>
+
+          <section>
+            <h2 className={h2}>This website</h2>
+            <p className="mt-2">
+              ramble.watch is hosted on Vercel and uses Vercel Web Analytics to count page views. It sets no cookies,
+              and visitors are counted without being identified across sites or across days. The app sends nothing to
+              it.
             </p>
           </section>
 
