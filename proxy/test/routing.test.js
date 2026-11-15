@@ -5,6 +5,7 @@ import { beforeEach, describe, it } from 'node:test';
 
 import { handleRequest } from '../src/index.js';
 import { LEGACY_RETIRES_AT } from '../src/legacy.js';
+import { recordServerError } from '../src/ops.js';
 import { DAY, HOUR, PREMIUM, T0, createHarness, jws, noteId } from './harness.js';
 
 let h;
@@ -171,6 +172,21 @@ describe('operator', () => {
     const failed = h.alerts.filter((a) => a.includes('failed permanently (audio_rejected)'));
     assert.equal(failed.length, 1);
     assert.ok(!failed[0].includes(secret));
+  });
+
+  it('alerts once when 20 server errors land within 10 minutes, and purges old counts', async () => {
+    const minute = Math.floor(h.now / 60000);
+    h.db.sqlite.exec(`INSERT INTO error_counts (minute, n) VALUES (${minute - 120}, 500), (${minute - 3}, 10), (${minute}, 9)`);
+    await h.cron();
+    const spikes = () => h.alerts.filter((a) => a.includes('failed with a server error in the last 10 minutes')).length;
+    assert.equal(spikes(), 0);
+    assert.equal(h.rows('SELECT COUNT(*) AS n FROM error_counts')[0].n, 2);
+    await recordServerError({ db: h.db, now: h.now });
+    await h.cron();
+    assert.equal(spikes(), 1);
+    assert.ok(h.alerts.some((a) => a.includes('20 requests failed')));
+    await h.cron();
+    assert.equal(spikes(), 1);
   });
 
   it('sends nothing without a Telegram bot', async () => {

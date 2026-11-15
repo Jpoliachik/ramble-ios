@@ -12,7 +12,7 @@ The behavior is specified in [`specs/`](../specs/): the HTTP contract is [`relay
 2. The relay stores the audio in a private R2 bucket, then accepts the note, counting a free note before the unlock.
 3. It transcribes right away with Groq Whisper v3 Turbo, the only provider. Quick transcripts come back in the upload response; if Groq is overloaded or down, the note waits for a retry.
 4. The audio is deleted. One copy of the transcript goes to each connected agent, and one is kept for the person's devices until the phone acks it (and, for a watch note, the watch has seen it), at most 30 days.
-5. A cron job every minute retries failed attempts (for up to 20 hours), picks up stalled ones, expires old data, and alerts the operator about notes stuck for 30 minutes.
+5. A cron job every minute retries failed attempts (for up to 20 hours), picks up stalled ones, expires old data, and alerts the operator about notes stuck for 30 minutes or a spike of server errors.
 
 ## Code map
 
@@ -25,7 +25,7 @@ The behavior is specified in [`specs/`](../specs/): the HTTP contract is [`relay
 | `src/relay.js` | Pairing, agent copies, pull and ack, delivery status, wake-up hooks, old builds' text upload |
 | `src/legacy.js` | Old builds' `POST /transcribe` for early subscribers, until the fixed retirement date `LEGACY_RETIRES_AT` (2027-01-07 00:00 UTC) |
 | `src/usage.js` | Usage stats: one content-free row per finished note, the app label each device last sent (`specs/usage.md`) |
-| `src/ops.js` | Operator alerts: Groq key rejected or missing, a note stuck 30 minutes, permanent failures |
+| `src/ops.js` | Operator alerts (Telegram): Groq key rejected or missing, a note stuck 30 minutes, permanent failures, 20+ server errors in 10 minutes |
 | `src/transcribe.js`, `src/audio.js` | The Groq call, error classification, formatting; audio length from the container |
 | `src/apple.js`, `src/attest.js`, `src/ratelimit.js`, `src/crypto.js` | Apple-signed records, App Attest, the D1 rate limiter |
 | `migrations/` | D1 schema |
@@ -88,7 +88,7 @@ Merging to `main` deploys the Worker and applies migrations (`.github/workflows/
 - **Purchases:** Apple's original transaction ID, kind, environment, the operator's revoke time, `inbox_cap` (empty means 10) and `suspended` flag.
 - **Usage:** transcribed audio seconds per user (purchase, or inbox without one) per UTC month, for monitoring only.
 - **Usage stats (`note_events`):** one row per finished note under the inbox's random `usage_id`: device, times, length, result, tries, free or not, language, whether filler removal and vocabulary were on, app label. No inbox ID, note ID or text. Kept indefinitely. Inboxes also keep `phone_app` and `watch_app`, the last `X-Ramble-Client` each device sent.
-- **Operator data:** alert cooldowns, and rate-limit counters for App Attest and inbox creation.
+- **Operator data:** alert cooldowns, server-error counts per minute (kept an hour), and rate-limit counters for App Attest and inbox creation.
 
 ## Usage stats: where to look
 

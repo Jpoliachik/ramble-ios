@@ -28,7 +28,7 @@ import { address, countLimit, limit, peekLimit } from './auth.js';
 import { DOCS_URL, fail, gone, json, rateLimited, unavailable } from './http.js';
 import { legacyOpen, legacyTranscribe } from './legacy.js';
 import { BODY_TIMEOUT_MS, INLINE_WAIT_MS, ackNotes, getNote, listNotes, purgeNotes, sweep, sweepCopies, uploadNote } from './notes.js';
-import { checkAlerts } from './ops.js';
+import { checkAlerts, recordServerError } from './ops.js';
 import { clientAddress, hit, peek, purgeRateLimits } from './ratelimit.js';
 import {
   ack,
@@ -152,6 +152,7 @@ export async function handleRequest(request, env, deps = {}) {
   } catch (err) {
     // Can't check a credential, count or limit: accept nothing. Never log bodies.
     console.error(`[relay] ${request.method} ${match.name} failed: ${String(err?.message).slice(0, 200)}`);
+    await recordServerError(ctx);
     return unavailable();
   }
 }

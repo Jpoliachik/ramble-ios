@@ -8,6 +8,8 @@ import { HOUR, MINUTE } from './http.js';
 
 export const ALERT_COOLDOWN_MS = 6 * HOUR;
 export const STUCK_AFTER_MS = 30 * MINUTE;
+export const ERROR_WINDOW_MS = 10 * MINUTE;
+export const ERROR_SPIKE = 20;
 
 /**
  * Sends `message` unless the same alert key went out in the last 6 hours.
@@ -63,8 +65,29 @@ export async function alertPermanentFailure(ctx, result, error) {
   await alert(ctx, `failed:${result}`, `A note failed permanently (${result}): ${String(error ?? '').slice(0, 120)}`);
 }
 
-/** Cron, every minute: notes still transcribing 30 minutes after they were accepted. */
+/** A request failed with a server error (503 from a thrown handler). Never throws. */
+export async function recordServerError(ctx) {
+  try {
+    await ctx.db
+      .prepare(`INSERT INTO error_counts (minute, n) VALUES (?, 1) ON CONFLICT (minute) DO UPDATE SET n = n + 1`)
+      .bind(Math.floor(ctx.now / MINUTE))
+      .run();
+  } catch {
+    // The database may be what is failing; the log line already went out.
+  }
+}
+
+/**
+ * Cron, every minute: notes still transcribing 30 minutes after they were
+ * accepted, and a spike of server errors in the last 10 minutes.
+ */
 export async function checkAlerts(ctx) {
+  const since = Math.floor((ctx.now - ERROR_WINDOW_MS) / MINUTE);
+  const errors = await ctx.db.prepare(`SELECT COALESCE(SUM(n), 0) AS n FROM error_counts WHERE minute > ?`).bind(since).first();
+  const failed = errors?.n ?? 0;
+  if (failed >= ERROR_SPIKE) await alert(ctx, 'errors', `${failed} requests failed with a server error in the last 10 minutes. See the Worker's logs.`);
+  await ctx.db.prepare(`DELETE FROM error_counts WHERE minute < ?`).bind(Math.floor((ctx.now - HOUR) / MINUTE)).run();
+
   const row = await ctx.db
     .prepare(`SELECT COUNT(*) AS n FROM notes WHERE status = 'transcribing' AND accepted_at < ?`)
     .bind(ctx.now - STUCK_AFTER_MS)

@@ -248,6 +248,7 @@ The server SHALL alert the operator when:
 - any accepted note is still transcribing more than 30 minutes after it was accepted (checked every minute)
 - a note fails permanently, naming its result
 - a user passes 100 hours of audio in a month (Cost limits, above)
+- 20 or more requests failed with a server error (the relay could not handle them and answered 503) within the last 10 minutes (checked every minute). The server keeps only a count per minute, for an hour.
 
 Besides these, the server SHALL send no alert and no usage summary; the operator reads anything else from Cloudflare's logs and the database. A Groq 429 alone alerts nothing.
 
@@ -260,6 +261,11 @@ Besides these, the server SHALL send no alert and no usage summary; the operator
 - GIVEN an accepted note has been transcribing for 29 minutes
 - WHEN the next check runs
 - THEN no alert is sent
+
+#### Scenario: Error spike
+- GIVEN 20 requests failed with a server error in the last 10 minutes
+- WHEN the next check runs
+- THEN the operator is alerted once with the count, and again at most every 6 hours while it holds
 
 #### Scenario: Permanent failure
 - GIVEN Groq can't decode a note's audio
