@@ -5,10 +5,14 @@
 // the agent ack.
 
 import { authenticate } from './auth.js';
-import { iso, json, readJSON, UUID_RE } from './http.js';
+import { bearerValue, fail, iso, json, UUID_RE } from './http.js';
 import { resourceMetadataURL } from './oauth.js';
 
-export const PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26'];
+// 2025-03-26 is left out: it requires JSON-RPC batches, which later versions dropped.
+export const PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18'];
+// Browsers may call /mcp only from these origins (DNS-rebinding guard). Claude
+// calls from its servers and usually sends no Origin.
+const ALLOWED_ORIGINS = ['https://claude.ai', 'https://claude.com'];
 export const LIST_DEFAULT = 20;
 export const LIST_MAX = 50;
 export const PREVIEW_LENGTH = 200;
@@ -31,7 +35,7 @@ export const TOOLS = [
   {
     name: 'list_new_notes',
     title: 'List new notes',
-    description: `Lists Ramble voice notes not yet marked handled, newest first: id, recorded time (the device's local time with its offset), duration in seconds and a transcript preview. ${DATA_NOTE}`,
+    description: `Lists Ramble voice notes not yet marked handled, newest first (by when Ramble received them): id, recorded time (the device's local time with its offset), duration in seconds and a transcript preview. When has_more is true, older notes appear once these are marked handled. ${DATA_NOTE}`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -63,20 +67,38 @@ const rpcError = (id, code, message, status = 200) => json({ jsonrpc: '2.0', id,
 
 /** POST /mcp. A missing or bad key gets 401 pointing at the sign-in metadata. */
 export async function mcp(request, ctx) {
+  const requestOrigin = request.headers.get('Origin');
+  if (requestOrigin && requestOrigin !== ctx.origin && !ALLOWED_ORIGINS.includes(requestOrigin)) {
+    return fail(403, 'This origin may not call the Ramble MCP server.', 'origin_not_allowed');
+  }
   const { cred, response } = await authenticate(request, ctx, ['agent']);
   if (response) {
     if (response.status !== 401) return response;
     const headers = new Headers(response.headers);
-    headers.set('WWW-Authenticate', `Bearer resource_metadata="${resourceMetadataURL(ctx)}"`);
+    const sent = Boolean(bearerValue(request));
+    headers.set(
+      'WWW-Authenticate',
+      `Bearer ${sent ? 'error="invalid_token", ' : ''}resource_metadata="${resourceMetadataURL(ctx)}"`,
+    );
     return new Response(response.body, { status: 401, headers });
   }
-
-  const msg = await readJSON(request);
-  if (!msg || typeof msg !== 'object' || Array.isArray(msg) || msg.jsonrpc !== '2.0' || typeof msg.method !== 'string') {
-    return rpcError(null, -32600, 'Send one JSON-RPC 2.0 request', 400);
+  const version = request.headers.get('MCP-Protocol-Version');
+  if (version && !PROTOCOL_VERSIONS.includes(version)) {
+    return rpcError(null, -32600, `Unsupported MCP-Protocol-Version. Supported: ${PROTOCOL_VERSIONS.join(', ')}`, 400);
   }
-  // Notifications and responses from the client: accepted, nothing to say.
-  if (msg.id === undefined || msg.id === null) return new Response(null, { status: 202 });
+
+  let msg;
+  try {
+    msg = JSON.parse(await request.text());
+  } catch {
+    return rpcError(null, -32700, 'Parse error', 400);
+  }
+  if (!msg || typeof msg !== 'object' || Array.isArray(msg) || msg.jsonrpc !== '2.0') {
+    return rpcError(null, -32600, 'Send one JSON-RPC 2.0 message', 400);
+  }
+  // Notifications, and responses from the client: accepted, nothing to say.
+  if (typeof msg.method !== 'string' || msg.id === undefined) return new Response(null, { status: 202 });
+  if (typeof msg.id !== 'string' && typeof msg.id !== 'number') return rpcError(null, -32600, 'Request id must be a string or number', 400);
 
   switch (msg.method) {
     case 'initialize': {
@@ -92,14 +114,18 @@ export async function mcp(request, ctx) {
       return rpcResult(msg.id, {});
     case 'tools/list':
       return rpcResult(msg.id, { tools: TOOLS });
-    case 'tools/call':
-      return rpcResult(msg.id, await callTool(cred.connection, msg.params ?? {}, ctx));
+    case 'tools/call': {
+      const name = msg.params?.name;
+      if (!TOOLS.some((t) => t.name === name)) return rpcError(msg.id, -32602, `Unknown tool: ${String(name)}`);
+      const args = msg.params.arguments;
+      return rpcResult(msg.id, await callTool(cred.connection, name, args && typeof args === 'object' && !Array.isArray(args) ? args : {}, ctx));
+    }
     default:
       return rpcError(msg.id, -32601, `Method not found: ${msg.method}`);
   }
 }
 
-async function callTool(connection, { name, arguments: args = {} }, ctx) {
+async function callTool(connection, name, args, ctx) {
   // Any tool call is a check-in, like a pull: the app shows it.
   await ctx.db.prepare('UPDATE connections SET last_pull_at = ? WHERE id = ?').bind(ctx.now, connection.id).run();
   switch (name) {
@@ -107,10 +133,8 @@ async function callTool(connection, { name, arguments: args = {} }, ctx) {
       return listNewNotes(connection, args, ctx);
     case 'get_note':
       return getNote(connection, args, ctx);
-    case 'mark_handled':
-      return markHandled(connection, args, ctx);
     default:
-      return toolError(`Unknown tool: ${name}`);
+      return markHandled(connection, args, ctx);
   }
 }
 
@@ -147,14 +171,15 @@ async function listNewNotes(connection, args, ctx) {
 /** This connection's copy of one note, in any state, or null. */
 async function findCopy(connection, args, ctx) {
   const id = args.id;
-  if (typeof id !== 'string' || !UUID_RE.test(id)) return { error: '"id" must be a note id from list_new_notes' };
+  // Note ids are UUIDs, stored uppercase; old builds' copies may carry other ids, stored as sent.
+  if (typeof id !== 'string' || !/^[A-Za-z0-9-]{1,64}$/.test(id)) return { error: '"id" must be a note id from list_new_notes' };
   const row = await ctx.db
     .prepare(
       `SELECT e.id, e.recording_id, e.recorded_at, e.received_at, e.duration, e.text,
               e.acked_at IS NOT NULL AS handled, CASE WHEN ${WAITING} THEN 1 ELSE 0 END AS waiting
          FROM entries e WHERE e.connection_id = ? AND e.recording_id = ?`,
     )
-    .bind(ctx.now, connection.id, id.toUpperCase())
+    .bind(ctx.now, connection.id, UUID_RE.test(id) ? id.toUpperCase() : id)
     .first();
   return { row };
 }
@@ -181,9 +206,11 @@ async function markHandled(connection, args, ctx) {
   if (error) return toolError(error);
   if (row?.handled) return toolResult({ id: row.recording_id, handled: true });
   if (!row?.waiting) return toolError(NOT_FOUND);
-  await ctx.db
+  const result = await ctx.db
     .prepare(`UPDATE entries AS e SET acked_at = ?, text = '' WHERE e.id = ? AND ${WAITING}`)
     .bind(ctx.now, row.id, ctx.now)
     .run();
+  // Deleted in the app, or expired, in the same moment.
+  if (result.meta.changes === 0) return toolError(NOT_FOUND);
   return toolResult({ id: row.recording_id, handled: true });
 }

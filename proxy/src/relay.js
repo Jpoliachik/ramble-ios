@@ -204,9 +204,7 @@ export async function createPairCode(request, ctx) {
     .prepare('SELECT COUNT(*) AS n FROM connections WHERE inbox_id = ?')
     .bind(cred.inboxId)
     .first();
-  if (agents.n >= MAX_AGENTS) {
-    return fail(409, `${MAX_AGENTS} agents are connected. Disconnect one to connect another.`, 'too_many_agents');
-  }
+  if (agents.n >= MAX_AGENTS) return tooManyAgents();
 
   const code = generatePairCode();
   const expiresAt = ctx.now + PAIR_CODE_TTL_SECONDS * 1000;
@@ -286,6 +284,7 @@ export async function exchangePairCode(request, ctx) {
   const claimed = await claimPairCode(ctx, code);
   if (claimed) {
     const token = await createConnection(ctx, { ...claimed, name });
+    if (!token) return tooManyAgents();
     return json({ token }, 201);
   }
   if (!(await pairCodeWasUsed(ctx, code))) return fail(400, INVALID_CODE);
@@ -310,21 +309,34 @@ export async function claimPairCode(ctx, code) {
   return claimed ? { inboxId: claimed.inbox_id, connectionId } : null;
 }
 
-/** True when the code is live and already made a connection that still exists. */
+/**
+ * True when the code is live and already made a connection that still
+ * exists, or is held by a connector sign-in that hasn't finished yet.
+ */
 export async function pairCodeWasUsed(ctx, code) {
   const row = await ctx.db
     .prepare(
-      `SELECT c.id AS live FROM pair_codes p
+      `SELECT c.id AS live, o.connection_id AS signing_in FROM pair_codes p
          LEFT JOIN connections c ON c.id = p.connection_id
+         LEFT JOIN oauth_codes o ON o.connection_id = p.connection_id
         WHERE p.code_hash = ? AND p.expires_at > ?`,
     )
     .bind(await sha256Hex(normalizePairCode(code)), ctx.now)
     .first();
-  return Boolean(row?.live);
+  return Boolean(row?.live || row?.signing_in);
 }
 
-/** Makes the connection a claimed code reserved and returns its agent key, once. */
+const tooManyAgents = () =>
+  fail(409, `${MAX_AGENTS} agents are connected. Disconnect one to connect another.`, 'too_many_agents');
+
+/**
+ * Makes the connection a claimed code reserved and returns its agent key,
+ * once, or null when the inbox already has MAX_AGENTS (codes claimed earlier
+ * can finish after others connected).
+ */
 export async function createConnection(ctx, { inboxId, connectionId, name }) {
+  const agents = await ctx.db.prepare('SELECT COUNT(*) AS n FROM connections WHERE inbox_id = ?').bind(inboxId).first();
+  if (agents.n >= MAX_AGENTS) return null;
   const token = `rmba_${randomToken(32)}`;
   await ctx.db
     .prepare('INSERT INTO connections (id, inbox_id, token_hash, created_at, name) VALUES (?, ?, ?, ?, ?)')

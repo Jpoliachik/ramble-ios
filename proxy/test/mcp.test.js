@@ -113,8 +113,8 @@ describe('registration', () => {
     assert.equal((await send('POST', '/register', { json: { redirect_uris: ['http://localhost:6274/cb'] } })).status, 201);
   });
 
-  it('is limited to 20 an hour per address', async () => {
-    for (let i = 0; i < 20; i++) await registerClient();
+  it('is limited to 600 an hour per address', async () => {
+    for (let i = 0; i < 600; i++) await registerClient();
     const res = await send('POST', '/register', { json: { redirect_uris: [REDIRECT] } });
     assert.equal(res.status, 429);
   });
@@ -129,7 +129,60 @@ describe('sign-in', () => {
     assert.match(res.headers.get('Content-Type'), /text\/html/);
     assert.equal(res.headers.get('X-Frame-Options'), 'DENY');
     assert.match(res.text, /Connect Claude to your notes/);
-    assert.match(res.text, /go back to claude\.ai/);
+    assert.match(res.text, /you go to claude\.ai/);
+    // Chromium applies form-action to the redirect after the submit.
+    assert.match(res.headers.get('Content-Security-Policy'), /form-action 'self' https:\/\/claude\.ai;/);
+  });
+
+  it("doesn't vouch for a name registered with someone else's redirect", async () => {
+    const clientId = await registerClient({ redirect_uris: ['https://evil.example/cb'] });
+    const q = new URLSearchParams({ ...(await authParams(clientId)), redirect_uri: 'https://evil.example/cb' });
+    const res = await send('GET', `/authorize?${q}`);
+    assert.match(res.text, /an app calling itself “Claude”/);
+    assert.match(res.text, /you go to evil\.example/);
+  });
+
+  it('matches a loopback redirect on any port', async () => {
+    const clientId = await registerClient({ redirect_uris: ['http://localhost:3000/callback'] });
+    const params = { ...(await authParams(clientId)), redirect_uri: 'http://localhost:51234/callback' };
+    assert.equal((await send('GET', `/authorize?${new URLSearchParams(params)}`)).status, 200);
+    const other = { ...params, redirect_uri: 'http://localhost:51234/other' };
+    assert.equal((await send('GET', `/authorize?${new URLSearchParams(other)}`)).status, 400);
+  });
+
+  it('treats a code held by an unfinished sign-in as used', async () => {
+    const secret = await h.inbox();
+    const clientId = await registerClient();
+    const params = await authParams(clientId);
+    const code = await pairCode(secret);
+    assert.equal((await send('POST', '/authorize', { form: { ...params, pairing_code: code } })).status, 302);
+    const again = await send('POST', '/authorize', { form: { ...params, pairing_code: code } });
+    assert.match(again.text, /already used/);
+    const exchange = await h.call('POST', '/pair/exchange', { body: { code } });
+    assert.equal(exchange.status, 409);
+    assert.equal(exchange.body.reason, 'code_used');
+  });
+
+  it('never connects more than 10 agents, even when a sign-in finishes late', async () => {
+    const secret = await h.inbox();
+    const clientId = await registerClient();
+    const res = await send('POST', '/authorize', { form: { ...(await authParams(clientId)), pairing_code: await pairCode(secret) } });
+    const code = new URL(res.headers.get('Location')).searchParams.get('code');
+    for (let i = 0; i < 10; i++) await h.connect(secret);
+    const tok = await send('POST', '/token', {
+      form: { grant_type: 'authorization_code', code, redirect_uri: REDIRECT, client_id: clientId, code_verifier: VERIFIER },
+    });
+    assert.equal(tok.status, 400);
+    assert.equal((await h.call('GET', '/connections', { auth: secret })).body.connections.length, 10);
+  });
+
+  it('deletes clients that never signed anyone in after a day', async () => {
+    const secret = await h.inbox();
+    await registerClient();
+    await signIn(secret);
+    h.now += 25 * 60 * MINUTE;
+    await h.cron();
+    assert.equal(h.rows('SELECT COUNT(*) AS n FROM oauth_clients')[0].n, 1);
   });
 
   it('never redirects to a URI the client did not register', async () => {
@@ -242,6 +295,56 @@ describe('MCP', () => {
     assert.equal((await send('GET', '/mcp', { auth: token })).status, 405);
   });
 
+  it('speaks only 2025-06-18 and later, and checks the version header', async () => {
+    const { token } = await setup();
+    const old = await rpc(token, 'initialize', { protocolVersion: '2025-03-26' });
+    assert.equal(old.body.result.protocolVersion, '2025-11-25');
+    const bad = await send('POST', '/mcp', {
+      auth: token,
+      headers: { 'MCP-Protocol-Version': '1999-01-01' },
+      json: { jsonrpc: '2.0', id: 1, method: 'ping' },
+    });
+    assert.equal(bad.status, 400);
+    const good = await send('POST', '/mcp', {
+      auth: token,
+      headers: { 'MCP-Protocol-Version': '2025-06-18' },
+      json: { jsonrpc: '2.0', id: 1, method: 'ping' },
+    });
+    assert.equal(good.status, 200);
+  });
+
+  it('answers malformed messages with JSON-RPC errors, never a 503', async () => {
+    const { token } = await setup();
+    const parse = await send('POST', '/mcp', { auth: token, headers: { 'Content-Type': 'application/json' } });
+    assert.equal(JSON.parse(parse.text).error.code, -32700);
+    const batch = await send('POST', '/mcp', { auth: token, json: [{ jsonrpc: '2.0', id: 1, method: 'ping' }] });
+    assert.equal(JSON.parse(batch.text).error.code, -32600);
+    const nullId = await send('POST', '/mcp', { auth: token, json: { jsonrpc: '2.0', id: null, method: 'ping' } });
+    assert.equal(JSON.parse(nullId.text).error.code, -32600);
+    const unknown = await rpc(token, 'tools/call', { name: 'delete_everything', arguments: {} });
+    assert.equal(unknown.body.error.code, -32602);
+    const nullArgs = await rpc(token, 'tools/call', { name: 'list_new_notes', arguments: null });
+    assert.deepEqual(nullArgs.body.result.structuredContent.notes, []);
+    assert.equal((await rpc(token, 'tools/call', { name: 'get_note', arguments: null })).body.result.isError, true);
+  });
+
+  it('refuses browser origins other than its own and Claude', async () => {
+    const { token } = await setup();
+    const call = (origin) =>
+      send('POST', '/mcp', { auth: token, headers: { Origin: origin }, json: { jsonrpc: '2.0', id: 1, method: 'ping' } });
+    assert.equal((await call('https://evil.example')).status, 403);
+    assert.equal((await call('https://claude.ai')).status, 200);
+    assert.equal((await call('https://relay.test')).status, 200);
+  });
+
+  it('says invalid_token for a bad key, and also answers at /mcp/', async () => {
+    const { token } = await setup();
+    const res = await rpc('rmba_notarealkeynotarealkey', 'ping');
+    assert.match(res.headers.get('WWW-Authenticate'), /^Bearer error="invalid_token", resource_metadata=/);
+    const slash = await send('POST', '/mcp/', { auth: token, json: { jsonrpc: '2.0', id: 1, method: 'ping' } });
+    assert.equal(slash.status, 200);
+  });
+
   it('lists the three tools with annotations', async () => {
     const { token } = await setup();
     const { tools } = (await rpc(token, 'tools/list')).body.result;
@@ -304,6 +407,27 @@ describe('MCP', () => {
     assert.equal((await tool(token, 'mark_handled', { id: noteId(9) })).isError, true);
     assert.equal((await tool(otherToken, 'list_new_notes')).structuredContent.notes.length, 1);
     void secret;
+  });
+
+  it('marking handled leaves other agents their copy', async () => {
+    const { secret, token } = await setup();
+    const muse = await h.connect(secret, 'Muse');
+    h.now += MINUTE;
+    await say(secret, 1);
+    await h.settle();
+    await tool(token, 'mark_handled', { id: noteId(1) });
+    const pulled = (await h.call('GET', '/inbox', { auth: muse })).body.items;
+    assert.deepEqual(pulled.map((i) => i.recording_id), [noteId(1)]);
+  });
+
+  it('reads and marks old builds\' non-UUID note ids', async () => {
+    const { secret, token } = await setup();
+    await h.call('POST', '/inbox', {
+      auth: secret,
+      body: { recording_id: 'legacy-note-1', created_at: '2026-11-01T06:59:00-05:00', duration: 3, transcription: 'old build' },
+    });
+    assert.equal((await tool(token, 'get_note', { id: 'legacy-note-1' })).structuredContent.transcript, 'old build');
+    assert.equal((await tool(token, 'mark_handled', { id: 'legacy-note-1' })).structuredContent.handled, true);
   });
 
   it('stops working once the person disconnects it in the app', async () => {

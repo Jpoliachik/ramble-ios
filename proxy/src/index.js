@@ -139,6 +139,7 @@ const ROUTES = [
   ['/authorize', { GET: authorizePage, POST: authorizeSubmit }],
   ['/token', { POST: token }],
   ['/mcp', { POST: mcp }],
+  ['/mcp/', { POST: mcp }],
 ];
 
 const NO_DB = new Set([

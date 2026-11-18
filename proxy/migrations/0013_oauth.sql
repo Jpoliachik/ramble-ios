@@ -8,8 +8,9 @@
 CREATE TABLE IF NOT EXISTS oauth_clients (
   id TEXT PRIMARY KEY,
   name TEXT,
-  redirect_uris TEXT NOT NULL, -- JSON array of exact URIs
-  created_at INTEGER NOT NULL
+  redirect_uris TEXT NOT NULL, -- JSON array of URIs
+  created_at INTEGER NOT NULL,
+  last_used_at INTEGER -- last sign-in; never-used clients are purged after a day
 );
 
 -- Authorization codes: single use, 10 minutes. The pairing code is already

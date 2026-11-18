@@ -267,7 +267,7 @@ A note's transcript SHALL stay readable by the person's devices until the phone 
 - THEN the first code fails to exchange
 
 ### Requirement: Pairing exchange
-`POST /pair/exchange` with `{"code", "name"?}` and no credential SHALL return `201 {"token": "rmba_…"}` and create one connection. `name` is optional, 1–40 characters, and an invalid name is dropped without failing; any other field, such as a `request_id` older instructions send, is ignored. Codes match ignoring case, spaces and dashes. A code SHALL make one connection and return its key once. An unknown or expired code SHALL get `400` ("Invalid or expired pairing code. Ask the user for a new one in the Ramble app."); a code already exchanged, while it hasn't expired and its connection still exists, `409` with `"reason": "code_used"` and no key. Which notes the connection receives: [delivery.md](delivery.md).
+`POST /pair/exchange` with `{"code", "name"?}` and no credential SHALL return `201 {"token": "rmba_…"}` and create one connection. `name` is optional, 1–40 characters, and an invalid name is dropped without failing; any other field, such as a `request_id` older instructions send, is ignored. Codes match ignoring case, spaces and dashes. A code SHALL make one connection and return its key once. An unknown or expired code SHALL get `400` ("Invalid or expired pairing code. Ask the user for a new one in the Ramble app."); a code already exchanged, while it hasn't expired and its connection still exists, or already entered on a connector's sign-in page ([connector.md](connector.md)), `409` with `"reason": "code_used"` and no key. A code made before the inbox reached 10 agents SHALL get `409` with `"reason": "too_many_agents"` and make nothing. Which notes the connection receives: [delivery.md](delivery.md).
 
 #### Scenario: Response lost
 - GIVEN an exchange succeeded but the response never reached the agent
@@ -341,7 +341,7 @@ Over these limits the relay SHALL answer `429` with `{"reason": "rate_limited"}`
 |---|---|
 | `POST /attest/challenge`; `POST /attest` | 20 per hour; 5 key registrations per day; per network address |
 | `POST /inboxes` | 3 per day per App Attest key, 20 per hour per network address |
-| `POST /register` (connector clients) | 20 per hour per network address |
+| `POST /register` (connector clients) | 600 per hour per network address |
 
 #### Scenario: Agent checking often
 - GIVEN an agent pulling every second

@@ -13,6 +13,7 @@ import { MINUTE, json, randomToken, readJSON, sha256Hex } from './http.js';
 import { claimPairCode, cleanName, createConnection, pairCodeWasUsed } from './relay.js';
 
 export const OAUTH_CODE_TTL_MS = 10 * MINUTE;
+export const CLIENT_UNUSED_TTL_MS = 24 * 60 * MINUTE;
 const MAX_REDIRECT_URIS = 5;
 const MAX_URI_LENGTH = 2000;
 
@@ -45,6 +46,7 @@ export function authorizationServerMetadata(_request, ctx) {
     grant_types_supported: ['authorization_code'],
     code_challenge_methods_supported: ['S256'],
     token_endpoint_auth_methods_supported: ['none'],
+    authorization_response_iss_parameter_supported: true,
     service_documentation: 'https://ramble.watch/docs',
   });
 }
@@ -54,21 +56,45 @@ export function authorizationServerMetadata(_request, ctx) {
 const oauthError = (status, error, description) =>
   json({ error, ...(description ? { error_description: description } : {}) }, status);
 
-/** HTTPS, or http on the local machine for developer tools. Exact match later. */
+const LOOPBACK = ['localhost', '127.0.0.1', '[::1]'];
+const parseURL = (value) => {
+  try {
+    return new URL(value);
+  } catch {
+    return null;
+  }
+};
+const isLoopback = (url) => url.protocol === 'http:' && LOOPBACK.includes(url.hostname);
+
+/** HTTPS, or http on the local machine for developer tools. */
 export function validRedirectURI(value) {
   if (typeof value !== 'string' || value.length > MAX_URI_LENGTH) return false;
-  let url;
-  try {
-    url = new URL(value);
-  } catch {
-    return false;
-  }
-  if (url.hash || url.username || url.password) return false;
-  if (url.protocol === 'https:') return true;
-  return url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+  const url = parseURL(value);
+  if (!url || url.hash || url.username || url.password) return false;
+  return url.protocol === 'https:' || isLoopback(url);
 }
 
-/** RFC 7591, public clients only. 20 registrations an hour per address. */
+/**
+ * Exact match, except that a loopback redirect matches on any port
+ * (RFC 8252 §7.3): local clients such as Claude Code pick a new port each run.
+ */
+export function redirectMatches(registered, given) {
+  if (registered.includes(given)) return true;
+  const url = parseURL(given);
+  if (!url || !isLoopback(url)) return false;
+  const portless = (u) => `${u.protocol}//${u.hostname}${u.pathname}${u.search}`;
+  return registered.some((r) => {
+    const reg = parseURL(r);
+    return reg && isLoopback(reg) && portless(reg) === portless(url);
+  });
+}
+
+/**
+ * RFC 7591, public clients only. Claude registers a client on every new
+ * connection, and all its traffic comes from a few addresses, so the
+ * per-address limit is high; it only stops floods. Clients never used to
+ * sign in are deleted after a day.
+ */
 export async function register(request, ctx) {
   const limited = await limit(ctx, ['oauth_register', address(request, ctx)]);
   if (limited) return limited;
@@ -116,7 +142,7 @@ const AUTH_FIELDS = ['response_type', 'client_id', 'redirect_uri', 'state', 'cod
 async function checkAuthorizeParams(params, ctx) {
   const client = await findClient(ctx, params.client_id);
   if (!client) return { response: errorPage(400, 'This connector isn’t registered with Ramble. Remove it and add it again.') };
-  if (!client.redirectURIs.includes(params.redirect_uri)) {
+  if (!redirectMatches(client.redirectURIs, params.redirect_uri)) {
     return { response: errorPage(400, 'This sign-in link doesn’t match the connector. Remove it and add it again.') };
   }
   if (params.response_type !== 'code') return { response: redirectError(params, 'unsupported_response_type', ctx) };
@@ -235,6 +261,8 @@ export async function token(request, ctx) {
     return oauthError(400, 'invalid_grant', 'The authorization code is invalid, expired or already used');
   }
   const accessToken = await createConnection(ctx, { inboxId: row.inbox_id, connectionId: row.connection_id, name: row.name });
+  if (!accessToken) return oauthError(400, 'invalid_grant', 'This Ramble inbox already has the most agents it can connect');
+  await ctx.db.prepare('UPDATE oauth_clients SET last_used_at = ? WHERE id = ?').bind(ctx.now, row.client_id).run();
   return json({ access_token: accessToken, token_type: 'Bearer' });
 }
 
@@ -257,9 +285,15 @@ async function readForm(request) {
   return Object.fromEntries(new URLSearchParams(text));
 }
 
-/** Cron: unredeemed authorization codes. Their claimed pairing codes just lapse. */
+/**
+ * Cron: unredeemed authorization codes (their claimed pairing codes just
+ * lapse), and clients a day old that never signed anyone in.
+ */
 export async function purgeOAuthCodes(db, now) {
-  await db.prepare('DELETE FROM oauth_codes WHERE expires_at <= ?').bind(now).run();
+  await db.batch([
+    db.prepare('DELETE FROM oauth_codes WHERE expires_at <= ?').bind(now),
+    db.prepare('DELETE FROM oauth_clients WHERE last_used_at IS NULL AND created_at <= ?').bind(now - CLIENT_UNUSED_TTL_MS),
+  ]);
 }
 
 // --- Pages -------------------------------------------------------------------
@@ -267,7 +301,7 @@ export async function purgeOAuthCodes(db, now) {
 const escape = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
-function page(status, body) {
+function page(status, body, formAction = "'self'") {
   const html = `<!doctype html>
 <html lang="en">
 <head>
@@ -293,6 +327,7 @@ function page(status, body) {
   textarea:focus { outline: 2px solid var(--amber); outline-offset: 1px; }
   button { width: 100%; margin-top: 16px; padding: 14px; border: 0; border-radius: 14px; background: var(--amber); color: var(--on-amber); font: 600 17px/1 inherit; font-family: inherit; cursor: pointer; }
   .error { color: var(--err); margin: 12px 0 0; }
+  .to { color: var(--ink); font-weight: 600; }
   .fine { color: var(--faint); font-size: 14px; margin: 16px 0 0; }
 </style>
 </head>
@@ -304,20 +339,28 @@ function page(status, body) {
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'no-store',
       'X-Frame-Options': 'DENY',
-      'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+      'Content-Security-Policy': `default-src 'none'; style-src 'unsafe-inline'; form-action ${formAction}; frame-ancestors 'none'; base-uri 'none'`,
       'Referrer-Policy': 'no-referrer',
     },
   });
 }
 
+// Hosts whose clients may be shown by the name they registered. Anyone can
+// register any name, so others are shown as "an app calling itself …".
+const KNOWN_HOSTS = ['claude.ai', 'claude.com'];
+
 function signInPage(params, client, error) {
-  const who = client.name ? escape(client.name) : 'this connector';
-  const back = escape(new URL(params.redirect_uri).host);
+  const back = new URL(params.redirect_uri);
+  const known = KNOWN_HOSTS.includes(back.hostname) || isLoopback(back);
+  const who = client.name ? (known ? escape(client.name) : `an app calling itself “${escape(client.name)}”`) : 'this app';
   const hidden = AUTH_FIELDS.map((k) => `<input type="hidden" name="${k}" value="${escape(params[k])}">`).join('');
+  // Chromium checks form-action on the redirect after the submit too, so the
+  // connector's origin must be allowed or the browser never goes back.
   return page(
     error ? 400 : 200,
     `<h1>Connect ${who} to your notes</h1>
-<p>${who === 'this connector' ? 'It' : who} will be able to read new Ramble notes and mark them handled. It can’t record, delete or change anything.</p>
+<p class="to">After you connect, you go to ${escape(back.host)}.</p>
+<p>It will be able to read new Ramble notes and mark them handled. It can’t record, delete or change anything. Only continue if you started this from ${escape(back.host)}.</p>
 <ol>
   <li>On your iPhone, open Ramble → Settings → Your agent.</li>
   <li>Tap <strong>Connect your agent</strong> (or <strong>Connect another</strong>) and copy the message.</li>
@@ -329,7 +372,8 @@ function signInPage(params, client, error) {
   ${error ? `<p class="error" role="alert">${escape(error)}</p>` : ''}
   <button type="submit">Connect</button>
 </form>
-<p class="fine">You’ll go back to ${back}. Disconnect anytime in Ramble → Settings → Your agent.</p>`,
+<p class="fine">Disconnect anytime in Ramble → Settings → Your agent.</p>`,
+    `'self' ${back.origin}`,
   );
 }
 
