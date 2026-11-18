@@ -121,6 +121,10 @@ The essentials the docs page teaches:
 
 To test: record "Test, remind me to water the plants" on the watch. Settings → Your agent shows one waiting. After the agent's next check it reads "nothing waiting".
 
+## MCP connector
+
+For clients that can add a remote MCP server (Claude: Settings → Connectors → Add custom connector), the relay is also an MCP server at `https://api.ramble.watch/mcp` (or the `workers.dev` host + `/mcp`). Streamable HTTP, JSON responses, no sessions. Signing in is OAuth (dynamic client registration, PKCE S256): the sign-in page asks for the pairing code, or the whole message the app copies, and the access token is an ordinary agent key, so the connector shows up in Settings → Your agent and is disconnected there. Tools: `list_new_notes`, `get_note`, `mark_handled` (the agent ack). Contract: [specs/connector.md](../specs/connector.md).
+
 ## Operator: the api.ramble.watch domain
 
 `ramble.watch` DNS is at Porkbun today, and a Worker custom domain needs the zone on Cloudflare. Until these steps are done, `api.ramble.watch` doesn't answer and agents must use the `workers.dev` host.

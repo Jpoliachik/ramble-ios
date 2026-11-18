@@ -282,10 +282,22 @@ export async function exchangePairCode(request, ctx) {
   }
   // Optional, so the user can tell agents apart. Bad names are dropped.
   const name = cleanName(body?.name);
-  const codeHash = await sha256Hex(normalizePairCode(code));
 
-  // Claim the code. The conditional update lets only one exchange win.
-  const token = `rmba_${randomToken(32)}`;
+  const claimed = await claimPairCode(ctx, code);
+  if (claimed) {
+    const token = await createConnection(ctx, { ...claimed, name });
+    return json({ token }, 201);
+  }
+  if (!(await pairCodeWasUsed(ctx, code))) return fail(400, INVALID_CODE);
+  return fail(409, 'This pairing code was already used. Ask the user for a new one.', 'code_used');
+}
+
+/**
+ * Claims a live, unused pairing code for a new connection ID. The
+ * conditional update lets only one claim win. Returns { inboxId,
+ * connectionId }, or null. The connection itself is made by createConnection.
+ */
+export async function claimPairCode(ctx, code) {
   const connectionId = `con_${randomToken(12)}`;
   const claimed = await ctx.db
     .prepare(
@@ -293,26 +305,32 @@ export async function exchangePairCode(request, ctx) {
         WHERE code_hash = ? AND connection_id IS NULL AND expires_at > ?
         RETURNING inbox_id`,
     )
-    .bind(connectionId, codeHash, ctx.now)
+    .bind(connectionId, await sha256Hex(normalizePairCode(code)), ctx.now)
     .first();
-  if (claimed) {
-    await ctx.db
-      .prepare('INSERT INTO connections (id, inbox_id, token_hash, created_at, name) VALUES (?, ?, ?, ?, ?)')
-      .bind(connectionId, claimed.inbox_id, await sha256Hex(token), ctx.now, name)
-      .run();
-    return json({ token }, 201);
-  }
+  return claimed ? { inboxId: claimed.inbox_id, connectionId } : null;
+}
 
+/** True when the code is live and already made a connection that still exists. */
+export async function pairCodeWasUsed(ctx, code) {
   const row = await ctx.db
     .prepare(
       `SELECT c.id AS live FROM pair_codes p
          LEFT JOIN connections c ON c.id = p.connection_id
         WHERE p.code_hash = ? AND p.expires_at > ?`,
     )
-    .bind(codeHash, ctx.now)
+    .bind(await sha256Hex(normalizePairCode(code)), ctx.now)
     .first();
-  if (!row?.live) return fail(400, INVALID_CODE);
-  return fail(409, 'This pairing code was already used. Ask the user for a new one.', 'code_used');
+  return Boolean(row?.live);
+}
+
+/** Makes the connection a claimed code reserved and returns its agent key, once. */
+export async function createConnection(ctx, { inboxId, connectionId, name }) {
+  const token = `rmba_${randomToken(32)}`;
+  await ctx.db
+    .prepare('INSERT INTO connections (id, inbox_id, token_hash, created_at, name) VALUES (?, ?, ?, ?, ?)')
+    .bind(connectionId, inboxId, await sha256Hex(token), ctx.now, name)
+    .run();
+  return token;
 }
 
 async function agentCred(request, ctx) {
