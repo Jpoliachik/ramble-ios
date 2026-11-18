@@ -32,10 +32,8 @@ export const PROVIDERS = [
   { name: "Groq", model: "Whisper v3 Turbo", privacy: "https://groq.com/privacy-policy/" },
 ] as const;
 
-// Relay base URL (specs/relay-api.md "Base URL"). The workers.dev host serves
-// the identical API, so agents paired against it keep working.
-export const RELAY_URL = "https://api.ramble.watch";
-export const RELAY_URL_LEGACY = "https://ramble-transcription-proxy.jpoliachik.workers.dev";
+// Relay base URL (specs/relay-api.md "Base URL").
+export const RELAY_URL = "https://ramble-transcription-proxy.jpoliachik.workers.dev";
 
 // Pairing codes: 12 characters, shown as XXXX-XXXX-XXXX, single use.
 export const PAIR_CODE_EXAMPLE = "K7QX-MP4D-HN3R";

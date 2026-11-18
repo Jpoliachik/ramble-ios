@@ -9,7 +9,6 @@ import {
   PRIVACY_WORDING,
   USAGE_WORDING,
   RELAY_URL,
-  RELAY_URL_LEGACY,
   RETENTION,
   SITE_URL,
 } from "@/lib/site";
@@ -22,8 +21,6 @@ export const metadata: Metadata = {
 
 const RELAY_HOST = new URL(RELAY_URL).host;
 const MCP_URL = `${RELAY_URL}/mcp`;
-const LEGACY_HOST = new URL(RELAY_URL_LEGACY).host;
-
 // The block agents actually follow. Keep it agnostic: every rule here has to
 // work for any agent stack. Platform specifics go under "Platform notes".
 const AGENT_INSTRUCTIONS = `Ramble connection
@@ -344,9 +341,7 @@ export default function AgentDocs() {
             <section className="space-y-4">
               <SectionHeader id="api">API</SectionHeader>
               <p>
-                Three JSON calls. Every path is relative to <InlineCode>{RELAY_URL}</InlineCode>.{" "}
-                <InlineCode>{RELAY_URL_LEGACY}</InlineCode> serves the identical API, so agents paired against it keep
-                working. A check returns up to 50 items, oldest first.
+                Three JSON calls. Every path is relative to <InlineCode>{RELAY_URL}</InlineCode>. A check returns up to 50 items, oldest first.
               </p>
               <CodeBlock>{API_EXAMPLE}</CodeBlock>
               <ul className="list-disc space-y-2 pl-5">
@@ -539,7 +534,7 @@ export default function AgentDocs() {
                 </li>
                 <li>
                   <Strong>Agents in a sandbox with a network allowlist.</Strong> Add <InlineCode>{RELAY_HOST}</InlineCode>{" "}
-                  to the allowed hosts (and <InlineCode>{LEGACY_HOST}</InlineCode> if you paired against it), or every
+                  to the allowed hosts, or every
                   request fails before it leaves the sandbox. If you can&rsquo;t change the allowlist, add Ramble{" "}
                   <a href="#connector" className={linkClass}>
                     as a connector

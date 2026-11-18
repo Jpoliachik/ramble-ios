@@ -2,7 +2,7 @@
 
 > Ramble for Apple Watch: one-way voice notes from your Apple Watch to your agent. Say it and let it go: nothing replies on the watch, and it records with no phone or signal and sends later. Tap the watch and talk; the watch sends the recording straight to Ramble's server, which transcribes it and holds the text until your agent picks it up. No accounts.
 
-Pairing: in Ramble on iPhone, Settings → Your agent → Connect your agent copies a message with a single-use code like K7QX-MP4D-HN3R. The user pastes it to their agent. The agent exchanges the code for a token, then pulls new transcripts and acknowledges them, which deletes them. Or, for agents that support remote MCP servers (custom connectors with OAuth), the user adds https://api.ramble.watch/mcp and pastes the same code on the sign-in page; the agent then gets the tools list_new_notes, get_note and mark_handled. Either way works; the connector also works from sandboxes that can't reach api.ramble.watch.
+Pairing: in Ramble on iPhone, Settings → Your agent → Connect your agent copies a message with a single-use code like K7QX-MP4D-HN3R. The user pastes it to their agent. The agent exchanges the code for a token, then pulls new transcripts and acknowledges them, which deletes them. Or, for agents that support remote MCP servers (custom connectors with OAuth), the user adds https://ramble-transcription-proxy.jpoliachik.workers.dev/mcp and pastes the same code on the sign-in page; the agent then gets the tools list_new_notes, get_note and mark_handled. Either way works; the connector also works from sandboxes that can't reach the relay.
 
 Privacy: Ramble's server is a relay, not an archive. Your audio is sent to a transcription provider and deleted as soon as the transcript is ready. Transcripts are deleted when your agent picks them up, or after 30 days. Your full history lives only on your iPhone. Ramble also keeps basic usage stats for each note, like its length and whether it came from your watch or iPhone, under a random ID. Never your audio or your words.
 
@@ -10,7 +10,7 @@ Transcription: Groq Whisper v3 Turbo, the only provider. When Groq is overloaded
 
 Price: Free to try. 25 notes free, then $14.99 once. No subscription.
 
-Relay: https://api.ramble.watch (https://ramble-transcription-proxy.jpoliachik.workers.dev serves the identical API)
+Relay: https://ramble-transcription-proxy.jpoliachik.workers.dev
 
 Ramble can also send each transcript to an HTTPS endpoint (webhook) from the iPhone.
 

@@ -8,7 +8,7 @@ The full contract, including the phone and watch endpoints, is `specs/relay-api.
 
 ## Base URL
 
-`https://api.ramble.watch`. Every path below is relative to it. `https://ramble-transcription-proxy.jpoliachik.workers.dev` serves the identical API, so agents paired against it keep working.
+`https://ramble-transcription-proxy.jpoliachik.workers.dev`. Every path below is relative to it. `https://api.ramble.watch` will serve the same API once its DNS moves (below); it doesn't answer yet.
 
 `GET /` on either host, with no credential, returns:
 
@@ -79,7 +79,7 @@ Optional, for agents that can receive a webhook. The agent registers its own hoo
 When a copy is made for an agent with a hook, the relay POSTs:
 
 ```json
-{"event": "ramble.notes_waiting", "text": "New Ramble notes are waiting. Pull them from …/inbox …", "pull_url": "https://api.ramble.watch/inbox"}
+{"event": "ramble.notes_waiting", "text": "New Ramble notes are waiting. Pull them from …/inbox …", "pull_url": "https://ramble-transcription-proxy.jpoliachik.workers.dev/inbox"}
 ```
 
 with the agent's headers, `Content-Type: application/json` and `User-Agent: Ramble-Relay/1 (+https://ramble.watch/docs)`.
@@ -123,7 +123,7 @@ To test: record "Test, remind me to water the plants" on the watch. Settings →
 
 ## MCP connector
 
-For clients that can add a remote MCP server (Claude: Settings → Connectors → Add custom connector), the relay is also an MCP server at `https://api.ramble.watch/mcp` (or the `workers.dev` host + `/mcp`). Streamable HTTP, JSON responses, no sessions. Signing in is OAuth (dynamic client registration, PKCE S256): the sign-in page asks for the pairing code, or the whole message the app copies, and the access token is an ordinary agent key, so the connector shows up in Settings → Your agent and is disconnected there. Tools: `list_new_notes`, `get_note`, `mark_handled` (the agent ack). Contract: [specs/connector.md](../specs/connector.md).
+For clients that can add a remote MCP server (Claude: Settings → Connectors → Add custom connector), the relay is also an MCP server at `https://ramble-transcription-proxy.jpoliachik.workers.dev/mcp`. Streamable HTTP, JSON responses, no sessions. Signing in is OAuth (dynamic client registration, PKCE S256): the sign-in page asks for the pairing code, or the whole message the app copies, and the access token is an ordinary agent key, so the connector shows up in Settings → Your agent and is disconnected there. Tools: `list_new_notes`, `get_note`, `mark_handled` (the agent ack). Contract: [specs/connector.md](../specs/connector.md).
 
 ## Operator: the api.ramble.watch domain
 
