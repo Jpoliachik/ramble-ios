@@ -357,7 +357,7 @@ function signInPage(params, client, error, typed = '') {
     error ? 400 : 200,
     `<h1>Connect ${name || 'your agent'}</h1>
 <p class="host">from ${escape(back.host)}</p>
-<p>Paste the pairing code from Ramble: Settings → Your agent → Connect.</p>
+<p>Paste the pairing code from the Ramble app: Settings → Your agent → Connect.</p>
 <form method="post" action="/authorize">${hidden}
   <textarea id="pairing_code" name="pairing_code" aria-label="Pairing code" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Pairing code" required>${escape(typed)}</textarea>
   ${error ? `<p class="error" role="alert">${escape(error)}</p>` : ''}
