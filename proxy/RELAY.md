@@ -127,10 +127,28 @@ For clients that can add a remote MCP server (Claude: Settings → Connectors �
 
 ## Operator: the api.ramble.watch domain
 
-`ramble.watch` DNS is at Porkbun today, and a Worker custom domain needs the zone on Cloudflare. Until these steps are done, `api.ramble.watch` doesn't answer and agents must use the `workers.dev` host.
+`ramble.watch` DNS is at Porkbun today, and a Worker custom domain needs the zone on Cloudflare. Until these steps are done, `api.ramble.watch` doesn't answer and agents must use the `workers.dev` host. The domain stays registered at Porkbun; only its nameservers move. Three things must keep working throughout: the website (Vercel), mail to `support@ramble.watch` (Porkbun email forwarding today), and the relay on `workers.dev`.
 
-1. Cloudflare dashboard → Add a domain → `ramble.watch` (Free plan). Let it import the existing records, and make sure the Vercel ones (apex `A 76.76.21.21`, `www CNAME cname.vercel-dns.com`, or whatever Vercel shows) are **DNS only** (grey cloud), so Vercel keeps serving the site and its certificates.
-2. Porkbun → ramble.watch → Nameservers → replace the four Porkbun ones with the two Cloudflare gives you. Wait for Cloudflare to say Active.
-3. Workers & Pages → `ramble-transcription-proxy` → Settings → Domains & Routes → Add → Custom domain → `api.ramble.watch`.
-4. Rules → Configuration Rules → Create: hostname equals `api.ramble.watch` → Browser Integrity Check **Off**. Leave Bot Fight Mode **off** (on the Free plan it can't be skipped per host). Security Level "Essentially off", or a WAF skip rule for that hostname, if anything else challenges API clients.
-5. Keep the `workers.dev` route on, so shipped builds and already-paired agents keep working.
+**Before**
+1. Porkbun → ramble.watch → DNS: export or copy every record (type, name, value, TTL, priority). Note the email forwarding rules (Porkbun → Email Forwarding) and where `support@` forwards to.
+2. Porkbun → ramble.watch → DNSSEC: if it is on, turn it off and wait for the DS record to go (a stale DS record makes the domain fail to resolve after the switch).
+3. Vercel → the website project → Domains: note the records Vercel wants for `ramble.watch` and `www` (usually apex `A 76.76.21.21` and `www CNAME cname.vercel-dns.com`, plus any `_vercel` TXT). If `api.ramble.watch` is listed there, remove it.
+
+**Cloudflare zone**
+4. Cloudflare → Add a domain → `ramble.watch`, Free plan, import existing records. Compare against step 1 and add anything missing. Set the Vercel records to **DNS only** (grey cloud), so Vercel keeps serving the site and its certificates.
+5. Delete the imported `api` record (the Porkbun parking CNAME `pixie.porkbun.com`) and any other parking `A`/`ALIAS` records for `ramble.watch` that aren't Vercel's.
+6. Email: Email → Email Routing → enable for `ramble.watch`, add `support@ramble.watch` → the same destination as today (verify the destination address from its inbox), and let Cloudflare replace the MX and SPF records with its own. Remove the Porkbun `fwd*.porkbun.com` MX records and the Porkbun SPF include. Copy any other forwarding rule from step 1 the same way.
+
+**Switch**
+7. Porkbun → ramble.watch → Nameservers → replace the Porkbun ones with the two Cloudflare gives. Wait for Cloudflare to show the zone **Active** (minutes to a few hours).
+8. Workers & Pages → `ramble-transcription-proxy` → Settings → Domains & Routes → Add → Custom domain → `api.ramble.watch`. Cloudflare makes the DNS record and certificate.
+9. Rules → Configuration Rules → Create: hostname equals `api.ramble.watch` → Browser Integrity Check **Off**. Leave Bot Fight Mode **off** (on the Free plan it can't be skipped per host). Security Level "Essentially off", or a WAF skip rule for that hostname, if anything else challenges API clients.
+10. Keep the `workers.dev` route on, so shipped builds and already-paired agents keep working.
+
+**Verify**
+- `https://ramble.watch` and `https://www.ramble.watch` load, and Vercel → Domains shows both valid.
+- `curl https://api.ramble.watch/` returns `{"service": "Ramble relay", …}`; `curl -X POST https://api.ramble.watch/mcp` returns `401` with a `WWW-Authenticate` header naming `https://api.ramble.watch/.well-known/oauth-protected-resource`; `curl https://api.ramble.watch/.well-known/oauth-authorization-server` returns JSON.
+- `python3 -c "import urllib.request; print(urllib.request.urlopen('https://api.ramble.watch/').status)"` prints `200` (proves Browser Integrity Check is off).
+- An email from an outside account to `support@ramble.watch` arrives.
+
+**After**: switch `RELAY_URL` in `website/src/lib/site.ts`, the llms files, this file and `proxy/README.md` back to `api.ramble.watch`.
