@@ -27,7 +27,7 @@ Use plain `<img>` tags with `BASE_PATH` from `src/lib/site.ts` (currently empty)
 | Route | File | Description |
 |-------|------|-------------|
 | `/` | `src/app/page.tsx` | Landing page — hero, value props, how-it-works, pricing |
-| `/docs` | `src/app/docs/page.tsx` | Connect your agent: pairing, Muse, relay API, what the relay stores |
+| `/docs` | `src/app/docs/page.tsx` | Connect your agent: pairing, the MCP connector, Muse, relay API, what the relay stores |
 | `/docs/webhooks` | `src/app/docs/webhooks/page.tsx` | Webhook API docs (developer-targeted) |
 | `/docs/help` | `src/app/docs/help/page.tsx` | Requirements (min iOS/watchOS) and troubleshooting |
 | `/support` | `src/app/support/page.tsx` | Support email and short answers (the App Store Support URL) |

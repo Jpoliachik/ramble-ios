@@ -6,7 +6,7 @@ Who receives each transcript, when, and for how long: connecting an agent, what 
 ## Connecting an agent
 
 ### Requirement: The Connect screen makes the pairing code
-The iPhone SHALL make a pairing code only when its Connect screen opens, from onboarding, the Home "Connect" pill, or the "Connect your agent", "Connect again" and "Connect another" buttons. Opening the agent status screen SHALL NOT make a code. Only the iPhone can connect agents.
+The iPhone SHALL make a pairing code only when its Connect screen opens, from onboarding, the Home "Connect" pill, or the "Connect your agent", "Connect again" and "Connect another" buttons. Opening the agent status screen SHALL NOT make a code. Only the iPhone can connect agents. An MCP connector such as Claude connects with the same code, entered on its sign-in page ([connector.md](connector.md)), and is then an agent like any other.
 
 #### Scenario: Opening the agent screen with no agent
 - GIVEN no agent is connected

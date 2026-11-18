@@ -16,6 +16,8 @@ The HTTP contract of Ramble's relay: every endpoint, who may call it with which 
 | `GET /notes`, `POST /notes/ack`, `POST /inbox/status`, `DELETE /inbox`, `POST /pair/code`, `GET /connections`, `DELETE /connections/:id` | phone | inbox secret |
 | `POST /pair/exchange` | agent | none (the pairing code) |
 | `GET /inbox`, `POST /inbox/ack`, `GET /agent`, `PATCH /agent` | agent | agent key |
+| `POST /mcp` | MCP connector ([connector.md](connector.md)) | agent key |
+| `GET /.well-known/oauth-*`, `POST /register`, `GET`/`POST /authorize`, `POST /token` | MCP connector sign-in ([connector.md](connector.md)) | none (the pairing code, then OAuth) |
 | `GET /`, `GET /health` | anyone | none |
 | `POST /transcribe`, `POST /inbox`; `GET /analytics` | old builds | work until 2027-01-07 00:00 UTC, then `410`; `410` |
 
@@ -43,7 +45,7 @@ Calls other than pairing exchange, inbox creation and App Attest registration SH
 - THEN the response is `403` with `"reason": "wrong_credential"`, and its next `GET /inbox` succeeds
 
 ### Requirement: Errors, and failing closed
-Every error SHALL be `{"error": "<sentence>"}`, plus `"reason": "<code>"` wherever a client acts on the kind of error. Bodies SHALL be read as JSON whatever their `Content-Type`, except note uploads, which are raw audio. A wrong method on an existing path SHALL get `405` naming the right method and linking https://ramble.watch/docs. When the relay cannot check a credential, a count, an entitlement or a limit, it SHALL answer `503` with `"reason": "unavailable"` and accept, store and count nothing; production honors no developer bypass.
+Every error SHALL be `{"error": "<sentence>"}`, plus `"reason": "<code>"` wherever a client acts on the kind of error, except on the connector's sign-in and MCP endpoints, which use OAuth and JSON-RPC errors ([connector.md](connector.md)). Bodies SHALL be read as JSON whatever their `Content-Type`, except note uploads, which are raw audio, and `POST /authorize` and `POST /token`, which also take form-encoded bodies. A wrong method on an existing path SHALL get `405` naming the right method and linking https://ramble.watch/docs. When the relay cannot check a credential, a count, an entitlement or a limit, it SHALL answer `503` with `"reason": "unavailable"` and accept, store and count nothing; production honors no developer bypass.
 
 #### Scenario: Wrong method
 - GIVEN the path `/inbox/ack`
@@ -265,7 +267,7 @@ A note's transcript SHALL stay readable by the person's devices until the phone 
 - THEN the first code fails to exchange
 
 ### Requirement: Pairing exchange
-`POST /pair/exchange` with `{"code", "name"?}` and no credential SHALL return `201 {"token": "rmba_…"}` and create one connection. `name` is optional, 1–40 characters, and an invalid name is dropped without failing; any other field, such as a `request_id` older instructions send, is ignored. Codes match ignoring case, spaces and dashes. A code SHALL make one connection and return its key once. An unknown or expired code SHALL get `400` ("Invalid or expired pairing code. Ask the user for a new one in the Ramble app."); a code already exchanged, while it hasn't expired and its connection still exists, `409` with `"reason": "code_used"` and no key. Which notes the connection receives: [delivery.md](delivery.md).
+`POST /pair/exchange` with `{"code", "name"?}` and no credential SHALL return `201 {"token": "rmba_…"}` and create one connection. `name` is optional, 1–40 characters, and an invalid name is dropped without failing; any other field, such as a `request_id` older instructions send, is ignored. Codes match ignoring case, spaces and dashes. A code SHALL make one connection and return its key once. An unknown or expired code SHALL get `400` ("Invalid or expired pairing code. Ask the user for a new one in the Ramble app."); a code already exchanged, while it hasn't expired and its connection still exists, or already entered on a connector's sign-in page ([connector.md](connector.md)), `409` with `"reason": "code_used"` and no key. A code made before the inbox reached 10 agents SHALL get `409` with `"reason": "too_many_agents"` and make nothing. Which notes the connection receives: [delivery.md](delivery.md).
 
 #### Scenario: Response lost
 - GIVEN an exchange succeeded but the response never reached the agent
@@ -333,12 +335,13 @@ When a copy is made for an agent with a hook, the relay SHALL POST `{"event": "r
 ## Limits
 
 ### Requirement: Rate limits
-Over these limits the relay SHALL answer `429` with `{"reason": "rate_limited"}` and `Retry-After` in seconds, and change nothing. No other endpoint is rate-limited: agents, uploads, reads and pairing have no per-caller limit. Network addresses are used only by the limiter for its window, never stored with notes or logged.
+Over these limits the relay SHALL answer `429` with `{"reason": "rate_limited"}` and `Retry-After` in seconds, and change nothing. No other endpoint is rate-limited: agents, the MCP connector, uploads, reads and pairing have no per-caller limit. Network addresses are used only by the limiter for its window, never stored with notes or logged.
 
 | What | Limit |
 |---|---|
 | `POST /attest/challenge`; `POST /attest` | 20 per hour; 5 key registrations per day; per network address |
 | `POST /inboxes` | 3 per day per App Attest key, 20 per hour per network address |
+| `POST /register` (connector clients) | 600 per hour per network address |
 
 #### Scenario: Agent checking often
 - GIVEN an agent pulling every second

@@ -146,7 +146,7 @@ Operator-only tools live in `admin/`, a separate Worker at https://ramble-admin.
 
 ### Relay API
 
-The full contract is **`specs/relay-api.md`**; agent-facing docs are `proxy/RELAY.md` and `/docs`. In short: the phone creates an inbox once with an App Attest assertion and gets an inbox secret (`rmbi_`); it mints an upload-only watch token (`rmbw_`); agents pair with a one-time code for an agent key (`rmba_`). Audio lives in R2 only until transcribed; transcripts for the person's devices and agent copies are deleted on ack or after 30 days. Purchases are verified server-side against Apple's root CA (`src/apple.js`).
+The full contract is **`specs/relay-api.md`**; agent-facing docs are `proxy/RELAY.md` and `/docs`. In short: the phone creates an inbox once with an App Attest assertion and gets an inbox secret (`rmbi_`); it mints an upload-only watch token (`rmbw_`); agents pair with a one-time code for an agent key (`rmba_`). MCP clients such as Claude connect at `/mcp` with OAuth whose sign-in page takes the same code and whose access token is an agent key (`specs/connector.md`, `src/oauth.js`, `src/mcp.js`). Audio lives in R2 only until transcribed; transcripts for the person's devices and agent copies are deleted on ack or after 30 days. Purchases are verified server-side against Apple's root CA (`src/apple.js`).
 
 ### Transcription
 

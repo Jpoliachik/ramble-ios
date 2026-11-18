@@ -21,12 +21,22 @@ export const metadata: Metadata = {
 };
 
 const RELAY_HOST = new URL(RELAY_URL).host;
+const MCP_URL = `${RELAY_URL}/mcp`;
 const LEGACY_HOST = new URL(RELAY_URL_LEGACY).host;
 
 // The block agents actually follow. Keep it agnostic: every rule here has to
 // work for any agent stack. Platform specifics go under "Platform notes".
 const AGENT_INSTRUCTIONS = `Ramble connection
 Relay: ${RELAY_URL}
+
+There are two ways to connect. Pick the one your platform supports:
+- The API below: you pair with my code and check the inbox yourself.
+- A connector: if your platform lets me add a remote MCP server (a "custom
+  connector", OAuth), tell me to add ${MCP_URL} and paste the same code on
+  the sign-in page that opens. You then get the tools list_new_notes,
+  get_note and mark_handled, and can skip steps 1, 2 and 4. This also works
+  when your sandbox can't reach ${RELAY_HOST}, because your platform calls
+  Ramble for you. Mark each note handled once you've dealt with it.
 
 1. Pair. When I give you a code like ${PAIR_CODE_EXAMPLE}, POST
    {"code": "<the code>", "name": "<your name>"}
@@ -230,6 +240,33 @@ export default function AgentDocs() {
             </section>
 
             <section className="space-y-4">
+              <SectionHeader id="connector">Or add it as a connector</SectionHeader>
+              <p>
+                If your agent supports remote MCP servers (often called custom connectors), you can add Ramble there
+                instead of pasting the message. Your agent&rsquo;s platform then calls Ramble for it, so this also
+                works when the agent&rsquo;s own sandbox can&rsquo;t reach {RELAY_HOST}.
+              </p>
+              <ol className="list-decimal space-y-2 pl-5">
+                <li>
+                  In your agent&rsquo;s settings, add a custom connector with the URL <InlineCode>{MCP_URL}</InlineCode>.
+                </li>
+                <li>
+                  A Ramble page opens. In the Ramble app, open Settings → Your agent → Connect, copy the message, and
+                  paste it there.
+                </li>
+                <li>
+                  You&rsquo;re back in your agent, connected. It shows up in Your agent like any other, and Disconnect
+                  works the same.
+                </li>
+              </ol>
+              <p>
+                The agent gets three tools: <InlineCode>list_new_notes</InlineCode> (newest first, with a preview),{" "}
+                <InlineCode>get_note</InlineCode> (the full transcript) and <InlineCode>mark_handled</InlineCode>{" "}
+                (removes it from the list). It reads notes when you ask, or on whatever schedule your platform runs it.
+              </p>
+            </section>
+
+            <section className="space-y-4">
               <SectionHeader id="agent-instructions">Instructions for the agent</SectionHeader>
               <p>This is the whole loop. If your agent asks how the connection works, paste this in.</p>
               <CodeBlock filename="Paste to your agent">{AGENT_INSTRUCTIONS}</CodeBlock>
@@ -407,13 +444,27 @@ export default function AgentDocs() {
             </section>
 
             <section className="space-y-4">
-              <SectionHeader id="relay-or-webhook">Relay or webhook</SectionHeader>
-              <p>Ramble can deliver to an agent two ways. Use either or both.</p>
+              <SectionHeader id="relay-or-webhook">Which way to connect</SectionHeader>
+              <p>
+                Ramble can deliver to an agent three ways. None is better in general; pick what your agent supports, or
+                use more than one.
+              </p>
               <ul className="list-disc space-y-2 pl-5">
                 <li>
-                  <Strong>Relay (this page).</Strong> The agent pulls. The relay holds each transcript for up to{" "}
+                  <Strong>Relay API (this page).</Strong> The agent pulls. The relay holds each transcript for up to{" "}
                   {RETENTION} until the agent acks it, so nothing is lost if the agent is down for a while. The agent
                   needs to make outbound HTTPS calls on a schedule, or have a wake-up hook.
+                </li>
+                <li>
+                  <Strong>
+                    <a href="#connector" className={linkClass}>
+                      Connector (MCP)
+                    </a>
+                    .
+                  </Strong>{" "}
+                  The same inbox, read through tools instead of HTTP calls. No code or token handling for the agent,
+                  and it works from sandboxes that block {RELAY_HOST}. The agent reads notes when it runs; nothing wakes
+                  it.
                 </li>
                 <li>
                   <Strong>
@@ -489,7 +540,11 @@ export default function AgentDocs() {
                 <li>
                   <Strong>Agents in a sandbox with a network allowlist.</Strong> Add <InlineCode>{RELAY_HOST}</InlineCode>{" "}
                   to the allowed hosts (and <InlineCode>{LEGACY_HOST}</InlineCode> if you paired against it), or every
-                  request fails before it leaves the sandbox.
+                  request fails before it leaves the sandbox. If you can&rsquo;t change the allowlist, add Ramble{" "}
+                  <a href="#connector" className={linkClass}>
+                    as a connector
+                  </a>{" "}
+                  instead.
                 </li>
               </ul>
             </section>

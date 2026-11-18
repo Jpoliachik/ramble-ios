@@ -7,6 +7,8 @@
 //   notes.js     audio uploads, the transcription pipeline, the device copy
 //   relay.js     pairing, agent copies, pull/ack, delivery status, hooks
 //   legacy.js    old builds' POST /transcribe
+//   oauth.js     the MCP connector's sign-in (OAuth)
+//   mcp.js       the MCP connector: POST /mcp and its tools
 //   ops.js       operator alerts
 //   transcribe.js, audio.js, apple.js, attest.js, ratelimit.js, crypto.js
 //
@@ -27,7 +29,17 @@ import { measureDurationSeconds } from './audio.js';
 import { address, countLimit, limit, peekLimit } from './auth.js';
 import { DOCS_URL, fail, gone, json, rateLimited, unavailable } from './http.js';
 import { legacyOpen, legacyTranscribe } from './legacy.js';
+import { mcp } from './mcp.js';
 import { BODY_TIMEOUT_MS, INLINE_WAIT_MS, ackNotes, getNote, listNotes, purgeNotes, sweep, sweepCopies, uploadNote } from './notes.js';
+import {
+  authorizationServerMetadata,
+  authorizePage,
+  authorizeSubmit,
+  protectedResourceMetadata,
+  purgeOAuthCodes,
+  register,
+  token,
+} from './oauth.js';
 import { checkAlerts, recordServerError } from './ops.js';
 import { clientAddress, hit, peek, purgeRateLimits } from './ratelimit.js';
 import {
@@ -119,9 +131,24 @@ const ROUTES = [
   ['/agent', { GET: getAgent, PATCH: updateAgent }],
   ['/transcribe', { POST: whileLegacy(legacyTranscribe) }],
   ['/analytics', { GET: () => gone() }],
+  // MCP connector (specs/connector.md)
+  ['/.well-known/oauth-protected-resource', { GET: protectedResourceMetadata }],
+  ['/.well-known/oauth-protected-resource/mcp', { GET: protectedResourceMetadata }],
+  ['/.well-known/oauth-authorization-server', { GET: authorizationServerMetadata }],
+  ['/register', { POST: register }],
+  ['/authorize', { GET: authorizePage, POST: authorizeSubmit }],
+  ['/token', { POST: token }],
+  ['/mcp', { POST: mcp }],
+  ['/mcp/', { POST: mcp }],
 ];
 
-const NO_DB = new Set(['/', '/health']);
+const NO_DB = new Set([
+  '/',
+  '/health',
+  '/.well-known/oauth-protected-resource',
+  '/.well-known/oauth-protected-resource/mcp',
+  '/.well-known/oauth-authorization-server',
+]);
 
 function route(pathname) {
   for (const [path, methods] of ROUTES) {
@@ -166,6 +193,7 @@ export async function runScheduled(env, deps = {}) {
     ['sweep', () => sweep(ctx)],
     ['copies', () => sweepCopies(ctx)],
     ['entries', () => purgeExpired(env.DB, ctx.now)],
+    ['oauth_codes', () => purgeOAuthCodes(env.DB, ctx.now)],
     ['notes', () => purgeNotes(ctx)],
     ['rate_limits', () => purgeRateLimits(env.DB, ctx.now)],
     ['alerts', () => checkAlerts(ctx)],
