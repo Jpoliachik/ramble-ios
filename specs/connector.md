@@ -22,7 +22,7 @@ Ramble as a remote MCP server, so an MCP client such as Claude can read the pers
 - THEN the response is `400`, and nothing is stored
 
 ### Requirement: The sign-in page asks for the pairing code
-`GET /authorize` SHALL show a page titled "Connect <client name> to your notes", then "After you connect, you go to <redirect host>.", then that the connector can read new notes and mark them handled and can't record, delete or change anything and to continue only if they started this from that host, then the steps: open Ramble → Settings → Your agent, tap "Connect your agent" (or "Connect another") and paste the message. The registered client name SHALL be shown as is only when the redirect host is `claude.ai`, `claude.com` or the local machine; otherwise the title reads "Connect an app calling itself “<name>” to your notes" ("this app" with no name). The field SHALL accept the pairing code alone in any case, with or without dashes or spaces, or the whole message the app copies. The page SHALL refuse to be framed, and SHALL let the form's redirect go to the connector's origin and nowhere else. An unknown `client_id`, or a `redirect_uri` the client did not register, SHALL get an error page and never a redirect. Redirect URIs match exactly, except that a local-machine `http://` URI matches on any port. A missing PKCE `S256` challenge or a `response_type` other than `code` SHALL redirect back with an OAuth error.
+`GET /authorize` SHALL show a page for any MCP client, in this order: "Connect <client name>" ("Connect your agent" with no name), "from <redirect host>", "Paste the pairing code from Ramble: Settings → Your agent → Connect.", the code field, a "Connect" button, and "<client name> can read your new notes. Disconnect anytime in Ramble." ("It can…" with no name). The redirect host is always shown, because any client can register any name. The field SHALL accept the pairing code alone in any case, with or without dashes or spaces, or the whole message the app copies. The page SHALL refuse to be framed, and SHALL let the form's redirect go to the connector's origin and nowhere else. An unknown `client_id`, or a `redirect_uri` the client did not register, SHALL get an error page and never a redirect. Redirect URIs match exactly, except that a local-machine `http://` URI matches on any port. A missing PKCE `S256` challenge or a `response_type` other than `code` SHALL redirect back with an OAuth error.
 
 #### Scenario: Pasting the whole message
 - GIVEN the Connect screen copied "I downloaded Ramble, connect it. My pairing code is K7QX-MP4D-2HNV. Instructions: https://ramble.watch/docs"
@@ -32,7 +32,7 @@ Ramble as a remote MCP server, so an MCP client such as Claude can read the pers
 #### Scenario: Wrong, expired or used code
 - GIVEN a code that is mistyped, more than 10 minutes old, already exchanged, or already entered on a sign-in page
 - WHEN the person submits it
-- THEN the page stays, with "That code is wrong or has expired. Codes work for 10 minutes. Make a new one in the Ramble app." or, for a used code, "That code was already used. Make a new one in the Ramble app."
+- THEN the page stays with what they pasted, and "That code didn’t work. Codes last 10 minutes, so make a new one in Ramble." or, for a used code, "That code was already used. Make a new one in Ramble."
 
 #### Scenario: Someone else's redirect
 - GIVEN a sign-in link whose `redirect_uri` the client never registered
@@ -42,7 +42,7 @@ Ramble as a remote MCP server, so an MCP client such as Claude can read the pers
 #### Scenario: A look-alike client
 - GIVEN a client registered as "Claude" with the redirect `https://evil.example/cb`
 - WHEN its sign-in link is opened
-- THEN the page reads "Connect an app calling itself “Claude” to your notes" and "After you connect, you go to evil.example."
+- THEN the page reads "Connect Claude" with "from evil.example" under it
 
 #### Scenario: Claude Code on a new port
 - GIVEN a client registered `http://localhost:3000/callback`

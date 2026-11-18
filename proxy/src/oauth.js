@@ -185,16 +185,16 @@ export async function authorizeSubmit(request, ctx) {
   const { client } = checked;
 
   const pairCode = extractPairCode(form.pairing_code);
-  if (!pairCode) return signInPage(params, client, 'Enter the pairing code from the Ramble app.');
+  const typed = typeof form.pairing_code === 'string' ? form.pairing_code.slice(0, 500) : '';
+  if (!pairCode) return signInPage(params, client, 'That doesn’t look like a pairing code.', typed);
   const claimed = await claimPairCode(ctx, pairCode);
   if (!claimed) {
     const used = await pairCodeWasUsed(ctx, pairCode);
     return signInPage(
       params,
       client,
-      used
-        ? 'That code was already used. Make a new one in the Ramble app.'
-        : 'That code is wrong or has expired. Codes work for 10 minutes. Make a new one in the Ramble app.',
+      used ? 'That code was already used. Make a new one in Ramble.' : 'That code didn’t work. Codes last 10 minutes, so make a new one in Ramble.',
+      typed,
     );
   }
 
@@ -323,11 +323,11 @@ function page(status, body, formAction = "'self'") {
   p { color: var(--soft); margin: 0 0 16px; }
   ol { color: var(--soft); padding-left: 20px; margin: 0 0 20px; }
   label { display: block; font-weight: 600; margin-bottom: 6px; }
-  textarea { width: 100%; min-height: 76px; resize: vertical; padding: 12px; border-radius: 12px; border: 1px solid var(--hair); background: var(--bg); color: var(--ink); font: 16px/1.4 ui-monospace, "SF Mono", Menlo, monospace; }
+  textarea { width: 100%; min-height: 56px; resize: vertical; padding: 12px; border-radius: 12px; border: 1px solid var(--hair); background: var(--bg); color: var(--ink); font: 16px/1.4 ui-monospace, "SF Mono", Menlo, monospace; }
   textarea:focus { outline: 2px solid var(--amber); outline-offset: 1px; }
   button { width: 100%; margin-top: 16px; padding: 14px; border: 0; border-radius: 14px; background: var(--amber); color: var(--on-amber); font: 600 17px/1 inherit; font-family: inherit; cursor: pointer; }
   .error { color: var(--err); margin: 12px 0 0; }
-  .to { color: var(--ink); font-weight: 600; }
+  .host { color: var(--faint); font-size: 15px; margin: -4px 0 20px; }
   .fine { color: var(--faint); font-size: 14px; margin: 16px 0 0; }
 </style>
 </head>
@@ -345,34 +345,25 @@ function page(status, body, formAction = "'self'") {
   });
 }
 
-// Hosts whose clients may be shown by the name they registered. Anyone can
-// register any name, so others are shown as "an app calling itself …".
-const KNOWN_HOSTS = ['claude.ai', 'claude.com'];
-
-function signInPage(params, client, error) {
+function signInPage(params, client, error, typed = '') {
   const back = new URL(params.redirect_uri);
-  const known = KNOWN_HOSTS.includes(back.hostname) || isLoopback(back);
-  const who = client.name ? (known ? escape(client.name) : `an app calling itself “${escape(client.name)}”`) : 'this app';
+  const name = client.name ? escape(client.name) : '';
   const hidden = AUTH_FIELDS.map((k) => `<input type="hidden" name="${k}" value="${escape(params[k])}">`).join('');
+  // Any MCP client can register any name, so the page always shows where the
+  // browser goes next (the redirect host) under it.
   // Chromium checks form-action on the redirect after the submit too, so the
   // connector's origin must be allowed or the browser never goes back.
   return page(
     error ? 400 : 200,
-    `<h1>Connect ${who} to your notes</h1>
-<p class="to">After you connect, you go to ${escape(back.host)}.</p>
-<p>It will be able to read new Ramble notes and mark them handled. It can’t record, delete or change anything. Only continue if you started this from ${escape(back.host)}.</p>
-<ol>
-  <li>On your iPhone, open Ramble → Settings → Your agent.</li>
-  <li>Tap <strong>Connect your agent</strong> (or <strong>Connect another</strong>) and copy the message.</li>
-  <li>Paste it here.</li>
-</ol>
+    `<h1>Connect ${name || 'your agent'}</h1>
+<p class="host">from ${escape(back.host)}</p>
+<p>Paste the pairing code from Ramble: Settings → Your agent → Connect.</p>
 <form method="post" action="/authorize">${hidden}
-  <label for="pairing_code">Pairing code or message</label>
-  <textarea id="pairing_code" name="pairing_code" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="K7QX-MP4D-2HNV" required></textarea>
+  <textarea id="pairing_code" name="pairing_code" aria-label="Pairing code" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Pairing code" required>${escape(typed)}</textarea>
   ${error ? `<p class="error" role="alert">${escape(error)}</p>` : ''}
   <button type="submit">Connect</button>
 </form>
-<p class="fine">Disconnect anytime in Ramble → Settings → Your agent.</p>`,
+<p class="fine">${name || 'It'} can read your new notes. Disconnect anytime in Ramble.</p>`,
     `'self' ${back.origin}`,
   );
 }

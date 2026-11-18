@@ -128,18 +128,17 @@ describe('sign-in', () => {
     assert.equal(res.status, 200);
     assert.match(res.headers.get('Content-Type'), /text\/html/);
     assert.equal(res.headers.get('X-Frame-Options'), 'DENY');
-    assert.match(res.text, /Connect Claude to your notes/);
-    assert.match(res.text, /you go to claude\.ai/);
+    assert.match(res.text, /<h1>Connect Claude<\/h1>/);
+    assert.match(res.text, /from claude\.ai/);
     // Chromium applies form-action to the redirect after the submit.
     assert.match(res.headers.get('Content-Security-Policy'), /form-action 'self' https:\/\/claude\.ai;/);
   });
 
-  it("doesn't vouch for a name registered with someone else's redirect", async () => {
+  it('always shows where the browser goes next, for any agent', async () => {
     const clientId = await registerClient({ redirect_uris: ['https://evil.example/cb'] });
     const q = new URLSearchParams({ ...(await authParams(clientId)), redirect_uri: 'https://evil.example/cb' });
     const res = await send('GET', `/authorize?${q}`);
-    assert.match(res.text, /an app calling itself “Claude”/);
-    assert.match(res.text, /you go to evil\.example/);
+    assert.match(res.text, /from evil\.example/);
   });
 
   it('matches a loopback redirect on any port', async () => {
@@ -224,7 +223,8 @@ describe('sign-in', () => {
     const params = await authParams(clientId);
     const wrong = await send('POST', '/authorize', { form: { ...params, pairing_code: 'AAAA-BBBB-CCCC' } });
     assert.equal(wrong.status, 400);
-    assert.match(wrong.text, /wrong or has expired/);
+    assert.match(wrong.text, /That code didn’t work/);
+    assert.match(wrong.text, /AAAA-BBBB-CCCC<\/textarea>/);
 
     const code = await pairCode(secret);
     await h.call('POST', '/pair/exchange', { body: { code } });
