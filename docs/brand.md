@@ -1,6 +1,6 @@
 # Ramble — Brand
 
-The source of truth for what Ramble stands for and how we talk about it. Use it for the website, the App Store, social posts, release notes, and in-app copy. How Ramble looks and moves lives in [`design.md`](design.md). App Store fields live in [`app-store.md`](app-store.md).
+The source of truth for what Ramble stands for and how we talk about it. Use it for the website, the App Store, social posts, release notes, and in-app copy. How Ramble looks and moves lives in [`design.md`](design.md). App Store fields live in [`app-store.md`](app-store.md), and the Product Hunt listing in [`product-hunt.md`](product-hunt.md).
 
 ## The belief
 
@@ -108,7 +108,9 @@ Use these as written, or start from them.
 
 **One sentence:** Ramble for Apple Watch lets you say a thought and let it go: no reply to wait for, no signal needed, and your agent picks it up later.
 
-**Short paragraph (~50 words):** Your best thoughts come when you're away from a screen. Ramble keeps them without pulling you back to one. Tap your Apple Watch, say it the messy way it came to you, and put your arm down. Nothing comes back. No signal? It sends later. Your agent picks it up and takes care of it. You only check in if it needs you.
+**Short paragraph (~60 words):** A thought hits you in the moment. Send it to your agent, and it writes back with a question. Now you're in problem-solving mode, sucked into your phone. Ramble is the one-way version. Tap your Apple Watch, say it, and keep going. Nothing comes back. Your agent picks it up later. Stay present. Leave your phone at home. Works on a run, with no signal.
+
+**Founder story** (first person, for launches and social posts): My best thoughts show up away from a screen: on a run, in the car, or on the floor playing with my kids. Capturing it meant reaching for my phone, always glued longer than I wanted. Sending it to my agent was worse. It would write back with a question, and suddenly I was working through the problem on my phone instead of playing with my kids.
 
 **No reply. On purpose.** Most agents write back, then ask a follow-up, and you end up on your phone. Ramble doesn't reply. Say it, put your arm down, and keep going.
 
@@ -170,3 +172,4 @@ Lives in [`design.md`](design.md): palette (warm neutrals anchored by brand ambe
 
 - Website: https://ramble.watch
 - App Store: https://apps.apple.com/app/id6761857751
+- Product Hunt: https://www.producthunt.com/posts/ramble-for-apple-watch
