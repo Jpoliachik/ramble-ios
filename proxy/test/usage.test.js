@@ -89,3 +89,36 @@ describe('usage stats', () => {
     assert.equal(events().length, 1);
   });
 });
+
+describe('delivery stats', () => {
+  it('records how an agent last reached Ramble', async () => {
+    const secret = await h.inbox();
+    const key = await h.connect(secret, 'Muse');
+    const via = () => h.rows('SELECT via FROM connections')[0].via;
+    assert.equal(via(), 'api');
+    h.db.sqlite.exec('UPDATE connections SET via = NULL');
+    assert.equal((await h.call('GET', '/inbox', { auth: key })).status, 200);
+    assert.equal(via(), 'api');
+  });
+
+  it('keeps whether the iPhone has a webhook set, never the URL', async () => {
+    const secret = await h.inbox();
+    const webhook = () => inboxRow().webhook;
+    assert.equal(webhook(), null);
+    await h.call('GET', '/notes', { auth: secret });
+    assert.equal(webhook(), null);
+    await h.call('GET', '/notes', { auth: secret, headers: { 'X-Ramble-Webhook': 'on' } });
+    assert.equal(webhook(), 1);
+    await h.call('GET', '/notes', { auth: secret, headers: { 'X-Ramble-Webhook': 'https://example.com/hook' } });
+    assert.equal(webhook(), 1);
+    await h.call('GET', '/notes', { auth: secret, headers: { 'X-Ramble-Webhook': 'off' } });
+    assert.equal(webhook(), 0);
+  });
+
+  it('ignores the webhook header from the watch', async () => {
+    const secret = await h.inbox();
+    const watch = await h.watchToken(secret);
+    await h.call('GET', '/notes', { auth: watch, headers: { 'X-Ramble-Webhook': 'on' } });
+    assert.equal(inboxRow().webhook, null);
+  });
+});

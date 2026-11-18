@@ -260,7 +260,7 @@ export async function token(request, ctx) {
   ) {
     return oauthError(400, 'invalid_grant', 'The authorization code is invalid, expired or already used');
   }
-  const accessToken = await createConnection(ctx, { inboxId: row.inbox_id, connectionId: row.connection_id, name: row.name });
+  const accessToken = await createConnection(ctx, { inboxId: row.inbox_id, connectionId: row.connection_id, name: row.name, via: 'mcp' });
   if (!accessToken) return oauthError(400, 'invalid_grant', 'This Ramble inbox already has the most agents it can connect');
   await ctx.db.prepare('UPDATE oauth_clients SET last_used_at = ? WHERE id = ?').bind(ctx.now, row.client_id).run();
   return json({ access_token: accessToken, token_type: 'Bearer' });

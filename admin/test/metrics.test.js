@@ -74,6 +74,20 @@ function seed(admin) {
     NOW - DAY,
   );
   admin.exec(
+    `INSERT INTO connections (id, inbox_id, token_hash, created_at, last_pull_at, via) VALUES ('c2', 'inb_a', 't2', ?, ?, 'mcp')`,
+    NOW - 3 * DAY,
+    NOW - 60 * 1000,
+  );
+  admin.exec(
+    `INSERT INTO connections (id, inbox_id, token_hash, created_at, last_pull_at, via, hook_url)
+     VALUES ('c3', 'inb_b', 't3', ?, ?, 'api', 'https://hooks.example/x')`,
+    NOW - 2 * DAY,
+    NOW - 20 * DAY,
+  );
+  admin.exec(`INSERT INTO connections (id, inbox_id, token_hash, created_at, via) VALUES ('c4', 'inb_c', 't4', ?, 'api')`, NOW - DAY);
+  admin.exec(`UPDATE inboxes SET webhook = 1 WHERE id = 'inb_a'`);
+  admin.exec(`UPDATE inboxes SET webhook = 0 WHERE id = 'inb_b'`);
+  admin.exec(
     `INSERT INTO notes (inbox_id, id, source, status, recorded_at, recorded_ms, received_at, accepted_at, content_type, transcript)
      VALUES ('inb_b', 'x', 'phone', 'transcribing', '2026-11-18T14:00:00Z', ?, ?, ?, 'audio/mp4', 'SECRET WORDS')`,
     NOW - 45 * 60 * 1000,
@@ -100,9 +114,9 @@ describe('metrics', () => {
       notes_last_7_days: 14,
       hours: 0.9,
       unlocked_installs: 1,
-      agents_connected: 1,
-      installs_with_agent: 1,
-      agents_pulled_last_7_days: 1,
+      agents_connected: 4,
+      installs_with_agent: 3,
+      agents_pulled_last_7_days: 2,
     });
     assert.deepEqual(d.active_users, { day: 2, week: 2, month: 2 });
     assert.deepEqual(
@@ -134,6 +148,22 @@ describe('metrics', () => {
       suspended_installs: 0,
       suspended_purchases: 0,
     });
+    assert.deepEqual(
+      d.delivery.agents.map((m) => [m.method, m.agents, m.pulled_last_7_days, m.installs]),
+      [
+        ['mcp', 1, 1, 1],
+        ['hook', 1, 0, 1],
+        ['poll', 0, 0, 0],
+        ['unknown', 1, 1, 1],
+        ['never', 1, 0, 1],
+      ],
+    );
+    assert.deepEqual(d.delivery.webhook, {
+      on: 1,
+      off: 1,
+      not_reported: 1,
+      active_30_days: { on: 1, off: 1, not_reported: 0 },
+    });
     assert.deepEqual(d.heaviest_this_month, [{ user: 'unlock:1', hours: 111.1, over_line: true }]);
   });
 
@@ -161,6 +191,9 @@ describe('metrics', () => {
     assert.match(html, /Needs a look/);
     assert.match(html, /oldest 45 min/);
     assert.match(html, /over 100 h/);
+    assert.match(html, /How agents get notes/);
+    assert.match(html, /data-tip="Nov 18: 13 notes"/);
+    assert.doesNotMatch(html, /hooks\.example/);
   });
 
   it('renders an empty database', async () => {

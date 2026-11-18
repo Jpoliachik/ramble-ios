@@ -287,7 +287,10 @@ final class RelayService: ObservableObject {
         if let cursor, let escaped = cursor.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
             path += "?after=\(escaped)"
         }
-        let data = try await send("GET", path, auth: try await ensureInbox())
+        // Whether a webhook destination is set (never its URL), for the
+        // operator's delivery stats (specs/usage.md).
+        let webhook = SettingsService.shared.load().isWebhookConfigured ? "on" : "off"
+        let data = try await send("GET", path, auth: try await ensureInbox(), headers: ["X-Ramble-Webhook": webhook])
         let page = try decoder.decode(NotePage.self, from: data)
         return (page.notes, page.next)
     }

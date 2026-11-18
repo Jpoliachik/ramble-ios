@@ -16,7 +16,7 @@ const strong = "font-medium text-stone-900";
 const stored: [string, string, string][] = [
   [
     "Inbox",
-    "Random id, hash of the app's inbox secret, your transcription settings (language, vocabulary, filler words), the free-note count, whether it is unlocked, a separate random usage id, and the app version and iOS or watchOS version each device last sent",
+    "Random id, hash of the app's inbox secret, your transcription settings (language, vocabulary, filler words), the free-note count, whether it is unlocked, a separate random usage id, the app version and iOS or watchOS version each device last sent, and whether your iPhone has a webhook destination set (never its address)",
     "Kept while you use Ramble",
   ],
   ["Watch connection", "Hash of the watch's token", "Replaced when the iPhone connects the watch again, or revoked"],
@@ -42,7 +42,7 @@ const stored: [string, string, string][] = [
   ],
   [
     "Agent connection",
-    "Random id, hash of the agent's key, the name it gave itself, created and last check-in times, and its wake-up hook (URL, encrypted headers, last ping time and status)",
+    "Random id, hash of the agent's key, the name it gave itself, created and last check-in times, whether it last checked in through the relay API or the MCP connector, and its wake-up hook (URL, encrypted headers, last ping time and status)",
     "You disconnect it",
   ],
   [

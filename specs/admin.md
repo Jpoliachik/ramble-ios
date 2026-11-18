@@ -46,6 +46,8 @@ The dashboard and `GET /api/overview` SHALL show the same numbers, computed when
 - Per day for 30 days: installs, active users, notes; per week for 12 weeks: active users and notes
 - Funnel: installed, first note, 10 notes, used all free notes, unlocked
 - Purchases by kind and environment (Sandbox is TestFlight), with this week's and revoked counts
+- How agents get notes, by how each last checked in ([usage.md](usage.md) "How notes reach people"): MCP connector, relay API with a wake-up hook, relay API polling, not seen since this was recorded, and hasn't checked in; each with its agents, how many pulled in the last 7 days, and installs
+- The iPhone webhook: installs with a destination on, off, or not reported by an older app, in total and among installs that uploaded in the last 30 days
 - Watch vs phone for 30 days: notes, average length, notes over 30 minutes
 - Reliability for 7 days by result: notes, first-try share, average and longest wait from upload to final
 - Health: notes waiting to be transcribed and the oldest one's age, server errors in the last hour, suspended installs and purchases
@@ -53,12 +55,19 @@ The dashboard and `GET /api/overview` SHALL show the same numbers, computed when
 - Phone and watch app labels among installs that uploaded in the last 30 days
 - The ten heaviest users this UTC month by hours, flagged past the internal heavy-use line
 
+Each bar on the charts SHALL show its day (or week) and exact value when hovered, or tapped on a touch screen.
+
 The internal heavy-use figure SHALL appear only here, never in the apps, website or user copy.
 
 #### Scenario: A quiet database
 - GIVEN no notes have been recorded
 - WHEN Justin opens the dashboard
 - THEN every number is zero, tables say "Nothing yet", and the health line reads "All clear"
+
+#### Scenario: Reading one day's value
+- GIVEN 13 notes were recorded on November 18
+- WHEN Justin hovers over that day's bar on "Notes per day"
+- THEN it reads "Nov 18: 13 notes"
 
 #### Scenario: Something is stuck
 - GIVEN a note has been waiting to be transcribed for 45 minutes

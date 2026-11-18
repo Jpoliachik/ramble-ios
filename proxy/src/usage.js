@@ -26,6 +26,25 @@ export async function rememberClient(ctx, cred, app) {
   }
 }
 
+/**
+ * Keeps whether the iPhone has a webhook destination set, from
+ * X-Ramble-Webhook: on|off on GET /notes. Never the URL. Never rejects.
+ */
+export async function rememberWebhook(ctx, cred, request) {
+  if (cred.kind !== 'inbox') return;
+  const value = (request.headers.get('X-Ramble-Webhook') || '').trim().toLowerCase();
+  if (value !== 'on' && value !== 'off') return;
+  const on = value === 'on' ? 1 : 0;
+  try {
+    await ctx.db
+      .prepare('UPDATE inboxes SET webhook = ? WHERE id = ? AND webhook IS NOT ?')
+      .bind(on, cred.inboxId, on)
+      .run();
+  } catch (err) {
+    console.error(`[usage] webhook state not recorded: ${String(err?.message).slice(0, 200)}`);
+  }
+}
+
 /** Writes (or, after a hand retry, rewrites) a finished note's row. Never rejects. */
 export async function recordNoteEvent(ctx, note) {
   try {

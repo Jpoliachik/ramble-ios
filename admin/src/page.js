@@ -13,16 +13,23 @@ function tile(label, value, sub = '') {
   }</div>`;
 }
 
-// A bar per day (or week). Pass `totalUnit` when the sum means something
-// (notes, installs); active users don't add up across days.
-function bars(series, key, title, totalUnit) {
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const shortDay = (iso) => `${MONTHS[Number(iso.slice(5, 7)) - 1]} ${Number(iso.slice(8, 10))}`;
+
+// A bar per day (or week), each with its exact value on hover (or tap: the
+// bar is focusable). Pass `totalUnit` when the sum means something (notes,
+// installs); active users don't add up across days.
+function bars(series, key, title, { unit, totalUnit } = {}) {
   const peak = Math.max(0, ...series.map((d) => d[key]));
   const max = Math.max(1, peak);
   const total = series.reduce((s, d) => s + d[key], 0);
   const cols = series
-    .map((d) => {
+    .map((d, i) => {
       const h = Math.round((d[key] / max) * 100);
-      return `<div class="bar" title="${esc(d.day ?? d.starts)}: ${esc(fmt(d[key]))}"><span style="height:${h}%"></span></div>`;
+      const when = d.day ? shortDay(d.day) : `Week of ${shortDay(d.starts)}`;
+      const tip = `${when}: ${fmt(d[key])} ${unit}`;
+      const side = i < series.length / 2 ? 'l' : 'r';
+      return `<div class="bar ${side}" tabindex="0" data-tip="${esc(tip)}" aria-label="${esc(tip)}"><span style="height:${h}%"></span></div>`;
     })
     .join('');
   const first = series[0]?.day ?? series[0]?.starts ?? '';
@@ -48,6 +55,7 @@ export function renderPage(data, who) {
   const h = data.health;
   const s = data.settings_30_days;
   const installs = data.funnel[0].n;
+  const w = data.delivery.webhook;
 
   const healthy = h.server_errors_last_hour < 20 && (h.oldest_waiting_minutes ?? 0) < 30;
   const healthLine = `${healthy ? 'All clear' : 'Needs a look'} · ${fmt(h.waiting_to_transcribe)} waiting${
@@ -64,10 +72,10 @@ export function renderPage(data, who) {
     </section>`,
     `<p class="health ${healthy ? 'ok' : 'warn'}"><span class="dot"></span>${esc(healthLine)}</p>`,
     `<div class="grid charts">`,
-    bars(data.daily, 'users', 'Daily active users, 30 days'),
-    bars(data.daily, 'notes', 'Notes per day, 30 days', 'notes'),
-    bars(data.daily, 'signups', 'Installs per day, 30 days', 'installs'),
-    bars(data.weekly, 'users', 'Weekly active users, 12 weeks'),
+    bars(data.daily, 'users', 'Daily active users, 30 days', { unit: 'users' }),
+    bars(data.daily, 'notes', 'Notes per day, 30 days', { unit: 'notes', totalUnit: 'notes' }),
+    bars(data.daily, 'signups', 'Installs per day, 30 days', { unit: 'installs', totalUnit: 'installs' }),
+    bars(data.weekly, 'users', 'Weekly active users, 12 weeks', { unit: 'users' }),
     `</div><div class="grid">`,
     table(
       'Funnel',
@@ -79,6 +87,24 @@ export function renderPage(data, who) {
       ['Kind', 'Environment', 'Total', 'This week', 'Revoked'],
       data.purchases.map((p) => [esc(p.kind), esc(p.environment), esc(fmt(p.n)), esc(fmt(p.last_7_days)), esc(fmt(p.revoked))]),
       'Sandbox rows are TestFlight.',
+    ),
+    table(
+      'How agents get notes',
+      ['Method', 'Agents', 'This week', 'Installs'],
+      data.delivery.agents
+        .filter((m) => m.agents > 0 || ['mcp', 'hook', 'poll'].includes(m.method))
+        .map((m) => [esc(m.label), esc(fmt(m.agents)), esc(fmt(m.pulled_last_7_days)), esc(fmt(m.installs))]),
+      'By how each agent last checked in',
+    ),
+    table(
+      'iPhone webhook',
+      ['Webhook', 'Installs', 'Active in 30 days'],
+      [
+        ['On', w.on, w.active_30_days.on],
+        ['Off', w.off, w.active_30_days.off],
+        ['Not reported (older app)', w.not_reported, w.active_30_days.not_reported],
+      ].map(([k, n, a]) => [esc(k), esc(fmt(n)), esc(fmt(a))]),
+      'Custom webhook destination set in the app',
     ),
     table(
       'Watch vs phone',
@@ -162,9 +188,13 @@ h1 small{font:500 15px -apple-system,BlinkMacSystemFont,sans-serif;color:var(--f
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:12px;margin-top:12px}
 .charts{grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr))}
 h2{margin:0 0 2px;font-size:15px;font-weight:600}
-.bars{display:flex;align-items:flex-end;gap:2px;height:96px;margin-top:12px}
-.bar{flex:1;height:100%;display:flex;align-items:flex-end}
+.bars{display:flex;align-items:flex-end;gap:2px;height:124px;padding-top:28px;margin-top:4px}
+.bar{flex:1;height:100%;display:flex;align-items:flex-end;position:relative;outline:none;cursor:default}
 .bar span{display:block;width:100%;min-height:1px;background:var(--amber);border-radius:3px 3px 0 0;opacity:.85}
+.bars:hover .bar span,.bars:focus-within .bar span{opacity:.45}
+.bars .bar:hover span,.bars .bar:focus span{opacity:1}
+.bar:hover::after,.bar:focus::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 6px);white-space:nowrap;background:var(--ink);color:var(--bg);font-size:12px;font-weight:500;padding:4px 8px;border-radius:8px;z-index:2;pointer-events:none;font-variant-numeric:tabular-nums}
+.bar.l::after{left:0}.bar.r::after{right:0}
 .axis{display:flex;justify-content:space-between;color:var(--faint);font-size:11px;margin-top:4px}
 table{width:100%;border-collapse:collapse;margin-top:10px;font-size:14px}
 th{font-size:12px;font-weight:500;color:var(--faint);text-align:left;padding:4px 0}

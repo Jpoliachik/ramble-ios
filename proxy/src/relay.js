@@ -283,7 +283,7 @@ export async function exchangePairCode(request, ctx) {
 
   const claimed = await claimPairCode(ctx, code);
   if (claimed) {
-    const token = await createConnection(ctx, { ...claimed, name });
+    const token = await createConnection(ctx, { ...claimed, name, via: 'api' });
     if (!token) return tooManyAgents();
     return json({ token }, 201);
   }
@@ -334,13 +334,13 @@ const tooManyAgents = () =>
  * once, or null when the inbox already has MAX_AGENTS (codes claimed earlier
  * can finish after others connected).
  */
-export async function createConnection(ctx, { inboxId, connectionId, name }) {
+export async function createConnection(ctx, { inboxId, connectionId, name, via }) {
   const agents = await ctx.db.prepare('SELECT COUNT(*) AS n FROM connections WHERE inbox_id = ?').bind(inboxId).first();
   if (agents.n >= MAX_AGENTS) return null;
   const token = `rmba_${randomToken(32)}`;
   await ctx.db
-    .prepare('INSERT INTO connections (id, inbox_id, token_hash, created_at, name) VALUES (?, ?, ?, ?, ?)')
-    .bind(connectionId, inboxId, await sha256Hex(token), ctx.now, name)
+    .prepare('INSERT INTO connections (id, inbox_id, token_hash, created_at, name, via) VALUES (?, ?, ?, ?, ?, ?)')
+    .bind(connectionId, inboxId, await sha256Hex(token), ctx.now, name, via)
     .run();
   return token;
 }
@@ -363,7 +363,7 @@ export async function pull(request, ctx) {
           WHERE e.connection_id = ? AND ${WAITING} ORDER BY e.id LIMIT ?`,
       )
       .bind(connection.id, ctx.now, PULL_LIMIT + 1),
-    ctx.db.prepare('UPDATE connections SET last_pull_at = ? WHERE id = ?').bind(ctx.now, connection.id),
+    ctx.db.prepare(`UPDATE connections SET last_pull_at = ?, via = 'api' WHERE id = ?`).bind(ctx.now, connection.id),
   ]);
 
   return json({
