@@ -1,0 +1,22 @@
+name = "ramble-admin"
+main = "src/index.js"
+compatibility_date = "2024-12-01"
+# account_id is set via CLOUDFLARE_ACCOUNT_ID env var in CI
+
+# Served at https://ramble-admin.jpoliachik.workers.dev, behind Cloudflare
+# Access (admin/README.md). Preview URLs stay off so there is exactly one
+# hostname to protect.
+workers_dev = true
+preview_urls = false
+
+# ACCESS_TEAM_DOMAIN and ACCESS_AUD are Worker secrets set in the dashboard
+# (admin/README.md "Setup"). Until both are set, every request gets 503.
+
+[observability]
+enabled = true
+
+# The relay's database. The admin Worker only ever runs SELECTs on it.
+[[d1_databases]]
+binding = "DB"
+database_name = "ramble-relay"
+database_id = "828af171-e0a8-4f99-86e1-30d464ab6409"
