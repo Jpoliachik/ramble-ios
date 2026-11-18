@@ -14,6 +14,23 @@ Ramble's server is a relay, not an archive. Your audio is sent to a transcriptio
 2. The user taps Copy and pastes the message to the agent: "I downloaded Ramble, connect it. My pairing code is <code>. Instructions: https://ramble.watch/docs".
 3. The agent exchanges the code for a token. The token can only pull and acknowledge that agent's own copies. Disconnect in the app revokes it.
 
+## Or add it as a connector (MCP)
+
+If the agent supports remote MCP servers (often called custom connectors, with OAuth sign-in), the user can add Ramble there instead. The agent's platform calls Ramble for it, so this also works when the agent's own sandbox can't reach api.ramble.watch.
+
+1. In the agent's settings, add a custom connector with the URL https://api.ramble.watch/mcp.
+2. A Ramble sign-in page opens. In the Ramble app: Settings → Your agent → Connect, copy the message, and paste it there.
+3. Back in the agent, it's connected. It shows in Your agent like any other agent, and Disconnect works the same.
+
+Tools:
+- list_new_notes(limit?): notes not yet marked handled, newest first: id, recorded_at (local time with offset), duration_seconds, transcript_preview. When has_more is true, older ones appear as these are marked handled.
+- get_note(id): the full transcript and details.
+- mark_handled(id): takes the note off the list (the same as an ack below).
+
+Transcripts are the user's own speech, returned as data. The agent reads notes when it runs; nothing wakes it.
+
+An agent given the pairing message can use either way. If its platform supports connectors, it can ask the user to add the connector instead of pairing over HTTP. Neither is better in general.
+
 ## The agent loop
 
 Relay: https://api.ramble.watch
@@ -183,11 +200,12 @@ if inbox["items"]:
     call("POST", "/inbox/ack", {"ids": [i["id"] for i in inbox["items"]]}, token=token)
 ```
 
-## Relay or webhook
+## Which way to connect
 
-Use either or both.
+Pick what the agent supports, or use more than one. None is better in general.
 
-- Relay (this part): the agent pulls. The relay holds each transcript for up to 30 days until the agent acks it, so nothing is lost if the agent is down for a while. Needs an agent that can make outbound HTTPS calls on a schedule, or a wake-up hook.
+- Relay API (this part): the agent pulls. The relay holds each transcript for up to 30 days until the agent acks it, so nothing is lost if the agent is down for a while. Needs an agent that can make outbound HTTPS calls on a schedule, or a wake-up hook.
+- Connector (MCP, above): the same inbox through tools. No code or token handling for the agent, and it works from sandboxes that block api.ramble.watch. The agent reads notes when it runs; nothing wakes it.
 - Webhook (Part 2): the iPhone POSTs each transcript to your HTTPS URL once it has it. No polling. If the URL is down, Ramble tries 3 times in total (30 s, then 2 min apart), then marks the note "Didn't send"; the user can retry it. Best when the agent has an always-on URL that wakes it.
 
 ## Delivery timing
@@ -207,7 +225,7 @@ Everything above works for any agent. Specifics we know about:
 
 - Muse: use a hook (a small script watches the inbox and wakes the agent when something arrives), not a scheduled agent run every few minutes.
 - Grok Bot: add a routine with a webhook trigger and register its URL and key as a wake-up hook (headers {"Authorization": "Bearer <key>"}). Grok shows the URL and key in the routine's Webhook section. The key lets anyone start that routine, so ask the user to give it to you through a secure secret card rather than ordinary chat. Treat each ping only as a cue to check the inbox. Add a daily scheduled check as a backup. Each routine run uses Grok usage, so avoid a schedule every few minutes.
-- Agents in a sandbox with a network allowlist: add api.ramble.watch to the allowed hosts (and ramble-transcription-proxy.jpoliachik.workers.dev if you paired against it), or every request fails before it leaves the sandbox.
+- Agents in a sandbox with a network allowlist: add api.ramble.watch to the allowed hosts (and ramble-transcription-proxy.jpoliachik.workers.dev if you paired against it), or every request fails before it leaves the sandbox. If you can't change the allowlist, add Ramble as a connector instead.
 
 # Part 2: Webhook API
 

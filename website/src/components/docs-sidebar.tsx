@@ -16,13 +16,14 @@ const pages: { key: DocsPage; href: string; label: string }[] = [
 const sectionsByPage: Record<DocsPage, Section[]> = {
   agent: [
     { id: "pairing", label: "Pairing" },
+    { id: "connector", label: "Or add it as a connector" },
     { id: "agent-instructions", label: "Instructions for the agent" },
     { id: "checking", label: "Checking cheaply" },
     { id: "wake-up-hook", label: "Wake-up hook" },
     { id: "api", label: "API" },
     { id: "connections", label: "Tokens and connections" },
     { id: "requests", label: "Making requests" },
-    { id: "relay-or-webhook", label: "Relay or webhook" },
+    { id: "relay-or-webhook", label: "Which way to connect" },
     { id: "timing", label: "Delivery timing" },
     { id: "platforms", label: "Platform notes" },
     { id: "privacy", label: "What the relay keeps" },
