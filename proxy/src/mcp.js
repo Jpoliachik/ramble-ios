@@ -127,7 +127,7 @@ export async function mcp(request, ctx) {
 
 async function callTool(connection, name, args, ctx) {
   // Any tool call is a check-in, like a pull: the app shows it.
-  await ctx.db.prepare('UPDATE connections SET last_pull_at = ? WHERE id = ?').bind(ctx.now, connection.id).run();
+  await ctx.db.prepare(`UPDATE connections SET last_pull_at = ?, via = 'mcp' WHERE id = ?`).bind(ctx.now, connection.id).run();
   switch (name) {
     case 'list_new_notes':
       return listNewNotes(connection, args, ctx);

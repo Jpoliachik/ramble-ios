@@ -28,7 +28,7 @@ import {
 import { alertKeyProblem, alertPermanentFailure } from './ops.js';
 import { makeAgentCopies } from './relay.js';
 import { INLINE_PROVIDER_TIMEOUT_MS, TranscribeError } from './transcribe.js';
-import { clientLabel, recordNoteEvent, rememberClient } from './usage.js';
+import { clientLabel, recordNoteEvent, rememberClient, rememberWebhook } from './usage.js';
 
 export const AUDIO_TYPES = new Set(['audio/mp4', 'audio/m4a', 'audio/x-m4a', 'audio/aac']);
 export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
@@ -293,6 +293,7 @@ export async function listNotes(request, ctx) {
   const { cred, response } = await authenticate(request, ctx, ['inbox']);
   if (response) return response;
   await rememberClient(ctx, cred, clientLabel(request));
+  await rememberWebhook(ctx, cred, request);
 
   const after = new URL(request.url).searchParams.get('after');
   let afterAt = -1;

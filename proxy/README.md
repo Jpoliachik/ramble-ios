@@ -87,7 +87,7 @@ Merging to `main` deploys the Worker and applies migrations (`.github/workflows/
 - **Agent copies:** transcript text until the agent acks it or 30 days pass; afterwards a row without text, so the app can show "picked up" or "not picked up".
 - **Purchases:** Apple's original transaction ID, kind, environment, the operator's revoke time, `inbox_cap` (empty means 10) and `suspended` flag.
 - **Usage:** transcribed audio seconds per user (purchase, or inbox without one) per UTC month, for monitoring only.
-- **Usage stats (`note_events`):** one row per finished note under the inbox's random `usage_id`: device, times, length, result, tries, free or not, language, whether filler removal and vocabulary were on, app label. No inbox ID, note ID or text. Kept indefinitely. Inboxes also keep `phone_app` and `watch_app`, the last `X-Ramble-Client` each device sent.
+- **Usage stats (`note_events`):** one row per finished note under the inbox's random `usage_id`: device, times, length, result, tries, free or not, language, whether filler removal and vocabulary were on, app label. No inbox ID, note ID or text. Kept indefinitely. Inboxes also keep `phone_app` and `watch_app`, the last `X-Ramble-Client` each device sent. Inboxes keep `webhook` (1/0, the last `X-Ramble-Webhook` the iPhone sent; never the URL) and connections keep `via` (`api` or `mcp`, how the agent last checked in).
 - **Operator data:** alert cooldowns, server-error counts per minute (kept an hour), and rate-limit counters for App Attest and inbox creation.
 
 ## Usage stats: where to look

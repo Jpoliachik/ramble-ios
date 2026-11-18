@@ -32,6 +32,19 @@ The phone and the watch SHALL send `X-Ramble-Client: Ramble/<version> (<build>) 
 - WHEN the relay handles it
 - THEN the label is ignored and the inbox keeps the one it had
 
+### Requirement: How notes reach people
+Each agent connection SHALL record which way it reaches Ramble: `api` when it is made by pairing or checks in with `GET /inbox`, `mcp` when it is made by connector sign-in or calls a tool at `/mcp`; the latest check-in wins, and a connection that hasn't checked in since this was recorded has none. The iPhone SHALL send `X-Ramble-Webhook: on` or `off` on `GET /notes`, by whether a webhook destination is set, and the relay SHALL keep the latest value on the inbox. Any other value, or the header from the watch, SHALL be ignored. The webhook's URL and secret SHALL never be sent.
+
+#### Scenario: Claude through the connector
+- GIVEN the person signs Claude in through the connector
+- WHEN Claude calls `list_new_notes`
+- THEN its connection is recorded as `mcp`
+
+#### Scenario: Webhook turned off
+- GIVEN the iPhone had sent `X-Ramble-Webhook: on`
+- WHEN the person removes the destination and the iPhone next calls `GET /notes`
+- THEN it sends `X-Ramble-Webhook: off`, and the inbox records the webhook as off
+
 ### Requirement: Usage stats are for the operator only
 No relay endpoint SHALL return usage rows or app labels. Justin reads them on the admin dashboard ([admin.md](admin.md)), which only he and agents he lets in can reach, or directly from the relay's database.
 

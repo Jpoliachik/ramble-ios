@@ -8,6 +8,14 @@ const DAY = 24 * 60 * 60 * 1000;
 const FREE_NOTES = 25; // specs/purchase.md "Free notes"
 const HEAVY_HOURS = 100; // internal heavy-use line (specs/purchase.md); admin only
 
+const AGENT_METHODS = [
+  ['mcp', 'MCP connector'],
+  ['hook', 'Relay API, wake-up hook'],
+  ['poll', 'Relay API, polling'],
+  ['unknown', 'Not seen since tracking began'],
+  ['never', "Hasn't checked in"],
+];
+
 const utcDay = (ms) => new Date(ms).toISOString().slice(0, 10);
 
 async function all(db, sql, ...params) {
@@ -52,6 +60,8 @@ export async function overview(db, now = Date.now()) {
     phoneApps,
     watchApps,
     heavy,
+    agentMethods,
+    webhooks,
   ] = await Promise.all([
     one(db, 'SELECT COUNT(*) AS n, SUM(created_at >= ?) AS last7 FROM inboxes', d7),
     one(
@@ -165,6 +175,29 @@ export async function overview(db, now = Date.now()) {
       d30,
     ),
     all(db, 'SELECT user_id, seconds FROM usage WHERE month = ? ORDER BY seconds DESC LIMIT 10', month),
+    // How each agent gets notes. `via` is how it last checked in; a hook means
+    // the relay pings it when a note is ready (it still pulls over the API).
+    all(
+      db,
+      `SELECT CASE WHEN last_pull_at IS NULL THEN 'never'
+                   WHEN via = 'mcp' THEN 'mcp'
+                   WHEN hook_url IS NOT NULL THEN 'hook'
+                   WHEN via = 'api' THEN 'poll'
+                   ELSE 'unknown' END AS method,
+              COUNT(*) AS n, SUM(last_pull_at >= ?) AS active7, COUNT(DISTINCT inbox_id) AS installs
+       FROM connections GROUP BY method`,
+      d7,
+    ),
+    one(
+      db,
+      `SELECT SUM(webhook = 1) AS on_all, SUM(webhook = 0) AS off_all, SUM(webhook IS NULL) AS unknown_all,
+              SUM(webhook = 1 AND last_upload_at >= ?) AS on_30, SUM(webhook = 0 AND last_upload_at >= ?) AS off_30,
+              SUM(webhook IS NULL AND last_upload_at >= ?) AS unknown_30
+       FROM inboxes`,
+      d30,
+      d30,
+      d30,
+    ),
   ]);
 
   // Daily series: one entry per UTC day, oldest first, zeros filled in.
@@ -189,6 +222,12 @@ export async function overview(db, now = Date.now()) {
     const r = byWeek.get(w);
     weeks.push({ starts: utcDay(weeksStart + w * 7 * DAY), users: num(r?.users), notes: num(r?.notes) });
   }
+
+  const methodRows = new Map(agentMethods.map((r) => [r.method, r]));
+  const agentDelivery = AGENT_METHODS.map(([method, label]) => {
+    const r = methodRows.get(method);
+    return { method, label, agents: num(r?.n), pulled_last_7_days: num(r?.active7), installs: num(r?.installs) };
+  });
 
   return {
     generated_at: new Date(now).toISOString(),
@@ -250,6 +289,15 @@ export async function overview(db, now = Date.now()) {
     apps_30_days: {
       phone: phoneApps.map((r) => ({ label: r.label, installs: num(r.n) })),
       watch: watchApps.map((r) => ({ label: r.label, installs: num(r.n) })),
+    },
+    delivery: {
+      agents: agentDelivery,
+      webhook: {
+        on: num(webhooks.on_all),
+        off: num(webhooks.off_all),
+        not_reported: num(webhooks.unknown_all),
+        active_30_days: { on: num(webhooks.on_30), off: num(webhooks.off_30), not_reported: num(webhooks.unknown_30) },
+      },
     },
     heaviest_this_month: heavy.map((r) => ({
       user: r.user_id,

@@ -63,7 +63,7 @@ Group related requirements under `##` headings when a spec gets long. Keep the w
 | [delivery.md](delivery.md) | Connecting an agent, delivering transcripts to agents and the app, delivery status, wake-up hooks, webhooks, retention and deletion |
 | [relay-api.md](relay-api.md) | The relay's HTTP API: device auth, note upload, inbox reads and acks, pairing, rate limits, status codes |
 | [connector.md](connector.md) | Ramble as a remote MCP server: OAuth sign-in with the pairing code, the `list_new_notes`, `get_note` and `mark_handled` tools |
-| [usage.md](usage.md) | Usage stats kept for the operator: one content-free row per note, the app version each device last sent |
+| [usage.md](usage.md) | Usage stats kept for the operator: one content-free row per note, the app version each device last sent, how each agent connects, whether a webhook is set |
 | [admin.md](admin.md) | The operator's private dashboard: who can get in (Cloudflare Access), read-only, counts never content, what it shows |
 | [purchase.md](purchase.md) | Free notes, the one-time unlock, Restore Purchases, fair use (heavy-use monitoring, suspending a user), existing buyers |
 

@@ -442,3 +442,19 @@ describe('MCP', () => {
     assert.equal((await rpc(secret, 'tools/list')).status, 403);
   });
 });
+
+describe('delivery stats', () => {
+  it('records a connector connection as mcp, and an API agent that later uses /mcp', async () => {
+    const secret = await h.inbox();
+    const connector = await signIn(secret);
+    const via = () => h.rows('SELECT name, via FROM connections ORDER BY created_at, name');
+    assert.deepEqual(via().map((r) => r.via), ['mcp']);
+
+    const apiKey = await h.connect(secret, 'Muse');
+    assert.equal(via().find((r) => r.name === 'Muse').via, 'api');
+    await tool(apiKey, 'list_new_notes');
+    assert.equal(via().find((r) => r.name === 'Muse').via, 'mcp');
+    await tool(connector, 'list_new_notes');
+    assert.ok(via().every((r) => r.via === 'mcp'));
+  });
+});
