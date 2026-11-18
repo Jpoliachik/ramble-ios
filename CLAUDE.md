@@ -99,6 +99,7 @@ Ramble/
 └── Ramble.xcodeproj/
 website/               # Marketing site (Next.js static export)
 proxy/                 # Cloudflare Worker: transcription proxy + agent relay (RELAY.md)
+admin/                 # Cloudflare Worker: Justin's private admin dashboard (README.md)
 ```
 
 ### Data Flow
@@ -138,6 +139,10 @@ WatchConnectivity now carries only the watch token and account state (phone → 
 
 - SwiftUI for all UI
 - Deployment target: iOS 18.6, watchOS 10.0 (covers Series 4+ and first-gen SE; guard newer watch APIs with `#available`). If you change a deployment target, update `MIN_IOS`/`MIN_WATCHOS` in `website/src/lib/site.ts` and the requirements in `website/public/llms*.txt`
+
+### Admin
+
+Operator-only tools live in `admin/`, a separate Worker at https://ramble-admin.jpoliachik.workers.dev, never in the relay. Cloudflare Access signs Justin in (email code) and lets agents in with service tokens; the Worker also verifies the Access JWT on every request. Read-only, counts and labels only, every page has a JSON twin. Spec: `specs/admin.md`. Setup and the pattern for adding tools: `admin/README.md`.
 
 ### Relay API
 

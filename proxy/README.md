@@ -92,7 +92,7 @@ Merging to `main` deploys the Worker and applies migrations (`.github/workflows/
 
 ## Usage stats: where to look
 
-Read them in the Cloudflare dashboard (**D1 → ramble-relay → Console**), or from an agent with Cloudflare D1 access (Claude threads use the Cloudflare connector; Muse uses its own Cloudflare connection). Query `note_events` and `inboxes` only, and never select `notes.transcript` or `entries.text`: those are people's words. Times are Unix milliseconds, days are UTC.
+The quickest view is the admin dashboard, https://ramble-admin.jpoliachik.workers.dev (`admin/README.md`). For anything it doesn't show, read them in the Cloudflare dashboard (**D1 → ramble-relay → Console**), or from an agent with Cloudflare D1 access (Claude threads use the Cloudflare connector; Muse uses its own Cloudflare connection). Query `note_events` and `inboxes` only, and never select `notes.transcript` or `entries.text`: those are people's words. Times are Unix milliseconds, days are UTC.
 
 ```sql
 -- Signups (new installs) per day

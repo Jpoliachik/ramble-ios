@@ -33,7 +33,7 @@ The phone and the watch SHALL send `X-Ramble-Client: Ramble/<version> (<build>) 
 - THEN the label is ignored and the inbox keeps the one it had
 
 ### Requirement: Usage stats are for the operator only
-No endpoint SHALL return usage rows or app labels. Justin reads them directly from the relay's database.
+No relay endpoint SHALL return usage rows or app labels. Justin reads them on the admin dashboard ([admin.md](admin.md)), which only he and agents he lets in can reach, or directly from the relay's database.
 
 #### Scenario: An agent asks for stats
 - GIVEN a connected agent

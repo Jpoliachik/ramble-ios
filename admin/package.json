@@ -1,0 +1,10 @@
+{
+  "name": "ramble-admin",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --no-warnings=ExperimentalWarning --test \"test/**/*.test.js\"",
+    "deploy": "npx --yes wrangler@4.14.0 deploy"
+  }
+}
