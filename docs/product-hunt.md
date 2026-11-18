@@ -36,7 +36,7 @@ The product page shows this as one paragraph; the launch page keeps the breaks.
 ```
 A thought hits you in the moment. Send it to your agent, and it writes back with a question. Now you're in problem-solving mode, sucked into your phone.
 
-Ramble is the one-way version. Tap your Apple Watch, say it, and keep going. Nothing comes back. Your agent picks it up later.
+Ramble is the one-way version. Tap your Apple Watch, say it, and keep going. Nothing comes back. Your agent picks it up later. Works with Muse, Grok Bot, ChatGPT and more.
 
 Stay present. Leave your phone at home. Works on a run, with no signal. Free to try.
 ```
@@ -55,7 +55,7 @@ Posted as Justin when the launch goes live. Product Hunt stores it as HTML (`<p>
 >
 > - **No reply, on purpose.** No follow-up questions on your wrist.
 > - **Leave your phone behind.** It queues up messages with no phone and no signal, and sends when it has a connection.
-> - **Connect with one message.** A short single-use pairing code. No API keys or URLs.
+> - **Connect with one message.** Works with Muse, Grok Bot, ChatGPT and more. A short single-use pairing code. No API keys or URLs.
 > - **Security-first system design.** No accounts. Ramble's server is a relay, not an archive. Your audio is sent to a transcription provider and deleted as soon as the transcript is ready. Transcripts are deleted when your agent picks them up, or after 30 days. Your full history lives only on your iPhone.
 > - **For custom agent builders too:** every transcript can POST to your own HTTPS endpoint, signed, with retries.
 >
