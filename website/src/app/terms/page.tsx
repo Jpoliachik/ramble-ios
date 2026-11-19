@@ -34,8 +34,8 @@ export default function TermsOfUse() {
             <h2 className={h2}>Acceptance of terms</h2>
             <p className="mt-2">
               By downloading, installing, or using Ramble (&quot;the App&quot;),
-              you agree to these Terms of Use. If you do not agree, do not use
-              the App.
+              you agree to these Terms of Use with Good Loop Software LLC,
+              which makes Ramble. If you do not agree, do not use the App.
             </p>
           </section>
 
