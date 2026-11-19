@@ -82,7 +82,7 @@ export function makeContext(request, env, deps = {}) {
     inlineWaitMs: deps.inlineWaitMs ?? INLINE_WAIT_MS,
     bodyTimeoutMs: deps.bodyTimeoutMs ?? BODY_TIMEOUT_MS,
     // Waits between MCP event delivery attempts (events.js).
-    eventRetryMs: deps.eventRetryMs ?? [2000, 8000],
+    eventRetryMs: deps.eventRetryMs,
   };
 }
 

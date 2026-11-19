@@ -120,15 +120,10 @@ The connector SHALL NOT upload, delete, change settings, pair or disconnect anyt
 Webhook delivery from the draft MCP Events extension, as ChatGPT implements it. Polling and streaming delivery are not offered, and missed events are not replayed: the note still waits in `list_new_notes`.
 
 ### Requirement: One event, note_received
-`events/list` SHALL return exactly one event, `note_received`, with `delivery` `["webhook"]`, an `inputSchema` that takes no arguments, and a `payloadSchema` for `{"id", "recorded_at", "duration_seconds", "transcript_preview", "about"}`. Its description SHALL say to call `get_note` for the full transcript and `mark_handled` once handled.
+`events/list` SHALL return exactly one event, `note_received`, with `delivery` `["webhook"]`, an `inputSchema` that takes no arguments, and a `payloadSchema` for `{"id", "recorded_at", "duration_seconds"}`. Its description SHALL say the event carries no text, and to call `get_note` for the transcript and `mark_handled` once handled.
 
 ### Requirement: Subscribing
-`events/subscribe` with `{"name": "note_received", "arguments": {}, "delivery": {"mode": "webhook", "url", "secret"}, "ttlMs"?}` SHALL first POST `{"type": "verification", "challenge"}` to the URL, signed like an event, and store the subscription only if a `2xx` answer's JSON `challenge` matches. It SHALL return `{"id", "refreshBefore", "cursor": null, "truncated": false}`. The id is the same for the same connection, event and URL, so subscribing again refreshes it in place: new secret and expiry, no new verification. Lifetime is 30 days by default, `ttlMs` between 1 minute and 365 days, and `ttlMs: null` never expires (`refreshBefore: null`), so weeks without a note never end push on their own. The URL SHALL be public `https://` with a hostname (the same rule as wake-up hooks, [delivery.md](delivery.md)); the secret SHALL be `whsec_` plus base64 of 24–64 bytes, stored only encrypted. A connection SHALL keep at most 10 subscriptions, a new one replacing the oldest, and make at most 30 new ones an hour. Errors: `-32602` for a bad name, arguments, URL or secret; `-32015` with `data.reason` `challenge_failed` or `timeout` when verification fails; `-32000` over the hourly limit.
-
-#### Scenario: A quiet month
-- GIVEN ChatGPT subscribed 29 days ago and the person recorded nothing since
-- WHEN the person records a note
-- THEN ChatGPT gets the event
+`events/subscribe` with `{"name": "note_received", "arguments": {}, "delivery": {"mode": "webhook", "url", "secret"}, "ttlMs"?}` SHALL first POST `{"type": "verification", "challenge"}` to the URL, signed like an event with `webhook-id` `msg_verification_…`, and store the subscription only if a `2xx` answer's JSON `challenge` (read up to 4 KB) matches. It SHALL return `{"id", "refreshBefore", "cursor": null, "truncated": false}`. The id is the same for the same connection, event and URL, so subscribing again while it is live refreshes it in place with no new verification: new expiry, and a new secret if one was sent, the old one still signing alongside it for an hour. Lifetime is 30 days by default, `ttlMs` between 1 minute and 365 days, and `ttlMs: null` never expires (`refreshBefore: null`), so weeks without a note never end push on their own. The URL SHALL be public `https://` with a hostname on the default port, not the relay itself (the same rule as wake-up hooks, [delivery.md](delivery.md)); the secret SHALL be `whsec_` plus base64 of 24–64 bytes, stored only encrypted. A connection SHALL keep at most 10 subscriptions, a new one replacing the expired or least recently refreshed, and make at most 30 new ones an hour. A connection disconnected while its subscribe is in flight stores nothing. Errors: `-32602` for a bad name, arguments, URL or secret; `-32015` with `data.reason` `challenge_failed`, `timeout`, `connection_refused`, `http_4xx` or `http_5xx` when verification fails; `-32000` over the hourly limit or after a disconnect.
 
 #### Scenario: ChatGPT subscribes
 - GIVEN ChatGPT is connected and the person asks a Work chat to act on new Ramble notes
@@ -140,16 +135,26 @@ Webhook delivery from the draft MCP Events extension, as ChatGPT implements it. 
 - WHEN a client subscribes with it
 - THEN the response is error `-32015` with reason `challenge_failed`, and nothing is stored
 
+#### Scenario: A quiet month
+- GIVEN ChatGPT subscribed 29 days ago and the person recorded nothing since
+- WHEN the person records a note
+- THEN ChatGPT gets the event
+
 ### Requirement: Delivery
-When a connection gets a new copy of a note ([delivery.md](delivery.md)), the relay SHALL POST to each of its live subscriptions `{"eventId", "name": "note_received", "timestamp", "data", "cursor": null}`, where `data` is the note's id, recorded time, duration, one-line transcript preview cut at 200 characters, and the same `about` as the tools. It SHALL be signed per Standard Webhooks (`webhook-id` equal to `eventId`, `webhook-timestamp`, `webhook-signature` `v1,<base64 HMAC-SHA256>`) with `X-MCP-Subscription-Id`, never follow redirects, and time out after 10 seconds. A failed delivery SHALL be tried up to 3 times in all, with the same `eventId` and a fresh signature, except after a `4xx` other than `408` and `429`. A `410` SHALL delete the subscription. Each copy is sent once per subscription; a repeat upload of the same note sends nothing.
+When a connection gets a new copy of a note ([delivery.md](delivery.md)), the relay SHALL POST to each of its live subscriptions, at most 4 at a time, `{"eventId", "name": "note_received", "timestamp", "data": {"id", "recorded_at", "duration_seconds"}, "cursor": null}`. Events SHALL carry no transcript text, like wake-up hook pings. They SHALL be signed per Standard Webhooks (`webhook-id` equal to `eventId`, `webhook-timestamp`, `webhook-signature` `v1,<base64 HMAC-SHA256>`, space-separated when two secrets sign) with `X-MCP-Subscription-Id`, never follow redirects, and time out after 5 seconds; response bodies are not read. Delivery is best effort: up to 3 tries, 1 and 3 seconds apart, with the same `eventId` and a fresh signature, stopping at a `2xx`, `3xx` or `4xx` other than `408` and `429`. A subscription whose deliveries have all failed for 7 days SHALL be deleted on its next failure; any success resets that. Each copy is sent once per subscription; a repeat upload of the same note sends nothing.
 
 #### Scenario: A note wakes ChatGPT
 - GIVEN ChatGPT subscribed to `note_received`
 - WHEN the person records "Book the dentist" and it is transcribed
-- THEN one signed event with the note's id and "Book the dentist" as the preview goes to ChatGPT's callback, and ChatGPT reads it with `get_note`
+- THEN one signed event with the note's id, and not its text, goes to ChatGPT's callback, and ChatGPT reads the note with `get_note`
+
+#### Scenario: A dead callback
+- GIVEN a subscription whose callback has answered `404` to every event for 8 days
+- WHEN the next note arrives and that delivery fails too
+- THEN the subscription is deleted
 
 ### Requirement: Ending a subscription
-`events/unsubscribe` with the same name, arguments and `delivery.url` SHALL delete it and return `{}`, also when nothing matched. Subscriptions SHALL stop at their expiry and be deleted by the cron, and SHALL be deleted when the person disconnects the connection in the app.
+`events/unsubscribe` with the same name, arguments and `delivery.url` (`mode` optional) SHALL delete it and return `{}`, also when nothing matched. Subscriptions SHALL stop at their expiry and be deleted by the cron, along with any whose connection is gone, and SHALL be deleted when the person disconnects the connection in the app.
 
 #### Scenario: Disconnected while subscribed
 - GIVEN ChatGPT subscribed to `note_received`
