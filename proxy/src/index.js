@@ -27,6 +27,7 @@ import { verifyAppTransaction, verifySignedTransaction } from './apple.js';
 import { handleAttest, handleAttestChallenge, verifyAssertionForRequest } from './attest.js';
 import { measureDurationSeconds } from './audio.js';
 import { address, countLimit, limit, peekLimit } from './auth.js';
+import { purgeSubscriptions } from './events.js';
 import { DOCS_URL, fail, gone, json, rateLimited, unavailable } from './http.js';
 import { legacyOpen, legacyTranscribe } from './legacy.js';
 import { mcp } from './mcp.js';
@@ -80,6 +81,8 @@ export function makeContext(request, env, deps = {}) {
     measureDuration: deps.measureDuration ?? measureDurationSeconds,
     inlineWaitMs: deps.inlineWaitMs ?? INLINE_WAIT_MS,
     bodyTimeoutMs: deps.bodyTimeoutMs ?? BODY_TIMEOUT_MS,
+    // Waits between MCP event delivery attempts (events.js).
+    eventRetryMs: deps.eventRetryMs,
   };
 }
 
@@ -194,6 +197,7 @@ export async function runScheduled(env, deps = {}) {
     ['copies', () => sweepCopies(ctx)],
     ['entries', () => purgeExpired(env.DB, ctx.now)],
     ['oauth_codes', () => purgeOAuthCodes(env.DB, ctx.now)],
+    ['event_subscriptions', () => purgeSubscriptions(env.DB, ctx.now)],
     ['notes', () => purgeNotes(ctx)],
     ['rate_limits', () => purgeRateLimits(env.DB, ctx.now)],
     ['alerts', () => checkAlerts(ctx)],

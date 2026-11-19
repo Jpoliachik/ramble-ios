@@ -86,6 +86,7 @@ export function createHarness() {
     fetches: [],
     alerts: [],
     pingStatus: 200,
+    echoChallenge: true,
     // Transcriber behavior for the next attempts: a function of the call.
     transcribe: async () => ({ result: 'transcript', text: 'hello world', provider: 'groq', model: 'whisper-large-v3-turbo', durationSeconds: 12 }),
     transcribeCalls: [],
@@ -104,8 +105,13 @@ export function createHarness() {
         h.alerts.push(JSON.parse(init.body).text);
         return new Response('ok');
       }
-      h.fetches.push({ url, headers: init.headers, body: JSON.parse(init.body) });
+      const body = JSON.parse(init.body);
+      h.fetches.push({ url, headers: init.headers, body, raw: init.body });
       if (h.pingStatus === 0) throw new Error('network down');
+      // MCP event callbacks echo the verification challenge unless told not to.
+      if (body.type === 'verification' && h.echoChallenge) {
+        return Response.json({ challenge: body.challenge }, { status: h.pingStatus });
+      }
       return new Response(null, { status: h.pingStatus });
     },
     waitUntil: (p) => h.background.push(p),
@@ -121,6 +127,7 @@ export function createHarness() {
     },
     measureDuration: () => h.measured,
     inlineWaitMs: 50,
+    eventRetryMs: [0, 0],
     ...extra,
   });
 

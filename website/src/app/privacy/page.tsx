@@ -42,7 +42,7 @@ const stored: [string, string, string][] = [
   ],
   [
     "Agent connection",
-    "Random id, hash of the agent's key, the name it gave itself, created and last check-in times, whether it last checked in through the relay API or the MCP connector, and its wake-up hook (URL, encrypted headers, last ping time and status)",
+    "Random id, hash of the agent's key, the name it gave itself, created and last check-in times, whether it last checked in through the relay API or the MCP connector, its wake-up hook (URL, encrypted headers, last ping time and status), and any event subscriptions its connector made (callback URL, encrypted signing secret, expiry, last delivery time and status)",
     "You disconnect it",
   ],
   [
@@ -155,7 +155,7 @@ export default function PrivacyPolicy() {
               <li>
                 Credentials (the inbox secret, the watch token, and agent keys) are stored only as SHA-256 hashes,
                 except a new agent key during its pairing code&apos;s {PAIR_CODE_TTL}, which is kept encrypted. Wake-up
-                hook headers are stored only encrypted.
+                hook headers and event signing secrets are stored only encrypted.
               </li>
               <li>
                 Logs contain no audio, transcript text, request bodies, credentials, or network addresses, and record

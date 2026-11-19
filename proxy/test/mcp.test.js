@@ -2,6 +2,7 @@
 // token, and the tools. specs/connector.md.
 
 import assert from 'node:assert/strict';
+import { createHmac } from 'node:crypto';
 import { beforeEach, describe, it } from 'node:test';
 
 import { handleRequest } from '../src/index.js';
@@ -334,6 +335,7 @@ describe('MCP', () => {
       send('POST', '/mcp', { auth: token, headers: { Origin: origin }, json: { jsonrpc: '2.0', id: 1, method: 'ping' } });
     assert.equal((await call('https://evil.example')).status, 403);
     assert.equal((await call('https://claude.ai')).status, 200);
+    assert.equal((await call('https://chatgpt.com')).status, 200);
     assert.equal((await call('https://relay.test')).status, 200);
   });
 
@@ -456,5 +458,246 @@ describe('delivery stats', () => {
     assert.equal(via().find((r) => r.name === 'Muse').via, 'mcp');
     await tool(connector, 'list_new_notes');
     assert.ok(via().every((r) => r.via === 'mcp'));
+  });
+});
+
+describe('events (MCP Events, webhook delivery)', () => {
+  const SECRET = `whsec_${Buffer.alloc(32, 7).toString('base64')}`;
+  const CALLBACK = 'https://chatgpt.example/events/cb';
+  const params = (extra = {}) => ({
+    name: 'note_received',
+    arguments: {},
+    delivery: { mode: 'webhook', url: CALLBACK, secret: SECRET },
+    cursor: null,
+    ...extra,
+  });
+
+  async function setup() {
+    const secret = await h.inbox();
+    const token = await signIn(secret);
+    h.now = T0 + MINUTE;
+    return { secret, token };
+  }
+
+  function signatureOK(f) {
+    const key = Buffer.from(SECRET.slice(6), 'base64');
+    const signed = `${f.headers['webhook-id']}.${f.headers['webhook-timestamp']}.${f.raw}`;
+    return f.headers['webhook-signature'] === `v1,${createHmac('sha256', key).update(signed).digest('base64')}`;
+  }
+
+  it('declares events and lists note_received', async () => {
+    const { token } = await setup();
+    const init = await rpc(token, 'initialize', { protocolVersion: '2025-11-25' });
+    assert.deepEqual(init.body.result.capabilities.events, {});
+    const list = (await rpc(token, 'events/list')).body.result.events;
+    assert.deepEqual(list.map((e) => [e.name, e.delivery]), [['note_received', ['webhook']]]);
+  });
+
+  it('verifies the callback, then sends a signed event when a note lands', async () => {
+    const { secret, token } = await setup();
+    const sub = (await rpc(token, 'events/subscribe', params())).body.result;
+    assert.match(sub.id, /^sub_/);
+    assert.equal(sub.refreshBefore, new Date(h.now + 30 * 24 * 60 * MINUTE).toISOString());
+    assert.equal(sub.cursor, null);
+    assert.equal(h.fetches.length, 1);
+    assert.equal(h.fetches[0].url, CALLBACK);
+    assert.equal(h.fetches[0].body.type, 'verification');
+    assert.equal(h.fetches[0].headers['X-MCP-Subscription-Id'], sub.id);
+    assert.ok(signatureOK(h.fetches[0]));
+
+    h.fetches = [];
+    await say(secret, 1, 'Book the dentist');
+    await h.settle();
+    assert.equal(h.fetches.length, 1);
+    const f = h.fetches[0];
+    assert.equal(f.body.name, 'note_received');
+    assert.equal(f.headers['webhook-id'], f.body.eventId);
+    assert.equal(f.headers['X-MCP-Subscription-Id'], sub.id);
+    assert.ok(signatureOK(f));
+    assert.equal(f.body.data.id, noteId(1));
+    assert.deepEqual(Object.keys(f.body.data).sort(), ['duration_seconds', 'id', 'recorded_at']);
+    assert.ok(!f.raw.includes('dentist'));
+  });
+
+  it('signs with both secrets for an hour after a refresh rotates it', async () => {
+    const { secret, token } = await setup();
+    await rpc(token, 'events/subscribe', params());
+    const NEW = `whsec_${Buffer.alloc(32, 9).toString('base64')}`;
+    await rpc(token, 'events/subscribe', params({ delivery: { mode: 'webhook', url: CALLBACK, secret: NEW } }));
+    h.fetches = [];
+    await say(secret, 1);
+    await h.settle();
+    const sigs = h.fetches[0].headers['webhook-signature'].split(' ');
+    assert.equal(sigs.length, 2);
+    h.now += 61 * MINUTE;
+    h.fetches = [];
+    await say(secret, 2);
+    await h.settle();
+    assert.equal(h.fetches[0].headers['webhook-signature'].split(' ').length, 1);
+  });
+
+  it('refuses a callback that does not echo the challenge, and stores nothing', async () => {
+    const { token } = await setup();
+    h.echoChallenge = false;
+    const res = await rpc(token, 'events/subscribe', params());
+    assert.equal(res.body.error.code, -32015);
+    assert.equal(res.body.error.data.reason, 'challenge_failed');
+    assert.equal(h.rows('SELECT * FROM event_subscriptions').length, 0);
+  });
+
+  it('refuses bad URLs, secrets, events and arguments', async () => {
+    const { token } = await setup();
+    const err = async (p) => (await rpc(token, 'events/subscribe', p)).body.error.code;
+    assert.equal(await err(params({ delivery: { mode: 'webhook', url: 'http://chatgpt.example/cb', secret: SECRET } })), -32602);
+    assert.equal(await err(params({ delivery: { mode: 'webhook', url: 'https://10.0.0.1/cb', secret: SECRET } })), -32602);
+    assert.equal(await err(params({ delivery: { mode: 'webhook', url: CALLBACK, secret: 'whsec_c2hvcnQ=' } })), -32602);
+    assert.equal(await err(params({ name: 'note_deleted' })), -32602);
+    assert.equal(await err(params({ arguments: { folder: 'x' } })), -32602);
+    assert.equal(await err(params({ delivery: { mode: 'webhook', url: 'https://chatgpt.example:8443/cb', secret: SECRET } })), -32602);
+    assert.equal(await err(params({ delivery: { mode: 'webhook', url: 'https://relay.test./cb', secret: SECRET } })), -32602);
+    assert.equal(h.fetches.length, 0);
+  });
+
+  it('reports why verification failed', async () => {
+    const { token } = await setup();
+    h.pingStatus = 503;
+    assert.equal((await rpc(token, 'events/subscribe', params())).body.error.data.reason, 'http_5xx');
+    h.pingStatus = 0;
+    assert.equal((await rpc(token, 'events/subscribe', params())).body.error.data.reason, 'connection_refused');
+  });
+
+  it("refreshes in place without re-verifying, and grants no expiry for ttlMs: null", async () => {
+    const { token } = await setup();
+    const first = (await rpc(token, 'events/subscribe', params())).body.result;
+    h.now += 60 * MINUTE;
+    const again = (await rpc(token, 'events/subscribe', params({ ttlMs: null }))).body.result;
+    assert.equal(again.id, first.id);
+    assert.equal(again.refreshBefore, null);
+    assert.equal(h.fetches.length, 1);
+    assert.equal(h.rows('SELECT * FROM event_subscriptions').length, 1);
+  });
+
+  it('stops after unsubscribe, expiry, or disconnecting in the app', async () => {
+    const { secret, token } = await setup();
+    await rpc(token, 'events/subscribe', params());
+    assert.deepEqual((await rpc(token, 'events/unsubscribe', params({ delivery: { mode: 'webhook', url: CALLBACK } }))).body.result, {});
+    assert.deepEqual((await rpc(token, 'events/unsubscribe', params({ delivery: { url: CALLBACK } }))).body.result, {});
+    h.fetches = [];
+    await say(secret, 1);
+    await h.settle();
+    assert.equal(h.fetches.length, 0);
+
+    await rpc(token, 'events/subscribe', params({ ttlMs: MINUTE }));
+    h.now += 2 * MINUTE;
+    h.fetches = [];
+    await say(secret, 2);
+    await h.settle();
+    assert.equal(h.fetches.length, 0);
+    await h.cron();
+    assert.equal(h.rows('SELECT * FROM event_subscriptions').length, 0);
+
+    await rpc(token, 'events/subscribe', params());
+    const { connections } = (await h.call('GET', '/connections', { auth: secret })).body;
+    await h.call('DELETE', `/connections/${connections[0].id}`, { auth: secret });
+    assert.equal(h.rows('SELECT * FROM event_subscriptions').length, 0);
+    h.fetches = [];
+    await say(secret, 3);
+    await h.settle();
+    assert.equal(h.fetches.length, 0);
+  });
+
+  it('keeps a subscription through a 410 for one event, drops it after a week of failures', async () => {
+    const { secret, token } = await setup();
+    await rpc(token, 'events/subscribe', params());
+    h.fetches = [];
+    h.pingStatus = 410;
+    await say(secret, 1);
+    await h.settle();
+    assert.equal(h.fetches.length, 1); // not retried
+    assert.equal(h.rows('SELECT * FROM event_subscriptions').length, 1);
+
+    h.pingStatus = 200;
+    await say(secret, 2);
+    await h.settle();
+    assert.equal(h.rows('SELECT failing_since FROM event_subscriptions')[0].failing_since, null);
+
+    h.pingStatus = 404;
+    await say(secret, 3);
+    await h.settle();
+    h.now += 6 * 24 * 60 * MINUTE;
+    await say(secret, 4);
+    await h.settle();
+    assert.equal(h.rows('SELECT * FROM event_subscriptions').length, 1);
+    h.now += 2 * 24 * 60 * MINUTE;
+    await say(secret, 5);
+    await h.settle();
+    assert.equal(h.rows('SELECT * FROM event_subscriptions').length, 0);
+  });
+
+  it('retries a failing callback with the same event id, three tries in all', async () => {
+    const { secret, token } = await setup();
+    await rpc(token, 'events/subscribe', params());
+    h.fetches = [];
+    h.pingStatus = 503;
+    await say(secret, 1);
+    await h.settle();
+    assert.equal(h.fetches.length, 3);
+    assert.equal(new Set(h.fetches.map((f) => f.body.eventId)).size, 1);
+    assert.equal(h.rows('SELECT last_status FROM event_subscriptions')[0].last_status, 503);
+  });
+
+  it('sends once per new copy: not for repeat uploads, not to a connection that got none', async () => {
+    const { secret, token } = await setup();
+    await rpc(token, 'events/subscribe', params());
+    h.fetches = [];
+    await say(secret, 1);
+    await h.settle();
+    await say(secret, 1);
+    await h.settle();
+    assert.equal(h.fetches.length, 1);
+
+    // A second connector on the same inbox gets its own event; another inbox's gets none.
+    const second = await signIn(secret);
+    await rpc(second, 'events/subscribe', params({ delivery: { mode: 'webhook', url: 'https://chatgpt.example/second', secret: SECRET } }));
+    const stranger = await signIn(await h.inbox());
+    await rpc(stranger, 'events/subscribe', params({ delivery: { mode: 'webhook', url: 'https://chatgpt.example/stranger', secret: SECRET } }));
+    h.now += MINUTE;
+    h.fetches = [];
+    await say(secret, 2);
+    await h.settle();
+    assert.deepEqual(h.fetches.map((f) => f.url).sort(), [CALLBACK, 'https://chatgpt.example/second']);
+  });
+});
+
+describe('events: long gaps and many chats', () => {
+  const SECRET = `whsec_${Buffer.alloc(32, 7).toString('base64')}`;
+  const sub = (url, extra = {}) => ({ name: 'note_received', arguments: {}, delivery: { mode: 'webhook', url, secret: SECRET }, ...extra });
+
+  it('still wakes the agent after weeks without a note', async () => {
+    const secret = await h.inbox();
+    const token = await signIn(secret);
+    await rpc(token, 'events/subscribe', sub('https://chatgpt.example/a'));
+    await rpc(token, 'events/subscribe', sub('https://chatgpt.example/b', { ttlMs: null }));
+    h.now = T0 + 29 * 24 * 60 * MINUTE;
+    await h.cron();
+    h.fetches = [];
+    await say(secret, 1);
+    await h.settle();
+    assert.equal(h.fetches.length, 2);
+    h.now = T0 + 400 * 24 * 60 * MINUTE;
+    await h.cron();
+    assert.deepEqual(h.rows('SELECT url FROM event_subscriptions').map((r) => r.url), ['https://chatgpt.example/b']);
+  });
+
+  it('keeps the 10 newest subscriptions; the oldest gives way', async () => {
+    const secret = await h.inbox();
+    const token = await signIn(secret);
+    for (let i = 0; i < 11; i++) {
+      h.now = T0 + i * MINUTE;
+      assert.ok((await rpc(token, 'events/subscribe', sub(`https://chatgpt.example/${i}`))).body.result);
+    }
+    const urls = h.rows('SELECT url FROM event_subscriptions').map((r) => r.url);
+    assert.equal(urls.length, 10);
+    assert.ok(!urls.includes('https://chatgpt.example/0'));
   });
 });

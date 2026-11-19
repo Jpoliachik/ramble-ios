@@ -47,6 +47,7 @@ async function lookup(value, ctx) {
 // Only App Attest, inbox creation and connector registration are limited.
 export const LIMITS = {
   oauth_register: [600, 3600],
+  events_subscribe: [30, 3600],
   attest_challenge: [20, 3600],
   attest_register: [5, 86400],
   inboxes_key: [3, 86400],
