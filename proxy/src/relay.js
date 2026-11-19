@@ -8,6 +8,7 @@
 // phone can tell "picked up" from "removed unread".
 
 import { authenticate } from './auth.js';
+import { sendNoteEvents } from './events.js';
 import { DAY, baseURL, fail, iso, json, randomToken, readJSON, sha256Hex, unavailable, UUID_RE } from './http.js';
 
 export const DEFAULT_RETENTION_SECONDS = 30 * 24 * 60 * 60;
@@ -79,6 +80,9 @@ async function insertCopies(ctx, connections, item) {
   // Wake hooked agents that got a new copy (a repeat pings no one).
   const toPing = connections.filter((c, i) => inserted[i].meta.changes > 0 && shouldPing(c, ctx.now));
   if (toPing.length > 0) ctx.waitUntil(Promise.all(toPing.map((c) => pingHook(c, ctx))));
+  // And send MCP events to connectors subscribed through /mcp.
+  const gotCopy = connections.filter((_, i) => inserted[i].meta.changes > 0).map((c) => c.id);
+  if (gotCopy.length > 0) ctx.waitUntil(sendNoteEvents(ctx, gotCopy, item).catch(() => {}));
   return inserted.filter((r) => r.meta.changes > 0).length;
 }
 
@@ -249,7 +253,13 @@ export async function disconnect(request, connectionId, ctx) {
   const { cred, response } = await authenticate(request, ctx, ['inbox']);
   if (response) return response;
 
-  const [, , removed] = await ctx.db.batch([
+  const [, , , removed] = await ctx.db.batch([
+    ctx.db
+      .prepare(
+        `DELETE FROM event_subscriptions WHERE connection_id IN
+           (SELECT id FROM connections WHERE id = ? AND inbox_id = ?)`,
+      )
+      .bind(connectionId, cred.inboxId),
     ctx.db
       .prepare(
         `UPDATE entries AS e SET removed_at = ?, text = ''
@@ -571,6 +581,28 @@ const RESERVED_HEADERS = new Set([
 ]);
 
 /** HTTPS only, public hostnames only, a few plain headers. */
+/** An https:// URL on a public hostname: no IP literals, local names, credentials or the relay itself. */
+export function isPublicHttpsURL(raw, relayOrigin) {
+  let url;
+  try {
+    url = new URL(raw);
+  } catch {
+    return false;
+  }
+  const host = url.hostname.toLowerCase();
+  return !(
+    url.protocol !== 'https:' ||
+    String(raw).length > 2048 ||
+    url.username ||
+    url.password ||
+    !host.includes('.') ||
+    /^[\d.]+$/.test(host) ||
+    host.startsWith('[') ||
+    /\.(local|internal|localhost|lan|home|arpa)$/.test(host) ||
+    url.origin === relayOrigin
+  );
+}
+
 export function validateHook(hook, relayOrigin) {
   if (!hook || typeof hook !== 'object' || Array.isArray(hook)) {
     return { error: '"hook" must be {"url": "https://…", "headers": {…}} or null' };
@@ -581,18 +613,7 @@ export function validateHook(hook, relayOrigin) {
   } catch {
     return { error: '"hook.url" must be a full https:// URL' };
   }
-  const host = url.hostname.toLowerCase();
-  if (
-    url.protocol !== 'https:' ||
-    String(hook.url).length > 2048 ||
-    url.username ||
-    url.password ||
-    !host.includes('.') ||
-    /^[\d.]+$/.test(host) ||
-    host.startsWith('[') ||
-    /\.(local|internal|localhost|lan|home|arpa)$/.test(host) ||
-    url.origin === relayOrigin
-  ) {
+  if (!isPublicHttpsURL(hook.url, relayOrigin)) {
     return { error: '"hook.url" must be a public https:// URL with a hostname' };
   }
 

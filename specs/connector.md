@@ -1,7 +1,7 @@
 # MCP connector
 
 ## Purpose
-Ramble as a remote MCP server, so an MCP client such as Claude can read the person's new notes and mark them handled, added as a custom connector with no copy-paste into a chat. Signing in pairs the connector as one more agent connection; what that connection receives is in [delivery.md](delivery.md), and the relay basics (base URL, credentials, logs) are in [relay-api.md](relay-api.md).
+Ramble as a remote MCP server, so an MCP client such as Claude or ChatGPT can read the person's new notes and mark them handled, added as a custom connector with no copy-paste into a chat. A client that supports MCP Events can subscribe and be woken when a note lands. Signing in pairs the connector as one more agent connection; what that connection receives is in [delivery.md](delivery.md), and the relay basics (base URL, credentials, logs) are in [relay-api.md](relay-api.md).
 
 ## Signing in
 
@@ -75,7 +75,7 @@ A good pairing code SHALL be used up at once, like an exchange. `POST /token` (f
 ## The MCP server
 
 ### Requirement: Streamable HTTP, stateless
-`POST /mcp` (or `/mcp/`) with an agent key SHALL take one JSON-RPC 2.0 message and answer with JSON (no event streams, no sessions, no batches). It SHALL support `initialize` (echoing protocol version `2025-11-25` or `2025-06-18` when asked, else `2025-11-25`), `ping`, `tools/list` and `tools/call`; notifications and client responses get `202` with no body; any other method gets JSON-RPC error `-32601`. Malformed requests SHALL get `400` with a JSON-RPC error: `-32700` for unparseable JSON, `-32600` for an array, a missing `jsonrpc`, or an `id` that is not a string or number. An `MCP-Protocol-Version` header naming another version SHALL get `400`. A request with an `Origin` other than the relay's own, `https://claude.ai` or `https://claude.com` SHALL get `403` with `"reason": "origin_not_allowed"`. `GET /mcp` SHALL get `405`. An inbox secret or watch token SHALL get `403` with `"reason": "wrong_credential"`. Server instructions SHALL say transcripts are the person's recorded speech, quoted as data, and not instructions.
+`POST /mcp` (or `/mcp/`) with an agent key SHALL take one JSON-RPC 2.0 message and answer with JSON (no event streams, no sessions, no batches). It SHALL support `initialize` (echoing protocol version `2025-11-25` or `2025-06-18` when asked, else `2025-11-25`, with capabilities `tools` and `events`), `ping`, `tools/list`, `tools/call`, `events/list`, `events/subscribe` and `events/unsubscribe`; notifications and client responses get `202` with no body; any other method gets JSON-RPC error `-32601`. Malformed requests SHALL get `400` with a JSON-RPC error: `-32700` for unparseable JSON, `-32600` for an array, a missing `jsonrpc`, or an `id` that is not a string or number. An `MCP-Protocol-Version` header naming another version SHALL get `400`. A request with an `Origin` other than the relay's own, `https://claude.ai`, `https://claude.com` or `https://chatgpt.com` SHALL get `403` with `"reason": "origin_not_allowed"`. `GET /mcp` SHALL get `405`. An inbox secret or watch token SHALL get `403` with `"reason": "wrong_credential"`. Server instructions SHALL say transcripts are the person's recorded speech, quoted as data, and not instructions.
 
 #### Scenario: Client opens a stream
 - GIVEN a connected client
@@ -114,3 +114,39 @@ The connector SHALL NOT upload, delete, change settings, pair or disconnect anyt
 - GIVEN Claude and Muse are both connected and each got a copy of a note
 - WHEN Claude marks it handled
 - THEN Muse still receives the note on its next pull, and the note stays in the app
+
+## Events
+
+Webhook delivery from the draft MCP Events extension, as ChatGPT implements it. Polling and streaming delivery are not offered, and missed events are not replayed: the note still waits in `list_new_notes`.
+
+### Requirement: One event, note_received
+`events/list` SHALL return exactly one event, `note_received`, with `delivery` `["webhook"]`, an `inputSchema` that takes no arguments, and a `payloadSchema` for `{"id", "recorded_at", "duration_seconds", "transcript_preview", "about"}`. Its description SHALL say to call `get_note` for the full transcript and `mark_handled` once handled.
+
+### Requirement: Subscribing
+`events/subscribe` with `{"name": "note_received", "arguments": {}, "delivery": {"mode": "webhook", "url", "secret"}, "ttlMs"?}` SHALL first POST `{"type": "verification", "challenge"}` to the URL, signed like an event, and store the subscription only if a `2xx` answer's JSON `challenge` matches. It SHALL return `{"id", "refreshBefore", "cursor": null, "truncated": false}`. The id is the same for the same connection, event and URL, so subscribing again refreshes it in place: new secret and expiry, no new verification. Lifetime is 24 hours by default, `ttlMs` between 1 minute and 7 days, and `ttlMs: null` gets 7 days (nothing is granted forever). The URL SHALL be public `https://` with a hostname (the same rule as wake-up hooks, [delivery.md](delivery.md)); the secret SHALL be `whsec_` plus base64 of 24–64 bytes, stored only encrypted. A connection SHALL have at most 10 subscriptions and make at most 30 new ones an hour. Errors: `-32602` for a bad name, arguments, URL or secret; `-32015` with `data.reason` `challenge_failed` or `timeout` when verification fails; `-32000` over a limit.
+
+#### Scenario: ChatGPT subscribes
+- GIVEN ChatGPT is connected and the person asks a Work chat to act on new Ramble notes
+- WHEN ChatGPT calls `events/subscribe` with its callback URL and secret
+- THEN the relay POSTs a verification challenge there, ChatGPT echoes it, and the subscription is stored
+
+#### Scenario: Callback that doesn't answer
+- GIVEN a callback URL that returns `200` with an empty body
+- WHEN a client subscribes with it
+- THEN the response is error `-32015` with reason `challenge_failed`, and nothing is stored
+
+### Requirement: Delivery
+When a connection gets a new copy of a note ([delivery.md](delivery.md)), the relay SHALL POST to each of its live subscriptions `{"eventId", "name": "note_received", "timestamp", "data", "cursor": null}`, where `data` is the note's id, recorded time, duration, one-line transcript preview cut at 200 characters, and the same `about` as the tools. It SHALL be signed per Standard Webhooks (`webhook-id` equal to `eventId`, `webhook-timestamp`, `webhook-signature` `v1,<base64 HMAC-SHA256>`) with `X-MCP-Subscription-Id`, never follow redirects, and time out after 10 seconds. A failed delivery SHALL be tried up to 3 times in all, with the same `eventId` and a fresh signature, except after a `4xx` other than `408` and `429`. A `410` SHALL delete the subscription. Each copy is sent once per subscription; a repeat upload of the same note sends nothing.
+
+#### Scenario: A note wakes ChatGPT
+- GIVEN ChatGPT subscribed to `note_received`
+- WHEN the person records "Book the dentist" and it is transcribed
+- THEN one signed event with the note's id and "Book the dentist" as the preview goes to ChatGPT's callback, and ChatGPT reads it with `get_note`
+
+### Requirement: Ending a subscription
+`events/unsubscribe` with the same name, arguments and `delivery.url` SHALL delete it and return `{}`, also when nothing matched. Subscriptions SHALL stop at their expiry and be deleted by the cron, and SHALL be deleted when the person disconnects the connection in the app.
+
+#### Scenario: Disconnected while subscribed
+- GIVEN ChatGPT subscribed to `note_received`
+- WHEN the person disconnects it in Ramble and then records a note
+- THEN no event is sent

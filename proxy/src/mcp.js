@@ -5,14 +5,15 @@
 // the agent ack.
 
 import { authenticate } from './auth.js';
+import { handleEventsMethod } from './events.js';
 import { bearerValue, fail, iso, json, UUID_RE } from './http.js';
 import { resourceMetadataURL } from './oauth.js';
 
 // 2025-03-26 is left out: it requires JSON-RPC batches, which later versions dropped.
 export const PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18'];
 // Browsers may call /mcp only from these origins (DNS-rebinding guard). Claude
-// calls from its servers and usually sends no Origin.
-const ALLOWED_ORIGINS = ['https://claude.ai', 'https://claude.com'];
+// and ChatGPT call from their servers and usually send no Origin.
+const ALLOWED_ORIGINS = ['https://claude.ai', 'https://claude.com', 'https://chatgpt.com'];
 export const LIST_DEFAULT = 20;
 export const LIST_MAX = 50;
 export const PREVIEW_LENGTH = 200;
@@ -105,7 +106,7 @@ export async function mcp(request, ctx) {
       const asked = msg.params?.protocolVersion;
       return rpcResult(msg.id, {
         protocolVersion: PROTOCOL_VERSIONS.includes(asked) ? asked : PROTOCOL_VERSIONS[0],
-        capabilities: { tools: { listChanged: false } },
+        capabilities: { tools: { listChanged: false }, events: {} },
         serverInfo: { name: 'ramble', title: 'Ramble', version: '1.0.0', websiteUrl: 'https://ramble.watch' },
         instructions: INSTRUCTIONS,
       });
@@ -119,6 +120,12 @@ export async function mcp(request, ctx) {
       if (!TOOLS.some((t) => t.name === name)) return rpcError(msg.id, -32602, `Unknown tool: ${String(name)}`);
       const args = msg.params.arguments;
       return rpcResult(msg.id, await callTool(cred.connection, name, args && typeof args === 'object' && !Array.isArray(args) ? args : {}, ctx));
+    }
+    case 'events/list':
+    case 'events/subscribe':
+    case 'events/unsubscribe': {
+      const { result, error } = await handleEventsMethod(msg.method, msg.params, cred.connection, ctx);
+      return error ? json({ jsonrpc: '2.0', id: msg.id, error }) : rpcResult(msg.id, result);
     }
     default:
       return rpcError(msg.id, -32601, `Method not found: ${msg.method}`);
