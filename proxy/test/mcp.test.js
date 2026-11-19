@@ -497,7 +497,7 @@ describe('events (MCP Events, webhook delivery)', () => {
     const { secret, token } = await setup();
     const sub = (await rpc(token, 'events/subscribe', params())).body.result;
     assert.match(sub.id, /^sub_/);
-    assert.equal(sub.refreshBefore, new Date(h.now + 24 * 60 * MINUTE).toISOString());
+    assert.equal(sub.refreshBefore, new Date(h.now + 30 * 24 * 60 * MINUTE).toISOString());
     assert.equal(sub.cursor, null);
     assert.equal(h.fetches.length, 1);
     assert.equal(h.fetches[0].url, CALLBACK);
@@ -539,13 +539,13 @@ describe('events (MCP Events, webhook delivery)', () => {
     assert.equal(h.fetches.length, 0);
   });
 
-  it('refreshes in place without re-verifying, and caps the lifetime at 7 days', async () => {
+  it("refreshes in place without re-verifying, and grants no expiry for ttlMs: null", async () => {
     const { token } = await setup();
     const first = (await rpc(token, 'events/subscribe', params())).body.result;
     h.now += 60 * MINUTE;
     const again = (await rpc(token, 'events/subscribe', params({ ttlMs: null }))).body.result;
     assert.equal(again.id, first.id);
-    assert.equal(again.refreshBefore, new Date(h.now + 7 * 24 * 60 * MINUTE).toISOString());
+    assert.equal(again.refreshBefore, null);
     assert.equal(h.fetches.length, 1);
     assert.equal(h.rows('SELECT * FROM event_subscriptions').length, 1);
   });
@@ -605,5 +605,38 @@ describe('events (MCP Events, webhook delivery)', () => {
     await say(secret, 2);
     await h.settle();
     assert.equal(h.fetches.length, 1);
+  });
+});
+
+describe('events: long gaps and many chats', () => {
+  const SECRET = `whsec_${Buffer.alloc(32, 7).toString('base64')}`;
+  const sub = (url, extra = {}) => ({ name: 'note_received', arguments: {}, delivery: { mode: 'webhook', url, secret: SECRET }, ...extra });
+
+  it('still wakes the agent after weeks without a note', async () => {
+    const secret = await h.inbox();
+    const token = await signIn(secret);
+    await rpc(token, 'events/subscribe', sub('https://chatgpt.example/a'));
+    await rpc(token, 'events/subscribe', sub('https://chatgpt.example/b', { ttlMs: null }));
+    h.now = T0 + 29 * 24 * 60 * MINUTE;
+    await h.cron();
+    h.fetches = [];
+    await say(secret, 1);
+    await h.settle();
+    assert.equal(h.fetches.length, 2);
+    h.now = T0 + 400 * 24 * 60 * MINUTE;
+    await h.cron();
+    assert.deepEqual(h.rows('SELECT url FROM event_subscriptions').map((r) => r.url), ['https://chatgpt.example/b']);
+  });
+
+  it('keeps the 10 newest subscriptions; the oldest gives way', async () => {
+    const secret = await h.inbox();
+    const token = await signIn(secret);
+    for (let i = 0; i < 11; i++) {
+      h.now = T0 + i * MINUTE;
+      assert.ok((await rpc(token, 'events/subscribe', sub(`https://chatgpt.example/${i}`))).body.result);
+    }
+    const urls = h.rows('SELECT url FROM event_subscriptions').map((r) => r.url);
+    assert.equal(urls.length, 10);
+    assert.ok(!urls.includes('https://chatgpt.example/0'));
   });
 });

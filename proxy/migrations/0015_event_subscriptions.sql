@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS event_subscriptions (
   url TEXT NOT NULL,
   secret TEXT NOT NULL, -- the whsec_ secret, encrypted with HOOK_ENCRYPTION_KEY
   created_at INTEGER NOT NULL,
-  expires_at INTEGER NOT NULL,
+  expires_at INTEGER, -- NULL: never expires (asked with ttlMs: null)
   delivered_at INTEGER, -- last delivery attempt
   last_status INTEGER -- its HTTP status, 0 if nothing answered
 );

@@ -12,8 +12,11 @@ import { baseURL, randomToken, sha256Hex } from './http.js';
 import { isPublicHttpsURL, openHeaders, sealHeaders } from './relay.js';
 
 export const EVENT_NAME = 'note_received';
-export const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
-export const MAX_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+// Long on purpose: weeks can pass between notes, and a lapsed subscription
+// would silently stop push. The client refreshes before refreshBefore; a
+// dead callback ends with a 410 or a disconnect in the app.
+export const DEFAULT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+export const MAX_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 export const MIN_TTL_MS = 60 * 1000;
 export const MAX_SUBSCRIPTIONS = 10;
 export const EVENT_TIMEOUT_MS = 10_000;
@@ -107,17 +110,20 @@ async function subscribe(params, connection, ctx) {
 
   const existing = await ctx.db.prepare('SELECT id FROM event_subscriptions WHERE id = ?').bind(id).first();
   if (!existing) {
-    const { results } = await ctx.db
-      .prepare('SELECT COUNT(*) AS n FROM event_subscriptions WHERE connection_id = ? AND expires_at > ?')
-      .bind(connection.id, ctx.now)
-      .all();
-    if (results[0].n >= MAX_SUBSCRIPTIONS) throw new RpcError(-32000, `At most ${MAX_SUBSCRIPTIONS} subscriptions per connection`);
     const limited = await countLimit(ctx, 'events_subscribe', connection.id);
     if (!limited.ok) throw new RpcError(-32000, 'Too many new subscriptions. Try again later.');
     await verifyCallback(id, url, secret, ctx);
+    // Full: the oldest gives way, so forgotten chats never block a new one.
+    await ctx.db
+      .prepare(
+        `DELETE FROM event_subscriptions WHERE id IN
+           (SELECT id FROM event_subscriptions WHERE connection_id = ? ORDER BY created_at DESC, id LIMIT -1 OFFSET ?)`,
+      )
+      .bind(connection.id, MAX_SUBSCRIPTIONS - 1)
+      .run();
   }
 
-  const expiresAt = ctx.now + ttl;
+  const expiresAt = ttl === null ? null : ctx.now + ttl;
   const sealed = await sealHeaders({ secret }, ctx.env);
   await ctx.db
     .prepare(
@@ -128,12 +134,13 @@ async function subscribe(params, connection, ctx) {
     .bind(id, connection.id, EVENT_NAME, url, sealed, ctx.now, expiresAt)
     .run();
   // No replay: events missed while unsubscribed are still waiting in list_new_notes.
-  return { id, refreshBefore: new Date(expiresAt).toISOString(), cursor: null, truncated: false };
+  return { id, refreshBefore: expiresAt === null ? null : new Date(expiresAt).toISOString(), cursor: null, truncated: false };
 }
 
+/** Milliseconds, or null for a subscription that never expires (what the client asked with ttlMs: null). */
 function grantedTTL(asked) {
   if (asked === undefined) return DEFAULT_TTL_MS;
-  if (asked === null) return MAX_TTL_MS; // no non-expiring grants
+  if (asked === null) return null;
   if (typeof asked !== 'number' || !Number.isFinite(asked) || asked <= 0) throw invalid('"ttlMs" must be a positive number of milliseconds or null');
   return Math.min(Math.max(asked, MIN_TTL_MS), MAX_TTL_MS);
 }
@@ -223,7 +230,7 @@ export async function sendNoteEvents(ctx, connectionIds, item) {
   const { results: subs } = await ctx.db
     .prepare(
       `SELECT id, url, secret FROM event_subscriptions
-        WHERE connection_id IN (${connectionIds.map(() => '?').join(', ')}) AND expires_at > ?`,
+        WHERE connection_id IN (${connectionIds.map(() => "?").join(", ")}) AND (expires_at IS NULL OR expires_at > ?)`,
     )
     .bind(...connectionIds, ctx.now)
     .all();
