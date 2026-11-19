@@ -83,7 +83,7 @@ A good pairing code SHALL be used up at once, like an exchange. `POST /token` (f
 - THEN the response is `405`, and it keeps using `POST`
 
 ### Requirement: Three tools
-The server SHALL offer exactly `list_new_notes`, `get_note` and `mark_handled`, each with a title and annotations (`list_new_notes` and `get_note` read-only). Calling any other tool SHALL get JSON-RPC error `-32602`; missing or `null` arguments count as none. Results SHALL carry the same object as JSON text and as structured content. A note `id` is the note's UUID in any case, returned uppercase (notes from old builds keep the id they were sent with). Any tool call counts as the agent checking in ([delivery.md](delivery.md) "Agent cards show status and last check-in").
+The server SHALL offer exactly `list_new_notes`, `get_note` and `mark_handled`, each with a title and annotations stating `readOnlyHint`, `destructiveHint` and `openWorldHint` (`list_new_notes` and `get_note` read-only and not destructive; `mark_handled` destructive, since it drops this connection's copy of the transcript; all three `openWorldHint` false). Calling any other tool SHALL get JSON-RPC error `-32602`; missing or `null` arguments count as none. Results SHALL carry the same object as JSON text and as structured content. A note `id` is the note's UUID in any case, returned uppercase (notes from old builds keep the id they were sent with). Any tool call counts as the agent checking in ([delivery.md](delivery.md) "Agent cards show status and last check-in").
 
 - `list_new_notes` (`limit` 1–50, default 20) SHALL return `{"notes": [{"id", "recorded_at", "duration_seconds", "transcript_preview"}], "has_more", "about"}`: this connection's copies not yet marked handled, newest received first. With more waiting than `limit`, the older ones appear as newer ones are marked handled. `recorded_at` is the recorded time as the device sent it, offset included; the preview is the transcript on one line, cut at 200 characters with "…".
 - `get_note` (`id`) SHALL return `{"id", "recorded_at", "received_at", "duration_seconds", "transcript", "about"}` for a copy not yet marked handled.
@@ -160,3 +160,26 @@ When a connection gets a new copy of a note ([delivery.md](delivery.md)), the re
 - GIVEN ChatGPT subscribed to `note_received`
 - WHEN the person disconnects it in Ramble and then records a note
 - THEN no event is sent
+
+## Directory listings
+
+### Requirement: Review inbox
+Directory reviewers sign in without the Ramble app. When the Worker secret `REVIEW_CODE` is set to at least 16 characters, the sign-in page SHALL accept it as well as pairing codes, in any case and with or without dashes or spaces, any number of times. It SHALL only ever connect to the review inbox (id `review`), made on first use with a secret no one holds, which no device uploads to. Each review sign-in makes its own connection; when the review inbox already has 9 connections, the oldest SHALL be dropped with its copies and subscriptions so the new one fits. Before each tool call on a review connection with no notes waiting, the connection SHALL get the five sample notes as new copies (the same ids each time, recorded 1 to 30 hours before), so marking every note handled restocks them. With `REVIEW_CODE` unset or shorter, the review code is just a wrong code.
+
+#### Scenario: A reviewer signs in
+- GIVEN `REVIEW_CODE` is set, and a reviewer adds the connector in Claude
+- WHEN they paste the review code on the sign-in page and Claude calls `list_new_notes`
+- THEN they see five sample notes, newest "Book the dentist for Thursday afternoon…", and no real person's notes
+
+#### Scenario: Reviewer marks everything handled
+- GIVEN a review connection that marked all five sample notes handled
+- WHEN it calls `list_new_notes` again
+- THEN the five sample notes are back, and other review connections are unaffected
+
+### Requirement: Domain checks
+`GET /.well-known/openai-apps-challenge` and `GET /.well-known/google-connected-apps` SHALL return the Worker setting `OPENAI_APPS_CHALLENGE` or `GOOGLE_CONNECTED_APPS_TOKEN`, trimmed, as `text/plain` with `200`, and `404` while unset.
+
+#### Scenario: OpenAI verifies the domain
+- GIVEN `OPENAI_APPS_CHALLENGE` is set to the token from the OpenAI dashboard
+- WHEN OpenAI fetches `https://api.ramble.watch/.well-known/openai-apps-challenge`
+- THEN it gets the token alone as plain text

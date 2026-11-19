@@ -11,6 +11,7 @@
 import { address, limit } from './auth.js';
 import { MINUTE, json, randomToken, readJSON, sha256Hex } from './http.js';
 import { claimPairCode, cleanName, createConnection, pairCodeWasUsed } from './relay.js';
+import { claimReviewCode, isReviewCode } from './review.js';
 
 export const OAUTH_CODE_TTL_MS = 10 * MINUTE;
 export const CLIENT_UNUSED_TTL_MS = 24 * 60 * MINUTE;
@@ -184,10 +185,11 @@ export async function authorizeSubmit(request, ctx) {
   if (checked.response) return checked.response;
   const { client } = checked;
 
-  const pairCode = extractPairCode(form.pairing_code);
   const typed = typeof form.pairing_code === 'string' ? form.pairing_code.slice(0, 500) : '';
-  if (!pairCode) return signInPage(params, client, 'That doesn’t look like a pairing code.', typed);
-  const claimed = await claimPairCode(ctx, pairCode);
+  const review = await isReviewCode(ctx.env, form.pairing_code);
+  const pairCode = review ? null : extractPairCode(form.pairing_code);
+  if (!review && !pairCode) return signInPage(params, client, 'That doesn’t look like a pairing code.', typed);
+  const claimed = review ? await claimReviewCode(ctx) : await claimPairCode(ctx, pairCode);
   if (!claimed) {
     const used = await pairCodeWasUsed(ctx, pairCode);
     return signInPage(
