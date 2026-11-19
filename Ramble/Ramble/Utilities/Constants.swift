@@ -22,8 +22,8 @@ enum Constants {
     }
 
     enum Relay {
-        /// Ramble's relay. Identical API to https://api.ramble.watch, which
-        /// isn't routed yet.
+        /// Ramble's relay. https://api.ramble.watch serves the identical API
+        /// (the website and agent docs use that host).
         static let hostedBaseURL = URL(string: "https://ramble-transcription-proxy.jpoliachik.workers.dev")!
 
         /// UserDefaults key a staging build sets to point at another relay.
