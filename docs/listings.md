@@ -1,6 +1,6 @@
 # Connector directory listings
 
-How Ramble's MCP connector (`https://api.ramble.watch/mcp`, behavior in `specs/connector.md`) gets listed in each directory, and the copy to paste. The plan with sources: https://claude.ai/artifact/N9aVmYeRpoCt2tA5La16p9.
+What every connector directory asks for, for Ramble's MCP connector (`https://api.ramble.watch/mcp`, behavior in `specs/connector.md`). Each directory's own submission steps change often, so they live in its current docs, not here.
 
 ## Shared pieces
 
@@ -58,17 +58,4 @@ Negative:
 }
 ```
 
-Publish with `mcp-publisher login dns --domain ramble.watch` after adding the TXT record `v=MCPv1; k=ed25519; p=<public key>` at the apex, then `mcp-publisher publish`. Versions can't be edited: any change needs a new `version`. Keep the private key out of the repo.
-
-## Per directory
-
-| Directory | Where | Who | Status |
-|---|---|---|---|
-| MCP Registry | `mcp-publisher` | DNS TXT record, then publish | Ready once api.ramble.watch is live |
-| Claude | claude.ai/directory/manage | Justin (paid plan) | Ready once the review code is set |
-| ChatGPT | platform.openai.com/plugins | Justin: identity verification, demo video | Needs ZIP package |
-| Gemini | connected.google.com (preview) | Justin applies | Waiting on access |
-| Perplexity | pplx.ai/connector-form-submission | Justin | Proposal form |
-| Mistral | support@mistral.ai | Justin | Ask for the submission sign-up |
-| GitHub MCP Registry | partnerships@github.com | Justin | After the MCP Registry |
-| Muse | platform.muse.ai | Justin: Good Loop business verification | Questionnaire to draft |
+Versions can't be edited once published: any change needs a new `version`. The signing key never goes in the repo.
