@@ -31,6 +31,7 @@ Start the chosen experts in parallel with the Agent tool, in one message. Give e
 ## 3. Check it yourself
 
 - Specs: does any observable behavior change come with its spec update, as CLAUDE.md requires? If code and spec disagree in a way the PR didn't intend, name which one looks wrong and let Justin decide.
+- Docs: does anything written about what the diff changed still hold? That includes CLAUDE.md, `docs/`, READMEs, agent-facing docs and website copy. Search for the names, numbers and behaviors the diff touches, and flag what's now stale as a must-do.
 - Before you report an expert's blocker or must-do, open the file and confirm it. Drop what you can't confirm.
 
 ## 4. Answer
