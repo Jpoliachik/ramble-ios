@@ -42,7 +42,7 @@ const stored: [string, string, string][] = [
   ],
   [
     "Agent connection",
-    "Random id, hash of the agent's key, the name it gave itself, created and last check-in times, whether it last checked in through the relay API or the MCP connector, its wake-up hook (URL, encrypted headers, last ping time and status), and any event subscriptions its connector made (callback URL, encrypted signing secret, expiry, last delivery time and status)",
+    "Random id, hash of the agent's key, the name it gave itself, your own name for it if you set one, created and last check-in times, whether it last checked in through the relay API or the MCP connector, its wake-up hook (URL, encrypted headers, last ping time and status), and any event subscriptions its connector made (callback URL, encrypted signing secret, expiry, last delivery time and status)",
     "You disconnect it",
   ],
   [
@@ -66,7 +66,7 @@ export default function PrivacyPolicy() {
           &larr; Back to Ramble
         </Link>
         <h1 className="mt-8 text-3xl font-semibold tracking-tight text-stone-900">Privacy Policy</h1>
-        <p className="mt-2 text-sm text-stone-500">Last updated: November 15, 2026</p>
+        <p className="mt-2 text-sm text-stone-500">Last updated: November 22, 2026</p>
 
         <div className="mt-10 space-y-8 text-sm leading-relaxed text-stone-600">
           <section>

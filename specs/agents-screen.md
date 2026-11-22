@@ -20,7 +20,7 @@ Each card SHALL have a "⋯" button (accessibility label "More for <name>") open
 ## Naming
 
 ### Requirement: The person can name each agent
-"Rename" SHALL open an alert titled "Rename agent" with "Only you see this name. Leave it empty to use “<the agent's own name, or Agent>”." and a text field holding the person's current name for it (empty if none), with "Cancel" and "Save". Saving stores the name on the relay, trimmed and cut to 40 characters; saving it empty removes it, so the agent's own name shows again. The agent can't see or change the person's name, and an agent renaming itself doesn't replace it.
+"Rename" SHALL open an alert titled "Rename agent" with "Your agent doesn't see this name. Leave it empty to use “<the agent's own name, or Agent>”." and a text field holding the person's current name for it (empty if none), with "Cancel" and "Save". Saving stores the name on the relay, trimmed and cut to 40 UTF-16 units without splitting a character; saving it empty removes it, so the agent's own name shows again. The agent can't see or change the person's name, and an agent renaming itself doesn't replace it.
 
 #### Scenario: Naming the second Claude
 - GIVEN two agents both named "Claude" are connected
@@ -43,7 +43,7 @@ While fewer than 10 agents are connected, the screen SHALL show a full-width "Co
 - THEN "Connect another agent" sits right under Muse's card
 
 ### Requirement: An old duplicate offers to remove itself
-A card SHALL read "Not checking in" with a grey dot, "Looks like an older <name>. It hasn't checked in since <name> connected again." and a red "Remove this one" button, in place of the quiet-agent message, when a newer connection gave the same name, the newer one has checked in, and this one hasn't checked in since the newer one connected. Nothing is removed until the person confirms.
+A card SHALL read "Not checking in" with a grey dot, "Looks like an older <name>. It hasn't checked in since <name> connected again." and a red "Remove this one" button, in place of the quiet-agent message, when the person hasn't named it, a newer connection gave the same name, the newer one has checked in, and this one hasn't checked in since the newer one connected. Nothing is removed until the person confirms.
 
 #### Scenario: Claude signed in twice
 - GIVEN "Claude" connected on Nov 1 and last checked in on Nov 20, and another "Claude" connected on Nov 22 and has checked in

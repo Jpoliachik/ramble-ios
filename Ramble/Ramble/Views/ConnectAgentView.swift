@@ -109,11 +109,14 @@ struct ConnectAgentView: View {
                     .textInputAutocapitalization(.words)
                 Button("Cancel", role: .cancel) {}
                 Button("Save") {
-                    let label = String(renameText.trimmingCharacters(in: .whitespacesAndNewlines).prefix(40))
+                    var label = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
+                    // The relay counts UTF-16 units, so cut the same way,
+                    // dropping whole characters, never half an emoji.
+                    while label.utf16.count > 40 { label.removeLast() }
                     Task { await run { try await relay.rename(connection, to: label.isEmpty ? nil : label) } }
                 }
             } message: { connection in
-                Text("Only you see this name. Leave it empty to use \u{201C}\(connection.name ?? "Agent")\u{201D}.")
+                Text("Your agent doesn't see this name. Leave it empty to use \u{201C}\(connection.name ?? "Agent")\u{201D}.")
             }
             .confirmationDialog(
                 "Delete waiting notes?",
@@ -350,7 +353,8 @@ enum AgentHealth: Equatable {
     /// checked in, and this one hasn't checked in since the newer one
     /// connected.
     static func looksReplaced(_ connection: RelayConnection, among all: [RelayConnection]) -> Bool {
-        guard let name = connection.name else { return false }
+        // A connection the person named is one they know; leave it be.
+        guard connection.label == nil, let name = connection.name else { return false }
         let lastSeen = connection.lastPullAt ?? connection.createdAt
         return all.contains { other in
             other.id != connection.id
