@@ -55,6 +55,16 @@ describe('the whole loop', () => {
         received_at: new Date(h.now).toISOString(),
         duration: 7,
         transcription: 'thought 1',
+        note: {
+          type: 'ramble.note',
+          version: 1,
+          id: noteId(1),
+          source: 'phone',
+          recorded_at: recordedAt(),
+          received_at: new Date(h.now).toISOString(),
+          duration_seconds: 7,
+          transcript: 'thought 1',
+        },
       },
     ]);
     assert.deepEqual((await ack(agent, [items[0].id])).body, { deleted: 1 });

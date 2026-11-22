@@ -180,7 +180,17 @@ export default function WebhookDocs() {
   "created_at": "2026-03-17T13:19:00Z",
   "duration": 138.5,
   "transcription": "Just had a great idea for the landing page...",
-  "device_id": "7a2b3c4d-5e6f-7890-abcd-ef1234567890"
+  "device_id": "7a2b3c4d-5e6f-7890-abcd-ef1234567890",
+  "note": {
+    "type": "ramble.note",
+    "version": 1,
+    "id": "550E8400-E29B-41D4-A716-446655440000",
+    "source": "watch",
+    "recorded_at": "2026-03-17T09:19:00-04:00",
+    "received_at": "2026-03-17T13:21:04.512Z",
+    "duration_seconds": 138.5,
+    "transcript": "Just had a great idea for the landing page..."
+  }
 }`}
                     </CodeBlock>
                   </div>
@@ -200,6 +210,14 @@ export default function WebhookDocs() {
                     </Param>
                     <Param name="device_id" type="string">
                       A random ID for this install of Ramble. Not tied to any account.
+                    </Param>
+                    <Param name="note" type="object">
+                      The same note as the note record agents get from the relay and the MCP connector:{" "}
+                      <InlineCode>source</InlineCode> is <InlineCode>watch</InlineCode> or <InlineCode>phone</InlineCode>,{" "}
+                      <InlineCode>recorded_at</InlineCode> keeps the device&rsquo;s UTC offset, and{" "}
+                      <InlineCode>received_at</InlineCode> is <InlineCode>null</InlineCode> if the iPhone doesn&rsquo;t
+                      know it yet. Within version 1, fields are only ever added. JSON Schema:{" "}
+                      <a href="/schemas/note-v1.json" className="underline">/schemas/note-v1.json</a>.
                     </Param>
                   </div>
 

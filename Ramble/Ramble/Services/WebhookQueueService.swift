@@ -107,6 +107,36 @@ final class WebhookQueueService: ObservableObject {
 
     private static let isoFormatter = ISO8601DateFormatter()
 
+    private static let utcMillisFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    /// The standard Ramble note record (specs/note.md), the same shape the
+    /// relay gives agents, sent as the webhook's `note` field.
+    static func noteRecord(
+        id: String,
+        source: NoteSource,
+        createdAt: Date,
+        recordedAtText: String?,
+        receivedAt: Date?,
+        duration: TimeInterval,
+        transcript: String
+    ) -> [String: Any] {
+        [
+            "type": "ramble.note",
+            "version": 1,
+            "id": id,
+            "source": source.rawValue,
+            // The relay's string when the phone has it, so every path agrees.
+            "recorded_at": recordedAtText ?? RelayService.localTimestamp(createdAt),
+            "received_at": receivedAt.map { utcMillisFormatter.string(from: $0) as Any } ?? NSNull(),
+            "duration_seconds": duration,
+            "transcript": transcript
+        ]
+    }
+
     private func processWebhook(_ job: WebhookJob) async {
         let settings = settingsService.load()
 
@@ -166,7 +196,16 @@ final class WebhookQueueService: ObservableObject {
             "created_at": Self.isoFormatter.string(from: recording.createdAt),
             "duration": recording.duration,
             "transcription": recording.transcription ?? "",
-            "device_id": settings.deviceId
+            "device_id": settings.deviceId,
+            "note": Self.noteRecord(
+                id: recording.id.uuidString,
+                source: recording.source,
+                createdAt: recording.createdAt,
+                recordedAtText: recording.recordedAtText,
+                receivedAt: recording.acceptedAt,
+                duration: recording.duration,
+                transcript: recording.transcription ?? ""
+            )
         ]
 
         do {
@@ -325,13 +364,25 @@ final class WebhookQueueService: ObservableObject {
             return "Invalid URL"
         }
 
+        let testId = "test-\(UUID().uuidString)"
+        let now = Date()
+        let testText = "This is a test webhook from Ramble."
         let payload: [String: Any] = [
-            "recording_id": "test-\(UUID().uuidString)",
-            "created_at": Self.isoFormatter.string(from: Date()),
+            "recording_id": testId,
+            "created_at": Self.isoFormatter.string(from: now),
             "duration": 0.0,
-            "transcription": "This is a test webhook from Ramble.",
+            "transcription": testText,
             "device_id": settings.deviceId,
-            "test": true
+            "test": true,
+            "note": Self.noteRecord(
+                id: testId,
+                source: .phone,
+                createdAt: now,
+                recordedAtText: nil,
+                receivedAt: now,
+                duration: 0,
+                transcript: testText
+            )
         ]
 
         do {

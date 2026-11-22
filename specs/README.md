@@ -62,6 +62,7 @@ Group related requirements under `##` headings when a spec gets long. Keep the w
 | [transcription.md](transcription.md) | What happens to uploaded audio on the server: the provider (Groq), formatting options, recording length cap, failures, audio deletion, cost controls, usage monitoring |
 | [delivery.md](delivery.md) | Connecting an agent, delivering transcripts to agents and the app, delivery status, wake-up hooks, webhooks, retention and deletion |
 | [relay-api.md](relay-api.md) | The relay's HTTP API: device auth, note upload, inbox reads and acks, pairing, rate limits, status codes |
+| [note.md](note.md) | The note record: one versioned shape for a note in the agent inbox, the MCP tools and events, and the iPhone webhook; its published JSON Schema |
 | [connector.md](connector.md) | Ramble as a remote MCP server: OAuth sign-in with the pairing code, the `list_new_notes`, `get_note` and `mark_handled` tools, MCP Events, the Claude plugin |
 | [usage.md](usage.md) | Usage stats kept for the operator: one content-free row per note, the app version each device last sent, how each agent connects, whether a webhook is set |
 | [admin.md](admin.md) | The operator's private dashboard: who can get in (Cloudflare Access), read-only, counts never content, what it shows |

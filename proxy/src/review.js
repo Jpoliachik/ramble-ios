@@ -102,8 +102,8 @@ export async function stockReviewNotes(ctx, connection) {
     ...notes.map((n) =>
       db
         .prepare(
-          `INSERT INTO entries (connection_id, inbox_id, recording_id, recorded_at, duration, text, expires_at, received_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO entries (connection_id, inbox_id, recording_id, source, recorded_at, duration, text, expires_at, received_at)
+           VALUES (?, ?, ?, 'watch', ?, ?, ?, ?, ?)`,
         )
         .bind(
           connection.id,

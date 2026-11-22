@@ -233,7 +233,7 @@ The person MAY set one webhook destination, under "Add destination" or "Edit des
 - THEN it shows "URL must use HTTPS" and Save is disabled
 
 ### Requirement: The iPhone sends the webhook once it has the transcript
-For every note with speech whose transcript reaches the iPhone while a destination is set, including watch notes, the iPhone SHALL POST one JSON body: `recording_id`, `created_at` (recording start, in UTC, unlike the agent item), `duration` (seconds), `transcription`, and `device_id` (a random per-install ID, not tied to any account). The relay never sees the webhook URL or secret.
+For every note with speech whose transcript reaches the iPhone while a destination is set, including watch notes, the iPhone SHALL POST one JSON body: `recording_id`, `created_at` (recording start, in UTC, unlike the agent item), `duration` (seconds), `transcription`, `device_id` (a random per-install ID, not tied to any account), and `note`, the note record with its transcript ([note.md](note.md)); its `received_at` is `null` when the iPhone hasn't learned it from the relay. The test webhook carries a `note` too, with the test's `recording_id` as its `id`. The relay never sees the webhook URL or secret.
 
 #### Scenario: Watch note to webhook
 - GIVEN a webhook is set and the watch uploaded a note straight to the relay

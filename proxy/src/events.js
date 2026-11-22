@@ -1,14 +1,15 @@
-// MCP Events (specs/connector.md "Events"): webhook delivery from the draft
-// MCP Events extension, as ChatGPT implements it
-// (developers.openai.com/plugins/build/mcp-events). A connector subscribes to
+// MCP Events (specs/connector.md "Events"): webhook and poll delivery from the
+// MCP Events extension (SEP-3415; ChatGPT's guide:
+// developers.openai.com/plugins/build/mcp-events). A connector subscribes to
 // "note_received" through /mcp; when its connection gets a new copy, the
-// relay POSTs a Standard Webhooks-signed event to the callback URL. Polling
-// and streaming from the draft are not offered. Kept in one file so a change
-// in the draft is a change here.
+// relay POSTs a Standard Webhooks-signed event to the callback URL. Or it
+// polls with a cursor, statelessly. Streaming is not offered. Kept in one
+// file so a change in the extension is a change here.
 
 import { countLimit } from './auth.js';
 import { base64ToBytes, arrayBufferToBase64 } from './crypto.js';
 import { baseURL, randomToken, sha256Hex } from './http.js';
+import { entryNote, noteRecord, NOTE_SUMMARY_SCHEMA } from './note.js';
 import { isPublicHttpsURL, openHeaders, sealHeaders } from './relay.js';
 
 export const EVENT_NAME = 'note_received';
@@ -28,6 +29,9 @@ export const ROTATION_WINDOW_MS = 60 * 60 * 1000;
 export const EVENT_TIMEOUT_MS = 5000;
 export const DEFAULT_RETRY_MS = [1000, 3000];
 const PARALLEL_SENDS = 4;
+// events/poll: events per answer, and how long the client should wait between polls.
+export const POLL_MAX_EVENTS = 50;
+export const POLL_INTERVAL_MS = 60 * 1000;
 const MAX_VERIFY_BODY = 4096;
 // JSON-RPC error ChatGPT uses when the callback can't be verified.
 export const CALLBACK_ERROR = -32015;
@@ -38,17 +42,10 @@ export const EVENTS = [
     title: 'Note received',
     description:
       'Fires when a new Ramble voice note is ready for this connection. The event carries the note id, not its text: call get_note with the id for the transcript, and mark_handled once it has been dealt with.',
-    delivery: ['webhook'],
+    delivery: ['webhook', 'poll'],
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
-    payloadSchema: {
-      type: 'object',
-      properties: {
-        id: { type: 'string', description: 'The note id, for get_note and mark_handled.' },
-        recorded_at: { type: 'string', description: "When it was recorded, in the device's local time with its offset." },
-        duration_seconds: { type: 'number' },
-      },
-      required: ['id', 'recorded_at', 'duration_seconds'],
-    },
+    // The note record without its transcript (specs/note.md).
+    payloadSchema: NOTE_SUMMARY_SCHEMA,
   },
 ];
 
@@ -64,6 +61,7 @@ class RpcError extends Error {
 export async function handleEventsMethod(method, params, connection, ctx) {
   try {
     if (method === 'events/list') return { result: { events: EVENTS } };
+    if (method === 'events/poll') return { result: await poll(params, connection, ctx) };
     if (method === 'events/subscribe') return { result: await subscribe(params, connection, ctx) };
     return { result: await unsubscribe(params, connection, ctx) };
   } catch (err) {
@@ -182,6 +180,88 @@ async function unsubscribe(params, connection, ctx) {
     .run();
   return {};
 }
+
+// --- Polling -------------------------------------------------------------------
+
+const POLL_CURSOR_RE = /^n1:(\d{1,15})$/;
+const pollCursor = (entryId) => `n1:${entryId}`;
+
+/**
+ * events/poll: stateless. A null cursor starts from now; later polls return
+ * this connection's copies made after the cursor that are still waiting
+ * (handled, removed or expired ones are skipped), oldest first.
+ */
+async function poll(params, connection, ctx) {
+  if (!params || typeof params !== 'object' || Array.isArray(params)) throw invalid('Send {"name", "arguments", "cursor"}');
+  if (params.name !== EVENT_NAME) throw invalid(`Unknown event: ${String(params.name)}. Ramble offers "${EVENT_NAME}".`);
+  const args = params.arguments ?? {};
+  if (typeof args !== 'object' || Array.isArray(args) || Object.keys(args).length > 0) {
+    throw invalid(`"${EVENT_NAME}" takes no arguments`);
+  }
+  const max = params.maxEvents ?? POLL_MAX_EVENTS;
+  if (!Number.isInteger(max) || max < 1) throw invalid('"maxEvents" must be a positive whole number');
+  const limit = Math.min(max, POLL_MAX_EVENTS);
+  const maxAge = params.maxAgeMs;
+  if (maxAge != null && (typeof maxAge !== 'number' || !Number.isFinite(maxAge) || maxAge < 0)) {
+    throw invalid('"maxAgeMs" must be a non-negative number of milliseconds');
+  }
+  const cursor = params.cursor ?? null;
+  const done = (events, last, hasMore, truncated = false) => ({
+    resultType: 'complete',
+    events,
+    cursor: pollCursor(last),
+    truncated,
+    hasMore,
+    nextPollMs: hasMore ? 0 : POLL_INTERVAL_MS,
+  });
+
+  if (cursor === null) {
+    const top = await ctx.db
+      .prepare('SELECT COALESCE(MAX(id), 0) AS id FROM entries WHERE connection_id = ?')
+      .bind(connection.id)
+      .first();
+    return done([], top.id, false);
+  }
+  const match = typeof cursor === 'string' ? POLL_CURSOR_RE.exec(cursor) : null;
+  if (!match) throw invalid('"cursor" must be null or a cursor from an earlier events/poll');
+  const after = Number(match[1]);
+  const since = maxAge == null ? 0 : ctx.now - maxAge;
+
+  const { results } = await ctx.db
+    .prepare(
+      `SELECT e.id, e.recording_id, e.source, e.recorded_at, e.received_at, e.duration FROM entries e
+        WHERE e.connection_id = ? AND e.id > ? AND e.acked_at IS NULL AND e.removed_at IS NULL
+          AND e.expires_at > ? AND COALESCE(e.received_at, 0) >= ?
+        ORDER BY e.id LIMIT ?`,
+    )
+    .bind(connection.id, after, ctx.now, since, limit + 1)
+    .all();
+  const page = results.slice(0, limit);
+  const events = [];
+  for (const row of page) {
+    events.push({
+      eventId: await pollEventId(connection, row.recording_id),
+      name: EVENT_NAME,
+      timestamp: new Date(row.received_at ?? ctx.now).toISOString(),
+      data: entryNote(row, false),
+    });
+  }
+  // maxAgeMs skipped waiting notes past the cursor: say so, as the extension asks.
+  const skipped =
+    maxAge != null &&
+    (await ctx.db
+      .prepare(
+        `SELECT 1 FROM entries e WHERE e.connection_id = ? AND e.id > ? AND e.acked_at IS NULL AND e.removed_at IS NULL
+           AND e.expires_at > ? AND COALESCE(e.received_at, 0) < ? LIMIT 1`,
+      )
+      .bind(connection.id, after, ctx.now, since)
+      .first()) != null;
+  return done(events, page.length ? page[page.length - 1].id : after, results.length > limit, skipped);
+}
+
+/** One id per connection and note across polls (webhook events use their own, per subscription). */
+const pollEventId = async (connection, recordingId) =>
+  `evt_${(await sha256Hex(`${connection.id}\n${EVENT_NAME}\n${recordingId}`)).slice(0, 32)}`;
 
 // --- Sending -------------------------------------------------------------------
 
@@ -326,7 +406,13 @@ async function sendOne(ctx, sub, item) {
     eventId,
     name: EVENT_NAME,
     timestamp: new Date(item.receivedAt ?? ctx.now).toISOString(),
-    data: { id: item.recordingId, recorded_at: item.recordedAt, duration_seconds: item.duration },
+    data: noteRecord({
+      id: item.recordingId,
+      source: item.source,
+      recordedAt: item.recordedAt,
+      receivedAt: item.receivedAt,
+      duration: item.duration,
+    }),
     cursor: null,
   });
   let status = 0;

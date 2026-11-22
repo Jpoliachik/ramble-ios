@@ -19,6 +19,7 @@ Ramble can also send each transcript to an HTTPS endpoint (webhook) from the iPh
 - [Full reference](https://ramble.watch/llms-full.txt): Agent connection, the relay API, the webhook API, and troubleshooting.
 - [Connect your agent](https://ramble.watch/docs): Pairing, the MCP connector, the agent loop, wake-up hooks, errors, and the relay API.
 - [Webhooks](https://ramble.watch/docs/webhooks): Payload format, signature verification, retries, automation platforms.
+- [Note record schema](https://ramble.watch/schemas/note-v1.json): JSON Schema of the one versioned note shape every path carries (relay inbox, MCP tools and event, webhook).
 - [Requirements and troubleshooting](https://ramble.watch/docs/help): Minimum iOS and watchOS, putting Ramble on the Apple Watch Ultra Action button, and fixes for a missing watch app, notes waiting on the watch, held notes, transcription errors, and an agent that isn't picking up.
 - [Support](https://ramble.watch/support): support@ramble.watch, restoring a purchase, refunds.
 

@@ -23,7 +23,7 @@ The behavior is specified in [`specs/`](../specs/): the HTTP contract is [`relay
 | `src/account.js` | Inbox creation, free notes, the unlock and its binding, revoked purchases, the usage tally and suspension, settings, the watch token |
 | `src/notes.js` | Audio uploads, the transcription pipeline and retries, the device copy and acks |
 | `src/relay.js` | Pairing, agent copies, pull and ack, delivery status, wake-up hooks, old builds' text upload |
-| `src/mcp.js`, `src/oauth.js`, `src/events.js` | The MCP connector, its OAuth sign-in, and MCP Events webhook delivery (`specs/connector.md`) |
+| `src/mcp.js`, `src/oauth.js`, `src/events.js` | The MCP connector, its OAuth sign-in, and MCP Events (webhook and poll delivery) (`specs/connector.md`) |
 | `src/legacy.js` | Old builds' `POST /transcribe` for early subscribers, until the fixed retirement date `LEGACY_RETIRES_AT` (2027-01-07 00:00 UTC) |
 | `src/usage.js` | Usage stats: one content-free row per finished note, the app label each device last sent (`specs/usage.md`) |
 | `src/ops.js` | Operator alerts (Telegram): Groq key rejected or missing, a note stuck 30 minutes, permanent failures, 20+ server errors in 10 minutes |

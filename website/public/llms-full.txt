@@ -23,11 +23,16 @@ If the agent supports remote MCP servers (often called custom connectors, with O
 3. Back in the agent, it's connected. It shows in Your agent like any other agent, and Disconnect works the same.
 
 Tools:
-- list_new_notes(limit?): notes not yet marked handled, newest first: id, recorded_at (local time with offset), duration_seconds, transcript_preview. When has_more is true, older ones appear as these are marked handled.
-- get_note(id): the full transcript and details.
+- list_new_notes(limit?): notes not yet marked handled, newest first, each the note record (id, source, recorded_at in local time with offset, received_at, duration_seconds) plus transcript_preview. When has_more is true, older ones appear as these are marked handled.
+- get_note(id): the note record with its full transcript.
 - mark_handled(id): takes the note off the list (the same as an ack below).
 
-Transcripts are the user's own speech, returned as data. The agent reads notes when it runs; nothing wakes it.
+Transcripts are the user's own speech, returned as data. The agent reads notes when it runs, unless its client listens for events.
+
+Events (MCP Events extension, SEP-3415): one event, note_received, whose data is the note record without the transcript. Two delivery modes:
+- webhook: events/subscribe with {"name": "note_received", "arguments": {}, "delivery": {"mode": "webhook", "url", "secret": "whsec_…"}}; signed per Standard Webhooks.
+- poll: events/poll with {"name": "note_received", "arguments": {}, "cursor": null} starts from now and returns a cursor; poll again with it for notes that arrived since, oldest first, up to 50 ("maxEvents" lowers it). The answer has "hasMore" and "nextPollMs" (60000). No subscription needed.
+Then call get_note for the text and mark_handled when done.
 
 An agent given the pairing message can use either way. If its platform supports connectors, it can ask the user to add the connector instead of pairing over HTTP. Neither is better in general.
 
@@ -99,7 +104,8 @@ GET /inbox
 Authorization: Bearer rmba_…
 → {"items": [{"id": 41, "recording_id": "6F1C…", "created_at": "2026-11-01T14:00:00-05:00",
               "received_at": "2026-11-02T00:00:00.000Z", "duration": 8.2,
-              "transcription": "Remind me to book the dentist."}],
+              "transcription": "Remind me to book the dentist.",
+              "note": {"type": "ramble.note", "version": 1, "id": "6F1C…", "source": "watch", …}}],
    "has_more": false}
 
 POST /inbox/ack
@@ -120,6 +126,7 @@ Authorization: Bearer rmba_…
 - Up to 50 items per check, oldest first.
 - Timestamps: "created_at" (ISO 8601 with the recording device's UTC offset, like 2026-11-01T14:00:00-05:00) is when the user started recording, from the watch or iPhone clock. "received_at" (ISO 8601, UTC, with milliseconds) is when the relay accepted the audio; the two can be hours apart if the watch was offline. Read relative times from "created_at" in its offset.
 - "duration" is the length in seconds, measured by the relay.
+- "note" is the same note as the note record: {"type": "ramble.note", "version": 1, "id", "source" ("watch", "phone", or null when unknown), "recorded_at", "received_at", "duration_seconds", "transcript"}. The MCP tools and event and the iPhone webhook carry the same record (lists and events without "transcript"). Within version 1 fields are only ever added; ignore ones you don't know. JSON Schema: https://ramble.watch/schemas/note-v1.json
 - Acks: 1 to 500 integer ids per call. Acking an id that's already gone, or isn't yours, does nothing; "deleted" counts what was actually removed. Anything never acked is deleted 30 days after it was made.
 - Pairing: codes are 12 characters, shown as XXXX-XXXX-XXXX, and match ignoring case, spaces, and dashes. A code makes one connection and gives its token once, so save it right away. Sending a used code again, even after a lost response, gets 409 and no token: ask the user for a new code.
 - Credentials: send `Authorization: Bearer <token>`. `bearer <token>` and the bare token also work.
@@ -205,7 +212,7 @@ if inbox["items"]:
 Pick what the agent supports, or use more than one. None is better in general.
 
 - Relay API (this part): the agent pulls. The relay holds each transcript for up to 30 days until the agent acks it, so nothing is lost if the agent is down for a while. Needs an agent that can make outbound HTTPS calls on a schedule, or a wake-up hook.
-- Connector (MCP, above): the same inbox through tools. No code or token handling for the agent, and it works from sandboxes that block api.ramble.watch. The agent reads notes when it runs; nothing wakes it.
+- Connector (MCP, above): the same inbox through tools. No code or token handling for the agent, and it works from sandboxes that block api.ramble.watch. The agent reads notes when it runs, unless its client listens for the note_received event (above).
 - Webhook (Part 2): the iPhone POSTs each transcript to your HTTPS URL once it has it. No polling. If the URL is down, Ramble tries 3 times in total (30 s, then 2 min apart), then marks the note "Didn't send"; the user can retry it. Best when the agent has an always-on URL that wakes it.
 
 ## Delivery timing
@@ -281,6 +288,7 @@ Webhooks go straight from the iPhone to your URL. Ramble's server never sees the
 - `duration` (number): Recording length in seconds.
 - `transcription` (string): Full transcript text.
 - `device_id` (string, UUID): A random ID for this install of Ramble. Not tied to any account.
+- `note` (object): The note record, the same shape agents get from the relay and the MCP connector: {"type": "ramble.note", "version": 1, "id", "source", "recorded_at" (device offset), "received_at" (UTC, or null if the iPhone doesn't know it yet), "duration_seconds", "transcript"}. JSON Schema: https://ramble.watch/schemas/note-v1.json
 
 Notes with no speech detected are not sent.
 
