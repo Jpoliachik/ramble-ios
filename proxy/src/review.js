@@ -137,3 +137,18 @@ export function domainToken(request, ctx) {
   }
   return new Response(value.trim(), { headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' } });
 }
+
+// Muse puts its challenge in the path and expects `muse-challenge=<token>` back.
+// Only the token in the MUSE_CHALLENGE var answers; any other is 404.
+export const MUSE_CHALLENGE_PATH = /^\/\.well-known\/muse-challenge\/([^/]+)$/;
+
+/** GET /.well-known/muse-challenge/:token */
+export function museChallenge(_request, ctx, token) {
+  const value = typeof ctx.env.MUSE_CHALLENGE === 'string' ? ctx.env.MUSE_CHALLENGE.trim() : '';
+  if (!value || token !== value) {
+    return new Response('Not found', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+  }
+  return new Response(`muse-challenge=${value}`, {
+    headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' },
+  });
+}

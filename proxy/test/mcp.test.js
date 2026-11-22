@@ -861,4 +861,14 @@ describe('directory domain checks', () => {
     assert.match(openai.headers.get('Content-Type'), /^text\/plain/);
     assert.equal((await send('GET', '/.well-known/google-connected-apps')).text, 'tok-google');
   });
+
+  it('answers Muse only for its own challenge token', async () => {
+    assert.equal((await send('GET', '/.well-known/muse-challenge/abc123')).status, 404);
+    h.envExtra = { MUSE_CHALLENGE: 'abc123' };
+    const ok = await send('GET', '/.well-known/muse-challenge/abc123');
+    assert.equal(ok.status, 200);
+    assert.equal(ok.text, 'muse-challenge=abc123');
+    assert.match(ok.headers.get('Content-Type'), /^text\/plain/);
+    assert.equal((await send('GET', '/.well-known/muse-challenge/other')).status, 404);
+  });
 });

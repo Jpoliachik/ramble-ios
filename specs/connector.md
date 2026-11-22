@@ -202,7 +202,7 @@ Directory reviewers sign in without the Ramble app. When the Worker secret `REVI
 - THEN the five sample notes are back, and other review connections are unaffected
 
 ### Requirement: Domain checks
-`GET /.well-known/openai-apps-challenge` and `GET /.well-known/google-connected-apps` SHALL return the Worker setting `OPENAI_APPS_CHALLENGE` or `GOOGLE_CONNECTED_APPS_TOKEN`, trimmed, as `text/plain` with `200`, and `404` while unset.
+`GET /.well-known/openai-apps-challenge` and `GET /.well-known/google-connected-apps` SHALL return the Worker setting `OPENAI_APPS_CHALLENGE` or `GOOGLE_CONNECTED_APPS_TOKEN`, trimmed, as `text/plain` with `200`, and `404` while unset. `GET /.well-known/muse-challenge/:token` SHALL return `muse-challenge=<token>` as `text/plain` with `200` when the token equals the `MUSE_CHALLENGE` var, and `404` otherwise.
 
 #### Scenario: OpenAI verifies the domain
 - GIVEN `OPENAI_APPS_CHALLENGE` is set to the token from the OpenAI dashboard
