@@ -28,6 +28,7 @@ struct OnboardingConnectStep: View {
     /// Connections when the current code was issued; more than this means it was used.
     @State private var baselineCount = 0
     @State private var justCopied = false
+    @State private var codeCopied = false
     /// The app went to the background after copying, i.e. they went to paste.
     @State private var leftAfterCopy = false
     @State private var isLoadingCode = false
@@ -48,9 +49,14 @@ struct OnboardingConnectStep: View {
                         messageBox
                     }
                     ConnectStepRow(number: 2, state: rowState(1), title: "Paste it to your agent", showsLine: true) {
-                        Text("Send it in any chat with your agent.")
-                            .font(.system(size: 15))
-                            .foregroundStyle(Color.obInkSoft)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Send it in any chat with your agent.")
+                                .font(.system(size: 15))
+                                .foregroundStyle(Color.obInkSoft)
+                            Text("Sign-in page? Tap the code to copy just that.")
+                                .font(.system(size: 13))
+                                .foregroundStyle(Color.obInkFaint)
+                        }
                     }
                     ConnectStepRow(
                         number: 3,
@@ -108,26 +114,44 @@ struct OnboardingConnectStep: View {
 
     private var messageBox: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(PairingMessage.text(code: pairCode?.code ?? "XXXX-XXXX"))
+            messageText
                 .font(.system(size: 15))
                 .foregroundStyle(Color.obInk)
-                .textSelection(.enabled)
+                .tint(chipTextColor)
                 .fixedSize(horizontal: false, vertical: true)
                 .redacted(reason: pairCode == nil ? .placeholder : [])
+                .environment(\.openURL, OpenURLAction { url in
+                    guard url.scheme == Self.copyCodeScheme else { return .systemAction }
+                    copyCode()
+                    return .handled
+                })
+                .accessibilityAction(named: "Copy code") { copyCode() }
 
             TimelineView(.periodic(from: .now, by: 1)) { context in
                 let remaining = pairCode.map { Int($0.expiresAt.timeIntervalSince(context.date)) } ?? 0
                 let expired = pairCode != nil && remaining <= 0
-                HStack {
-                    Text(metaText(remaining: remaining, expired: expired))
-                        .font(.system(size: 12))
-                        .foregroundStyle(Color.obInkFaint)
-                        .monospacedDigit()
-                    Spacer()
-                    copyButton(expired: expired)
+                let meta = Text(metaText(remaining: remaining, expired: expired))
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.obInkFaint)
+                    .monospacedDigit()
+                // "Copy message" and the countdown share a row when they fit,
+                // and stack on a narrow phone or at large text sizes. The
+                // button keeps the width of its longest label, so the layout
+                // doesn't jump when the label changes to "Copy again".
+                ViewThatFits(in: .horizontal) {
+                    HStack {
+                        meta.fixedSize()
+                        Spacer(minLength: 8)
+                        steadyCopyButton(expired: expired, alignment: .trailing).fixedSize()
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        meta
+                        steadyCopyButton(expired: expired, alignment: .leading)
+                    }
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -136,10 +160,47 @@ struct OnboardingConnectStep: View {
         .padding(.top, 8)
     }
 
+    private static let copyCodeScheme = "ramble-copy-code"
+
+    private var chipTextColor: Color {
+        codeCopied ? Color.onOnboardingAmber : Color.codeChipText
+    }
+
+    /// The message with the pairing code as a tappable amber chip that copies
+    /// just the code, for connector sign-in pages.
+    private var messageText: Text {
+        let code = pairCode?.code ?? "XXXX-XXXX-XXXX"
+        let parts = PairingMessage.text(code: code).components(separatedBy: code)
+        let before = AttributedString(parts.first ?? "")
+        let after = AttributedString(parts.count > 1 ? parts[1] : "")
+
+        // Word joiners keep the code on one line instead of breaking at a dash.
+        // Narrow no-break spaces pad the amber fill around the code.
+        let unbroken = code.replacingOccurrences(of: "-", with: "\u{2060}-\u{2060}")
+        var chip = AttributedString("\u{202F}\(unbroken)\u{202F}")
+        chip.font = .system(size: 15, weight: .semibold, design: .monospaced)
+        chip.foregroundColor = chipTextColor
+        // After a copy the chip fills solid amber for 2 seconds. Nothing is
+        // added to the text, so the message never reflows under the finger.
+        chip.backgroundColor = codeCopied ? Color.brandAmber : Color.brandAmberSoft
+        chip.link = URL(string: "\(Self.copyCodeScheme):code")
+
+        return Text("\(before)\(chip)\(after)")
+    }
+
     private func metaText(remaining: Int, expired: Bool) -> String {
         if pairCode == nil { return isLoadingCode ? "Getting a code…" : " " }
         if expired { return "This code expired" }
         return "Works once · \(remaining / 60):\(String(format: "%02d", remaining % 60)) left"
+    }
+
+    private func steadyCopyButton(expired: Bool, alignment: Alignment) -> some View {
+        ZStack(alignment: alignment) {
+            Label("Copy message", systemImage: "doc.on.doc")
+                .modifier(CopyCapsule(prominent: false))
+                .hidden()
+            copyButton(expired: expired)
+        }
     }
 
     @ViewBuilder
@@ -166,7 +227,7 @@ struct OnboardingConnectStep: View {
 
     private var copyTitle: String {
         if justCopied { return "Copied" }
-        return stage == .copy ? "Copy" : "Copy again"
+        return stage == .copy ? "Copy message" : "Copy again"
     }
 
     private var stepThreeTitle: String {
@@ -216,6 +277,19 @@ struct OnboardingConnectStep: View {
         Task {
             try? await Task.sleep(for: .seconds(2))
             justCopied = false
+        }
+    }
+
+    /// Copies only the pairing code, for a connector's sign-in page.
+    private func copyCode() {
+        guard let pairCode, pairCode.expiresAt > .now else { return }
+        UIPasteboard.general.string = pairCode.code
+        HapticService.success()
+        codeCopied = true
+        if stage == .copy { stage = .paste }
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            codeCopied = false
         }
     }
 
@@ -384,6 +458,16 @@ private struct CopyCapsule: ViewModifier {
             .frame(height: 34)
             .background(prominent ? Color.brandAmber : Color(.tertiarySystemFill), in: Capsule())
     }
+}
+
+private extension Color {
+    /// Amber for the code chip's text: #b45309 in light, a lighter amber in
+    /// dark, so it reads on the soft amber fill.
+    static let codeChipText = Color(UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0xFB / 255, green: 0xBF / 255, blue: 0x5A / 255, alpha: 1)
+            : UIColor(red: 0xB4 / 255, green: 0x53 / 255, blue: 0x09 / 255, alpha: 1)
+    })
 }
 
 extension Color {
