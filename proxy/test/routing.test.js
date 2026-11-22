@@ -193,7 +193,7 @@ describe('operator', () => {
     h.envExtra = { TELEGRAM_BOT_TOKEN: undefined };
     const secret = await h.inbox();
     const [{ id }] = h.rows('SELECT id FROM inboxes');
-    h.db.sqlite.exec(`INSERT INTO usage (user_id, month, seconds) VALUES ('${id}', '2026-11', ${100 * 3600 - 1})`);
+    h.db.sqlite.exec(`INSERT INTO usage (user_id, month, seconds) VALUES ('${id}', '2026-11', ${50 * 3600 - 1})`);
     await h.upload(secret, noteId(1));
     await h.cron();
     assert.equal(h.alerts.length, 0);
