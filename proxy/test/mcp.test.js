@@ -553,7 +553,10 @@ describe('events (MCP Events, webhook delivery)', () => {
 
     // maxAgeMs leaves out older copies.
     h.now += 10 * MINUTE;
-    assert.deepEqual((await poll({ cursor: start.cursor, maxAgeMs: MINUTE })).result.events, []);
+    const aged = (await poll({ cursor: start.cursor, maxAgeMs: MINUTE })).result;
+    assert.deepEqual(aged.events, []);
+    assert.equal(aged.truncated, true);
+    assert.equal(aged.resultType, 'complete');
     assert.deepEqual((await poll({ cursor: start.cursor, maxAgeMs: 60 * MINUTE })).result.events.map((e) => e.data.id), [noteId(2)]);
 
     // Bad input.

@@ -206,10 +206,11 @@ async function poll(params, connection, ctx) {
     throw invalid('"maxAgeMs" must be a non-negative number of milliseconds');
   }
   const cursor = params.cursor ?? null;
-  const done = (events, last, hasMore) => ({
+  const done = (events, last, hasMore, truncated = false) => ({
+    resultType: 'complete',
     events,
     cursor: pollCursor(last),
-    truncated: false,
+    truncated,
     hasMore,
     nextPollMs: hasMore ? 0 : POLL_INTERVAL_MS,
   });
@@ -245,10 +246,20 @@ async function poll(params, connection, ctx) {
       data: entryNote(row, false),
     });
   }
-  return done(events, page.length ? page[page.length - 1].id : after, results.length > limit);
+  // maxAgeMs skipped waiting notes past the cursor: say so, as the extension asks.
+  const skipped =
+    maxAge != null &&
+    (await ctx.db
+      .prepare(
+        `SELECT 1 FROM entries e WHERE e.connection_id = ? AND e.id > ? AND e.acked_at IS NULL AND e.removed_at IS NULL
+           AND e.expires_at > ? AND COALESCE(e.received_at, 0) < ? LIMIT 1`,
+      )
+      .bind(connection.id, after, ctx.now, since)
+      .first()) != null;
+  return done(events, page.length ? page[page.length - 1].id : after, results.length > limit, skipped);
 }
 
-/** One id per connection and note, whichever way it is delivered. */
+/** One id per connection and note across polls (webhook events use their own, per subscription). */
 const pollEventId = async (connection, recordingId) =>
   `evt_${(await sha256Hex(`${connection.id}\n${EVENT_NAME}\n${recordingId}`)).slice(0, 32)}`;
 
