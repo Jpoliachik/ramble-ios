@@ -128,10 +128,10 @@ The Ramble plugin for Claude SHALL contain exactly the connector at `https://api
 
 ## Events
 
-Webhook delivery from the draft MCP Events extension, as ChatGPT implements it. Polling and streaming delivery are not offered, and missed events are not replayed: the note still waits in `list_new_notes`.
+Webhook and poll delivery from the MCP Events extension (SEP-3415), declared with `events` in `initialize` capabilities as ChatGPT expects. Streaming delivery is not offered, and webhook events missed while unsubscribed are not replayed: the note still waits in `list_new_notes`.
 
 ### Requirement: One event, note_received
-`events/list` SHALL return exactly one event, `note_received`, with `delivery` `["webhook"]`, an `inputSchema` that takes no arguments, and a `payloadSchema` for the note record without `transcript` ([note.md](note.md)). Its description SHALL say the event carries no text, and to call `get_note` for the transcript and `mark_handled` once handled.
+`events/list` SHALL return exactly one event, `note_received`, with `delivery` `["webhook", "poll"]`, an `inputSchema` that takes no arguments, and a `payloadSchema` for the note record without `transcript` ([note.md](note.md)). Its description SHALL say the event carries no text, and to call `get_note` for the transcript and `mark_handled` once handled.
 
 ### Requirement: Subscribing
 `events/subscribe` with `{"name": "note_received", "arguments": {}, "delivery": {"mode": "webhook", "url", "secret"}, "ttlMs"?}` SHALL first POST `{"type": "verification", "challenge"}` to the URL, signed like an event with `webhook-id` `msg_verification_…`, and store the subscription only if a `2xx` answer's JSON `challenge` (read up to 4 KB) matches. It SHALL return `{"id", "refreshBefore", "cursor": null, "truncated": false}`. The id is the same for the same connection, event and URL, so subscribing again while it is live refreshes it in place with no new verification: new expiry, and a new secret if one was sent, the old one still signing alongside it for an hour. Lifetime is 30 days by default, `ttlMs` between 1 minute and 365 days, and `ttlMs: null` never expires (`refreshBefore: null`), so weeks without a note never end push on their own. The URL SHALL be public `https://` with a hostname on the default port, not the relay itself (the same rule as wake-up hooks, [delivery.md](delivery.md)); the secret SHALL be `whsec_` plus base64 of 24–64 bytes, stored only encrypted. A connection SHALL keep at most 10 subscriptions, a new one replacing the expired or least recently refreshed, and make at most 30 new ones an hour. A connection disconnected while its subscribe is in flight stores nothing. Errors: `-32602` for a bad name, arguments, URL or secret; `-32015` with `data.reason` `challenge_failed`, `timeout`, `connection_refused`, `http_4xx` or `http_5xx` when verification fails; `-32000` over the hourly limit or after a disconnect.
@@ -150,6 +150,20 @@ Webhook delivery from the draft MCP Events extension, as ChatGPT implements it. 
 - GIVEN ChatGPT subscribed 29 days ago and the person recorded nothing since
 - WHEN the person records a note
 - THEN ChatGPT gets the event
+
+### Requirement: Polling
+`events/poll` with `{"name": "note_received", "arguments": {}, "cursor", "maxEvents"?, "maxAgeMs"?}` SHALL need no subscription and keep no state. It SHALL return `{"events", "cursor", "truncated": false, "hasMore", "nextPollMs"}`. A `null` or missing cursor starts from now: no events, and a cursor for later polls. With a cursor from an earlier poll, `events` SHALL be this connection's copies made after it that are still waiting (not handled, removed or expired), oldest first, up to `maxEvents` (default and most 50), leaving out copies the relay received more than `maxAgeMs` ago when it is given. Each event is `{"eventId", "name": "note_received", "timestamp", "data"}`, `data` the note record without `transcript` ([note.md](note.md)), and the same note always has the same `eventId` for this connection. `hasMore` is true when more are waiting past the page, with `nextPollMs` `0`; otherwise `nextPollMs` is `60000`. A poll counts as the agent checking in, like a tool call. Errors: `-32602` for a bad name, arguments, cursor, `maxEvents` or `maxAgeMs`.
+
+#### Scenario: An agent with no public URL listens
+- GIVEN an agent connected through the MCP connector polls `note_received` with a `null` cursor and keeps the cursor it gets
+- WHEN the person records two notes and the agent polls again with that cursor
+- THEN it gets two events, oldest first, each with the note record and no text
+- AND polling with the new cursor returns no events until the next note
+
+#### Scenario: A note handled before the poll
+- GIVEN an agent's cursor is from before a note arrived
+- WHEN the agent marks that note handled through `mark_handled` and then polls
+- THEN the poll leaves that note out
 
 ### Requirement: Delivery
 When a connection gets a new copy of a note ([delivery.md](delivery.md)), the relay SHALL POST to each of its live subscriptions, at most 4 at a time, `{"eventId", "name": "note_received", "timestamp", "data", "cursor": null}`, where `data` is the note record without `transcript` ([note.md](note.md)). Events SHALL carry no transcript text, like wake-up hook pings. They SHALL be signed per Standard Webhooks (`webhook-id` equal to `eventId`, `webhook-timestamp`, `webhook-signature` `v1,<base64 HMAC-SHA256>`, space-separated when two secrets sign) with `X-MCP-Subscription-Id`, never follow redirects, and time out after 5 seconds; response bodies are not read. Delivery is best effort: up to 3 tries, 1 and 3 seconds apart, with the same `eventId` and a fresh signature, stopping at a `2xx`, `3xx` or `4xx` other than `408` and `429`. A subscription whose deliveries have all failed for 7 days SHALL be deleted on its next failure; any success resets that. Each copy is sent once per subscription; a repeat upload of the same note sends nothing.

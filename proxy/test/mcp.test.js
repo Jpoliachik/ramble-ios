@@ -509,7 +509,74 @@ describe('events (MCP Events, webhook delivery)', () => {
     const init = await rpc(token, 'initialize', { protocolVersion: '2025-11-25' });
     assert.deepEqual(init.body.result.capabilities.events, {});
     const list = (await rpc(token, 'events/list')).body.result.events;
-    assert.deepEqual(list.map((e) => [e.name, e.delivery]), [['note_received', ['webhook']]]);
+    assert.deepEqual(list.map((e) => [e.name, e.delivery]), [['note_received', ['webhook', 'poll']]]);
+  });
+
+  it('polls from now, then returns waiting notes oldest first with no text', async () => {
+    const { secret, token } = await setup();
+    await say(secret, 1);
+    await h.settle();
+    const poll = async (extra = {}) => (await rpc(token, 'events/poll', { name: 'note_received', arguments: {}, ...extra })).body;
+
+    // From now: the note already waiting is in list_new_notes, not here.
+    const start = (await poll({ cursor: null })).result;
+    assert.deepEqual(start.events, []);
+    assert.match(start.cursor, /^n1:\d+$/);
+    assert.equal(start.hasMore, false);
+    assert.equal(start.nextPollMs, 60000);
+    assert.equal(start.truncated, false);
+
+    h.now += MINUTE;
+    await say(secret, 2);
+    await say(secret, 3);
+    await h.settle();
+    const next = (await poll({ cursor: start.cursor })).result;
+    assert.deepEqual(next.events.map((e) => e.data.id), [noteId(2), noteId(3)]);
+    assert.equal(next.events[0].name, 'note_received');
+    assert.match(next.events[0].eventId, /^evt_[0-9a-f]{32}$/);
+    assert.equal(next.events[0].data.type, 'ramble.note');
+    assert.equal('transcript' in next.events[0].data, false);
+    // Same note, same event id, on every poll.
+    const again = (await poll({ cursor: start.cursor })).result;
+    assert.equal(again.events[0].eventId, next.events[0].eventId);
+
+    // Paging, and a note handled before the poll is left out.
+    const page = (await poll({ cursor: start.cursor, maxEvents: 1 })).result;
+    assert.equal(page.events.length, 1);
+    assert.equal(page.hasMore, true);
+    assert.equal(page.nextPollMs, 0);
+    await tool(token, 'mark_handled', { id: noteId(3) });
+    const rest = (await poll({ cursor: page.cursor })).result;
+    assert.deepEqual(rest.events, []);
+    assert.equal(rest.hasMore, false);
+    assert.deepEqual((await poll({ cursor: next.cursor })).result.events, []);
+
+    // maxAgeMs leaves out older copies.
+    h.now += 10 * MINUTE;
+    assert.deepEqual((await poll({ cursor: start.cursor, maxAgeMs: MINUTE })).result.events, []);
+    assert.deepEqual((await poll({ cursor: start.cursor, maxAgeMs: 60 * MINUTE })).result.events.map((e) => e.data.id), [noteId(2)]);
+
+    // Bad input.
+    assert.equal((await poll({ cursor: 'bogus' })).error.code, -32602);
+    assert.equal((await poll({ cursor: null, maxEvents: 0 })).error.code, -32602);
+    assert.equal((await rpc(token, 'events/poll', { name: 'other', arguments: {}, cursor: null })).body.error.code, -32602);
+  });
+
+  it('polls only its own connection', async () => {
+    const { secret, token } = await setup();
+    const other = await signIn(secret);
+    const cursorA = (await rpc(token, 'events/poll', { name: 'note_received', arguments: {}, cursor: null })).body.result.cursor;
+    const cursorB = (await rpc(other, 'events/poll', { name: 'note_received', arguments: {}, cursor: null })).body.result.cursor;
+    h.now += MINUTE;
+    await say(secret, 1);
+    await h.settle();
+    const a = (await rpc(token, 'events/poll', { name: 'note_received', arguments: {}, cursor: cursorA })).body.result;
+    const b = (await rpc(other, 'events/poll', { name: 'note_received', arguments: {}, cursor: cursorB })).body.result;
+    assert.equal(a.events.length, 1);
+    assert.equal(b.events.length, 1);
+    assert.notEqual(a.events[0].eventId, b.events[0].eventId);
+    const stranger = await signIn(await h.inbox());
+    assert.deepEqual((await rpc(stranger, 'events/poll', { name: 'note_received', arguments: {}, cursor: cursorA })).body.result.events, []);
   });
 
   it('verifies the callback, then sends a signed event when a note lands', async () => {

@@ -175,6 +175,7 @@ final class NoteSyncService: ObservableObject {
             r.hold = nil
         }
         if let accepted = note.receivedAt { r.acceptedAt = accepted }
+        if !note.recordedAt.isEmpty { r.recordedAtText = note.recordedAt }
         if let measured = note.duration, measured > 0 { r.duration = measured }
 
         if r.status != oldStatus {

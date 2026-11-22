@@ -27,7 +27,12 @@ Tools:
 - get_note(id): the note record with its full transcript.
 - mark_handled(id): takes the note off the list (the same as an ack below).
 
-Transcripts are the user's own speech, returned as data. The agent reads notes when it runs; nothing wakes it.
+Transcripts are the user's own speech, returned as data. The agent reads notes when it runs, unless its client listens for events.
+
+Events (MCP Events extension, SEP-3415): one event, note_received, whose data is the note record without the transcript. Two delivery modes:
+- webhook: events/subscribe with {"name": "note_received", "arguments": {}, "delivery": {"mode": "webhook", "url", "secret": "whsec_…"}}; signed per Standard Webhooks.
+- poll: events/poll with {"name": "note_received", "arguments": {}, "cursor": null} starts from now and returns a cursor; poll again with it for notes that arrived since, oldest first, up to 50 ("maxEvents" lowers it). The answer has "hasMore" and "nextPollMs" (60000). No subscription needed.
+Then call get_note for the text and mark_handled when done.
 
 An agent given the pairing message can use either way. If its platform supports connectors, it can ask the user to add the connector instead of pairing over HTTP. Neither is better in general.
 
@@ -207,7 +212,7 @@ if inbox["items"]:
 Pick what the agent supports, or use more than one. None is better in general.
 
 - Relay API (this part): the agent pulls. The relay holds each transcript for up to 30 days until the agent acks it, so nothing is lost if the agent is down for a while. Needs an agent that can make outbound HTTPS calls on a schedule, or a wake-up hook.
-- Connector (MCP, above): the same inbox through tools. No code or token handling for the agent, and it works from sandboxes that block api.ramble.watch. The agent reads notes when it runs; nothing wakes it.
+- Connector (MCP, above): the same inbox through tools. No code or token handling for the agent, and it works from sandboxes that block api.ramble.watch. The agent reads notes when it runs, unless its client listens for the note_received event (above).
 - Webhook (Part 2): the iPhone POSTs each transcript to your HTTPS URL once it has it. No polling. If the URL is down, Ramble tries 3 times in total (30 s, then 2 min apart), then marks the note "Didn't send"; the user can retry it. Best when the agent has an always-on URL that wakes it.
 
 ## Delivery timing

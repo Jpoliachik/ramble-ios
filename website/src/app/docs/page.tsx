@@ -475,8 +475,9 @@ export default function AgentDocs() {
                     .
                   </Strong>{" "}
                   The same inbox, read through tools instead of HTTP calls. No code or token handling for the agent,
-                  and it works from sandboxes that block {RELAY_HOST}. The agent reads notes when it runs; nothing wakes
-                  it.
+                  and it works from sandboxes that block {RELAY_HOST}. The agent reads notes when it runs, unless its
+                  client listens for the connector&rsquo;s <InlineCode>note_received</InlineCode> event (MCP Events,
+                  by webhook or by polling).
                 </li>
                 <li>
                   <Strong>

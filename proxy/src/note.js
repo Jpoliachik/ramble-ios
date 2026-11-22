@@ -45,7 +45,7 @@ export const NOTE_SUMMARY_SCHEMA = {
     type: { const: NOTE_TYPE },
     version: { const: NOTE_VERSION },
     id: { type: 'string', description: 'The note id (a UUID). Stable everywhere the note appears.' },
-    source: { type: ['string', 'null'], enum: ['watch', 'phone', null], description: 'The device that recorded it, or null when unknown.' },
+    source: { type: ['string', 'null'], description: 'The device that recorded it: today "watch" or "phone". null when unknown; treat any other value as unknown.' },
     recorded_at: { type: 'string', description: "When recording started, in the device's local time with its offset." },
     received_at: { type: ['string', 'null'], description: 'When Ramble received the audio, ISO 8601 UTC.' },
     duration_seconds: { type: 'number' },

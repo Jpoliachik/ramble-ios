@@ -12,8 +12,8 @@
       "description": "The note id: a UUID, uppercase. Notes from old builds may carry other ids. The same on every surface."
     },
     "source": {
-      "enum": ["watch", "phone", null],
-      "description": "The device that recorded it, or null when unknown."
+      "type": ["string", "null"],
+      "description": "The device that recorded it: today \"watch\" or \"phone\". null when unknown. Treat any other value as unknown."
     },
     "recorded_at": {
       "type": "string",

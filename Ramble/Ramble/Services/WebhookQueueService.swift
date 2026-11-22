@@ -119,6 +119,7 @@ final class WebhookQueueService: ObservableObject {
         id: String,
         source: NoteSource,
         createdAt: Date,
+        recordedAtText: String?,
         receivedAt: Date?,
         duration: TimeInterval,
         transcript: String
@@ -128,7 +129,8 @@ final class WebhookQueueService: ObservableObject {
             "version": 1,
             "id": id,
             "source": source.rawValue,
-            "recorded_at": RelayService.localTimestamp(createdAt),
+            // The relay's string when the phone has it, so every path agrees.
+            "recorded_at": recordedAtText ?? RelayService.localTimestamp(createdAt),
             "received_at": receivedAt.map { utcMillisFormatter.string(from: $0) as Any } ?? NSNull(),
             "duration_seconds": duration,
             "transcript": transcript
@@ -199,6 +201,7 @@ final class WebhookQueueService: ObservableObject {
                 id: recording.id.uuidString,
                 source: recording.source,
                 createdAt: recording.createdAt,
+                recordedAtText: recording.recordedAtText,
                 receivedAt: recording.acceptedAt,
                 duration: recording.duration,
                 transcript: recording.transcription ?? ""
@@ -375,6 +378,7 @@ final class WebhookQueueService: ObservableObject {
                 id: testId,
                 source: .phone,
                 createdAt: now,
+                recordedAtText: nil,
                 receivedAt: now,
                 duration: 0,
                 transcript: testText

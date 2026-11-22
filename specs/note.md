@@ -13,8 +13,8 @@ A note SHALL appear to agents and automations as this JSON object, the note reco
 | `type` | always `"ramble.note"` |
 | `version` | always `1` for this shape |
 | `id` | the note's id: a UUID, uppercase; notes from old builds may carry other ids. The same note has the same `id` on every surface |
-| `source` | `"watch"` or `"phone"`, the device that recorded it; `null` when unknown (notes delivered by old builds) |
-| `recorded_at` | when recording started, ISO 8601 exactly as the recording device sent it, with its UTC offset |
+| `source` | the device that recorded it: today `"watch"` or `"phone"`; `null` when unknown (notes delivered by old builds). Agents SHOULD treat any other value as unknown |
+| `recorded_at` | when recording started, ISO 8601 exactly as the recording device sent it, with its UTC offset. In the webhook, the iPhone sends the relay's string once it has it, and otherwise its own clock and offset |
 | `received_at` | when Ramble's server accepted the audio, ISO 8601 UTC with milliseconds; `null` when the iPhone doesn't know it yet |
 | `duration_seconds` | the recording's length in seconds |
 | `transcript` | the full transcript text |

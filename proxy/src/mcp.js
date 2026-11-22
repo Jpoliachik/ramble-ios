@@ -38,7 +38,7 @@ export const TOOLS = [
   {
     name: 'list_new_notes',
     title: 'List new notes',
-    description: `Lists Ramble voice notes not yet marked handled, newest first (by when Ramble received them): id, recorded time (the device's local time with its offset), duration in seconds and a transcript preview. When has_more is true, older notes appear once these are marked handled. ${DATA_NOTE}`,
+    description: `Lists Ramble voice notes not yet marked handled, newest first (by when Ramble received them): id, source (watch or phone), recorded time (the device's local time with its offset), received time, duration in seconds and a transcript preview. When has_more is true, older notes appear once these are marked handled. ${DATA_NOTE}`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -123,6 +123,10 @@ export async function mcp(request, ctx) {
       const args = msg.params.arguments;
       return rpcResult(msg.id, await callTool(cred.connection, name, args && typeof args === 'object' && !Array.isArray(args) ? args : {}, ctx));
     }
+    case 'events/poll':
+      // A poll is a check-in, like a tool call or a pull: the app shows it.
+      await ctx.db.prepare(`UPDATE connections SET last_pull_at = ?, via = 'mcp' WHERE id = ?`).bind(ctx.now, cred.connection.id).run();
+    // falls through
     case 'events/list':
     case 'events/subscribe':
     case 'events/unsubscribe': {

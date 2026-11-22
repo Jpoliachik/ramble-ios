@@ -111,6 +111,9 @@ struct Recording: Identifiable, Codable, Hashable {
     var retryRequested: Bool
     /// When the server accepted the audio (`received_at`).
     var acceptedAt: Date?
+    /// `recorded_at` exactly as the server has it (the recording device's
+    /// own string, offset included), for the webhook's note record.
+    var recordedAtText: String? = nil
     /// When the note became final (done or failed), as the phone saw it.
     var finishedAt: Date?
     var webhookStatus: WebhookStatus?
@@ -192,6 +195,7 @@ struct Recording: Identifiable, Codable, Hashable {
         retryCount = try c.decodeIfPresent(Int.self, forKey: .retryCount) ?? 0
         retryRequested = try c.decodeIfPresent(Bool.self, forKey: .retryRequested) ?? false
         acceptedAt = try c.decodeIfPresent(Date.self, forKey: .acceptedAt)
+        recordedAtText = try c.decodeIfPresent(String.self, forKey: .recordedAtText)
         finishedAt = try c.decodeIfPresent(Date.self, forKey: .finishedAt)
 
         if let delivery = try c.decodeIfPresent(AgentDelivery.self, forKey: .agentDelivery) {
@@ -237,6 +241,7 @@ struct Recording: Identifiable, Codable, Hashable {
         if retryCount > 0 { try c.encode(retryCount, forKey: .retryCount) }
         if retryRequested { try c.encode(retryRequested, forKey: .retryRequested) }
         try c.encodeIfPresent(acceptedAt, forKey: .acceptedAt)
+        try c.encodeIfPresent(recordedAtText, forKey: .recordedAtText)
         try c.encodeIfPresent(finishedAt, forKey: .finishedAt)
         try c.encodeIfPresent(webhookStatus, forKey: .webhookStatus)
         try c.encodeIfPresent(agentDelivery, forKey: .agentDelivery)
@@ -248,7 +253,7 @@ struct Recording: Identifiable, Codable, Hashable {
     private enum CodingKeys: String, CodingKey {
         case id, createdAt, duration, audioFileName, source, status, transcription
         case noSpeech, failureResult, hold, releasedAt, retryCount, retryRequested
-        case acceptedAt, finishedAt, webhookStatus, agentDelivery, receivedAt, lastError, activityLog
+        case acceptedAt, recordedAtText, finishedAt, webhookStatus, agentDelivery, receivedAt, lastError, activityLog
         // Legacy keys, read for migration only
         case relayStatus, relayUploadedAt, pickedUpAt
     }
