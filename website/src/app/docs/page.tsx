@@ -87,7 +87,8 @@ GET /inbox
 Authorization: Bearer rmba_…
 → {"items": [{"id": 41, "recording_id": "6F1C…", "created_at": "2026-11-01T14:00:00-05:00",
               "received_at": "2026-11-02T00:00:00.000Z", "duration": 8.2,
-              "transcription": "Remind me to book the dentist."}],
+              "transcription": "Remind me to book the dentist.",
+              "note": {"type": "ramble.note", "version": 1, "id": "6F1C…", "source": "watch", …}}],
    "has_more": false}
 
 POST /inbox/ack
@@ -362,6 +363,17 @@ export default function AgentDocs() {
                 <li>
                   <Strong>Duration.</Strong> <InlineCode>duration</InlineCode> is the length in seconds, measured by
                   the relay.
+                </li>
+                <li>
+                  <Strong>The note record.</Strong> <InlineCode>note</InlineCode> is the same note in the one shape
+                  every Ramble path uses: these items, the connector&rsquo;s tools and event, and the iPhone webhook.
+                  It has <InlineCode>type</InlineCode> (<InlineCode>ramble.note</InlineCode>),{" "}
+                  <InlineCode>version</InlineCode> (1), <InlineCode>id</InlineCode>, <InlineCode>source</InlineCode>{" "}
+                  (<InlineCode>watch</InlineCode>, <InlineCode>phone</InlineCode>, or <InlineCode>null</InlineCode>{" "}
+                  when unknown), <InlineCode>recorded_at</InlineCode>, <InlineCode>received_at</InlineCode>,{" "}
+                  <InlineCode>duration_seconds</InlineCode> and <InlineCode>transcript</InlineCode>. Within version 1,
+                  fields are only ever added, so ignore ones you don&rsquo;t know. JSON Schema:{" "}
+                  <a href="/schemas/note-v1.json" className="underline">/schemas/note-v1.json</a>.
                 </li>
                 <li>
                   <Strong>Acks.</Strong> 1 to 500 integer ids per call. Acking an id that&rsquo;s already gone, or

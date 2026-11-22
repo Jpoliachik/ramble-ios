@@ -288,7 +288,7 @@ A note's transcript SHALL stay readable by the person's devices until the phone 
 - THEN its next pull gets `401` and the 3 copies are gone
 
 ### Requirement: Agent pull and ack
-`GET /inbox` (agent) SHALL return `{"items": [{"id", "recording_id", "created_at", "received_at", "duration", "transcription"}], "has_more"}`: that agent's copies only, oldest first, up to 50. `id` is an integer, `created_at` the recorded time as sent, `received_at` when the relay accepted the audio, `duration` relay-measured seconds. Unacked items SHALL come back on every pull. `POST /inbox/ack` with `{"ids": [1–500 integers]}` SHALL delete those of the agent's own copies and return `{"deleted": <n>}`; IDs gone or not the agent's count as nothing; any other body gets `400`. Unacked copies SHALL be deleted 30 days after they are made.
+`GET /inbox` (agent) SHALL return `{"items": [{"id", "recording_id", "created_at", "received_at", "duration", "transcription", "note"}], "has_more"}`: that agent's copies only, oldest first, up to 50. `id` is an integer, `created_at` the recorded time as sent, `received_at` when the relay accepted the audio, `duration` relay-measured seconds, and `note` the same note as the note record, transcript included ([note.md](note.md)). Unacked items SHALL come back on every pull. `POST /inbox/ack` with `{"ids": [1–500 integers]}` SHALL delete those of the agent's own copies and return `{"deleted": <n>}`; IDs gone or not the agent's count as nothing; any other body gets `400`. Unacked copies SHALL be deleted 30 days after they are made.
 
 #### Scenario: Nothing waiting
 - GIVEN no copies for this agent

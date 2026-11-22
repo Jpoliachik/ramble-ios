@@ -45,7 +45,17 @@ If you're building your own endpoint, the rest of this document covers the paylo
   "created_at": "2026-03-17T13:19:00Z",
   "duration": 138.5,
   "transcription": "Just had a great idea for the landing page...",
-  "device_id": "7a2b3c4d-5e6f-7890-abcd-ef1234567890"
+  "device_id": "7a2b3c4d-5e6f-7890-abcd-ef1234567890",
+  "note": {
+    "type": "ramble.note",
+    "version": 1,
+    "id": "550E8400-E29B-41D4-A716-446655440000",
+    "source": "watch",
+    "recorded_at": "2026-03-17T09:19:00-04:00",
+    "received_at": "2026-03-17T13:21:04.512Z",
+    "duration_seconds": 138.5,
+    "transcript": "Just had a great idea for the landing page..."
+  }
 }
 ```
 
@@ -56,6 +66,7 @@ If you're building your own endpoint, the rest of this document covers the paylo
 | `duration`      | `number`            | Recording duration in seconds.                                                    |
 | `transcription` | `string`            | Full transcript text. Never empty: notes with no speech detected send no webhook. |
 | `device_id`     | `string` (UUID)     | A random per-install ID. Not tied to any account — useful for telling installs apart. |
+| `note`          | `object`            | The note record (`specs/note.md`, JSON Schema at https://ramble.watch/schemas/note-v1.json): the same shape agents get from the relay and the MCP connector. `received_at` is `null` if the iPhone doesn't know it yet. |
 
 ## Response
 

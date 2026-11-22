@@ -9,6 +9,7 @@
 import { countLimit } from './auth.js';
 import { base64ToBytes, arrayBufferToBase64 } from './crypto.js';
 import { baseURL, randomToken, sha256Hex } from './http.js';
+import { noteRecord, NOTE_SUMMARY_SCHEMA } from './note.js';
 import { isPublicHttpsURL, openHeaders, sealHeaders } from './relay.js';
 
 export const EVENT_NAME = 'note_received';
@@ -40,15 +41,8 @@ export const EVENTS = [
       'Fires when a new Ramble voice note is ready for this connection. The event carries the note id, not its text: call get_note with the id for the transcript, and mark_handled once it has been dealt with.',
     delivery: ['webhook'],
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
-    payloadSchema: {
-      type: 'object',
-      properties: {
-        id: { type: 'string', description: 'The note id, for get_note and mark_handled.' },
-        recorded_at: { type: 'string', description: "When it was recorded, in the device's local time with its offset." },
-        duration_seconds: { type: 'number' },
-      },
-      required: ['id', 'recorded_at', 'duration_seconds'],
-    },
+    // The note record without its transcript (specs/note.md).
+    payloadSchema: NOTE_SUMMARY_SCHEMA,
   },
 ];
 
@@ -326,7 +320,13 @@ async function sendOne(ctx, sub, item) {
     eventId,
     name: EVENT_NAME,
     timestamp: new Date(item.receivedAt ?? ctx.now).toISOString(),
-    data: { id: item.recordingId, recorded_at: item.recordedAt, duration_seconds: item.duration },
+    data: noteRecord({
+      id: item.recordingId,
+      source: item.source,
+      recordedAt: item.recordedAt,
+      receivedAt: item.receivedAt,
+      duration: item.duration,
+    }),
     cursor: null,
   });
   let status = 0;

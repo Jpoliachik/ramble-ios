@@ -40,7 +40,7 @@ Send `Authorization: Bearer rmba_…`. `bearer <token>` and the bare token also 
 
 | Method | Path | Body → Response |
 |---|---|---|
-| `GET` | `/inbox` | → `{"items": [{"id", "recording_id", "created_at", "received_at", "duration", "transcription"}], "has_more"}` |
+| `GET` | `/inbox` | → `{"items": [{"id", "recording_id", "created_at", "received_at", "duration", "transcription", "note"}], "has_more"}` |
 | `POST` | `/inbox/ack` | `{"ids": [1–500 integers]}` → `{"deleted": <n>}` |
 | `GET` | `/agent` | → `{"name", "hook": null \| {"url", "header_names", "last_ping_at", "last_status"}}` |
 | `PATCH` | `/agent` | `{"name"?, "hook"?: {"url", "headers"} \| null}` → same shape as `GET /agent` |
@@ -55,8 +55,21 @@ Send `Authorization: Bearer rmba_…`. `bearer <token>` and the bare token also 
 | `received_at` | When the relay accepted the audio, ISO 8601 UTC with milliseconds (`2026-11-02T00:00:00.000Z`). Can be hours after `created_at` if the device was offline |
 | `duration` | Length in seconds, measured by the relay |
 | `transcription` | The full transcript |
+| `note` | The same note as the note record, below |
 
 Items carry no audio, device id or device name.
+
+### The note record
+
+Every way an agent can get a note (the `note` field on each `GET /inbox` item, the MCP connector's `get_note` and `list_new_notes`, its `note_received` event, and the iPhone's webhook) carries the same versioned object. Lists and events leave out `transcript`.
+
+```json
+{"type": "ramble.note", "version": 1, "id": "6F1C…", "source": "watch",
+ "recorded_at": "2026-11-01T14:00:00-05:00", "received_at": "2026-11-02T00:00:00.000Z",
+ "duration_seconds": 8.2, "transcript": "Remind me to book the dentist."}
+```
+
+`source` is `"watch"`, `"phone"`, or `null` when unknown. Within version 1, fields are only ever added; ignore ones you don't know. JSON Schema: https://ramble.watch/schemas/note-v1.json. The older item fields stay.
 
 `POST /inbox/ack` deletes those of the agent's own copies. Ids that are gone or belong to another agent count as nothing. Any other body gets `400`.
 

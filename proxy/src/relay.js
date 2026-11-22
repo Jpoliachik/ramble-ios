@@ -10,6 +10,7 @@
 import { authenticate } from './auth.js';
 import { sendNoteEvents } from './events.js';
 import { DAY, baseURL, fail, iso, json, randomToken, readJSON, sha256Hex, unavailable, UUID_RE } from './http.js';
+import { entryNote } from './note.js';
 
 export const DEFAULT_RETENTION_SECONDS = 30 * 24 * 60 * 60;
 export const PAIR_CODE_TTL_SECONDS = 10 * 60;
@@ -57,6 +58,7 @@ export async function makeAgentCopies(ctx, note) {
   return insertCopies(ctx, connections, {
     inboxId: note.inbox_id,
     recordingId: note.id,
+    source: note.source,
     recordedAt: note.recorded_at,
     duration: note.duration ?? 0,
     text: note.transcript,
@@ -71,10 +73,10 @@ async function insertCopies(ctx, connections, item) {
       ctx.db
         .prepare(
           `INSERT OR IGNORE INTO entries
-             (connection_id, inbox_id, recording_id, recorded_at, duration, text, expires_at, received_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+             (connection_id, inbox_id, recording_id, source, recorded_at, duration, text, expires_at, received_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
-        .bind(c.id, item.inboxId, item.recordingId, item.recordedAt, item.duration, item.text, expiresAt, item.receivedAt),
+        .bind(c.id, item.inboxId, item.recordingId, item.source ?? null, item.recordedAt, item.duration, item.text, expiresAt, item.receivedAt),
     ),
   );
   // Wake hooked agents that got a new copy (a repeat pings no one).
@@ -369,7 +371,7 @@ export async function pull(request, ctx) {
   const [{ results }] = await ctx.db.batch([
     ctx.db
       .prepare(
-        `SELECT e.id, e.recording_id, e.recorded_at, e.received_at, e.duration, e.text FROM entries e
+        `SELECT e.id, e.recording_id, e.source, e.recorded_at, e.received_at, e.duration, e.text FROM entries e
           WHERE e.connection_id = ? AND ${WAITING} ORDER BY e.id LIMIT ?`,
       )
       .bind(connection.id, ctx.now, PULL_LIMIT + 1),
@@ -385,6 +387,8 @@ export async function pull(request, ctx) {
       received_at: iso(row.received_at),
       duration: row.duration,
       transcription: row.text,
+      // The same note as the standard note record (specs/note.md).
+      note: entryNote(row, true),
     })),
     has_more: results.length > PULL_LIMIT,
   });

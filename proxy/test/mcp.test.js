@@ -371,9 +371,23 @@ describe('MCP', () => {
     assert.ok(list.notes[0].transcript_preview.endsWith('…'));
     assert.equal(list.has_more, false);
 
+    // The same note record as GET /inbox and events (specs/note.md), without the transcript.
+    const { transcript_preview: _, ...summary } = list.notes[1];
+    assert.deepEqual(summary, {
+      type: 'ramble.note',
+      version: 1,
+      id: noteId(1),
+      source: 'phone',
+      recorded_at: '2026-11-01T06:59:00-05:00',
+      received_at: list.notes[1].received_at,
+      duration_seconds: 7,
+    });
+    assert.match(summary.received_at, /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/);
+
     const note = (await tool(token, 'get_note', { id: noteId(1).toLowerCase() })).structuredContent;
-    assert.equal(note.transcript, 'first');
-    assert.equal(note.id, noteId(1));
+    const { about, ...record } = note;
+    assert.deepEqual(record, { ...summary, transcript: 'first' });
+    assert.ok(about);
 
     assert.deepEqual((await tool(token, 'mark_handled', { id: noteId(1) })).structuredContent, { id: noteId(1), handled: true });
     assert.deepEqual((await tool(token, 'mark_handled', { id: noteId(1) })).structuredContent, { id: noteId(1), handled: true });
@@ -429,7 +443,11 @@ describe('MCP', () => {
       auth: secret,
       body: { recording_id: 'legacy-note-1', created_at: '2026-11-01T06:59:00-05:00', duration: 3, transcription: 'old build' },
     });
-    assert.equal((await tool(token, 'get_note', { id: 'legacy-note-1' })).structuredContent.transcript, 'old build');
+    const note = (await tool(token, 'get_note', { id: 'legacy-note-1' })).structuredContent;
+    assert.equal(note.transcript, 'old build');
+    // Old builds don't say which device recorded it.
+    assert.equal(note.source, null);
+    assert.equal(note.version, 1);
     assert.equal((await tool(token, 'mark_handled', { id: 'legacy-note-1' })).structuredContent.handled, true);
   });
 
@@ -516,7 +534,10 @@ describe('events (MCP Events, webhook delivery)', () => {
     assert.equal(f.headers['X-MCP-Subscription-Id'], sub.id);
     assert.ok(signatureOK(f));
     assert.equal(f.body.data.id, noteId(1));
-    assert.deepEqual(Object.keys(f.body.data).sort(), ['duration_seconds', 'id', 'recorded_at']);
+    assert.deepEqual(Object.keys(f.body.data).sort(), ['duration_seconds', 'id', 'received_at', 'recorded_at', 'source', 'type', 'version']);
+    assert.equal(f.body.data.type, 'ramble.note');
+    assert.equal(f.body.data.version, 1);
+    assert.equal('transcript' in f.body.data, false);
     assert.ok(!f.raw.includes('dentist'));
   });
 

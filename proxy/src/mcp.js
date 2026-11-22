@@ -6,8 +6,9 @@
 
 import { authenticate } from './auth.js';
 import { handleEventsMethod } from './events.js';
-import { bearerValue, fail, iso, json, UUID_RE } from './http.js';
+import { bearerValue, fail, json, UUID_RE } from './http.js';
 import { resourceMetadataURL } from './oauth.js';
+import { entryNote } from './note.js';
 import { stockReviewNotes } from './review.js';
 
 // 2025-03-26 is left out: it requires JSON-RPC batches, which later versions dropped.
@@ -160,18 +161,13 @@ async function listNewNotes(connection, args, ctx) {
   if (!Number.isInteger(asked) || asked < 1 || asked > LIST_MAX) return toolError(`"limit" must be a whole number from 1 to ${LIST_MAX}`);
   const { results } = await ctx.db
     .prepare(
-      `SELECT e.recording_id, e.recorded_at, e.duration, e.text FROM entries e
+      `SELECT e.recording_id, e.source, e.recorded_at, e.received_at, e.duration, e.text FROM entries e
         WHERE e.connection_id = ? AND ${WAITING} ORDER BY e.id DESC LIMIT ?`,
     )
     .bind(connection.id, ctx.now, asked + 1)
     .all();
   return toolResult({
-    notes: results.slice(0, asked).map((r) => ({
-      id: r.recording_id,
-      recorded_at: r.recorded_at,
-      duration_seconds: r.duration,
-      transcript_preview: preview(r.text),
-    })),
+    notes: results.slice(0, asked).map((r) => ({ ...entryNote(r, false), transcript_preview: preview(r.text) })),
     has_more: results.length > asked,
     about: DATA_NOTE,
   });
@@ -184,7 +180,7 @@ async function findCopy(connection, args, ctx) {
   if (typeof id !== 'string' || !/^[A-Za-z0-9-]{1,64}$/.test(id)) return { error: '"id" must be a note id from list_new_notes' };
   const row = await ctx.db
     .prepare(
-      `SELECT e.id, e.recording_id, e.recorded_at, e.received_at, e.duration, e.text,
+      `SELECT e.id, e.recording_id, e.source, e.recorded_at, e.received_at, e.duration, e.text,
               e.acked_at IS NOT NULL AS handled, CASE WHEN ${WAITING} THEN 1 ELSE 0 END AS waiting
          FROM entries e WHERE e.connection_id = ? AND e.recording_id = ?`,
     )
@@ -200,14 +196,7 @@ async function getNote(connection, args, ctx) {
   if (error) return toolError(error);
   if (row?.handled) return toolError('That note was already marked handled, so its transcript is no longer kept here.');
   if (!row?.waiting) return toolError(NOT_FOUND);
-  return toolResult({
-    id: row.recording_id,
-    recorded_at: row.recorded_at,
-    received_at: iso(row.received_at),
-    duration_seconds: row.duration,
-    transcript: row.text,
-    about: DATA_NOTE,
-  });
+  return toolResult({ ...entryNote(row, true), about: DATA_NOTE });
 }
 
 async function markHandled(connection, args, ctx) {
