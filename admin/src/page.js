@@ -139,7 +139,7 @@ export function renderPage(data, who) {
       ['User', 'Hours'],
       data.heaviest_this_month.map((u) => [
         `<code>${esc(u.user)}</code>`,
-        `${u.over_line ? '<span class="flag">over 100 h</span> ' : ''}${esc(fmt(u.hours))}`,
+        `${u.over_line ? `<span class="flag">over ${esc(fmt(data.heavy_use_hours))} h</span> ` : ''}${esc(fmt(u.hours))}`,
       ]),
       'UTC month. Internal only.',
     ),

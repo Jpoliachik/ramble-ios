@@ -41,7 +41,7 @@ export function createAdmin(keySets) {
     if (url !== `${TEAM}/cdn-cgi/access/certs`) return new Response('no', { status: 404 });
     return Response.json({ keys: keySets.map((k) => k.jwk) });
   };
-  const env = { DB: db, ACCESS_TEAM_DOMAIN: 'goodloop.cloudflareaccess.com', ACCESS_AUD: AUD };
+  const env = { DB: db, ACCESS_TEAM_DOMAIN: 'goodloop.cloudflareaccess.com', ACCESS_AUD: AUD, HEAVY_USE_HOURS: '50' };
   return {
     db,
     env,

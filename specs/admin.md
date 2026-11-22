@@ -53,7 +53,7 @@ The dashboard and `GET /api/overview` SHALL show the same numbers, computed when
 - Health: notes waiting to be transcribed and the oldest one's age, server errors in the last hour, suspended installs and purchases
 - Share of the last 30 days' notes with a language set, filler-word removal, or vocabulary
 - Phone and watch app labels among installs that uploaded in the last 30 days
-- The ten heaviest users this UTC month by hours, flagged past the internal heavy-use line
+- The ten heaviest users this UTC month by hours, flagged past the internal heavy-use line (the `HEAVY_USE_HOURS` secret, the same value the relay uses; unset, nobody is flagged)
 
 Each bar on the charts SHALL show its day (or week) and exact value when hovered, or tapped on a touch screen.
 

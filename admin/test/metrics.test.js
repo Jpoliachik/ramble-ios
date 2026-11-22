@@ -190,7 +190,7 @@ describe('metrics', () => {
     const html = await (await admin.get('/', await sign(keys))).text();
     assert.match(html, /Needs a look/);
     assert.match(html, /oldest 45 min/);
-    assert.match(html, /over 100 h/);
+    assert.match(html, /over 50 h/);
     assert.match(html, /How agents get notes/);
     assert.match(html, /data-tip="Nov 18: 13 notes"/);
     assert.doesNotMatch(html, /hooks\.example/);

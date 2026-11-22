@@ -1,6 +1,6 @@
 # Ramble — Brand
 
-The source of truth for what Ramble stands for and how we talk about it. Use it for the website, the App Store, social posts, release notes, and in-app copy. How Ramble looks and moves lives in [`design.md`](design.md). App Store fields live in [`app-store.md`](app-store.md), and the Product Hunt listing in [`product-hunt.md`](product-hunt.md).
+The source of truth for what Ramble stands for and how we talk about it. Use it for the website, the App Store, social posts, release notes, and in-app copy. How Ramble looks and moves lives in [`design.md`](design.md).
 
 ## The belief
 

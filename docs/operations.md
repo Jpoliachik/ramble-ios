@@ -1,6 +1,6 @@
 # Relay operations
 
-The operator runbook for the relay: usage stats, heavy users, suspending, refunds, inbox caps, and the first-deploy checklist. Private: it lives here, not in `proxy/`, because `proxy/` is mirrored to the public relay repo. The heavy-use alert threshold is the `HEAVY_USE_HOURS` Worker secret (set to 100); never write the figure into `proxy/` or a public spec.
+The operator runbook for the relay: usage stats, heavy users, suspending, refunds, inbox caps, and the first-deploy checklist. The heavy-use alert threshold is the `HEAVY_USE_HOURS` secret on both the relay and admin Workers; the figure itself is internal and is never written in this repo.
 
 ## Usage stats: where to look
 
@@ -47,7 +47,7 @@ SELECT phone_app, watch_app, COUNT(*) AS inboxes FROM inboxes GROUP BY 1, 2 ORDE
 
 ## Operations: heavy users, suspending one, and revoking a refund
 
-There is no usage limit, and the 100-hour figure below is internal: it is never shown to people (not in the app, the Terms or the listing). The relay keeps a monthly tally per user, where the user is the purchase an inbox is unlocked by (`unlock:…`, `sub:…`, `app:…`) or the inbox ID (`inb_…`) when it has none, and sends one Telegram alert the first time a user passes 100 hours in a UTC month. Nothing is refused. The global backstop is a spend limit in the Groq console.
+There is no usage limit, and the heavy-use threshold is internal: it is never shown to people (not in the app, the Terms or the listing) and lives only in the `HEAVY_USE_HOURS` secret. The relay keeps a monthly tally per user, where the user is the purchase an inbox is unlocked by (`unlock:…`, `sub:…`, `app:…`) or the inbox ID (`inb_…`) when it has none, and sends one Telegram alert the first time a user passes that threshold in a UTC month. Nothing is refused. The global backstop is a spend limit in the Groq console.
 
 If one user needs stopping, suspend them by hand. Uploads (`PUT /notes/:id` and old builds' `POST /transcribe`) from a suspended inbox, or from any inbox bound to a suspended purchase, get `403` with `"reason": "suspended"`; the apps show "Couldn't send" and stop retrying. Notes already accepted still transcribe, and everyone else is unaffected. Each command is one line:
 
