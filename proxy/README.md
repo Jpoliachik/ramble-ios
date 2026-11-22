@@ -49,6 +49,7 @@ Secrets (`npx wrangler secret put NAME`):
 | `HOOK_ENCRYPTION_KEY` | Encrypts agents' wake-up hook headers at rest. Without it, setting a hook answers 503 |
 | `TELEGRAM_BOT_TOKEN` | Token of the operator's Telegram bot (from @BotFather). Operator alerts are sent by this bot. Unset: nothing is sent |
 | `TELEGRAM_CHAT_ID` | The chat the bot sends alerts to (the operator's own chat with the bot). Unset: nothing is sent |
+| `HEAVY_USE_HOURS` | Hours of transcribed audio in a UTC month after which the operator gets one heavy-use alert per user. Internal; kept as a secret so the figure isn't published. Nothing is ever refused. Unset: no heavy-use alert |
 | `REVIEW_CODE` | The connector's review code for directory reviewers: signs in only to the sample-note review inbox (`specs/connector.md` "Review inbox"). Make one with `openssl rand -hex 12` and give it only to directory review forms. Unset or under 16 characters: off |
 | `OPENAI_APPS_CHALLENGE` | Token from the OpenAI plugin dashboard, served at `/.well-known/openai-apps-challenge`. Unset: 404 |
 | `GOOGLE_CONNECTED_APPS_TOKEN` | Token from Google Connected Console, served at `/.well-known/google-connected-apps`. Unset: 404 |
@@ -58,31 +59,6 @@ Vars (`[vars]`): `RETENTION_SECONDS`, `APPLE_BUNDLE_ID`, `UNLOCK_PRODUCT_ID`, `P
 Production has no developer bypass: never set `ENVIRONMENT` or `DEV_BYPASS_KEY` on the deployed Worker (see Local Development). `DEV_BYPASS_TOKEN`, `ANALYTICS_TOKEN`, `DEEPGRAM_API_KEY` and `OPENAI_API_KEY` are no longer read and can be deleted.
 
 Apple: the relay takes no App Store Server Notifications; leave the App Store Server Notifications URL unset in App Store Connect. Refunds are revoked by hand (Operations, below).
-
-## Before the first deploy of this version
-
-Merging to `main` deploys the Worker and applies migrations (`.github/workflows/deploy-proxy.yml`), so do steps 1–4 first. Run the `npx wrangler` commands from `proxy/`.
-
-1. **CI token.** The `CLOUDFLARE_API_TOKEN` GitHub secret needs, for the account: Workers Scripts Edit, Workers KV Storage Edit, D1 Edit, and now **Workers R2 Storage Edit** (My Profile → API Tokens → edit the token). Without R2 the deploy fails on the `AUDIO` binding.
-2. **R2 bucket.** Create it private (the default) with a 1-day expiry rule as the backstop for failed deletes:
-   ```bash
-   npx wrangler r2 bucket create ramble-audio
-   npx wrangler r2 bucket lifecycle add ramble-audio expire-1-day --expire-days 1
-   ```
-   Don't enable public access or an r2.dev URL. The binding is already in `wrangler.toml`.
-3. **Secrets.** Each command prompts for the value:
-   ```bash
-   npx wrangler secret put GROQ_API_KEY          # console.groq.com → API Keys
-   npx wrangler secret put HOOK_ENCRYPTION_KEY   # paste the output of: openssl rand -base64 32
-   npx wrangler secret put TELEGRAM_BOT_TOKEN    # Telegram → @BotFather → /newbot → copy the token
-   npx wrangler secret put TELEGRAM_CHAT_ID      # send your bot any message, then open https://api.telegram.org/bot<token>/getUpdates and copy result[0].message.chat.id
-   ```
-   Keep `HOOK_ENCRYPTION_KEY` stable: changing it makes stored hook headers unreadable. Only after this version is deployed (the Worker running before it still calls Deepgram and OpenAI), delete the ones no longer read: `npx wrangler secret delete NAME` for `DEEPGRAM_API_KEY`, `OPENAI_API_KEY`, `DEV_BYPASS_TOKEN` and `ANALYTICS_TOKEN`, if they exist (`npx wrangler secret list`).
-4. **Groq spend limit.** On the paid Developer tier, set a monthly spend limit (about $50) in console.groq.com; it is the only global cost cap. The free tier never bills, so it needs none, but its rate limits cap throughput: past them Groq answers 429 and notes wait for a retry (the stuck-note alert fires after 30 minutes).
-5. **App Store Connect.** Create the in-app purchase: type Non-Consumable, product ID `dev.goodloop.ramble.unlock`, price $14.99, Family Sharing **off** (shared purchases don't unlock). Add it to the app version you submit. Take `dev.goodloop.ramble.premium.monthly2` off sale at launch. Leave the App Store Server Notifications URL empty.
-6. **`FIRST_FREE_BUILD`, at release.** Set it in `wrangler.toml` `[vars]` to the build number of the first free-notes build you ship (Xcode Cloud's build number for it), commit, and let it deploy. Downloads from a lower build are early buyers. Old builds' paths retire on their own on 2027-01-07; there is no `LEGACY_UNTIL` to set.
-7. **`api.ramble.watch`.** Done: the zone is on Cloudflare and the host is a custom domain on the Worker; the website and agent docs use it, and the apps keep using the `workers.dev` host. Setup: [RELAY.md](RELAY.md) "Operator: the api.ramble.watch domain".
-8. **Local relay** (any time): `cp .dev.vars.example .dev.vars`, put your Groq key in `GROQ_API_KEY`, keep `ENVIRONMENT=development` and `DEV_BYPASS_KEY` as they are, then `npx wrangler d1 migrations apply ramble-relay --local` and `npm run dev`.
 
 ## What is stored
 
@@ -94,9 +70,11 @@ Merging to `main` deploys the Worker and applies migrations (`.github/workflows/
 - **Usage stats (`note_events`):** one row per finished note under the inbox's random `usage_id`: device, times, length, result, tries, free or not, language, whether filler removal and vocabulary were on, app label. No inbox ID, note ID or text. Kept indefinitely. Inboxes also keep `phone_app` and `watch_app`, the last `X-Ramble-Client` each device sent. Inboxes keep `webhook` (1/0, the last `X-Ramble-Webhook` the iPhone sent; never the URL) and connections keep `via` (`api` or `mcp`, how the agent last checked in).
 - **Operator data:** alert cooldowns, server-error counts per minute (kept an hour), and rate-limit counters for App Attest and inbox creation.
 
+Logs carry no request bodies, transcript text, audio, credentials or network addresses; inbox IDs and App Attest key IDs appear only as short hashes, and provider error bodies are cut to 200 characters.
+
 ## Usage stats: where to look
 
-The quickest view is the admin dashboard, https://ramble-admin.jpoliachik.workers.dev (`admin/README.md`). For anything it doesn't show, read them in the Cloudflare dashboard (**D1 → ramble-relay → Console**), or from an agent with Cloudflare D1 access (Claude threads use the Cloudflare connector; Muse uses its own Cloudflare connection). Query `note_events` and `inboxes` only, and never select `notes.transcript` or `entries.text`: those are people's words. Times are Unix milliseconds, days are UTC.
+The quickest view is the admin dashboard, https://ramble-admin.jpoliachik.workers.dev (`admin/README.md`). For anything it doesn't show, read them in the Cloudflare dashboard (**D1 → ramble-relay → Console**), or from an agent with Cloudflare D1 access. Query `note_events` and `inboxes` only, and never select `notes.transcript` or `entries.text`: those are people's words. Times are Unix milliseconds, days are UTC.
 
 ```sql
 -- Signups (new installs) per day
@@ -139,7 +117,7 @@ SELECT phone_app, watch_app, COUNT(*) AS inboxes FROM inboxes GROUP BY 1, 2 ORDE
 
 ## Operations: heavy users, suspending one, and revoking a refund
 
-There is no usage limit, and the 100-hour figure below is internal: it is never shown to people (not in the app, the Terms or the listing). The relay keeps a monthly tally per user, where the user is the purchase an inbox is unlocked by (`unlock:…`, `sub:…`, `app:…`) or the inbox ID (`inb_…`) when it has none, and sends one Telegram alert the first time a user passes 100 hours in a UTC month. Nothing is refused. The global backstop is a spend limit in the Groq console.
+There is no usage limit, and the heavy-use threshold is internal: it is never shown to people (not in the app, the Terms or the listing) and lives only in the `HEAVY_USE_HOURS` secret. The relay keeps a monthly tally per user, where the user is the purchase an inbox is unlocked by (`unlock:…`, `sub:…`, `app:…`) or the inbox ID (`inb_…`) when it has none, and sends one Telegram alert the first time a user passes that threshold in a UTC month. Nothing is refused. The global backstop is a spend limit in the Groq console.
 
 If one user needs stopping, suspend them by hand. Uploads (`PUT /notes/:id` and old builds' `POST /transcribe`) from a suspended inbox, or from any inbox bound to a suspended purchase, get `403` with `"reason": "suspended"`; the apps show "Couldn't send" and stop retrying. Notes already accepted still transcribe, and everyone else is unaffected. Each command is one line:
 
@@ -173,8 +151,6 @@ npx wrangler d1 execute ramble-relay --remote --command "UPDATE purchases SET re
 The `UPDATE` reports `changes: 1` when it found the purchase. The old-build subscriber command adds a row only when the `sub:` ID isn't known yet; that row is dated 1970, so it never counts as a new unlock. Notes the apps marked "Couldn't send" while suspended don't upload again by themselves after an unsuspend; new notes do.
 
 Refunds: the relay doesn't listen for Apple's refund notifications. A refunded purchase whose signed record Apple marks with a `revocationDate` is refused when it is sent again, but inboxes it already unlocked stay unlocked until you revoke it with the command above. Use the original transaction ID from App Store Connect or the refund report. Notes accepted before the revoke still transcribe.
-
-Logs carry no request bodies, transcript text, audio, credentials or network addresses; inbox IDs and App Attest key IDs appear only as short hashes, and provider error bodies are cut to 200 characters.
 
 ## Operations: a purchase on more than 10 iPhones
 
@@ -224,31 +200,6 @@ During attestation, the credential public key is available in two places: the CO
 **4. App Attest works on local Xcode dev builds**
 
 `DCAppAttestService` works on any real Apple device, including apps built directly from Xcode. The only difference is the environment: dev builds use `appattestdevelop` as the AAGUID, while TestFlight/App Store builds use `appattest`. The production relay accepts only `appattest`. App Attest does NOT work on the iOS Simulator.
-
-## Deploy Your Own
-
-1. Copy the example config:
-   ```bash
-   cp wrangler.example.toml wrangler.toml
-   ```
-
-2. Edit `wrangler.toml` — set your Cloudflare account ID.
-
-3. Create the KV namespace for App Attest state:
-   ```bash
-   npx wrangler kv namespace create ATTEST_KV
-   ```
-   Paste the returned ID into `wrangler.toml`.
-
-4. Create the D1 database and the R2 bucket (see Configuration), paste the D1 id into `wrangler.toml`, and apply the migrations.
-
-5. Set the secrets listed under Configuration.
-
-6. Deploy:
-   ```bash
-   npm install
-   npm run deploy
-   ```
 
 ## Local Development
 

@@ -1,43 +1,42 @@
 # Ramble
 
-Voice capture that goes somewhere. Record a thought on the go, get an accurate transcript, and pipe it into your agent, workflow, or automation via webhook.
+**Say it. Let it go.** Ramble is a voice capture app for Apple Watch and iPhone. Say a thought to your watch, get back to what you were doing, and your agent picks it up later. No accounts, no reply to wait for.
 
-iPhone + Apple Watch. Open source, private by design, no accounts.
+[App Store](https://apps.apple.com/app/id6761857751) · [ramble.watch](https://ramble.watch) · [Connect your agent](https://ramble.watch/docs)
 
-## Why Ramble
+## Privacy
 
-- **Best-in-class transcription** — Cloud transcription (Groq Whisper v3 Turbo) or free on-device Apple Speech.
-- **Webhook-native** — Every transcript can POST to any HTTPS endpoint. Signed requests, automatic retries.
-- **Capture on the go** — Record from Apple Watch or phone. Walk, think, talk.
-- **Private by architecture** — No accounts, no servers. Audio stays on-device unless you send it somewhere. Open source is the proof.
+Ramble's server is a relay, not an archive. Your audio is sent to a transcription provider and deleted as soon as the transcript is ready. Transcripts are deleted when your agent picks them up, or after 30 days. Your full history lives only on your iPhone.
 
-## What's in This Repo
+Ramble also keeps basic usage stats for each note, like its length and whether it came from your watch or iPhone, under a random ID. Never your audio or your words.
 
-| dir                |                                                                                             |
-| ------------------ | ------------------------------------------------------------------------------------------- |
-| `Ramble/`          | iOS app (SwiftUI)                                                                           |
-| `watch Watch App/` | watchOS companion                                                                           |
-| `proxy/`           | Cloudflare Worker transcription proxy                                                       |
-| `website/`         | Marketing site - [ramble.watch](https://ramble.watch) (Next.js static export) |
+The relay is in [`proxy/`](proxy/): what it stores is listed in [`proxy/README.md`](proxy/README.md), and the behavior it promises is in [`specs/`](specs/README.md).
 
-## Getting Started
+## What's here
 
-Requires Xcode 26+. Clone, open `Ramble/Ramble.xcodeproj`, build and run. Works out of the box with Apple Speech — no API keys needed.
+| Path | What |
+| --- | --- |
+| `Ramble/` | The iPhone app, the watch app and the watch control (SwiftUI) |
+| `proxy/` | The relay: a Cloudflare Worker that takes uploads, transcribes, and holds transcripts for your devices and agents ([API](proxy/RELAY.md)) |
+| `plugins/ramble/` | The Claude plugin: the Ramble connector plus a skill for working through notes |
+| `admin/` | The operator's read-only dashboard (counts only, never anyone's words) |
+| `website/` | [ramble.watch](https://ramble.watch) (Next.js static export) |
+| `specs/` | What Ramble does, requirement by requirement. The code must match them |
+| `docs/` | Why and how: brand, design, sync architecture, webhooks, operations |
 
-For cloud transcription, see `proxy/README.md`.
+## Connect an agent
 
-## Building from Command Line
+Any agent that can make an HTTPS request can pull notes; see [ramble.watch/docs](https://ramble.watch/docs) and [`proxy/RELAY.md`](proxy/RELAY.md). MCP clients such as Claude connect at `https://api.ramble.watch/mcp` ([`specs/connector.md`](specs/connector.md)).
+
+## Build
+
+Requires Xcode 26+. Open `Ramble/Ramble.xcodeproj`. Debug simulator builds talk to a local relay at `http://localhost:8787`; see "Local Development" in [`proxy/README.md`](proxy/README.md).
 
 ```bash
-# iOS app
-xcodebuild -project Ramble/Ramble.xcodeproj -scheme Ramble \
-  -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
-
-# Watch app
-xcodebuild -project Ramble/Ramble.xcodeproj -scheme "watch Watch App" \
-  -destination 'platform=watchOS Simulator,name=Apple Watch Series 11 (46mm)'
+cd proxy && npm ci && npm test     # relay tests, no credentials needed
+cd website && npm install && npm run dev
 ```
 
 ## License
 
-MIT
+The source is public, but it is not open source: no licence is granted, and all rights are reserved by Good Loop Software LLC. Questions: support@ramble.watch.

@@ -8,7 +8,6 @@ import { DAY, fail, json, logId, randomHex, randomToken, readJSON, sha256Hex, un
 import { alert } from './ops.js';
 
 export const FREE_NOTES = 25;
-export const HEAVY_USE_SECONDS = 100 * 3600;
 // Inboxes one purchase may ever be bound to, unless the operator raised its
 // inbox_cap by hand (proxy/README.md "Operations").
 export const MAX_INBOXES_PER_PURCHASE = 10;
@@ -55,9 +54,18 @@ export const suspendedResponse = () =>
   fail(403, 'Uploads from this Ramble setup are paused. Contact support@ramble.watch.', 'suspended');
 
 /**
+ * The heavy-use alert threshold in seconds, from the HEAVY_USE_HOURS secret.
+ * The figure is internal, so it lives only in the secret. Unset: no alert.
+ */
+function heavyUseSeconds(env) {
+  const hours = Number(env?.HEAVY_USE_HOURS);
+  return hours > 0 ? hours * 3600 : null;
+}
+
+/**
  * Adds transcribed audio to the user's tally for this UTC month: the purchase
  * an inbox is unlocked by, else the inbox. Alerts the operator once, when the
- * tally first passes HEAVY_USE_SECONDS. Monitoring only; never throws.
+ * tally first passes the heavy-use threshold. Monitoring only; never throws.
  */
 export async function recordUsage(ctx, userId, seconds) {
   if (!userId || !(seconds > 0)) return;
@@ -72,11 +80,12 @@ export async function recordUsage(ctx, userId, seconds) {
       .bind(userId, month, seconds)
       .first();
     const total = row?.seconds ?? 0;
-    if (total >= HEAVY_USE_SECONDS && total - seconds < HEAVY_USE_SECONDS) {
+    const threshold = heavyUseSeconds(ctx.env);
+    if (threshold && total >= threshold && total - seconds < threshold) {
       await alert(
         ctx,
         `heavy_use:${userId}:${month}`,
-        `${userId} passed ${HEAVY_USE_SECONDS / 3600} hours of audio in ${month} (UTC). Nothing is refused; suspend by hand if needed (proxy/README.md).`,
+        `${userId} passed ${threshold / 3600} hours of audio in ${month} (UTC). Nothing is refused; suspend by hand if needed.`,
       );
     }
   } catch (err) {

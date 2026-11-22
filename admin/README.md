@@ -19,7 +19,7 @@ The first deploy happens when this folder lands on `main`. Then:
 
 1. **Turn on Access.** Workers & Pages → `ramble-admin` → Settings → Domains & Routes → `workers.dev` → **Enable Cloudflare Access**. If Cloudflare asks to set up Zero Trust first, pick a team name and the **Free** plan. Then **Manage Cloudflare Access** and make sure the policy allows only your email (`Include → Emails`).
 2. **Copy two values.** In Zero Trust → Access controls → Applications → the `ramble-admin` app: copy the **Application Audience (AUD) Tag**. In Zero Trust → Settings, note your **team domain** (`<team>.cloudflareaccess.com`).
-3. **Give them to the Worker.** Workers & Pages → `ramble-admin` → Settings → Variables and Secrets → add two **Secrets** (secrets survive deploys): `ACCESS_TEAM_DOMAIN` = the team domain, `ACCESS_AUD` = the AUD tag.
+3. **Give them to the Worker.** Workers & Pages → `ramble-admin` → Settings → Variables and Secrets → add three **Secrets** (secrets survive deploys): `ACCESS_TEAM_DOMAIN` = the team domain, `ACCESS_AUD` = the AUD tag, and `HEAVY_USE_HOURS` = the same heavy-use line the relay alerts on (unset: nobody is flagged).
 4. **Open the URL.** You get Cloudflare's sign-in page, enter the code from your email, and land on the dashboard.
 
 ### Letting an agent in (Muse)

@@ -94,12 +94,12 @@ describe('old builds', () => {
     assert.equal(h.transcribeCalls.length, 0);
   });
 
-  it('never caps a subscription: past 100 hours it alerts once and keeps transcribing', async () => {
-    h.db.sqlite.exec(`INSERT INTO usage (user_id, month, seconds) VALUES ('sub:s1', '2026-11', ${100 * 3600 - 5})`);
+  it('never caps a subscription: past the threshold it alerts once and keeps transcribing', async () => {
+    h.db.sqlite.exec(`INSERT INTO usage (user_id, month, seconds) VALUES ('sub:s1', '2026-11', ${50 * 3600 - 5})`);
     for (let i = 0; i < 2; i++) {
       assert.equal((await handleRequest(transcribeRequest(sub()), h.env(), h.deps())).status, 200);
     }
-    assert.equal(h.alerts.filter((a) => a.includes('sub:s1 passed 100 hours')).length, 1);
+    assert.equal(h.alerts.filter((a) => a.includes('sub:s1 passed 50 hours')).length, 1);
   });
 
   it('refuses a suspended subscription with 403 suspended', async () => {
@@ -193,7 +193,7 @@ describe('operator', () => {
     h.envExtra = { TELEGRAM_BOT_TOKEN: undefined };
     const secret = await h.inbox();
     const [{ id }] = h.rows('SELECT id FROM inboxes');
-    h.db.sqlite.exec(`INSERT INTO usage (user_id, month, seconds) VALUES ('${id}', '2026-11', ${100 * 3600 - 1})`);
+    h.db.sqlite.exec(`INSERT INTO usage (user_id, month, seconds) VALUES ('${id}', '2026-11', ${50 * 3600 - 1})`);
     await h.upload(secret, noteId(1));
     await h.cron();
     assert.equal(h.alerts.length, 0);

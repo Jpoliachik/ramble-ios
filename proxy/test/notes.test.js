@@ -220,13 +220,14 @@ describe('held uploads', () => {
 });
 
 describe('heavy use is monitored, never refused', () => {
-  const heavyAlerts = () => h.alerts.filter((a) => a.includes('100 hours of audio'));
+  // The harness sets HEAVY_USE_HOURS to 50; the real figure is a Worker secret.
+  const heavyAlerts = () => h.alerts.filter((a) => a.includes('50 hours of audio'));
 
-  it('passing 100 hours in a month alerts the operator once, and every note still transcribes', async () => {
+  it('passing the threshold in a month alerts the operator once, and every note still transcribes', async () => {
     const { unlockTx } = await import('./harness.js');
     const { inbox_secret: secret, account_token: token } = await h.newInbox();
     await h.call('POST', '/entitlement', { auth: secret, body: { signed_transaction: unlockTx(token) } });
-    h.db.sqlite.exec(`INSERT INTO usage (user_id, month, seconds) VALUES ('unlock:otx1', '2026-11', ${100 * 3600 - 600})`);
+    h.db.sqlite.exec(`INSERT INTO usage (user_id, month, seconds) VALUES ('unlock:otx1', '2026-11', ${50 * 3600 - 600})`);
     h.measured = 59 * 60;
     h.transcribe = async () => ({ result: 'transcript', text: 'x', provider: 'groq', durationSeconds: 59 * 60 });
     assert.equal((await h.upload(secret, noteId(1))).status, 201);
@@ -244,6 +245,17 @@ describe('heavy use is monitored, never refused', () => {
     }
     await h.cron();
     assert.equal(heavyAlerts().length, 1);
+  });
+
+  it('sends no heavy-use alert while HEAVY_USE_HOURS is unset', async () => {
+    h.envExtra = { HEAVY_USE_HOURS: undefined };
+    const secret = await h.inbox();
+    h.measured = 59 * 60;
+    h.transcribe = async () => ({ result: 'transcript', text: 'x', provider: 'groq', durationSeconds: 59 * 60 });
+    h.db.sqlite.exec(`INSERT INTO usage (user_id, month, seconds) SELECT id, '2026-11', ${50 * 3600 - 600} FROM inboxes`);
+    assert.equal((await h.upload(secret, noteId(1))).status, 201);
+    await h.settle();
+    assert.equal(h.alerts.filter((a) => a.includes('hours of audio')).length, 0);
   });
 
   it('counts an inbox with no purchase by its inbox ID, and only transcribed audio', async () => {

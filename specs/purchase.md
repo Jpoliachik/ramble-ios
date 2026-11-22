@@ -188,7 +188,7 @@ The unlock SHALL live on the server, attached to inboxes. The iPhone SHALL send 
 - THEN the server rejects it and the inbox stays locked
 
 ### Requirement: Purchase bound to inboxes, at most 10
-A purchase MAY be sent from any inbox, including a fresh inbox after a reinstall; each inbox it unlocks is bound to it for good. One purchase SHALL unlock at most 10 inboxes ever, keyed on the purchase's original transaction (or the app purchase record for early buyers). Time SHALL free no spot. The operator MAY raise one purchase's cap by hand with one database command (proxy/README.md).
+A purchase MAY be sent from any inbox, including a fresh inbox after a reinstall; each inbox it unlocks is bound to it for good. One purchase SHALL unlock at most 10 inboxes ever, keyed on the purchase's original transaction (or the app purchase record for early buyers). Time SHALL free no spot. The operator MAY raise one purchase's cap by hand with one database command.
 
 #### Scenario: Eleventh iPhone
 - GIVEN a purchase bound to 10 inboxes, however long ago
@@ -229,24 +229,24 @@ TestFlight testers and App Review buy with sandbox purchases against the product
 
 ## Fair use
 
-Ramble has no usage limit. The Terms of Use say only that Ramble may pause uploads from a setup that abuses the service. The server watches for heavy use with an internal 100-hour monthly threshold and alerts the operator, who can suspend one user by hand. The product has no automatic cap and no override screen, and the threshold is never shown to people.
+Ramble has no usage limit. The Terms of Use say only that Ramble may pause uploads from a setup that abuses the service. The server watches for heavy use with an internal monthly threshold (the operator's `HEAVY_USE_HOURS` setting) and alerts the operator, who can suspend one user by hand. The product has no automatic cap and no override screen, and the threshold is never shown to people.
 
 ### Requirement: Heavy use is monitored, never refused
-The server SHALL keep a tally of transcribed audio per user per calendar month (UTC), where the user is the purchase an inbox is unlocked by (counted across every inbox bound to it), or the inbox when it has none. Only notes that finish with a transcript or as "No speech detected" SHALL count, by the length the server measured ([transcription.md](transcription.md)); old-build transcriptions count toward their subscription's original transaction. When a user's tally first passes 100 hours in a month, the server SHALL send the operator one alert naming the user and the month, and no further heavy-use alert for that user that month. Heavy use SHALL NOT refuse, hold or slow any note, and the person SHALL see nothing about it.
+The server SHALL keep a tally of transcribed audio per user per calendar month (UTC), where the user is the purchase an inbox is unlocked by (counted across every inbox bound to it), or the inbox when it has none. Only notes that finish with a transcript or as "No speech detected" SHALL count, by the length the server measured ([transcription.md](transcription.md)); old-build transcriptions count toward their subscription's original transaction. When a user's tally first passes the threshold in a month, the server SHALL send the operator one alert naming the user and the month, and no further heavy-use alert for that user that month. Heavy use SHALL NOT refuse, hold or slow any note, and the person SHALL see nothing about it.
 
-#### Scenario: Passing 100 hours
-- GIVEN a purchase with 99.8 hours transcribed in November
+#### Scenario: Passing the threshold
+- GIVEN a purchase 10 minutes under the threshold in November
 - WHEN a 59-minute note from one of its inboxes transcribes
 - THEN the operator gets one alert naming the purchase and "2026-11"
 - AND that note and every later one transcribe as usual, with no second alert in November
 
 #### Scenario: A new month
-- GIVEN a purchase that passed 100 hours in November
+- GIVEN a purchase that passed the threshold in November
 - WHEN its first note transcribes on December 1 (UTC)
 - THEN it counts toward a fresh December tally
 
 #### Scenario: Heavy but normal use
-- GIVEN 85 hours used in November
+- GIVEN a heavy November, still under the threshold
 - WHEN the person opens Settings and Home
 - THEN neither mentions usage or a limit
 

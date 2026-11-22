@@ -50,9 +50,9 @@ export async function handleRequest(request, env, deps = {}) {
 
   const now = deps.now ?? Date.now();
   if (pathname === '/') {
-    return respond(200, renderPage(await overview(env.DB, now), auth.who), 'text/html; charset=utf-8');
+    return respond(200, renderPage(await overview(env.DB, now, Number(env.HEAVY_USE_HOURS) || null), auth.who), 'text/html; charset=utf-8');
   }
-  if (pathname === '/api/overview') return json(200, await overview(env.DB, now));
+  if (pathname === '/api/overview') return json(200, await overview(env.DB, now, Number(env.HEAVY_USE_HOURS) || null));
   if (pathname === '/api/whoami') return json(200, auth.who);
   return text(404, 'Not found');
 }

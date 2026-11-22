@@ -111,9 +111,9 @@ The server SHALL offer exactly `list_new_notes`, `get_note` and `mark_handled`, 
 The connector SHALL NOT upload, delete, change settings, pair or disconnect anything. Marking handled removes only this connection's copy; the person's own devices and other agents keep theirs.
 
 #### Scenario: Two agents
-- GIVEN Claude and Muse are both connected and each got a copy of a note
+- GIVEN Claude and another agent are both connected and each got a copy of a note
 - WHEN Claude marks it handled
-- THEN Muse still receives the note on its next pull, and the note stays in the app
+- THEN the other agent still receives the note on its next pull, and the note stays in the app
 
 ## Claude plugin
 

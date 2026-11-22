@@ -6,7 +6,6 @@
 
 const DAY = 24 * 60 * 60 * 1000;
 const FREE_NOTES = 25; // specs/purchase.md "Free notes"
-const HEAVY_HOURS = 100; // internal heavy-use line (specs/purchase.md); admin only
 
 const AGENT_METHODS = [
   ['mcp', 'MCP connector'],
@@ -31,7 +30,9 @@ const num = (v) => Number(v ?? 0);
 const round = (v, places = 1) => (v == null ? null : Math.round(Number(v) * 10 ** places) / 10 ** places);
 
 /** Everything the dashboard shows, as one plain object (also the JSON API). */
-export async function overview(db, now = Date.now()) {
+// heavyHours: the internal heavy-use line, from the HEAVY_USE_HOURS secret (the
+// same value the relay alerts on). Null when unset: no one is flagged.
+export async function overview(db, now = Date.now(), heavyHours = null) {
   const d1 = now - DAY;
   const d7 = now - 7 * DAY;
   const d30 = now - 30 * DAY;
@@ -299,10 +300,11 @@ export async function overview(db, now = Date.now()) {
         active_30_days: { on: num(webhooks.on_30), off: num(webhooks.off_30), not_reported: num(webhooks.unknown_30) },
       },
     },
+    heavy_use_hours: heavyHours > 0 ? heavyHours : null,
     heaviest_this_month: heavy.map((r) => ({
       user: r.user_id,
       hours: round(num(r.seconds) / 3600),
-      over_line: num(r.seconds) / 3600 >= HEAVY_HOURS,
+      over_line: heavyHours > 0 && num(r.seconds) / 3600 >= heavyHours,
     })),
   };
 }

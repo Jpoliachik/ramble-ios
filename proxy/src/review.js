@@ -1,5 +1,5 @@
 // The review inbox (specs/connector.md "Review inbox"): how directory
-// reviewers (Claude, ChatGPT, Gemini, Muse) sign in to the connector without
+// reviewers (Claude, ChatGPT, Gemini and others) sign in to the connector without
 // the Ramble app. The operator sets a long review code as the Worker secret
 // REVIEW_CODE. The sign-in page accepts it any number of times, and it only
 // ever connects to one inbox, which holds sample notes and nothing else. No
