@@ -57,6 +57,7 @@ import {
   purgeExpired,
   purgeInbox,
   updateAgent,
+  updateConnection,
 } from './relay.js';
 import { transcribeNote } from './transcribe.js';
 
@@ -131,7 +132,10 @@ const ROUTES = [
   ['/pair/code', { POST: createPairCode }],
   ['/pair/exchange', { POST: exchangePairCode }],
   ['/connections', { GET: listConnections }],
-  [/^\/connections\/([^/]+)$/, { DELETE: (r, c, id) => disconnect(r, id, c) }],
+  [
+    /^\/connections\/([^/]+)$/,
+    { PATCH: (r, c, id) => updateConnection(r, id, c), DELETE: (r, c, id) => disconnect(r, id, c) },
+  ],
   ['/agent', { GET: getAgent, PATCH: updateAgent }],
   ['/transcribe', { POST: whileLegacy(legacyTranscribe) }],
   ['/analytics', { GET: () => gone() }],

@@ -61,6 +61,7 @@ Group related requirements under `##` headings when a spec gets long. Keep the w
 | [ipad.md](ipad.md) | How the iPhone app differs on iPad: the device's name in copy, no watch setup, readable width |
 | [transcription.md](transcription.md) | What happens to uploaded audio on the server: the provider (Groq), formatting options, recording length cap, failures, audio deletion, cost controls, usage monitoring |
 | [delivery.md](delivery.md) | Connecting an agent, delivering transcripts to agents and the app, delivery status, wake-up hooks, webhooks, retention and deletion |
+| [agents-screen.md](agents-screen.md) | Settings → "Your agent": agent cards, naming agents, connecting another, old duplicates, disconnecting |
 | [relay-api.md](relay-api.md) | The relay's HTTP API: device auth, note upload, inbox reads and acks, pairing, rate limits, status codes |
 | [connector.md](connector.md) | Ramble as a remote MCP server: OAuth sign-in with the pairing code, the `list_new_notes`, `get_note` and `mark_handled` tools, MCP Events, the Claude plugin |
 | [usage.md](usage.md) | Usage stats kept for the operator: one content-free row per note, the app version each device last sent, how each agent connects, whether a webhook is set |

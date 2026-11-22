@@ -147,7 +147,7 @@ export async function inboxStatus(request, ctx) {
   // disconnected agent's row is gone, so its copy comes back with no name.
   const { results: perAgent } = await ctx.db
     .prepare(
-      `SELECT e.recording_id, e.connection_id, c.name,
+      `SELECT e.recording_id, e.connection_id, COALESCE(c.label, c.name) AS name,
               CASE WHEN e.acked_at IS NOT NULL THEN 'picked_up'
                    WHEN ${WAITING} THEN 'waiting' ELSE 'removed' END AS state,
               e.acked_at
@@ -227,25 +227,64 @@ export async function listConnections(request, ctx) {
 
   const { results } = await ctx.db
     .prepare(
-      `SELECT c.id, c.name, c.created_at, c.last_pull_at, c.hook_url, c.hook_pinged_at, c.hook_status,
+      `SELECT ${CONNECTION_FIELDS},
               (SELECT COUNT(*) FROM entries e WHERE e.connection_id = c.id AND ${WAITING}) AS pending
          FROM connections c WHERE c.inbox_id = ? ORDER BY c.created_at`,
     )
     .bind(ctx.now, cred.inboxId)
     .all();
 
-  return json({
-    connections: results.map((c) => ({
-      id: c.id,
-      name: c.name ?? null,
-      created_at: iso(c.created_at),
-      last_pull_at: iso(c.last_pull_at),
-      pending: c.pending,
-      // The URL and headers stay on the relay; the app only needs to know
-      // a hook exists and whether its last ping worked.
-      hook: c.hook_url ? { last_ping_at: iso(c.hook_pinged_at), last_status: c.hook_status ?? null } : null,
-    })),
-  });
+  return json({ connections: results.map(connectionJSON) });
+}
+
+const CONNECTION_FIELDS =
+  'c.id, c.name, c.label, c.created_at, c.last_pull_at, c.hook_url, c.hook_pinged_at, c.hook_status';
+
+function connectionJSON(c) {
+  return {
+    id: c.id,
+    name: c.name ?? null,
+    label: c.label ?? null,
+    created_at: iso(c.created_at),
+    last_pull_at: iso(c.last_pull_at),
+    pending: c.pending,
+    // The URL and headers stay on the relay; the app only needs to know
+    // a hook exists and whether its last ping worked.
+    hook: c.hook_url ? { last_ping_at: iso(c.hook_pinged_at), last_status: c.hook_status ?? null } : null,
+  };
+}
+
+/**
+ * The person's own name for an agent: {"label": "Claude at work"} or
+ * {"label": null} to go back to the name the agent gave. The agent can't
+ * see or change it.
+ */
+export async function updateConnection(request, connectionId, ctx) {
+  const { cred, response } = await authenticate(request, ctx, ['inbox']);
+  if (response) return response;
+
+  const body = await readJSON(request);
+  if (!body || typeof body !== 'object' || Array.isArray(body) || !('label' in body)) {
+    return fail(400, 'Send JSON like {"label": "Claude at work"}, or {"label": null} to clear it');
+  }
+  const label = cleanName(body.label);
+  if (body.label !== null && !label) return fail(400, `"label" must be 1–${MAX_NAME_LENGTH} characters`);
+
+  const updated = await ctx.db
+    .prepare('UPDATE connections SET label = ? WHERE id = ? AND inbox_id = ?')
+    .bind(label, connectionId, cred.inboxId)
+    .run();
+  if (updated.meta.changes === 0) return fail(404, 'Connection not found');
+
+  const row = await ctx.db
+    .prepare(
+      `SELECT ${CONNECTION_FIELDS},
+              (SELECT COUNT(*) FROM entries e WHERE e.connection_id = c.id AND ${WAITING}) AS pending
+         FROM connections c WHERE c.id = ?`,
+    )
+    .bind(ctx.now, connectionId)
+    .first();
+  return json(connectionJSON(row));
 }
 
 /** Kills the agent's key, its hook, and every copy waiting for it. */
