@@ -279,6 +279,44 @@ describe('disconnect and delete waiting', () => {
     assert.equal((await h.call('DELETE', `/connections/${c.id}`, { auth: secret })).status, 404);
   });
 
+  it('the person labels a connection; the agent can neither see nor overwrite it', async () => {
+    const secret = await h.inbox();
+    const agent = await h.connect(secret, 'Claude');
+    const [c] = (await h.call('GET', '/connections', { auth: secret })).body.connections;
+    assert.equal(c.label, null);
+
+    const set = await h.call('PATCH', `/connections/${c.id}`, { auth: secret, body: { label: '  Claude at work ' } });
+    assert.equal(set.status, 200);
+    assert.equal(set.body.label, 'Claude at work');
+    assert.equal(set.body.name, 'Claude');
+
+    await h.call('PATCH', '/agent', { auth: agent, body: { name: 'Renamed' } });
+    assert.equal((await h.call('GET', '/agent', { auth: agent })).body.name, 'Renamed');
+    const [after] = (await h.call('GET', '/connections', { auth: secret })).body.connections;
+    assert.equal(after.label, 'Claude at work');
+    assert.equal(after.name, 'Renamed');
+
+    await say(secret, 1);
+    const [rec] = (await status(secret, [noteId(1)])).body.recordings;
+    assert.equal(rec.agents[0].name, 'Claude at work');
+
+    const cleared = await h.call('PATCH', `/connections/${c.id}`, { auth: secret, body: { label: null } });
+    assert.equal(cleared.body.label, null);
+  });
+
+  it('rejects a bad label, a missing connection, and anyone but the inbox', async () => {
+    const secret = await h.inbox();
+    const agent = await h.connect(secret, 'Claude');
+    const [c] = (await h.call('GET', '/connections', { auth: secret })).body.connections;
+    assert.equal((await h.call('PATCH', `/connections/${c.id}`, { auth: secret, body: { label: '' } })).status, 400);
+    assert.equal((await h.call('PATCH', `/connections/${c.id}`, { auth: secret, body: { label: 'x'.repeat(41) } })).status, 400);
+    assert.equal((await h.call('PATCH', `/connections/${c.id}`, { auth: secret, body: {} })).status, 400);
+    assert.equal((await h.call('PATCH', '/connections/nope', { auth: secret, body: { label: 'A' } })).status, 404);
+    assert.equal((await h.call('PATCH', `/connections/${c.id}`, { auth: agent, body: { label: 'A' } })).status, 403);
+    const other = await h.inbox();
+    assert.equal((await h.call('PATCH', `/connections/${c.id}`, { auth: other, body: { label: 'A' } })).status, 404);
+  });
+
   it('DELETE /inbox removes waiting copies only, keeping the device copy and transcribing notes', async () => {
     const { secret, agent } = await setup();
     const watch = await h.watchToken(secret);

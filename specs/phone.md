@@ -304,7 +304,7 @@ Settings SHALL open as a sheet with "Done" and, in order: "Where notes go" ("You
 - THEN nothing opens
 
 ### Requirement: Agent row
-The "Your agent" row SHALL read "Not connected" (grey) with no agent; with one, the check-in summary ("Checked in 2m ago · nothing waiting", "Checked in just now · 2 waiting") with a green dot, or "Hasn't checked in · 14h" with an amber dot when the agent is "Hasn't checked in" by the rule in [delivery.md](delivery.md); with several, the title "Your agents" and "N agents connected", or "<name> hasn't checked in". It opens the agent screen ([delivery.md](delivery.md)).
+The "Your agent" row SHALL read "Not connected" (grey) with no agent; with one, the check-in summary ("Checked in 2m ago · nothing waiting", "Checked in just now · 2 waiting") with a green dot, or "Hasn't checked in · 14h" with an amber dot when the agent is "Hasn't checked in" by the rule in [agents-screen.md](agents-screen.md); with several, the title "Your agents" and "N agents connected", or "<name> hasn't checked in". It opens the agent screen ([agents-screen.md](agents-screen.md)).
 
 #### Scenario: One quiet agent
 - GIVEN one agent last checked in 14 hours ago with notes waiting over 12 hours

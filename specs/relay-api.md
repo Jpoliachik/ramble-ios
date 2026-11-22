@@ -272,7 +272,7 @@ A note's transcript SHALL stay readable by the person's devices until the phone 
 #### Scenario: Response lost
 - GIVEN an exchange succeeded but the response never reached the agent
 - WHEN the agent sends the same code again
-- THEN the response is `409` with `"reason": "code_used"` and no key, the unused connection shows as "Hasn't checked in yet" ([delivery.md](delivery.md)), and the user makes a new code
+- THEN the response is `409` with `"reason": "code_used"` and no key, the unused connection shows as "Hasn't checked in yet" ([agents-screen.md](agents-screen.md)), and the user makes a new code
 
 #### Scenario: Someone else replays the code
 - GIVEN a code already exchanged
@@ -280,7 +280,7 @@ A note's transcript SHALL stay readable by the person's devices until the phone 
 - THEN the response is `409`, and no key is returned
 
 ### Requirement: Connections
-`GET /connections` (phone) SHALL return `{"connections": [{"id", "name", "created_at", "last_pull_at", "pending", "hook"}]}`: `pending` counts that agent's unacked copies; `hook` is `null` or `{"last_ping_at", "last_status"}`, never the URL or headers. `DELETE /connections/:id` SHALL revoke that agent's key, delete its copies and return `{"status": "disconnected"}`, or `404` for an ID not in this inbox.
+`GET /connections` (phone) SHALL return `{"connections": [{"id", "name", "label", "created_at", "last_pull_at", "pending", "hook"}]}`: `name` is the agent's own name, `label` the person's name for it, each `null` when unset; `pending` counts that agent's unacked copies; `hook` is `null` or `{"last_ping_at", "last_status"}`, never the URL or headers. `PATCH /connections/:id` (phone) with `{"label": "…" | null}` SHALL set or clear the label (1–40 characters after trimming, else `400`) and return that connection in the same shape, or `404` for an ID not in this inbox. Agents can't read or change a label. `DELETE /connections/:id` SHALL revoke that agent's key, delete its copies and return `{"status": "disconnected"}`, or `404` for an ID not in this inbox.
 
 #### Scenario: Disconnect
 - GIVEN a connected agent with 3 copies waiting
@@ -301,7 +301,7 @@ A note's transcript SHALL stay readable by the person's devices until the phone 
 - THEN the response is `{"deleted": 0}` and item 41 remains
 
 ### Requirement: Delivery status
-`POST /inbox/status` (phone) with `{"recording_ids": [1–100 note IDs]}` SHALL return `{"recordings": [{"recording_id", "copies", "waiting", "picked_up", "removed", "first_picked_up_at", "agents"}], "missing": [ids]}`: agent copies made, still waiting, acked, and removed unread (expired, deleted, or agent disconnected), the first ack time or `null`, and `agents`, one `{"connection_id", "name", "state", "picked_up_at"}` per copy in the order copies were made, with `state` `"waiting"`, `"picked_up"` or `"removed"`, and `name` `null` when the agent gave none or has since been disconnected. IDs this inbox doesn't know are listed only in `missing`. States: [delivery.md](delivery.md).
+`POST /inbox/status` (phone) with `{"recording_ids": [1–100 note IDs]}` SHALL return `{"recordings": [{"recording_id", "copies", "waiting", "picked_up", "removed", "first_picked_up_at", "agents"}], "missing": [ids]}`: agent copies made, still waiting, acked, and removed unread (expired, deleted, or agent disconnected), the first ack time or `null`, and `agents`, one `{"connection_id", "name", "state", "picked_up_at"}` per copy in the order copies were made, with `state` `"waiting"`, `"picked_up"` or `"removed"`, and `name` the connection's label if set, else the agent's own name, or `null` when it has neither or has since been disconnected. IDs this inbox doesn't know are listed only in `missing`. States: [delivery.md](delivery.md).
 
 #### Scenario: Removed unread
 - GIVEN a note copied to one agent, which was disconnected before pulling

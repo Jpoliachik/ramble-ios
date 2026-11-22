@@ -20,6 +20,8 @@ struct RelayConnection: Decodable, Identifiable, Hashable {
     let id: String
     /// What the agent called itself when it paired ("Grok Bot"). Optional.
     let name: String?
+    /// The person's own name for it, set on this iPhone. Wins over `name`.
+    let label: String?
     let createdAt: Date
     let lastPullAt: Date?
     let pending: Int
@@ -129,6 +131,8 @@ enum RelayError: LocalizedError {
 @MainActor
 final class RelayService: ObservableObject {
     static let shared = RelayService()
+    /// The relay's MAX_AGENTS: connections one inbox can have.
+    static let maxAgents = 10
 
     private static let inboxSecretKey = "relayInboxSecret"
     private static let connectionCountKey = "relayConnectionCount"
@@ -227,6 +231,15 @@ final class RelayService: ObservableObject {
             // Already gone.
         }
         setConnections(connections.filter { $0.id != connection.id })
+    }
+
+    /// Sets the person's own name for an agent; nil goes back to the name
+    /// the agent gave itself.
+    func rename(_ connection: RelayConnection, to label: String?) async throws {
+        let body = try JSONSerialization.data(withJSONObject: ["label": label.map { $0 as Any } ?? NSNull()])
+        let data = try await send("PATCH", "connections/\(connection.id)", body: body, auth: try await ensureInbox())
+        let updated = try decoder.decode(RelayConnection.self, from: data)
+        setConnections(connections.map { $0.id == updated.id ? updated : $0 })
     }
 
     /// Deletes every agent copy still waiting. Agents stay connected.

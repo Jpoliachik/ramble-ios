@@ -1,12 +1,12 @@
 # Delivery
 
 ## Purpose
-Who receives each transcript, when, and for how long: connecting an agent, what the agent receives, wake-up hooks, webhooks, the delivery states and their words, how transcripts are kept and deleted, and the privacy wording. The HTTP contract, limits and status codes are in [relay-api.md](relay-api.md); how audio becomes a transcript is in [transcription.md](transcription.md); where each string sits on the iPhone is in [phone.md](phone.md).
+Who receives each transcript, when, and for how long: connecting an agent, what the agent receives, wake-up hooks, webhooks, the delivery states and their words, how transcripts are kept and deleted, and the privacy wording. The agent screen (cards, naming, disconnecting) is in [agents-screen.md](agents-screen.md). The HTTP contract, limits and status codes are in [relay-api.md](relay-api.md); how audio becomes a transcript is in [transcription.md](transcription.md); where each string sits on the iPhone is in [phone.md](phone.md).
 
 ## Connecting an agent
 
 ### Requirement: The Connect screen makes the pairing code
-The iPhone SHALL make a pairing code only when its Connect screen opens, from onboarding, the Home "Connect" pill, or the "Connect your agent", "Connect again" and "Connect another" buttons. Opening the agent status screen SHALL NOT make a code. Only the iPhone can connect agents. An MCP connector such as Claude connects with the same code, entered on its sign-in page ([connector.md](connector.md)), and is then an agent like any other.
+The iPhone SHALL make a pairing code only when its Connect screen opens, from onboarding, the Home "Connect" pill, or the "Connect your agent", "Connect again" and "Connect another agent" buttons. Opening the agent status screen SHALL NOT make a code. Only the iPhone can connect agents. An MCP connector such as Claude connects with the same code, entered on its sign-in page ([connector.md](connector.md)), and is then an agent like any other.
 
 #### Scenario: Opening the agent screen with no agent
 - GIVEN no agent is connected
@@ -71,42 +71,6 @@ When Ramble is reinstalled and the iPhone still holds its inbox credential, it S
 - GIVEN an agent was connected and the iPhone starts a fresh inbox
 - WHEN the person records a note before connecting any agent
 - THEN the old agent does not receive it, and the note reads "Saved, no agent connected"
-
-## What the person sees per agent
-
-### Requirement: Agent cards show status and last check-in
-The agent screen SHALL be titled "Your agent" and give each agent a card: its name if it gave one ([relay-api.md](relay-api.md)), "Connected" (green) or "Hasn't checked in" (amber), and a line such as "Checked in 2m ago · nothing waiting", "Hasn't checked in yet · nothing waiting", or "Last checked in 14h ago · 2 waiting" when something is waiting. It is "Hasn't checked in" when a copy waits for it and it has not checked its inbox in 12 hours, or ever. Dialogs call an unnamed agent "Agent".
-
-#### Scenario: A quiet agent
-- GIVEN 2 notes have waited for the agent and it last checked in 14 hours ago
-- WHEN the person opens "Your agent"
-- THEN the card is amber and reads "Hasn't checked in" and "Last checked in 14h ago · 2 waiting"
-- AND it shows "If your agent lost its setup, connect it again with a fresh message." with a "Connect again" button
-
-### Requirement: More than one agent stays quiet in the interface
-The agent screen SHALL offer further agents only through the footnote "Using more than one agent? **Connect another**", with "Connect another" in the amber accent so it reads as tappable. "Connect another" and "Connect again" each pair a separate connection; an existing one stays until disconnected. With more than one agent, the title SHALL read "Your agents", each card gets a small red trash can button on its right (accessibility label "Disconnect <name>") that asks first, and the bottom action reads "Disconnect all".
-
-#### Scenario: Two agents
-- GIVEN "Grok Bot" and "Muse" are connected
-- WHEN the person opens the agent screen
-- THEN it is titled "Your agents" and shows two cards, each with a red trash can that disconnects it after confirming
-
-### Requirement: Disconnect cuts an agent off at once
-Disconnecting an agent SHALL revoke its key immediately, delete every copy waiting for it, and remove its wake-up hook. Other agents stay connected.
-
-#### Scenario: Disconnect one of two
-- GIVEN "Grok Bot" has 3 notes waiting and "Muse" has 1
-- WHEN the person disconnects "Grok Bot"
-- THEN Grok Bot's 3 copies are deleted and its key stops working
-- AND Muse's copy is untouched
-
-### Requirement: Disconnect asks first
-The app SHALL confirm before disconnecting: "Disconnect your agent?" with "It loses access immediately, and anything waiting for it is deleted." for a single agent; "Disconnect <name>?" with "It loses access immediately, and anything waiting for it is deleted. Your other agents stay connected." for one of several; "Disconnect your agents?" with "They lose access immediately, and anything waiting for them is deleted." for "Disconnect all".
-
-#### Scenario: Disconnect all
-- GIVEN two agents are connected
-- WHEN the person taps "Disconnect all"
-- THEN "Disconnect your agents?" appears, and nothing changes until they confirm
 
 ## What each agent receives
 

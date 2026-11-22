@@ -28,6 +28,9 @@ struct ConnectAgentView: View {
     @State private var showDisconnectConfirmation = false
     /// The one agent to disconnect, when several are connected.
     @State private var disconnectTarget: RelayConnection?
+    /// The agent being renamed, and the text in the rename field.
+    @State private var renameTarget: RelayConnection?
+    @State private var renameText = ""
 
     init(startPairing: Bool = false) {
         self.startPairing = startPairing
@@ -94,6 +97,27 @@ struct ConnectAgentView: View {
             } message: { _ in
                 Text("It loses access immediately, and anything waiting for it is deleted. Your other agents stay connected.")
             }
+            .alert(
+                "Rename agent",
+                isPresented: Binding(
+                    get: { renameTarget != nil },
+                    set: { if !$0 { renameTarget = nil } }
+                ),
+                presenting: renameTarget
+            ) { connection in
+                TextField(connection.name ?? "Agent", text: $renameText)
+                    .textInputAutocapitalization(.words)
+                Button("Cancel", role: .cancel) {}
+                Button("Save") {
+                    var label = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
+                    // The relay counts UTF-16 units, so cut the same way,
+                    // dropping whole characters, never half an emoji.
+                    while label.utf16.count > 40 { label.removeLast() }
+                    Task { await run { try await relay.rename(connection, to: label.isEmpty ? nil : label) } }
+                }
+            } message: { connection in
+                Text("Your agent doesn't see this name. Leave it empty to use \u{201C}\(connection.name ?? "Agent")\u{201D}.")
+            }
             .confirmationDialog(
                 "Delete waiting notes?",
                 isPresented: $showDeleteConfirmation,
@@ -142,34 +166,27 @@ struct ConnectAgentView: View {
                     ForEach(relay.connections) { connection in
                         AgentStatusCard(
                             connection: connection,
-                            onConnectAgain: {
-                                HapticService.buttonTap()
-                                note = nil
-                                isPairing = true
+                            replaced: AgentHealth.looksReplaced(connection, among: relay.connections),
+                            onConnectAgain: beginPairing,
+                            onRename: {
+                                renameText = connection.label ?? ""
+                                renameTarget = connection
                             },
-                            // With one agent, the Disconnect row below covers it.
-                            onDisconnect: relay.connections.count > 1 ? { disconnectTarget = connection } : nil
+                            onDisconnect: {
+                                if relay.connections.count > 1 {
+                                    disconnectTarget = connection
+                                } else {
+                                    showDisconnectConfirmation = true
+                                }
+                            }
                         )
+                    }
+                    if relay.connections.count < RelayService.maxAgents {
+                        connectAnother
                     }
                     privacyNote
                         .padding(.top, 14)
                     actions
-                    // Most people use one agent, so this stays a quiet footnote.
-                    Button {
-                        HapticService.buttonTap()
-                        note = nil
-                        isPairing = true
-                    } label: {
-                        (Text("Using more than one agent? ")
-                            .foregroundStyle(Color.obInkFaint)
-                         + Text("Connect another")
-                            .fontWeight(.semibold)
-                            .foregroundStyle(Color.brandAmber))
-                            .font(.footnote)
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 4)
-                    .padding(.top, 10)
                 }
 
                 if let errorMessage {
@@ -186,6 +203,29 @@ struct ConnectAgentView: View {
         .scrollBounceBehavior(.basedOnSize)
         .refreshable { await run { try await relay.refreshConnections() } }
         .task { await run { try await relay.refreshConnections() } }
+    }
+
+    private func beginPairing() {
+        HapticService.buttonTap()
+        note = nil
+        isPairing = true
+    }
+
+    /// Right under the cards, so a second agent is easy to find without
+    /// shouting: a dashed outline and amber text, no fill.
+    private var connectAnother: some View {
+        Button(action: beginPairing) {
+            Label("Connect another agent", systemImage: "plus.circle")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Color.connectAmberText)
+                .frame(maxWidth: .infinity, minHeight: 56)
+                .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(Color.obInkFaint.opacity(0.45), style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+        }
     }
 
     private var notConnected: some View {
@@ -302,9 +342,27 @@ enum AgentHealth: Equatable {
         self = connection.pending > 0 && stale ? .quiet : .connected
     }
 
-    /// The name the agent gave itself at pairing, or a plain fallback.
+    /// The person's name for it, else the name the agent gave itself, else
+    /// a plain fallback.
     static func displayName(_ connection: RelayConnection) -> String {
-        connection.name ?? "Agent"
+        connection.label ?? connection.name ?? "Agent"
+    }
+
+    /// True for an older connection that the same agent seems to have
+    /// replaced by connecting again: a newer one gave the same name and has
+    /// checked in, and this one hasn't checked in since the newer one
+    /// connected.
+    static func looksReplaced(_ connection: RelayConnection, among all: [RelayConnection]) -> Bool {
+        // A connection the person named is one they know; leave it be.
+        guard connection.label == nil, let name = connection.name else { return false }
+        let lastSeen = connection.lastPullAt ?? connection.createdAt
+        return all.contains { other in
+            other.id != connection.id
+                && other.name == name
+                && other.createdAt > connection.createdAt
+                && other.lastPullAt != nil
+                && lastSeen < other.createdAt
+        }
     }
 
     /// "Checked in 2m ago · nothing waiting".
@@ -323,44 +381,50 @@ enum AgentHealth: Equatable {
     }
 }
 
-/// The status card on "Your agent": green when it's fine, amber with
-/// "Connect again" when it has gone quiet.
+/// One agent's card on "Your agent": its name, how it's doing, and a menu
+/// to rename or disconnect it. Amber with "Connect again" when it has gone
+/// quiet; a remove offer instead when a newer copy of it replaced it.
 private struct AgentStatusCard: View {
     let connection: RelayConnection
+    let replaced: Bool
     let onConnectAgain: () -> Void
-    /// Shown only when several agents are connected.
-    var onDisconnect: (() -> Void)? = nil
+    let onRename: () -> Void
+    let onDisconnect: () -> Void
 
     var body: some View {
         let health = AgentHealth(connection)
+        let name = AgentHealth.displayName(connection)
+        let quiet = health == .quiet && !replaced
         VStack(alignment: .leading, spacing: 6) {
-            if let name = connection.name {
-                Text(name)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Color.obInkFaint)
-            }
             HStack(spacing: 8) {
-                Circle()
-                    .fill(health == .quiet ? Color.brandAmber : Color.green)
-                    .frame(width: 10, height: 10)
-                Text(health == .quiet ? "Hasn't checked in" : "Connected")
+                Text(name)
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(Color.obInk)
+                    .lineLimit(1)
                 Spacer(minLength: 8)
-                if let onDisconnect {
-                    // A small red trash can; the confirmation dialog asks first.
-                    Button(action: onDisconnect) {
-                        Image(systemName: "trash")
-                            .font(.system(size: 19, weight: .medium))
-                            .foregroundStyle(Color.red)
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.trailing, -10)
-                    .padding(.vertical, -10)
-                    .accessibilityLabel("Disconnect \(AgentHealth.displayName(connection))")
+                Menu {
+                    Button("Rename", systemImage: "pencil", action: onRename)
+                    Button("Disconnect", systemImage: "trash", role: .destructive, action: onDisconnect)
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color.obInkSoft)
+                        .frame(width: 32, height: 32)
+                        .background(Color(.tertiarySystemFill), in: Circle())
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
+                .padding(.trailing, -6)
+                .padding(.vertical, -6)
+                .accessibilityLabel("More for \(name)")
+            }
+            HStack(spacing: 7) {
+                Circle()
+                    .fill(replaced ? Color.obInkFaint : quiet ? Color.brandAmber : Color.green)
+                    .frame(width: 8, height: 8)
+                Text(replaced ? "Not checking in" : quiet ? "Hasn't checked in" : "Connected")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Color.obInkSoft)
             }
             Text(AgentHealth.summary(connection))
                 .font(.system(size: 15))
@@ -374,7 +438,27 @@ private struct AgentStatusCard: View {
                 .foregroundStyle(hook.isFailing ? Color.connectAmberText : Color.obInkFaint)
             }
 
-            if health == .quiet {
+            if replaced {
+                VStack(alignment: .leading, spacing: 10) {
+                    Rectangle()
+                        .fill(Color.obHair)
+                        .frame(height: 1)
+                    Text("Looks like an older \(connection.name ?? "agent"). It hasn't checked in since \(connection.name ?? "it") connected again.")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Color.obInkSoft)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button(action: onDisconnect) {
+                        Text("Remove this one")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Color.red)
+                            .padding(.horizontal, 16)
+                            .frame(minHeight: 36)
+                            .background(Color(.tertiarySystemFill), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.top, 6)
+            } else if quiet {
                 Text("If your agent lost its setup, connect it again with a fresh message.")
                     .font(.system(size: 14))
                     .foregroundStyle(Color.obInkSoft)
@@ -388,7 +472,7 @@ private struct AgentStatusCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay {
-            if health == .quiet {
+            if quiet {
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .stroke(Color.brandAmber, lineWidth: 1.5)
             }
