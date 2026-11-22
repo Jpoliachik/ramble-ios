@@ -117,7 +117,7 @@ struct OnboardingConnectStep: View {
             messageText
                 .font(.system(size: 15))
                 .foregroundStyle(Color.obInk)
-                .tint(Color.codeChipText)
+                .tint(chipTextColor)
                 .fixedSize(horizontal: false, vertical: true)
                 .redacted(reason: pairCode == nil ? .placeholder : [])
                 .environment(\.openURL, OpenURLAction { url in
@@ -151,6 +151,7 @@ struct OnboardingConnectStep: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -160,6 +161,10 @@ struct OnboardingConnectStep: View {
     }
 
     private static let copyCodeScheme = "ramble-copy-code"
+
+    private var chipTextColor: Color {
+        codeCopied ? Color.onOnboardingAmber : Color.codeChipText
+    }
 
     /// The message with the pairing code as a tappable amber chip that copies
     /// just the code, for connector sign-in pages.
@@ -174,17 +179,13 @@ struct OnboardingConnectStep: View {
         let unbroken = code.replacingOccurrences(of: "-", with: "\u{2060}-\u{2060}")
         var chip = AttributedString("\u{202F}\(unbroken)\u{202F}")
         chip.font = .system(size: 15, weight: .semibold, design: .monospaced)
-        chip.foregroundColor = Color.codeChipText
-        chip.backgroundColor = Color.brandAmberSoft
+        chip.foregroundColor = chipTextColor
+        // After a copy the chip fills solid amber for 2 seconds. Nothing is
+        // added to the text, so the message never reflows under the finger.
+        chip.backgroundColor = codeCopied ? Color.brandAmber : Color.brandAmberSoft
         chip.link = URL(string: "\(Self.copyCodeScheme):code")
 
-        guard codeCopied else { return Text("\(before)\(chip)\(after)") }
-        // Only a link can be tapped inside Text, and an SF Symbol can't be a
-        // link, so the chip has no copy icon. A check shows after a copy.
-        let check = Text(Image(systemName: "checkmark"))
-            .font(.system(size: 12, weight: .bold))
-            .foregroundStyle(Color.codeChipText)
-        return Text("\(before)\(chip)\u{00A0}\(check)\(after)")
+        return Text("\(before)\(chip)\(after)")
     }
 
     private func metaText(remaining: Int, expired: Bool) -> String {

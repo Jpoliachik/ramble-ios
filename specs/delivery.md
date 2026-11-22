@@ -25,7 +25,7 @@ The Connect screen SHALL show three steps, "Copy this message", "Paste it to you
 #### Scenario: Copying just the code
 - GIVEN the Connect screen shows the live code K7QX-MP4D-2HNV
 - WHEN the person taps the code in the message
-- THEN only "K7QX-MP4D-2HNV" is on the clipboard, with a success haptic, a check shows beside the chip for 2 seconds, and step 2 is next
+- THEN only "K7QX-MP4D-2HNV" is on the clipboard, with a success haptic, the chip fills solid amber for 2 seconds without moving the text, and step 2 is next
 
 ### Requirement: Codes work once and expire after 10 minutes
 A pairing code SHALL connect one agent and stay valid for 10 minutes after it is made, even if the Connect screen closes. The screen counts down ("Works once · 5:30 left"). Code length and format are in [relay-api.md](relay-api.md).
