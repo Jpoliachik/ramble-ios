@@ -4,7 +4,7 @@
 
 [App Store](https://apps.apple.com/app/id6761857751) · [ramble.watch](https://ramble.watch) · [Connect your agent](https://ramble.watch/docs)
 
-## Privacy, in the code
+## Privacy
 
 Ramble's server is a relay, not an archive. Your audio is sent to a transcription provider and deleted as soon as the transcript is ready. Transcripts are deleted when your agent picks them up, or after 30 days. Your full history lives only on your iPhone.
 
@@ -39,4 +39,4 @@ cd website && npm install && npm run dev
 
 ## License
 
-The source is public so it can be read and checked. It is not open source: no licence is granted, and all rights are reserved by Good Loop Software LLC. Questions: support@ramble.watch.
+The source is public, but it is not open source: no licence is granted, and all rights are reserved by Good Loop Software LLC. Questions: support@ramble.watch.

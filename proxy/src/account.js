@@ -9,7 +9,7 @@ import { alert } from './ops.js';
 
 export const FREE_NOTES = 25;
 // Inboxes one purchase may ever be bound to, unless the operator raised its
-// inbox_cap by hand (docs/operations.md).
+// inbox_cap by hand (proxy/README.md "Operations").
 export const MAX_INBOXES_PER_PURCHASE = 10;
 export const MAX_VOCABULARY = 900;
 const DEFAULT_UNLOCK_PRODUCT = 'dev.goodloop.ramble.unlock';
@@ -49,7 +49,7 @@ export function accountView(account) {
 
 // --- Usage monitoring and suspension -------------------------------------------
 
-/** Set by the operator by hand; see docs/operations.md. */
+/** Set by the operator by hand; see proxy/README.md "Operations". */
 export const suspendedResponse = () =>
   fail(403, 'Uploads from this Ramble setup are paused. Contact support@ramble.watch.', 'suspended');
 

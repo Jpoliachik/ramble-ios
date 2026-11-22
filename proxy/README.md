@@ -58,7 +58,7 @@ Vars (`[vars]`): `RETENTION_SECONDS`, `APPLE_BUNDLE_ID`, `UNLOCK_PRODUCT_ID`, `P
 
 Production has no developer bypass: never set `ENVIRONMENT` or `DEV_BYPASS_KEY` on the deployed Worker (see Local Development). `DEV_BYPASS_TOKEN`, `ANALYTICS_TOKEN`, `DEEPGRAM_API_KEY` and `OPENAI_API_KEY` are no longer read and can be deleted.
 
-Apple: the relay takes no App Store Server Notifications; leave the App Store Server Notifications URL unset in App Store Connect. Refunds are revoked by hand by the operator.
+Apple: the relay takes no App Store Server Notifications; leave the App Store Server Notifications URL unset in App Store Connect. Refunds are revoked by hand (Operations, below).
 
 ## What is stored
 
@@ -71,6 +71,98 @@ Apple: the relay takes no App Store Server Notifications; leave the App Store Se
 - **Operator data:** alert cooldowns, server-error counts per minute (kept an hour), and rate-limit counters for App Attest and inbox creation.
 
 Logs carry no request bodies, transcript text, audio, credentials or network addresses; inbox IDs and App Attest key IDs appear only as short hashes, and provider error bodies are cut to 200 characters.
+
+## Usage stats: where to look
+
+The quickest view is the admin dashboard, https://ramble-admin.jpoliachik.workers.dev (`admin/README.md`). For anything it doesn't show, read them in the Cloudflare dashboard (**D1 → ramble-relay → Console**), or from an agent with Cloudflare D1 access. Query `note_events` and `inboxes` only, and never select `notes.transcript` or `entries.text`: those are people's words. Times are Unix milliseconds, days are UTC.
+
+```sql
+-- Signups (new installs) per day
+SELECT date(created_at / 1000, 'unixepoch') AS day, COUNT(*) AS signups
+FROM inboxes GROUP BY day ORDER BY day DESC LIMIT 30;
+
+-- Daily active users (recorded at least one note that day)
+SELECT date(recorded_at / 1000, 'unixepoch') AS day, COUNT(DISTINCT user_id) AS users, COUNT(*) AS notes
+FROM note_events GROUP BY day ORDER BY day DESC LIMIT 30;
+
+-- Weekly active users
+SELECT strftime('%Y-W%W', recorded_at / 1000, 'unixepoch') AS week, COUNT(DISTINCT user_id) AS users, COUNT(*) AS notes
+FROM note_events GROUP BY week ORDER BY week DESC LIMIT 12;
+
+-- Notes per user, including installs that never recorded
+SELECT COUNT(*) AS users, ROUND(AVG(n), 1) AS avg_notes, MAX(n) AS most
+FROM (SELECT i.usage_id, COUNT(e.note_key) AS n FROM inboxes i
+      LEFT JOIN note_events e ON e.user_id = i.usage_id GROUP BY i.usage_id);
+
+-- How many users reach 10 notes, and how many days after install
+WITH ranked AS (
+  SELECT user_id, recorded_at, ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY recorded_at) AS n
+  FROM note_events)
+SELECT COUNT(*) AS users_at_10, ROUND(AVG((r.recorded_at - i.created_at) / 86400000.0), 1) AS avg_days
+FROM ranked r JOIN inboxes i ON i.usage_id = r.user_id WHERE r.n = 10;
+
+-- Note length, watch vs phone
+SELECT source, COUNT(*) AS notes, ROUND(AVG(duration) / 60, 1) AS avg_min,
+       SUM(duration > 1800) AS over_30_min
+FROM note_events GROUP BY source;
+
+-- Reliability: results, first-try share, wait from upload to final
+SELECT result, COUNT(*) AS notes, SUM(attempts = 1) AS first_try,
+       ROUND(AVG(finished_at - accepted_at) / 1000.0, 1) AS avg_wait_s
+FROM note_events GROUP BY result;
+
+-- Which app builds are in use
+SELECT phone_app, watch_app, COUNT(*) AS inboxes FROM inboxes GROUP BY 1, 2 ORDER BY inboxes DESC;
+```
+
+## Operations: heavy users, suspending one, and revoking a refund
+
+There is no usage limit, and the heavy-use threshold is internal: it is never shown to people (not in the app, the Terms or the listing) and lives only in the `HEAVY_USE_HOURS` secret. The relay keeps a monthly tally per user, where the user is the purchase an inbox is unlocked by (`unlock:…`, `sub:…`, `app:…`) or the inbox ID (`inb_…`) when it has none, and sends one Telegram alert the first time a user passes that threshold in a UTC month. Nothing is refused. The global backstop is a spend limit in the Groq console.
+
+If one user needs stopping, suspend them by hand. Uploads (`PUT /notes/:id` and old builds' `POST /transcribe`) from a suspended inbox, or from any inbox bound to a suspended purchase, get `403` with `"reason": "suspended"`; the apps show "Couldn't send" and stop retrying. Notes already accepted still transcribe, and everyone else is unaffected. Each command is one line:
+
+```bash
+# Heaviest users this month (UTC)
+npx wrangler d1 execute ramble-relay --remote --command "SELECT user_id, ROUND(seconds / 3600.0, 1) AS hours FROM usage WHERE month = strftime('%Y-%m', 'now') ORDER BY seconds DESC LIMIT 20"
+
+# Inboxes bound to a purchase
+npx wrangler d1 execute ramble-relay --remote --command "SELECT id, suspended, last_upload_at FROM inboxes WHERE purchase_id = 'unlock:2000000123456789'"
+
+# Suspend a purchase (every inbox bound to it)
+npx wrangler d1 execute ramble-relay --remote --command "UPDATE purchases SET suspended = 1 WHERE id = 'unlock:2000000123456789'"
+
+# Suspend an old-build subscriber (POST /transcribe) whose sub:… ID may not be in purchases yet
+npx wrangler d1 execute ramble-relay --remote --command "INSERT INTO purchases (id, kind, environment, created_at, suspended) VALUES ('sub:2000000123456789', 'subscriber', 'Production', 0, 1) ON CONFLICT (id) DO UPDATE SET suspended = 1"
+
+# Suspend one inbox
+npx wrangler d1 execute ramble-relay --remote --command "UPDATE inboxes SET suspended = 1 WHERE id = 'inb_abc123'"
+
+# Unsuspend
+npx wrangler d1 execute ramble-relay --remote --command "UPDATE purchases SET suspended = 0 WHERE id = 'unlock:2000000123456789'"
+npx wrangler d1 execute ramble-relay --remote --command "UPDATE inboxes SET suspended = 0 WHERE id = 'inb_abc123'"
+
+# Everyone suspended
+npx wrangler d1 execute ramble-relay --remote --command "SELECT 'purchase' AS kind, id FROM purchases WHERE suspended = 1 UNION ALL SELECT 'inbox', id FROM inboxes WHERE suspended = 1"
+
+# Revoke a refunded unlock (every inbox bound to it goes back to the free state, and the record is refused from then on)
+npx wrangler d1 execute ramble-relay --remote --command "UPDATE purchases SET revoked_at = CAST(strftime('%s', 'now') AS INTEGER) * 1000 WHERE id = 'unlock:2000000123456789'"
+```
+
+The `UPDATE` reports `changes: 1` when it found the purchase. The old-build subscriber command adds a row only when the `sub:` ID isn't known yet; that row is dated 1970, so it never counts as a new unlock. Notes the apps marked "Couldn't send" while suspended don't upload again by themselves after an unsuspend; new notes do.
+
+Refunds: the relay doesn't listen for Apple's refund notifications. A refunded purchase whose signed record Apple marks with a `revocationDate` is refused when it is sent again, but inboxes it already unlocked stay unlocked until you revoke it with the command above. Use the original transaction ID from App Store Connect or the refund report. Notes accepted before the revoke still transcribe.
+
+## Operations: a purchase on more than 10 iPhones
+
+One purchase unlocks at most 10 inboxes ever (each fresh start after a reinstall is a new inbox), and time frees no spot. The 11th gets `403` `too_many_inboxes`, and the app asks the person to contact support. To check and raise one purchase's cap (the person then taps "Restore Purchases"):
+
+```bash
+# How many inboxes it is bound to, and its cap (empty means 10)
+npx wrangler d1 execute ramble-relay --remote --command "SELECT p.id, p.inbox_cap, COUNT(i.id) AS inboxes FROM purchases p LEFT JOIN inboxes i ON i.purchase_id = p.id WHERE p.id = 'unlock:2000000123456789' GROUP BY p.id"
+
+# Raise its cap
+npx wrangler d1 execute ramble-relay --remote --command "UPDATE purchases SET inbox_cap = 15 WHERE id = 'unlock:2000000123456789'"
+```
 
 ## App Attest Implementation Notes
 
@@ -108,31 +200,6 @@ During attestation, the credential public key is available in two places: the CO
 **4. App Attest works on local Xcode dev builds**
 
 `DCAppAttestService` works on any real Apple device, including apps built directly from Xcode. The only difference is the environment: dev builds use `appattestdevelop` as the AAGUID, while TestFlight/App Store builds use `appattest`. The production relay accepts only `appattest`. App Attest does NOT work on the iOS Simulator.
-
-## Deploy Your Own
-
-1. Copy the example config:
-   ```bash
-   cp wrangler.example.toml wrangler.toml
-   ```
-
-2. Edit `wrangler.toml` — set your Cloudflare account ID.
-
-3. Create the KV namespace for App Attest state:
-   ```bash
-   npx wrangler kv namespace create ATTEST_KV
-   ```
-   Paste the returned ID into `wrangler.toml`.
-
-4. Create the D1 database and the R2 bucket (see Configuration), paste the D1 id into `wrangler.toml`, and apply the migrations.
-
-5. Set the secrets listed under Configuration.
-
-6. Deploy:
-   ```bash
-   npm install
-   npm run deploy
-   ```
 
 ## Local Development
 
