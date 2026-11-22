@@ -32,6 +32,10 @@ These rules are not optional. They apply to every change, however small:
 - Marketing website on Vercel at https://ramble.watch (source in `website/`, static export)
 - **App Store URL:** https://apps.apple.com/app/id6761857751 (Apple ID: 6761857751)
 
+## Pull requests: safe to merge?
+
+Whenever you open a PR, run the `pr-review` skill (`.claude/skills/pr-review/SKILL.md`) once CI has finished, and lead your reply with its verdict. It sends the diff to a small panel of expert reviewers (deploy and ops, security, agent integrations, UX and copy, privacy and App Store), only those the diff touches, and rolls them up into one answer. Run it again when Justin asks whether a PR is safe to merge. Small changes still go straight to `main` without a PR.
+
 ## Build & Development
 
 This is a native iOS project using Xcode. No CocoaPods or SPM dependencies.

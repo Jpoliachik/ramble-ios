@@ -61,8 +61,9 @@ Ramble/Ramble/Secrets.swift
 # Cloudflare Wrangler
 .wrangler/
 
-# Claude Code
-.claude/
+# Claude Code: local settings stay out, project skills are shared
+.claude/*
+!.claude/skills/
 
 # Local wrangler config with a D1 binding for relay development
 proxy/wrangler.local.toml
