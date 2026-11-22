@@ -115,6 +115,17 @@ The connector SHALL NOT upload, delete, change settings, pair or disconnect anyt
 - WHEN Claude marks it handled
 - THEN Muse still receives the note on its next pull, and the note stays in the app
 
+## Claude plugin
+
+### Requirement: One plugin, the connector plus one skill
+The Ramble plugin for Claude SHALL contain exactly the connector at `https://api.ramble.watch/mcp` and one skill, `ramble-notes`, with no hooks, commands or agents. The skill SHALL tell Claude to treat `list_new_notes` as the to-do list, work through notes oldest first, call `mark_handled` on each note as soon as it is dealt with and never on a note it could not act on, ask before anything that sends, buys, deletes or posts, and end with one line per note. Installing the plugin signs in exactly like adding the connector by hand.
+
+#### Scenario: Two notes, one needs the person
+- GIVEN the plugin is installed and connected, and two notes wait: "Add oat milk to the list" and "Email Sam that I'm in"
+- WHEN the person asks Claude to check their Ramble notes
+- THEN Claude adds oat milk, marks that note handled, drafts the email and asks before sending
+- AND the email note stays in `list_new_notes` until it is dealt with
+
 ## Events
 
 Webhook delivery from the draft MCP Events extension, as ChatGPT implements it. Polling and streaming delivery are not offered, and missed events are not replayed: the note still waits in `list_new_notes`.

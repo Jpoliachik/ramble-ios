@@ -104,6 +104,7 @@ Ramble/
 website/               # Marketing site (Next.js static export)
 proxy/                 # Cloudflare Worker: transcription proxy + agent relay (RELAY.md)
 admin/                 # Cloudflare Worker: Justin's private admin dashboard (README.md)
+plugins/ramble/        # Claude plugin: the MCP connector + the ramble-notes skill (specs/connector.md)
 ```
 
 ### Data Flow
