@@ -46,7 +46,7 @@ crons = ["* * * * *"]
 # migrations_dir = "migrations"
 
 # Note audio, stored only until the note is transcribed (or fails for good).
-# SETUP (Justin): create the bucket before deploying, private, with a 1-day
+# Setup: create the bucket before deploying, private, with a 1-day
 # lifecycle rule as the backstop for failed deletes:
 #   npx wrangler r2 bucket create ramble-audio
 #   then add an object lifecycle rule deleting objects after 1 day

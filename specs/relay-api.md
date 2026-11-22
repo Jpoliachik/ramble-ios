@@ -105,7 +105,7 @@ Any inbox MAY submit a purchase, whichever inbox it was bought from. A purchase 
 - THEN the response is `403` with `"reason": "too_many_inboxes"`
 
 ### Requirement: Revoked purchases
-The relay SHALL NOT receive App Store Server Notifications. A purchase the operator marks revoked by hand ([proxy/README.md](../proxy/README.md) "Operations") SHALL return every inbox bound to it to the free state, with its used free-note count unchanged, and SHALL be refused as `invalid_transaction` when submitted again.
+The relay SHALL NOT receive App Store Server Notifications. A purchase the operator marks revoked by hand SHALL return every inbox bound to it to the free state, with its used free-note count unchanged, and SHALL be refused as `invalid_transaction` when submitted again.
 
 #### Scenario: Refund revoked by hand
 - GIVEN a purchase bound to 2 inboxes that used all 25 free notes before unlocking

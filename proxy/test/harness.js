@@ -93,7 +93,7 @@ export function createHarness() {
     measured: 12,
     envExtra: {},
   };
-  h.env = () => ({ DB: h.db, AUDIO: h.bucket, HOOK_ENCRYPTION_KEY: 'k', TELEGRAM_BOT_TOKEN: 't', TELEGRAM_CHAT_ID: '1', ...h.envExtra });
+  h.env = () => ({ DB: h.db, AUDIO: h.bucket, HOOK_ENCRYPTION_KEY: 'k', TELEGRAM_BOT_TOKEN: 't', TELEGRAM_CHAT_ID: '1', HEAVY_USE_HOURS: '50', ...h.envExtra });
 
   h.deps = (extra = {}) => ({
     now: h.now,

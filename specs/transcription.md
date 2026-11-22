@@ -233,10 +233,10 @@ The server SHALL delete a note's audio as soon as the note has a transcript, is 
 ## Cost limits
 
 ### Requirement: Heavy use is monitored, not capped
-The server SHALL add the measured length of each note that finishes (with a transcript or as "No speech detected") to its user's monthly tally and alert the operator once when a user passes 100 hours in a month (purchase.md). No upload SHALL be refused or held for usage; the operator's manual suspension is the only per-user stop (purchase.md). A note that fails for good adds nothing.
+The server SHALL add the measured length of each note that finishes (with a transcript or as "No speech detected") to its user's monthly tally and alert the operator once when a user passes the heavy-use threshold in a month (purchase.md). No upload SHALL be refused or held for usage; the operator's manual suspension is the only per-user stop (purchase.md). A note that fails for good adds nothing.
 
 #### Scenario: Crossing the line
-- GIVEN a purchase is 10 minutes under 100 hours this month
+- GIVEN a purchase is 10 minutes under the threshold this month
 - WHEN a 30-minute note is transcribed
 - THEN the operator is alerted once, and the next upload is accepted and transcribed as usual
 
@@ -247,7 +247,7 @@ The server SHALL alert the operator when:
 - an attempt finds Groq rejected Ramble's key, or the key is missing
 - any accepted note is still transcribing more than 30 minutes after it was accepted (checked every minute)
 - a note fails permanently, naming its result
-- a user passes 100 hours of audio in a month (Cost limits, above)
+- a user passes the heavy-use threshold in a month (Cost limits, above)
 - 20 or more requests failed with a server error (the relay could not handle them and answered 503) within the last 10 minutes (checked every minute). The server keeps only a count per minute, for an hour.
 
 Besides these, the server SHALL send no alert and no usage summary; the operator reads anything else from Cloudflare's logs and the database. A Groq 429 alone alerts nothing.

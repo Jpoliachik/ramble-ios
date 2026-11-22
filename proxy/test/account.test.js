@@ -161,7 +161,7 @@ describe('purchases', () => {
 });
 
 describe('revoking a purchase by hand', () => {
-  // The command in proxy/README.md "Operations".
+  // The command in docs/operations.md.
   const revoke = (otx) =>
     h.db.sqlite.exec(`UPDATE purchases SET revoked_at = CAST(strftime('%s', 'now') AS INTEGER) * 1000 WHERE id = 'unlock:${otx}'`);
 
