@@ -135,16 +135,18 @@ struct OnboardingConnectStep: View {
                     .foregroundStyle(Color.obInkFaint)
                     .monospacedDigit()
                 // "Copy message" and the countdown share a row when they fit,
-                // and stack on a narrow phone or at large text sizes.
+                // and stack on a narrow phone or at large text sizes. The
+                // button keeps the width of its longest label, so the layout
+                // doesn't jump when the label changes to "Copy again".
                 ViewThatFits(in: .horizontal) {
                     HStack {
                         meta.fixedSize()
                         Spacer(minLength: 8)
-                        copyButton(expired: expired).fixedSize()
+                        steadyCopyButton(expired: expired, alignment: .trailing).fixedSize()
                     }
                     VStack(alignment: .leading, spacing: 8) {
                         meta
-                        copyButton(expired: expired)
+                        steadyCopyButton(expired: expired, alignment: .leading)
                     }
                 }
             }
@@ -176,17 +178,28 @@ struct OnboardingConnectStep: View {
         chip.backgroundColor = Color.brandAmberSoft
         chip.link = URL(string: "\(Self.copyCodeScheme):code")
 
-        let icon = Text(Image(systemName: codeCopied ? "checkmark" : "doc.on.doc"))
-            .font(.system(size: 12, weight: .semibold))
+        guard codeCopied else { return Text("\(before)\(chip)\(after)") }
+        // Only a link can be tapped inside Text, and an SF Symbol can't be a
+        // link, so the chip has no copy icon. A check shows after a copy.
+        let check = Text(Image(systemName: "checkmark"))
+            .font(.system(size: 12, weight: .bold))
             .foregroundStyle(Color.codeChipText)
-
-        return Text("\(before)\(chip)\u{00A0}\(icon)\(after)")
+        return Text("\(before)\(chip)\u{00A0}\(check)\(after)")
     }
 
     private func metaText(remaining: Int, expired: Bool) -> String {
         if pairCode == nil { return isLoadingCode ? "Getting a code…" : " " }
         if expired { return "This code expired" }
         return "Works once · \(remaining / 60):\(String(format: "%02d", remaining % 60)) left"
+    }
+
+    private func steadyCopyButton(expired: Bool, alignment: Alignment) -> some View {
+        ZStack(alignment: alignment) {
+            Label("Copy message", systemImage: "doc.on.doc")
+                .modifier(CopyCapsule(prominent: false))
+                .hidden()
+            copyButton(expired: expired)
+        }
     }
 
     @ViewBuilder

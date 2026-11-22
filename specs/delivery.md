@@ -14,7 +14,7 @@ The iPhone SHALL make a pairing code only when its Connect screen opens, from on
 - THEN they see "No agent yet", "Notes stay on your iPhone until you connect one. It sets itself up from one message.", "Works with Muse, Grok Bot, ChatGPT and more" and a "Connect your agent" button, and no pairing code exists
 
 ### Requirement: One copy-paste message pairs the agent
-The Connect screen SHALL show three steps, "Copy this message", "Paste it to your agent" and "Wait for it to connect", and a message copied with one tap: "I downloaded Ramble, connect it. My pairing code is <code>. Instructions: https://ramble.watch/docs". The button under the message SHALL read "Copy message". Inside the message, the code SHALL show as an amber monospaced chip with a copy icon that copies only the code, for a connector's sign-in page, and step 2 SHALL add "Sign-in page? Tap the code to copy just that." under "Send it in any chat with your agent."
+The Connect screen SHALL show three steps, "Copy this message", "Paste it to your agent" and "Wait for it to connect", and a message copied with one tap: "I downloaded Ramble, connect it. My pairing code is <code>. Instructions: https://ramble.watch/docs". The button under the message SHALL read "Copy message". Inside the message, the code SHALL show as an amber monospaced chip that copies only the code when tapped, for a connector's sign-in page, and step 2 SHALL add "Sign-in page? Tap the code to copy just that." under "Send it in any chat with your agent."
 
 #### Scenario: Copying and pasting
 - GIVEN the Connect screen shows a live code
@@ -25,7 +25,7 @@ The Connect screen SHALL show three steps, "Copy this message", "Paste it to you
 #### Scenario: Copying just the code
 - GIVEN the Connect screen shows the live code K7QX-MP4D-2HNV
 - WHEN the person taps the code in the message
-- THEN only "K7QX-MP4D-2HNV" is on the clipboard, with a success haptic, the chip's icon turns to a check for 2 seconds, and step 2 is next
+- THEN only "K7QX-MP4D-2HNV" is on the clipboard, with a success haptic, a check shows beside the chip for 2 seconds, and step 2 is next
 
 ### Requirement: Codes work once and expire after 10 minutes
 A pairing code SHALL connect one agent and stay valid for 10 minutes after it is made, even if the Connect screen closes. The screen counts down ("Works once · 5:30 left"). Code length and format are in [relay-api.md](relay-api.md).
