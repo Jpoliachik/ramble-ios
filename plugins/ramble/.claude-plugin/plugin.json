@@ -1,0 +1,13 @@
+{
+  "name": "ramble",
+  "displayName": "Ramble",
+  "version": "1.0.0",
+  "description": "Voice notes from your Apple Watch or iPhone, transcribed and waiting for your agent. Adds the Ramble connector and a skill for handling each note once.",
+  "author": { "name": "Good Loop Software LLC", "url": "https://ramble.watch" },
+  "homepage": "https://ramble.watch",
+  "documentationUrl": "https://ramble.watch/docs",
+  "supportUrl": "https://ramble.watch/support",
+  "privacyPolicyUrl": "https://ramble.watch/privacy",
+  "termsOfServiceUrl": "https://ramble.watch/terms",
+  "keywords": ["voice notes", "apple watch", "transcription", "capture"]
+}
