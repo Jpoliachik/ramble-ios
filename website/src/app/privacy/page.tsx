@@ -246,7 +246,7 @@ export default function PrivacyPolicy() {
           <section>
             <h2 className={h2}>Contact</h2>
             <p className="mt-2">
-              Questions about this policy? Email{" "}
+              Ramble is made by Good Loop Software LLC. Questions about this policy? Email{" "}
               <a href={`mailto:${SUPPORT_EMAIL}`} className={link}>
                 {SUPPORT_EMAIL}
               </a>

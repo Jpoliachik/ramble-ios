@@ -8,6 +8,7 @@ import { authenticate } from './auth.js';
 import { handleEventsMethod } from './events.js';
 import { bearerValue, fail, iso, json, UUID_RE } from './http.js';
 import { resourceMetadataURL } from './oauth.js';
+import { stockReviewNotes } from './review.js';
 
 // 2025-03-26 is left out: it requires JSON-RPC batches, which later versions dropped.
 export const PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18'];
@@ -44,14 +45,14 @@ export const TOOLS = [
       },
       additionalProperties: false,
     },
-    annotations: { title: 'List new notes', readOnlyHint: true, openWorldHint: false },
+    annotations: { title: 'List new notes', readOnlyHint: true, destructiveHint: false, openWorldHint: false },
   },
   {
     name: 'get_note',
     title: 'Get note',
     description: `Returns one Ramble note's full transcript and details. Only notes not yet marked handled can be read. ${DATA_NOTE}`,
     inputSchema: ID_SCHEMA,
-    annotations: { title: 'Get note', readOnlyHint: true, openWorldHint: false },
+    annotations: { title: 'Get note', readOnlyHint: true, destructiveHint: false, openWorldHint: false },
   },
   {
     name: 'mark_handled',
@@ -59,7 +60,7 @@ export const TOOLS = [
     description:
       'Marks a Ramble note handled so it no longer appears in list_new_notes. Ramble then drops this connector’s copy of the transcript; the note stays in the person’s Ramble app. Marking a note twice is fine.',
     inputSchema: ID_SCHEMA,
-    annotations: { title: 'Mark note handled', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    annotations: { title: 'Mark note handled', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
   },
 ];
 
@@ -135,6 +136,7 @@ export async function mcp(request, ctx) {
 async function callTool(connection, name, args, ctx) {
   // Any tool call is a check-in, like a pull: the app shows it.
   await ctx.db.prepare(`UPDATE connections SET last_pull_at = ?, via = 'mcp' WHERE id = ?`).bind(ctx.now, connection.id).run();
+  await stockReviewNotes(ctx, connection);
   switch (name) {
     case 'list_new_notes':
       return listNewNotes(connection, args, ctx);

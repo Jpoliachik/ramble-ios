@@ -31,6 +31,7 @@ import { purgeSubscriptions } from './events.js';
 import { DOCS_URL, fail, gone, json, rateLimited, unavailable } from './http.js';
 import { legacyOpen, legacyTranscribe } from './legacy.js';
 import { mcp } from './mcp.js';
+import { DOMAIN_TOKEN_PATHS, domainToken } from './review.js';
 import { BODY_TIMEOUT_MS, INLINE_WAIT_MS, ackNotes, getNote, listNotes, purgeNotes, sweep, sweepCopies, uploadNote } from './notes.js';
 import {
   authorizationServerMetadata,
@@ -143,6 +144,8 @@ const ROUTES = [
   ['/token', { POST: token }],
   ['/mcp', { POST: mcp }],
   ['/mcp/', { POST: mcp }],
+  // Directory listings' domain checks (specs/connector.md "Directory listings")
+  ...DOMAIN_TOKEN_PATHS.map((path) => [path, { GET: domainToken }]),
 ];
 
 const NO_DB = new Set([
@@ -151,6 +154,7 @@ const NO_DB = new Set([
   '/.well-known/oauth-protected-resource',
   '/.well-known/oauth-protected-resource/mcp',
   '/.well-known/oauth-authorization-server',
+  ...DOMAIN_TOKEN_PATHS,
 ]);
 
 function route(pathname) {

@@ -353,6 +353,7 @@ describe('MCP', () => {
     assert.deepEqual(tools.map((t) => t.name), ['list_new_notes', 'get_note', 'mark_handled']);
     assert.equal(tools[0].annotations.readOnlyHint, true);
     assert.equal(tools[2].annotations.readOnlyHint, false);
+    assert.deepEqual(tools.map((t) => t.annotations.destructiveHint), [false, false, true]);
   });
 
   it('lists new notes newest first, reads one, marks it handled', async () => {
@@ -699,5 +700,74 @@ describe('events: long gaps and many chats', () => {
     const urls = h.rows('SELECT url FROM event_subscriptions').map((r) => r.url);
     assert.equal(urls.length, 10);
     assert.ok(!urls.includes('https://chatgpt.example/0'));
+  });
+});
+
+describe('review inbox', () => {
+  const REVIEW_CODE = 'REVIEW-ABCD-EFGH-JKMN';
+
+  async function reviewSignIn(code = REVIEW_CODE) {
+    const clientId = await registerClient();
+    const params = await authParams(clientId);
+    const res = await send('POST', '/authorize', { form: { ...params, pairing_code: code } });
+    if (res.status !== 302) return { res };
+    const authCode = new URL(res.headers.get('Location')).searchParams.get('code');
+    const tok = await send('POST', '/token', {
+      form: { grant_type: 'authorization_code', code: authCode, redirect_uri: REDIRECT, client_id: clientId, code_verifier: VERIFIER },
+    });
+    assert.equal(tok.status, 200, tok.text);
+    return { token: JSON.parse(tok.text).access_token };
+  }
+
+  it('is off until REVIEW_CODE is set', async () => {
+    const { res } = await reviewSignIn();
+    assert.equal(res.status, 400);
+  });
+
+  it('signs in any number of times, only to sample notes, and restocks', async () => {
+    h.envExtra = { REVIEW_CODE };
+    const secret = await h.inbox();
+    await say(secret, 1, 'a real note');
+    const a = await reviewSignIn('review abcd efgh jkmn');
+    const b = await reviewSignIn();
+    const listA = (await tool(a.token, 'list_new_notes')).structuredContent;
+    assert.equal(listA.notes.length, 5);
+    assert.match(listA.notes[0].transcript_preview, /dentist/);
+    assert.ok(!JSON.stringify(listA).includes('a real note'));
+    // Marking every note handled on one connection leaves the other alone, then restocks.
+    for (const n of listA.notes) assert.equal((await tool(a.token, 'mark_handled', { id: n.id })).structuredContent.handled, true);
+    assert.equal((await tool(b.token, 'list_new_notes')).structuredContent.notes.length, 5);
+    assert.equal((await tool(a.token, 'list_new_notes')).structuredContent.notes.length, 5);
+    const note = (await tool(a.token, 'get_note', { id: listA.notes[0].id })).structuredContent;
+    assert.match(note.transcript, /dentist/);
+  });
+
+  it('drops the oldest reviewer instead of filling up', async () => {
+    h.envExtra = { REVIEW_CODE };
+    const first = await reviewSignIn();
+    for (let i = 0; i < 10; i++) {
+      h.now = T0 + (i + 1) * MINUTE;
+      await reviewSignIn();
+    }
+    assert.equal(h.rows(`SELECT COUNT(*) AS n FROM connections WHERE inbox_id = 'review'`)[0].n, 10);
+    assert.equal((await rpc(first.token, 'ping')).status, 401);
+  });
+
+  it('ignores a review code that is too short', async () => {
+    h.envExtra = { REVIEW_CODE: 'short' };
+    const { res } = await reviewSignIn('short');
+    assert.equal(res.status, 400);
+  });
+});
+
+describe('directory domain checks', () => {
+  it('serves each token as plain text, 404 when unset', async () => {
+    assert.equal((await send('GET', '/.well-known/openai-apps-challenge')).status, 404);
+    h.envExtra = { OPENAI_APPS_CHALLENGE: 'tok-openai\n', GOOGLE_CONNECTED_APPS_TOKEN: 'tok-google' };
+    const openai = await send('GET', '/.well-known/openai-apps-challenge');
+    assert.equal(openai.status, 200);
+    assert.equal(openai.text, 'tok-openai');
+    assert.match(openai.headers.get('Content-Type'), /^text\/plain/);
+    assert.equal((await send('GET', '/.well-known/google-connected-apps')).text, 'tok-google');
   });
 });
