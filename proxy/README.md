@@ -169,11 +169,12 @@ npx wrangler d1 execute ramble-relay --remote --command "UPDATE purchases SET in
 `server.json` is the connector's entry in the official MCP Registry (`watch.ramble/ramble`). Directories such as Glama and mcptry read it from there. To change it, bump `version` (the registry refuses a version it has seen), then publish from this folder on Justin's Mac, where the signing key lives:
 
 ```bash
-mcp-publisher login dns --domain ramble.watch --private-key <hex key from ~/.mcp-registry/ramble-key.pem>
+/opt/homebrew/opt/openssl@3/bin/openssl pkey -in ~/.mcp-registry/ramble-key.pem -outform DER | tail -c 32 | xxd -p -c 64 | tr -d '\n' | mcp-publisher login dns --domain ramble.watch --private-key-file /dev/stdin
 mcp-publisher publish
+mcp-publisher logout
 ```
 
-The key is Ed25519; `mcp-publisher login dns --help` shows the format it takes. Login proves the domain with the `v=MCPv1` TXT record on `ramble.watch`, so that record must stay.
+The key is Ed25519; the tool takes its raw 32 bytes as hex, so the first line converts the PEM without printing it. Login proves the domain with the `v=MCPv1` TXT record on `ramble.watch`, so that record must stay.
 
 ## App Attest Implementation Notes
 
