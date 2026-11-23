@@ -131,8 +131,9 @@ describe('sign-in', () => {
     assert.equal(res.headers.get('X-Frame-Options'), 'DENY');
     assert.match(res.text, /<h1>Connect Claude<\/h1>/);
     assert.match(res.text, /from claude\.ai/);
-    // Chromium applies form-action to the redirect after the submit.
-    assert.match(res.headers.get('Content-Security-Policy'), /form-action 'self' https:\/\/claude\.ai;/);
+    // Chromium applies form-action to every redirect after the submit, and
+    // callbacks can hop hosts (chatgpt.com → platform.openai.com).
+    assert.match(res.headers.get('Content-Security-Policy'), /form-action 'self' https:;/);
   });
 
   it('always shows where the browser goes next, for any agent', async () => {

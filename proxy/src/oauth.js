@@ -353,8 +353,10 @@ function signInPage(params, client, error, typed = '') {
   const hidden = AUTH_FIELDS.map((k) => `<input type="hidden" name="${k}" value="${escape(params[k])}">`).join('');
   // Any MCP client can register any name, so the page always shows where the
   // browser goes next (the redirect host) under it.
-  // Chromium checks form-action on the redirect after the submit too, so the
-  // connector's origin must be allowed or the browser never goes back.
+  // Chromium checks form-action on every redirect after the submit too, and
+  // some connectors' callbacks hop on to another host (ChatGPT's goes from
+  // chatgpt.com to platform.openai.com), so any https: origin is allowed or
+  // the browser silently never goes back.
   return page(
     error ? 400 : 200,
     `<h1>Connect ${name || 'your agent'}</h1>
@@ -366,7 +368,7 @@ function signInPage(params, client, error, typed = '') {
   <button type="submit">Connect</button>
 </form>
 <p class="fine">${name || 'It'} can read your new notes. Disconnect anytime in Ramble.</p>`,
-    `'self' ${back.origin}`,
+    `'self' https:`,
   );
 }
 
