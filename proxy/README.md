@@ -51,10 +51,9 @@ Secrets (`npx wrangler secret put NAME`):
 | `TELEGRAM_CHAT_ID` | The chat the bot sends alerts to (the operator's own chat with the bot). Unset: nothing is sent |
 | `HEAVY_USE_HOURS` | Hours of transcribed audio in a UTC month after which the operator gets one heavy-use alert per user. Internal; kept as a secret so the figure isn't published. Nothing is ever refused. Unset: no heavy-use alert |
 | `REVIEW_CODE` | The connector's review code for directory reviewers: signs in only to the sample-note review inbox (`specs/connector.md` "Review inbox"). Make one with `openssl rand -hex 12` and give it only to directory review forms. Unset or under 16 characters: off |
-| `OPENAI_APPS_CHALLENGE` | Token from the OpenAI plugin dashboard, served at `/.well-known/openai-apps-challenge`. Unset: 404 |
 | `GOOGLE_CONNECTED_APPS_TOKEN` | Token from Google Connected Console, served at `/.well-known/google-connected-apps`. Unset: 404 |
 
-Vars (`[vars]`): `RETENTION_SECONDS`, `APPLE_BUNDLE_ID`, `UNLOCK_PRODUCT_ID`, `PREMIUM_PRODUCT_ID`, `RELAY_BASE_URL`, `MUSE_CHALLENGE` (Muse's domain check token, served at `/.well-known/muse-challenge/<token>`), and one set at release: `FIRST_FREE_BUILD` (build number of the first free-notes build). Without it no paid download counts as an early buyer (old subscribers still do). Old builds' paths (`POST /transcribe`, text `POST /inbox`) answer 410 from 2027-01-07 00:00 UTC, a date fixed in `src/legacy.js`, not a var.
+Vars (`[vars]`): `RETENTION_SECONDS`, `APPLE_BUNDLE_ID`, `UNLOCK_PRODUCT_ID`, `PREMIUM_PRODUCT_ID`, `RELAY_BASE_URL`, `MUSE_CHALLENGE` (Muse's domain check token, served at `/.well-known/muse-challenge/<token>`), `OPENAI_APPS_CHALLENGE` (OpenAI's domain check token, served at `/.well-known/openai-apps-challenge`; unset: 404), and one set at release: `FIRST_FREE_BUILD` (build number of the first free-notes build). Without it no paid download counts as an early buyer (old subscribers still do). Old builds' paths (`POST /transcribe`, text `POST /inbox`) answer 410 from 2027-01-07 00:00 UTC, a date fixed in `src/legacy.js`, not a var.
 
 Production has no developer bypass: never set `ENVIRONMENT` or `DEV_BYPASS_KEY` on the deployed Worker (see Local Development). `DEV_BYPASS_TOKEN`, `ANALYTICS_TOKEN`, `DEEPGRAM_API_KEY` and `OPENAI_API_KEY` are no longer read and can be deleted.
 

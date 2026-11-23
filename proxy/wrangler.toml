@@ -22,6 +22,8 @@ FIRST_FREE_BUILD = "17"
 RELAY_BASE_URL = "https://ramble-transcription-proxy.jpoliachik.workers.dev"
 # Muse's domain check token (public: it is in the URL Muse fetches).
 MUSE_CHALLENGE = "34617cd4966f39fb682de86e1270c728218a393ab84e583f773050694b60772c"
+# OpenAI's domain check token (public: served at /.well-known/openai-apps-challenge).
+OPENAI_APPS_CHALLENGE = "-AR1IUO3vqGnPwdH5M9H_1l5x1qP5k8vr3ry2Y7ZU6M"
 
 # KV namespace for App Attest state (challenges, attested device keys).
 [[kv_namespaces]]
