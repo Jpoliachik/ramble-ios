@@ -1,0 +1,26 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "watch.ramble/ramble",
+  "description": "Voice notes from Apple Watch and iPhone, ready for your agent to read and mark handled.",
+  "title": "Ramble",
+  "version": "1.0.1",
+  "websiteUrl": "https://ramble.watch/docs",
+  "repository": {
+    "url": "https://github.com/Jpoliachik/ramble-ios",
+    "source": "github",
+    "subfolder": "proxy"
+  },
+  "icons": [
+    {
+      "src": "https://ramble.watch/icon-512.png",
+      "mimeType": "image/png",
+      "sizes": ["512x512"]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://api.ramble.watch/mcp"
+    }
+  ]
+}

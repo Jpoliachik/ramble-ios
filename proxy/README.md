@@ -164,6 +164,17 @@ npx wrangler d1 execute ramble-relay --remote --command "SELECT p.id, p.inbox_ca
 npx wrangler d1 execute ramble-relay --remote --command "UPDATE purchases SET inbox_cap = 15 WHERE id = 'unlock:2000000123456789'"
 ```
 
+## Operations: the MCP Registry entry
+
+`server.json` is the connector's entry in the official MCP Registry (`watch.ramble/ramble`). Directories such as Glama and mcptry read it from there. To change it, bump `version` (the registry refuses a version it has seen), then publish from this folder on Justin's Mac, where the signing key lives:
+
+```bash
+mcp-publisher login dns --domain ramble.watch --private-key <hex key from ~/.mcp-registry/ramble-key.pem>
+mcp-publisher publish
+```
+
+The key is Ed25519; `mcp-publisher login dns --help` shows the format it takes. Login proves the domain with the `v=MCPv1` TXT record on `ramble.watch`, so that record must stay.
+
 ## App Attest Implementation Notes
 
 The proxy implements Apple's [App Attest](https://developer.apple.com/documentation/devicecheck/establishing-your-app-s-integrity) server-side verification entirely in hand-rolled JavaScript using only the Web Crypto API. This section documents why and the gotchas we hit along the way.
