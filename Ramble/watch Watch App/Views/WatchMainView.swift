@@ -130,6 +130,14 @@ struct WatchMainView: View {
         .onChange(of: recordingManager.stopCount) { _, _ in
             flashCheck()
         }
+        // The complication's tap. It only ever starts: a recording already
+        // running keeps going, and Home shows its timer.
+        .onOpenURL { url in
+            guard url.scheme == "ramble", url.host == "record" else { return }
+            path = []
+            guard !recordingManager.isRecording else { return }
+            Task { await toggleRecording() }
+        }
         .onReceive(clock) { date in
             now = date
         }

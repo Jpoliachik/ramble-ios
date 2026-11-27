@@ -408,6 +408,7 @@ Human-readable version: https://ramble.watch/docs/help
 
 - **The iPhone app installed, but the watch app didn't.** Check the watch's watchOS version first. Below 10.0, the App Store installs the iPhone app and silently skips the watch app; update the watch in Watch app → General → Software Update. If the version is fine: Watch app on the iPhone → Available Apps → Install next to Ramble. Turn on Watch app → App Store → Automatic App Install so it happens on its own next time.
 - **Ramble on the Action button.** Apple Watch Ultra with watchOS 26 or later: on the watch, Settings → Action Button → Ramble. Press once to start recording, again to stop. The same Ramble control can go in Control Center or the Smart Stack on any watch with watchOS 26. Don't use Shortcut: a shortcut from the Shortcuts app runs Ramble on the iPhone, not the watch.
+- **Ramble on the watch face.** Any supported watchOS: edit the watch face, tap a complication slot, choose Ramble (round, corner, wide or inline, and the Smart Stack). A tap opens Ramble and starts recording; stop with the button in Ramble.
 - **"Set up" on the watch.** The watch isn't connected to Ramble yet. Open Ramble on the iPhone once (tap Get started the first time). The watch connects on its own and waiting notes send. Until then they're safe on the watch.
 - **"No phone" on the watch.** Ramble isn't on the iPhone. Install it and open it once.
 - **"Mic off" on the watch.** On the watch: Settings → Privacy & Security → Microphone → turn on Ramble.

@@ -1,7 +1,7 @@
 # Watch
 
 ## Purpose
-What the person experiences on Apple Watch: recording a note, the home screen and its states, the short list of recent notes, and how the watch sends each note straight to Ramble's server and says when one is stuck. The watch works without the iPhone nearby; the iPhone holds the full history (phone.md).
+What the person experiences on Apple Watch: recording a note, the home screen and its states, the short list of recent notes, and how the watch sends each note straight to Ramble's server and says when one is stuck. The watch works without the iPhone nearby; the iPhone holds the full history (phone.md). Siri, the Ramble control and the complication are in [watch-shortcuts.md](watch-shortcuts.md).
 
 ## Home screen
 
@@ -280,21 +280,3 @@ Ramble on Apple Watch SHALL post no notifications and SHALL NOT ask for notifica
 - GIVEN the watch has been offline for 7 hours with notes not yet accepted
 - WHEN the person has not opened Ramble on the watch
 - THEN no notification appears, and the notes upload on their own once the watch is online
-
-## Siri and shortcuts
-
-### Requirement: Watch shortcuts
-The watch SHALL offer one action, "Ramble", that works like the record button: it starts recording when nothing is recording and stops and saves like the button when something is. Siri phrases "Ramble", "Toggle Ramble", "Start a Ramble", "Start recording with Ramble", "Stop my Ramble" and "Stop recording with Ramble" all run it. It SHALL bring Ramble to the front before it starts, so a recording started from Siri or the control keeps going and shows its timer. It SHALL be silent both ways, with the start or stop haptic telling which. A failed start SHALL play the failure haptic and say "Allow microphone in Settings." when the microphone is off, or "Couldn't start recording." otherwise.
-
-### Requirement: Ramble control
-On watchOS 26 and later, the watch app SHALL offer a "Ramble" control that runs the same action. A person can assign it to the Apple Watch Ultra Action button, or add it to Control Center or the Smart Stack. It runs on the watch, not the iPhone. Shortcuts built on the iPhone run the iPhone app's actions, so they are not a way to record on the watch.
-
-#### Scenario: Start from the Action button
-- GIVEN nothing is recording and the Action button is set to the Ramble control
-- WHEN the person presses the Action button
-- THEN Ramble opens and records, with the start haptic and no spoken reply, and keeps recording
-
-#### Scenario: Stop from the same action
-- GIVEN the watch is recording
-- WHEN the person presses the Action button again, or says "Stop my Ramble"
-- THEN the note is saved with the same check and haptic as a button stop, and nothing is spoken

@@ -113,6 +113,13 @@ export default function HelpDocs() {
                   watch, so it can&rsquo;t record on your wrist.
                 </p>
               </Question>
+              <Question id="complication" q="Put Ramble on your watch face">
+                <p>
+                  Touch and hold the watch face, tap Edit, swipe to the complications, tap a slot and choose Ramble. It
+                  fits round, corner, wide and inline slots, and the Smart Stack. Tap it to open Ramble and start
+                  recording. Tap the button in Ramble to stop.
+                </p>
+              </Question>
               <Question id="set-up" q="The watch shows “Set up”">
                 <p>
                   The watch isn&rsquo;t connected to Ramble yet. Open Ramble on your iPhone once, and tap Get started if

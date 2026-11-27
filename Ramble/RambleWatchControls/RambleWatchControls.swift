@@ -2,8 +2,9 @@
 //  RambleWatchControls.swift
 //  RambleWatchControls
 //
-//  The Ramble control for the watch (watchOS 26+): Action button on
-//  Apple Watch Ultra, Control Center and the Smart Stack.
+//  Ramble's watch face and Smart Stack pieces: the Ramble complication
+//  (watchOS 10+), and the Ramble control (watchOS 26+) for the Action
+//  button on Apple Watch Ultra, Control Center and the Smart Stack.
 //
 
 import AppIntents
@@ -13,10 +14,14 @@ import WidgetKit
 @main
 struct RambleWatchControlsBundle: WidgetBundle {
     var body: some Widget {
-        RambleRecordControl()
+        RambleRecordComplication()
+        if #available(watchOS 26.0, *) {
+            RambleRecordControl()
+        }
     }
 }
 
+@available(watchOS 26.0, *)
 struct RambleRecordControl: ControlWidget {
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(kind: "dev.goodloop.Ramble.watchkitapp.record") {
@@ -36,6 +41,7 @@ struct RambleRecordControl: ControlWidget {
 struct WatchToggleRecordingIntent: AppIntent {
     static var title: LocalizedStringResource = "Ramble"
     static var description: IntentDescription = "Start or stop a recording"
+    @available(watchOS 26.0, *)
     static var supportedModes: IntentModes { .foreground(.immediate) }
 
     func perform() async throws -> some IntentResult {
