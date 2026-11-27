@@ -92,7 +92,7 @@ The site is a static export (`output: "export"`) deployed on Vercel from the `we
 
 - **Ramble** — Main iOS app (SwiftUI)
 - **watch Watch App** — watchOS companion app
-- **RambleWatchControls** — widget extension embedded in the watch app: the "Ramble" control (Action button, Control Center, Smart Stack). watchOS 26+ only
+- **RambleWatchControls** — widget extension embedded in the watch app: the "Ramble" complication (watch faces, Smart Stack; taps open `ramble://record`) and, on watchOS 26+, the "Ramble" control (Action button, Control Center, Smart Stack)
 
 ### Source Layout
 
@@ -160,6 +160,6 @@ One provider and model for everyone: Groq Whisper v3 Turbo. There is no fallback
 ## Resolved Questions
 
 - **Transcript browsing UX for v1:** Just scroll the list. No search, no tags, no folders.
-- **Watch complication:** Not in v1.
+- **Watch complication:** One static "Ramble" complication that starts a recording. No status or counts on it.
 - **Pricing:** Free download, 25 notes free, then $14.99 once. No usage limit. Heavy use is monitored internally: one operator alert per user per month past an internal threshold, and a manual per-user suspend switch (`proxy/README.md` "Operations"). The threshold lives only in the `HEAVY_USE_HOURS` secret (relay and admin Workers). This repo is public, so never write the figure anywhere in it, and never show it to people. Early $4.99 buyers and active subscribers are unlocked (`specs/purchase.md`).
 - **Platform:** Apple only (iPhone + Apple Watch). No Android, no web.

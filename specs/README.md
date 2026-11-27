@@ -56,7 +56,8 @@ Group related requirements under `##` headings when a spec gets long. Keep the w
 
 | Spec | Covers |
 |---|---|
-| [watch.md](watch.md) | Recording on Apple Watch, the watch home screen and its states, history on the watch, uploading straight to the relay, no notifications, Siri and App Intents on the watch |
+| [watch.md](watch.md) | Recording on Apple Watch, the watch home screen and its states, history on the watch, uploading straight to the relay, no notifications |
+| [watch-shortcuts.md](watch-shortcuts.md) | Starting a recording on the watch without the home screen button: Siri and App Intents, the Ramble control, the Ramble complication |
 | [phone.md](phone.md) | Recording on iPhone, the notes list and note detail, playback, history merged from the watch and the server, onboarding, Settings, Siri and App Intents on the phone |
 | [ipad.md](ipad.md) | How the iPhone app differs on iPad: the device's name in copy, no watch setup, readable width |
 | [transcription.md](transcription.md) | What happens to uploaded audio on the server: the provider (Groq), formatting options, recording length cap, failures, audio deletion, cost controls, usage monitoring |

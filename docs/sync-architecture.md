@@ -93,7 +93,8 @@ relay's clock. Exact table: `specs/relay-api.md`.
   the system's discretion [K2]. Budget is "approximately four tasks per hour
   for each app with a complication on the active watch face" [K3]; apps with
   a complication or in the Dock get priority and time is "not guaranteed"
-  [K4]. Ramble has no complication, so expect fewer.
+  [K4]. Ramble has a complication, so a person who keeps it on the active
+  face gets this budget; without it, expect fewer.
 - We ask every 15 minutes while notes are waiting or transcribing. A pass
   retries uploads, reads transcripts, and reads the account when notes are
   held. Ramble posts no notifications on either device.
