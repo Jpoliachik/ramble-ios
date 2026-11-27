@@ -48,13 +48,11 @@ nonisolated struct RambleComplicationProvider: TimelineProvider {
     }
 }
 
-/// The extension has no asset catalog, so the brand colors live here.
+/// The extension has no asset catalog, so the brand color lives here.
 /// Values from docs/design.md (dark appearance, as on the watch).
 private extension Color {
     /// brand-amber, #F59E0B
     static let rambleAmber = Color(red: 0xF5 / 255, green: 0x9E / 255, blue: 0x0B / 255)
-    /// brand-amber-soft, #33230A
-    static let rambleAmberSoft = Color(red: 0x33 / 255, green: 0x23 / 255, blue: 0x0A / 255)
 }
 
 struct RambleComplicationView: View {
@@ -63,7 +61,8 @@ struct RambleComplicationView: View {
     var body: some View {
         content
             .widgetURL(RambleLink.record)
-            .containerBackground(for: .widget) { Color.rambleAmberSoft }
+            // Black, as on the watch, so amber stays the one accent in the Smart Stack
+            .containerBackground(for: .widget) { Color.black }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Record with Ramble")
     }
